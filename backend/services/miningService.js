@@ -33,7 +33,8 @@ export async function mineSingleDocument({
     sourceLang,
     targetLang,
     domain = null,
-    project = null
+    project = null,
+    miningBatchId = null
 }) {
     console.log(`[Mining] Starting single doc mining: ${fileName}`);
 
@@ -100,7 +101,8 @@ export async function mineSingleDocument({
         metadata: {
             sourceFile: fileName,
             context: term.evidenceSentence || ''
-        }
+        },
+        miningBatchId
     }));
 
     // 7. Handle conflicts and insert
@@ -125,7 +127,8 @@ export async function mineSingleDocument({
         termsConflict: insertResults.conflicts.length,
         insertedIds: insertResults.inserted.map(t => t.termId),
         conflicts: insertResults.conflicts,
-        terms: enrichedTerms
+        terms: enrichedTerms,
+        miningBatchId
     };
 }
 
@@ -147,7 +150,8 @@ export async function mineParallelDocuments({
     sourceLang,
     targetLang,
     domain = null,
-    project = null
+    project = null,
+    miningBatchId = null
 }) {
     console.log(`[Mining] Starting parallel doc mining: ${sourceFileName} + ${targetFileName}`);
 
@@ -230,7 +234,8 @@ export async function mineParallelDocuments({
         metadata: {
             sourceFile: sourceFileName,
             context: term.evidenceSource || ''
-        }
+        },
+        miningBatchId
     }));
 
     // 8. Handle conflicts and insert
@@ -252,7 +257,8 @@ export async function mineParallelDocuments({
             ...term,
             _id: insertResults.inserted.find(t => t.source === term.source)?.termId,
             verificationStatus: 'unverified'
-        }))
+        })),
+        miningBatchId
     };
 }
 

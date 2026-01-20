@@ -1,6 +1,6 @@
 import multer from "multer";
 import axios from "axios";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 import path from "path";
 import {
     uploadFileToBlob,
@@ -9,7 +9,8 @@ import {
     listBlobsInContainer,
     downloadBlobByName,
     deleteBlob,
-    extractCleanFileName
+    extractCleanFileName,
+    checkBlobExists
 } from "../../AISystemUtils/system-translate/azureBlobHelper.js";
 import { BlobSASPermissions, ContainerSASPermissions } from "@azure/storage-blob";
 import fs from 'fs';
@@ -19,6 +20,7 @@ import { countDocumentCharacters, calculateTranslationCost } from "../../AISyste
 import { logTranslationCost } from "../../AISystemUtils/system-translate/translationCostLogger.js";
 import { getGlossaryUrl } from "../glossaries/glossaryController.js";
 import { GlossaryTerm } from "../MongoDB/dbConnectionController.js";
+import { buildTSV } from "../../services/variationEngine.js";
 
 // Create temp directory if it doesn't exist
 const tempUploadDir = path.join(process.cwd(), 'temp', 'uploads');
@@ -123,53 +125,71 @@ const sanitizeBlobName = (filename) => {
  * @param {string} domain - Optional domain filter (e.g., 'Legal', 'Engineering')
  * @returns {Promise<{glossaryUrl: string, blobName: string, termCount: number} | null>}
  */
+/**
+ * Generate Just-in-Time Glossary from MongoDB
+ * Features:
+ * 1. Queries Verified terms only
+ * 2. Caches result based on hash (lang + domain + updateTime)
+ * 3. Expands variants using Variation Engine
+ * @returns {Promise<{glossaryUrl: string, blobName: string, termCount: number} | null>}
+ */
 const generateJustInTimeGlossary = async (sourceLang, targetLang, domain = null) => {
     try {
-        console.log(`Generating Just-in-Time Glossary: ${sourceLang} -> ${targetLang}${domain ? ` (${domain})` : ''}`);
+        console.log(`Generating JIT Glossary for ${sourceLang}->${targetLang} (${domain || 'General'})`);
 
-        // Query MongoDB for matching terms
+        // 1. Build Query (Verified only)
         const query = {
             sourceLang: sourceLang.toLowerCase(),
-            targetLang: targetLang.toLowerCase()
+            targetLang: targetLang.toLowerCase(),
+            verificationStatus: 'verified'
         };
+        if (domain) query.domain = domain;
 
-        if (domain && domain !== 'General') {
-            query.domain = domain;
-        }
-
-        const terms = await GlossaryTerm.find(query)
-            .select('source target')
-            .limit(5000) // Azure has limits
-            .lean();
-
-        if (!terms || terms.length === 0) {
-            console.log("No glossary terms found in database. Proceeding without glossary.");
+        // 2. Check Database Stats for Hashing
+        const count = await GlossaryTerm.countDocuments(query);
+        if (count === 0) {
+            console.log("No verified terms found. JIT skipped.");
             return null;
         }
 
-        console.log(`Found ${terms.length} glossary terms in database.`);
+        const lastTerm = await GlossaryTerm.findOne(query).sort({ updatedAt: -1 }).select('updatedAt');
+        const lastUpdate = lastTerm ? new Date(lastTerm.updatedAt).getTime() : Date.now();
 
-        // Generate TSV content (no header, Azure format)
-        const tsvContent = terms.map(t => `${t.source}\t${t.target}`).join('\n');
-
-        // Create temp file
-        const tempDir = path.join(process.cwd(), 'temp', 'glossaries');
-        if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
-        }
-
-        const tempFileName = `temp_${sourceLang}_${targetLang}_${Date.now()}.tsv`;
-        const tempFilePath = path.join(tempDir, tempFileName);
-        const tsvBuffer = Buffer.from(tsvContent, 'utf-8');
-        fs.writeFileSync(tempFilePath, tsvBuffer);
-
-        // Upload to Azure Blob Storage (glossaries container)
+        // 3. Compute Hash
+        const hashStr = `${sourceLang}_${targetLang}_${domain || 'all'}_${count}_${lastUpdate}`;
+        const hash = createHash('md5').update(hashStr).digest('hex');
+        const blobName = `jit/glossary_${hash}.tsv`;
         const glossaryContainer = process.env.AZURE_STORAGE_GLOSSARY_CONTAINER || "glossaries";
-        const blobName = `temp/${tempFileName}`;
 
         const storageAccountName = process.env.AZURE_STORAGE_ACCOUNT_NAME || "sophystorage";
         const storageAccountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
 
+        // 4. Check Cache
+        const exists = await checkBlobExists(glossaryContainer, blobName, storageAccountName, storageAccountKey);
+
+        if (exists) {
+            console.log(`Cache Hit! Reusing JIT glossary: ${blobName}`);
+            const glossaryUrl = await getBlobSASUrl(
+                glossaryContainer,
+                blobName,
+                storageAccountName,
+                storageAccountKey,
+                BlobSASPermissions.parse("r"),
+                24 // 24 hours expiry for cached items
+            );
+            return { glossaryUrl, blobName, termCount: count, cached: true };
+        }
+
+        // 5. Cache Miss - Generate
+        console.log(`Cache Miss. Generating new JIT glossary: ${blobName}`);
+
+        const terms = await GlossaryTerm.find(query).select('source target sourceLang').limit(5000).lean();
+
+        // 6. Build TSV with Variation Engine
+        const tsvContent = buildTSV(terms);
+        const tsvBuffer = Buffer.from(tsvContent, 'utf-8');
+
+        // 7. Upload
         await uploadFileToBlob(
             tsvBuffer,
             blobName,
@@ -178,31 +198,23 @@ const generateJustInTimeGlossary = async (sourceLang, targetLang, domain = null)
             storageAccountKey
         );
 
-        console.log(`Uploaded Just-in-Time glossary: ${blobName} (${terms.length} terms)`);
-
-        // Generate SAS URL
-        const glossaryUrl = getBlobSASUrl(
+        // 8. Return SAS
+        const glossaryUrl = await getBlobSASUrl(
             glossaryContainer,
             blobName,
             storageAccountName,
             storageAccountKey,
             BlobSASPermissions.parse("r"),
-            1 // 1 hour expiry
+            24
         );
 
-        // Cleanup temp file
-        fs.unlink(tempFilePath, (err) => {
-            if (err) console.warn(`Failed to cleanup temp glossary file: ${err.message}`);
-        });
+        console.log(`Uploaded JIT glossary with variations: ${blobName} (${tsvContent.split('\n').length} lines)`);
 
-        return {
-            glossaryUrl,
-            blobName,
-            termCount: terms.length
-        };
+        return { glossaryUrl, blobName, termCount: count, cached: false };
 
     } catch (error) {
-        console.error("Just-in-Time Glossary Error:", error.message);
+        console.error("Just-in-Time Glossary Error:", error); // Log full error object
+        console.error("Stack:", error.stack);
         return null;
     }
 };

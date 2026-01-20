@@ -18,7 +18,7 @@ export default function TranslationEditor({
     const [project, setProject] = useState(sourceFile?.originalName || sourceFile?.name || "OnlineEditor");
     const [learning, setLearning] = useState(false);
     const [learnResult, setLearnResult] = useState(null);
-    const [domain, setDomain] = useState(initialDomain || "General");
+    const [domain, setDomain] = useState(initialDomain || "Garment Industry");
 
     // Fetch alignment when component mounts
     useEffect(() => {
@@ -173,6 +173,7 @@ export default function TranslationEditor({
                                 onChange={(e) => setDomain(e.target.value)}
                                 className="text-xs bg-transparent border-none p-0 text-blue-600 dark:text-blue-400 font-medium focus:ring-0 cursor-pointer"
                             >
+                                <option value="Garment Industry">Garment Industry</option>
                                 <option value="General">General</option>
                                 <option value="Legal">Legal</option>
                                 <option value="Engineering">Engineering</option>

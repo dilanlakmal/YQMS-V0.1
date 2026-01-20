@@ -29,7 +29,7 @@ const glossaryTermSchema = new mongoose.Schema({
     },
     domain: {
         type: String,
-        default: "General",
+        default: "Garment Industry",
         trim: true,
         index: true
     },
@@ -64,9 +64,19 @@ const glossaryTermSchema = new mongoose.Schema({
         max: 1,
         default: 0
     },
+    originalConfidenceScore: {
+        type: Number,
+        min: 0,
+        max: 1,
+        default: null
+    },
     metadata: {
         sourceFile: String,
         context: String
+    },
+    miningBatchId: {
+        type: String,
+        index: true
     }
 }, {
     timestamps: true // Provides createdAt and updatedAt

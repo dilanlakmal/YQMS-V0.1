@@ -102,7 +102,7 @@ const FilterPanel = ({ filters, onChange, domains }) => {
 };
 
 // Main component
-const MiningResultsPage = ({ currentUser = { name: 'Expert', role: 2 } }) => {
+const MiningResultsPage = ({ currentUser = { name: 'Expert', role: 2 }, initialBatchId = null }) => {
     // State
     const [terms, setTerms] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -112,16 +112,18 @@ const MiningResultsPage = ({ currentUser = { name: 'Expert', role: 2 } }) => {
         domain: '',
         project: '',
         verificationStatus: 'unverified',
-        search: ''
+        search: '',
+        creator: '',
+        miningBatchId: initialBatchId || ''
     });
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 });
     const [editingTerms, setEditingTerms] = useState({}); // {termId: {source, target, domain}}
     const [message, setMessage] = useState(null);
     const [isAdding, setIsAdding] = useState(false);
-    const [newTerm, setNewTerm] = useState({ source: '', target: '', domain: 'General' });
+    const [newTerm, setNewTerm] = useState({ source: '', target: '', domain: 'Garment Industry' });
 
-    const domains = ['Legal', 'Medical', 'Engineering', 'Building', 'Finance', 'IT', 'General'];
+    const domains = ['Garment Industry', 'Legal', 'Medical', 'Engineering', 'Building', 'Finance', 'IT', 'General'];
 
     // Fetch terms
     const fetchTerms = useCallback(async () => {
@@ -353,6 +355,48 @@ const MiningResultsPage = ({ currentUser = { name: 'Expert', role: 2 } }) => {
             {message && (
                 <div className={`message-toast ${message.type}`}>
                     {message.text}
+                </div>
+            )}
+
+            {/* Source Type Tabs */}
+            <div style={{ display: 'flex', gap: '20px', marginBottom: '16px', borderBottom: '1px solid #e5e7eb', paddingBottom: '0px' }}>
+                {[
+                    { id: '', label: 'All Results' },
+                    { id: 'single', label: 'Single File' },
+                    { id: 'parallel', label: 'Parallel Files' },
+                    { id: 'manual', label: 'Manual Input' }
+                ].map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setFilters({ ...filters, creator: tab.id })}
+                        style={{
+                            padding: '8px 12px',
+                            background: 'none',
+                            border: 'none',
+                            borderBottom: filters.creator === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
+                            color: filters.creator === tab.id ? '#3b82f6' : '#6b7280',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            fontSize: '14px'
+                        }}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* Batch Filter Indicator */}
+            {filters.miningBatchId && (
+                <div style={{ backgroundColor: '#eff6ff', padding: '8px 12px', borderRadius: '4px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #bfdbfe' }}>
+                    <span style={{ fontSize: '13px', color: '#1e40af', fontWeight: 500 }}>
+                        📍 Showing terms from extraction batch: <strong>{filters.miningBatchId}</strong>
+                    </span>
+                    <button
+                        onClick={() => setFilters({ ...filters, miningBatchId: '' })}
+                        style={{ fontSize: '12px', color: '#1e40af', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer' }}
+                    >
+                        Show all batches
+                    </button>
                 </div>
             )}
 

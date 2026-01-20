@@ -131,6 +131,7 @@ import createHumidityModel from "../../models/huminity/HumidityReport.js";
 
 //Glossary Term Model
 import createGlossaryTermModel from "../../models/GlossaryTerm.js";
+import createMiningHistoryModel from "../../models/MiningHistory.js";
 
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
@@ -315,6 +316,7 @@ export const HumidityReport = createHumidityModel(ymProdConnection);
 
 //Glossary Term Exported Model
 export const GlossaryTerm = createGlossaryTermModel(ymProdConnection);
+export const MiningHistory = createMiningHistoryModel(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

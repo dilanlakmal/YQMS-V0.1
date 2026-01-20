@@ -1,6 +1,6 @@
-import { 
-  BlobServiceClient, 
-  StorageSharedKeyCredential, 
+import {
+  BlobServiceClient,
+  StorageSharedKeyCredential,
   generateBlobSASQueryParameters,
   BlobSASPermissions,
   ContainerSASPermissions
@@ -17,7 +17,7 @@ export const uploadFileToBlob = async (fileBuffer, fileName, containerName, stor
   );
 
   const containerClient = blobServiceClient.getContainerClient(containerName);
-  
+
   // Create container if it doesn't exist
   await containerClient.createIfNotExists();
 
@@ -40,7 +40,7 @@ export const generateContainerSAS = async (containerName, storageAccountName, st
   );
 
   const containerClient = blobServiceClient.getContainerClient(containerName);
-  
+
   // Ensure container exists
   await containerClient.createIfNotExists();
 
@@ -126,7 +126,7 @@ export const listBlobsInContainer = async (containerName, storageAccountName, st
 
     const containerClient = blobServiceClient.getContainerClient(containerName);
     const blobs = [];
-    
+
     for await (const blob of containerClient.listBlobsFlat()) {
       blobs.push({
         name: blob.name,
@@ -221,15 +221,15 @@ export const readBlobContent = async (containerName, blobName, storageAccountNam
 
     const containerClient = blobServiceClient.getContainerClient(containerName);
     const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-    
+
     // Download blob content
     const downloadResponse = await blockBlobClient.download(0);
     const chunks = [];
-    
+
     for await (const chunk of downloadResponse.readableStreamBody) {
       chunks.push(chunk);
     }
-    
+
     // Combine chunks into single buffer
     const buffer = Buffer.concat(chunks);
     return buffer;
@@ -257,12 +257,12 @@ export const updateBlobContent = async (containerName, blobName, newBuffer, stor
     );
 
     const containerClient = blobServiceClient.getContainerClient(containerName);
-    
+
     // Create container if it doesn't exist
     await containerClient.createIfNotExists();
-    
+
     const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-    
+
     // Upload (overwrite) the new content
     await blockBlobClient.upload(newBuffer, newBuffer.length, {
       blobHTTPHeaders: { blobContentType: 'application/octet-stream' }
@@ -272,5 +272,24 @@ export const updateBlobContent = async (containerName, blobName, newBuffer, stor
   } catch (error) {
     console.error(`Error updating blob ${blobName}:`, error);
     throw new Error(`Failed to update blob: ${error.message}`);
+  }
+};
+
+/**
+ * Check if a blob exists in the container
+ */
+export const checkBlobExists = async (containerName, blobName, storageAccountName, storageAccountKey) => {
+  try {
+    const sharedKeyCredential = new StorageSharedKeyCredential(storageAccountName, storageAccountKey);
+    const blobServiceClient = new BlobServiceClient(
+      `https://${storageAccountName}.blob.core.windows.net`,
+      sharedKeyCredential
+    );
+    const containerClient = blobServiceClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+    return await blockBlobClient.exists();
+  } catch (error) {
+    console.error(`Error checking blob existence ${blobName}:`, error);
+    return false;
   }
 };

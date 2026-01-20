@@ -14,6 +14,7 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 const DOMAINS = [
     { value: "", label: "Auto Detect" },
+    { value: "Garment Industry", label: "Garment Industry" },
     { value: "Legal", label: "Legal" },
     { value: "Medical", label: "Medical" },
     { value: "Engineering", label: "Engineering" },
@@ -96,7 +97,7 @@ export default function MiningUpload({ onMiningComplete }) {
     const [targetLanguage, setTargetLanguage] = useState("km");
 
     // Domain
-    const [domain, setDomain] = useState("");
+    const [domain, setDomain] = useState("Garment Industry");
 
     // Files - separate state for each mode to prevent confusion
     const [singleFile, setSingleFile] = useState(null);

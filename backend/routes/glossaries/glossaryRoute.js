@@ -29,26 +29,17 @@ import {
   bulkVerifyTerms,
   mineSingleDoc,
   mineParallelDocs,
-  generateTSV
+  generateTSV,
+  getMiningHistory,
+  deleteMiningHistory,
+  getMiningSourceSAS
 } from "../../controller/glossaries/termController.js";
 import { ROLES, requireRole } from "../../middleware/rbac.js";
 
 const router = express.Router();
 
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      const tempDir = path.join(process.cwd(), 'temp', 'glossaries');
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
-      }
-      cb(null, tempDir);
-    },
-    filename: (req, file, cb) => {
-      const uniqueName = `${randomUUID()}-${Date.now()}-${file.originalname}`;
-      cb(null, uniqueName);
-    }
-  }),
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 50 * 1024 * 1024 // 50MB max for mining files
   },
@@ -66,7 +57,7 @@ const upload = multer({
 // ========== LEGACY GLOSSARY ROUTES (FILE-BASED) ==========
 
 // POST /api/glossaries/upload - Upload glossary file
-router.post("/api/glossaries/upload", upload.single('glossaryFile'), uploadGlossary);
+// router.post("/api/glossaries/upload", upload.single('glossaryFile'), uploadGlossary);
 
 // GET /api/glossaries/list - List all glossaries
 router.get("/api/glossaries/list", listGlossaries);
@@ -139,5 +130,15 @@ router.post("/api/glossary/terms/bulk-verify", requireRole(ROLES.USER), bulkVeri
 // === TSV Generation Endpoint ===
 // GET /api/glossary/generate-tsv - Generate TSV from verified terms
 router.get("/api/glossary/generate-tsv", generateTSV);
+
+// === History Endpoints ===
+// GET /api/glossary/history - List extraction history
+router.get("/api/glossary/history", getMiningHistory);
+
+// DELETE /api/glossary/history/:batchId - Delete history entry
+router.delete("/api/glossary/history/:batchId", deleteMiningHistory);
+
+// GET /api/glossary/history/:batchId/source - Get SAS URL for source doc
+router.get("/api/glossary/history/:batchId/source", getMiningSourceSAS);
 
 export default router;

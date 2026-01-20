@@ -1,305 +1,257 @@
 import React, { useState, useEffect } from "react";
+import { FileText, Files, User, RefreshCw, Trash2, Download, ExternalLink } from "lucide-react";
 import { API_BASE_URL } from "../../../../config";
-import GlossaryEditor from "./GlossaryEditor";
 
-export default function GlossaryList({ onDeleteSuccess }) {
-  const [glossaries, setGlossaries] = useState([]);
+export default function GlossaryList({ onReviewBatch }) {
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [filterLangPair, setFilterLangPair] = useState("all");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedGlossary, setSelectedGlossary] = useState(null);
 
   useEffect(() => {
-    loadGlossaries();
+    loadHistory();
   }, []);
 
-  const loadGlossaries = async () => {
+  const loadHistory = async () => {
     setLoading(true);
     setError("");
-
     try {
-      const response = await fetch(`${API_BASE_URL}/api/glossaries/list`);
+      const response = await fetch(`${API_BASE_URL}/api/glossary/history`);
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setGlossaries(data.glossaries || []);
+        setHistory(data.history || []);
       } else {
-        setError(data.error || "Failed to load glossaries");
-        setGlossaries([]);
+        setError(data.error || "Failed to load extraction history");
       }
     } catch (err) {
-      console.error("Error loading glossaries:", err);
-      setError("Failed to load glossaries");
-      setGlossaries([]);
+      console.error("Error loading history:", err);
+      setError("Failed to connect to server");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (blobName) => {
-    if (!confirm(`Are you sure you want to delete this glossary?`)) {
+  const handleDelete = async (batchId) => {
+    if (!confirm(`Are you sure you want to delete this extraction history? Terms extracted in this batch will be preserved but unlinked.`)) {
       return;
     }
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/glossaries/delete?blobName=${encodeURIComponent(blobName)}`,
+        `${API_BASE_URL}/api/glossary/history/${batchId}`,
         { method: "DELETE" }
       );
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        loadGlossaries();
-        if (onDeleteSuccess) {
-          onDeleteSuccess();
-        }
+        loadHistory();
       } else {
-        alert(data.error || "Failed to delete glossary");
+        alert(data.error || "Failed to delete history entry");
       }
     } catch (err) {
       console.error("Delete error:", err);
-      alert("Failed to delete glossary");
+      alert("Failed to delete history entry");
     }
   };
 
-  const handleDownload = async (blobName, fileName) => {
+  const handleDownloadTSV = async (item) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/glossaries/${encodeURIComponent(blobName)}/download`);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Download failed" }));
-        alert(errorData.error || "Failed to download glossary");
-        return;
-      }
+      const params = new URLSearchParams({
+        sourceLang: item.sourceLang,
+        targetLang: item.targetLang,
+        domain: item.domain || 'General'
+      });
 
-      // Get the blob from response
-      const blob = await response.blob();
-      
-      // Create a temporary URL and trigger download
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName || blobName;
-      document.body.appendChild(link);
-      link.click();
-      
-      // Clean up
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      const response = await fetch(`${API_BASE_URL}/api/glossary/generate-tsv?${params}`);
+      const data = await response.json();
+
+      if (data.success && data.sasUrl) {
+        window.open(data.sasUrl, '_blank');
+      } else {
+        alert(data.message || "No verified terms found to generate TSV.");
+      }
     } catch (err) {
       console.error("Download error:", err);
-      alert("Failed to download glossary. Please try again.");
+      alert("Failed to generate TSV");
     }
   };
 
-  const formatFileSize = (bytes) => {
-    if (!bytes) return "0 B";
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + " KB";
-    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
-  };
-
-  const formatDate = (dateString) => {
+  const handleDownloadSource = async (batchId, type = 'source') => {
     try {
-      return new Date(dateString).toLocaleString();
-    } catch {
-      return dateString;
+      const response = await fetch(`${API_BASE_URL}/api/glossary/history/${batchId}/source?type=${type}`);
+      const data = await response.json();
+
+      if (data.success && data.sasUrl) {
+        window.open(data.sasUrl, '_blank');
+      } else {
+        alert(data.error || "Failed to get download link");
+      }
+    } catch (err) {
+      console.error("Download source error:", err);
+      alert("Failed to connect to server");
     }
   };
 
-  // Get unique language pairs for filter
-  const languagePairs = [
-    "all",
-    ...new Set(glossaries.map((g) => g.languagePair)),
-  ];
-
-  // Filter glossaries
-  const filteredGlossaries = glossaries.filter((glossary) => {
-    const matchesLangPair =
-      filterLangPair === "all" || glossary.languagePair === filterLangPair;
-    const matchesSearch =
-      !searchTerm ||
-      glossary.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      glossary.languagePair.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesLangPair && matchesSearch;
-  });
-
-  const handleViewEdit = (blobName) => {
-    setSelectedGlossary(blobName);
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case 'parallel': return <Files size={18} className="text-purple-500" />;
+      case 'manual': return <User size={18} className="text-gray-500" />;
+      default: return <FileText size={18} className="text-blue-500" />;
+    }
   };
 
-  const handleBack = () => {
-    setSelectedGlossary(null);
-    loadGlossaries(); // Refresh list when returning
+  const getTypeText = (type) => {
+    switch (type) {
+      case 'parallel': return 'PARALLEL DOCS';
+      case 'manual': return 'MANUAL ENTRY';
+      default: return 'SINGLE DOC';
+    }
   };
 
-  const handleUpdateSuccess = () => {
-    loadGlossaries(); // Refresh list after update
-  };
-
-  if (selectedGlossary) {
+  if (loading && history.length === 0) {
     return (
-      <GlossaryEditor
-        blobName={selectedGlossary}
-        onBack={handleBack}
-        onUpdateSuccess={handleUpdateSuccess}
-      />
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="text-center py-8 translator-muted-foreground">
-        Loading glossaries...
+      <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+        <RefreshCw className="animate-spin mb-4" size={32} />
+        <p>Loading extraction history...</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="text-sm font-semibold translator-text-foreground">
-            Filter by Language Pair
-          </label>
-          <select
-            value={filterLangPair}
-            onChange={(e) => setFilterLangPair(e.target.value)}
-            className="w-full translator-rounded translator-border translator-input px-3 py-2 text-sm"
-          >
-            {languagePairs.map((pair) => (
-              <option key={pair} value={pair}>
-                {pair === "all" ? "All Language Pairs" : pair.toUpperCase()}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-semibold translator-text-foreground">
-            Search
-          </label>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by name or language pair..."
-            className="w-full translator-rounded translator-border translator-input px-3 py-2 text-sm"
-          />
-        </div>
-      </div>
-
-      {/* Refresh button */}
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold text-gray-800 dark:text-white">Extraction History</h2>
         <button
-          onClick={loadGlossaries}
-          disabled={loading}
-          className="text-sm translator-primary-text hover:opacity-80 flex items-center gap-2"
+          onClick={loadHistory}
+          className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
         >
-          <svg
-            className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-          Refresh
+          <RefreshCw size={14} /> Refresh
         </button>
       </div>
 
       {error && (
-        <div className="translator-rounded translator-border translator-destructive-bg-light p-3 text-sm translator-destructive">
-          <p className="font-medium">Error</p>
-          <p className="text-xs mt-1">{error}</p>
+        <div className="p-4 bg-red-50 text-red-700 rounded-lg border border-red-100 text-sm">
+          {error}
         </div>
       )}
 
-      {/* Glossary List */}
-      {filteredGlossaries.length === 0 ? (
-        <div className="text-center py-8 translator-muted-foreground">
-          {glossaries.length === 0
-            ? "No glossaries found. Upload your first glossary to get started."
-            : "No glossaries match your filters."}
-        </div>
-      ) : (
-        <div className="space-y-2 max-h-96 overflow-y-auto">
-          {filteredGlossaries.map((glossary) => (
-            <div
-              key={glossary.blobName}
-              className="flex items-center justify-between translator-rounded translator-card translator-border p-3 hover:translator-muted"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3">
-                  <span className="inline-flex items-center justify-center w-10 h-10 translator-rounded font-bold text-xs bg-blue-100 text-blue-700">
-                    {glossary.format.toUpperCase()}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm translator-text-foreground truncate font-medium">
-                      {glossary.fileName}
-                    </p>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs translator-muted-foreground">
-                        {glossary.sourceLanguage.toUpperCase()} →{" "}
-                        {glossary.targetLanguage.toUpperCase()}
-                      </span>
-                      <span className="text-xs translator-muted-foreground">
-                        {formatFileSize(glossary.size)}
-                      </span>
-                      <span className="text-xs translator-muted-foreground">
-                        {formatDate(glossary.lastModified)}
-                      </span>
+      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-800">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-900">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Source Resource</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Lang / Domain</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Extracted Stats</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            {history.length === 0 ? (
+              <tr>
+                <td colSpan="4" className="px-6 py-12 text-center text-gray-500">
+                  No extraction history found. Start mining documents to see results here!
+                </td>
+              </tr>
+            ) : (
+              history.map((item) => (
+                <tr key={item.batchId} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                        {getTypeIcon(item.miningType)}
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-xs">{item.sourceResource}</div>
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">{getTypeText(item.miningType)}</div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleViewEdit(glossary.blobName);
-                  }}
-                  className="text-xs font-medium translator-primary-text translator-rounded px-3 py-1.5 hover:opacity-80"
-                >
-                  View/Edit/Add
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDownload(glossary.blobName, glossary.fileName);
-                  }}
-                  className="text-xs font-medium translator-primary-text translator-rounded px-3 py-1.5 hover:opacity-80"
-                >
-                  Download
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(glossary.blobName);
-                  }}
-                  className="text-xs font-medium translator-destructive translator-rounded px-3 py-1.5 hover:translator-destructive-bg-light"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex flex-col">
+                      <div className="text-xs font-bold text-blue-600 uppercase mb-1">
+                        {item.sourceLang} → {item.targetLang}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {item.domain || 'General'}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex flex-col w-40">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{item.termCount} <span className="font-normal text-xs">terms</span></span>
+                        <span className={`text-[10px] font-bold ${item.percentVerified === 100 ? 'text-green-600' : 'text-amber-600'}`}>
+                          {item.percentVerified}% Verified
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full transition-all duration-500 ${item.percentVerified === 100 ? 'bg-green-500' : 'bg-green-400 opacity-80'}`}
+                          style={{ width: `${item.percentVerified}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-3 mb-1">
+                        <button
+                          onClick={() => onReviewBatch(item.batchId)}
+                          className="text-xs font-bold text-blue-600 hover:text-blue-800"
+                        >
+                          Review Terms
+                        </button>
+                        <button
+                          onClick={() => handleDownloadTSV(item)}
+                          className="text-xs font-bold text-gray-400 hover:text-gray-600 flex items-center gap-1"
+                        >
+                          Download TSV
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.batchId)}
+                          className="text-xs font-bold text-red-500 hover:text-red-700"
+                        >
+                          Delete
+                        </button>
+                        {(item.sourceUrl || item.targetUrl) && (
+                          <div className="flex gap-2 mt-1">
+                            {item.sourceUrl && (
+                              <button
+                                onClick={() => handleDownloadSource(item.batchId, 'source')}
+                                className="text-[10px] font-medium text-gray-500 hover:text-blue-600 flex items-center gap-1"
+                              >
+                                <Download size={10} /> Source Doc
+                              </button>
+                            )}
+                            {item.targetUrl && (
+                              <button
+                                onClick={() => handleDownloadSource(item.batchId, 'target')}
+                                className="text-[10px] font-medium text-gray-500 hover:text-blue-600 flex items-center gap-1"
+                              >
+                                <Download size={10} /> Target Doc
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-gray-400 flex items-center gap-1">
+                        Last update: {new Date(item.updatedAt).toLocaleString()}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
-      {/* Summary */}
-      {glossaries.length > 0 && (
-        <div className="text-sm translator-muted-foreground text-center">
-          Showing {filteredGlossaries.length} of {glossaries.length} glossaries
-        </div>
+      {history.length > 0 && (
+        <p className="text-right text-xs text-gray-400 px-2 italic">
+          Showing {history.length} extraction sources
+        </p>
       )}
     </div>
   );
 }
-

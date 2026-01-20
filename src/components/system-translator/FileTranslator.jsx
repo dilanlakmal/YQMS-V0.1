@@ -41,7 +41,7 @@ export default function FileTranslator() {
   const [estimatedCost, setEstimatedCost] = useState(null);
   const [countingCharacters, setCountingCharacters] = useState(false);
   const [selectedGlossary, setSelectedGlossary] = useState(null);
-  const [domain, setDomain] = useState("General");
+  const [domain, setDomain] = useState("Garment Industry");
 
   // Load files from blob storage
   const loadBlobFiles = async () => {
@@ -737,15 +737,15 @@ export default function FileTranslator() {
             </div>
           </div>
 
-          {/* Glossary Selection */}
-          <div className="space-y-2">
+          {/* Glossary Selection (Commented out in favor of JIT Glossary) */}
+          {/* <div className="space-y-2">
             <GlossarySelector
               sourceLanguage={sourceLanguage}
               targetLanguage={targetLanguage}
               value={selectedGlossary}
               onChange={setSelectedGlossary}
             />
-          </div>
+          </div> */}
 
           {/* Domain Selection */}
           <div className="flex items-center gap-4 mb-4 p-4 translator-card translator-rounded bg-white/50 dark:bg-gray-900/50">
@@ -760,7 +760,8 @@ export default function FileTranslator() {
               onChange={(e) => setDomain(e.target.value)}
               className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none flex-1 max-w-xs transition-shadow shadow-sm"
             >
-              <option value="General">General (Default)</option>
+              <option value="Garment Industry">Garment Industry (Default)</option>
+              <option value="General">General</option>
               <option value="Legal">Legal</option>
               <option value="Engineering">Engineering</option>
               <option value="Building">Building</option>
