@@ -75,6 +75,8 @@ import YPivotQAReportPPSheetSection from "./YPivotQAReportPPSheetSection";
 import YPivotQAReportMeasurementManualDisplay from "./YPivotQAReportMeasurementManualDisplay";
 import YPivotQAInspectionManualDefectDisplay from "./YPivotQAInspectionManualDefectDisplay";
 
+import OrderShippingStageBreakdownTable from "./OrderShippingStageBreakdownTable";
+
 import YPivotQAReportDecisionModal from "./YPivotQAReportDecisionModal";
 
 import YPivotQAReportPDFGenerator from "./YPivotQAReportPDFGenerator";
@@ -581,7 +583,7 @@ const ColorSizeBreakdownTable = ({ data, orderNo }) => {
                       className="w-2.5 h-2.5 rounded-full border border-gray-300 dark:border-gray-600"
                       style={{ backgroundColor: row.colorCode || "#ccc" }}
                     />
-                    <span className="truncate max-w-[100px] text-[11px]">
+                    <span className="text-[11px] whitespace-nowrap">
                       {row.color}
                     </span>
                   </div>
@@ -872,6 +874,7 @@ const YPivotQAReportFullView = () => {
   });
   const [sizeList, setSizeList] = useState([]);
   const [activeValidColors, setActiveValidColors] = useState([]);
+  const [shippingBreakdown, setShippingBreakdown] = useState(null);
 
   // UI States
   const [previewImage, setPreviewImage] = useState(null);
@@ -1164,6 +1167,30 @@ const YPivotQAReportFullView = () => {
   }, [report?.measurementData]);
 
   const savedMeasurements = processedMeasurementData.savedMeasurements;
+
+  // EFFECT: Fetch Shipping Breakdown if Shipping Stage exists
+  useEffect(() => {
+    const fetchShippingData = async () => {
+      // Logic: If we have a reportId AND the config says there is a shipping stage
+      if (reportId && config?.shippingStage) {
+        try {
+          const res = await axios.get(
+            `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}/shipping-stage-breakdown`
+          );
+          if (res.data.success) {
+            setShippingBreakdown(res.data.data);
+          }
+        } catch (err) {
+          console.error("Failed to load shipping breakdown", err);
+        }
+      }
+    };
+
+    // Ensure config is loaded before checking
+    if (config?.shippingStage) {
+      fetchShippingData();
+    }
+  }, [reportId, config?.shippingStage]);
 
   // =========================================================================
   // NEW: Process Measurement Data by Stage (Before / After)
@@ -1607,6 +1634,7 @@ const YPivotQAReportFullView = () => {
             <YPivotQAReportPDFGenerator
               report={report}
               orderData={orderData}
+              shippingBreakdown={shippingBreakdown}
               inspectorInfo={inspectorInfo}
               definitions={definitions}
               headerData={headerData}
@@ -2455,6 +2483,14 @@ const YPivotQAReportFullView = () => {
                       </div>
                     </div>
                   )}
+
+                {/* --- Shipping Stage Breakdown Table --- */}
+                {config?.shippingStage && shippingBreakdown && (
+                  <OrderShippingStageBreakdownTable
+                    shippingData={shippingBreakdown}
+                    orderNos={selectedOrders}
+                  />
+                )}
 
                 {/* 3. SKU Details Tables (Full Width, Below Breakdown) */}
                 {orderData.orderBreakdowns &&

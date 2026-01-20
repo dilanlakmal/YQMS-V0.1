@@ -17,7 +17,8 @@ import {
   getLeaderDecision,
   submitLeaderDecision,
   getQANotifications,
-  getActionRequiredCount
+  getActionRequiredCount,
+  getShippingStageBreakdown
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Report_Controller.js";
 
 const router = express.Router();
@@ -98,5 +99,11 @@ router.get("/api/fincheck-reports/notifications", getQANotifications);
 
 // route (after getQANotifications route)
 router.get("/api/fincheck-reports/action-count", getActionRequiredCount);
+
+// ROUTE: Shipping Stage Breakdown
+router.get(
+  "/api/fincheck-inspection/report/:reportId/shipping-stage-breakdown",
+  getShippingStageBreakdown
+);
 
 export default router;

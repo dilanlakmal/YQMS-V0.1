@@ -975,9 +975,88 @@ const SKUDetailsTable = ({ skuData }) => {
   );
 };
 
-const OrderInfoSection = ({ orderData, selectedOrders, remarks }) => {
+// =============================================================================
+// SHIPPING STAGE SUMMARY (New Helper)
+// =============================================================================
+const ShippingStageSummary = ({ data }) => {
+  if (!data || !data.columnTotals || !data.seqColumns) return null;
+
+  const { seqColumns, columnTotals } = data;
+
+  // 1. Prepare Data: Create objects like { label: "D1", value: "48,000" }
+  const items = seqColumns.map((seq) => ({
+    label: `D${seq}`,
+    value: columnTotals[seq]?.toLocaleString() || "0"
+  }));
+
+  // 2. Chunk Data: Group into arrays of 4 for grid layout
+  const rows = [];
+  for (let i = 0; i < items.length; i += 4) {
+    rows.push(items.slice(i, i + 4));
+  }
+
+  return (
+    <View
+      style={{
+        marginTop: 6,
+        padding: 6,
+        backgroundColor: "#FFF7ED", // Light Orange bg
+        borderWidth: 1,
+        borderColor: "#FDBA74", // Orange border
+        borderRadius: 4
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 6,
+          fontFamily: "Helvetica-Bold",
+          color: "#C2410C", // Dark Orange
+          marginBottom: 4,
+          textTransform: "uppercase"
+        }}
+      >
+        Shipping Qty Breakdown
+      </Text>
+
+      {rows.map((row, rowIndex) => (
+        <View
+          key={rowIndex}
+          style={{
+            flexDirection: "row",
+            marginBottom: rowIndex === rows.length - 1 ? 0 : 2
+          }}
+        >
+          {row.map((item, colIndex) => (
+            <Text
+              key={colIndex}
+              style={{
+                fontSize: 7,
+                width: "25%", // 4 items per line = 25% width each
+                color: colors.gray[700]
+              }}
+            >
+              {item.label}:{" "}
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>{item.value}</Text>
+            </Text>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+};
+
+const OrderInfoSection = ({
+  orderData,
+  selectedOrders,
+  inspectionDetails,
+  shippingBreakdown
+}) => {
   const dtOrder = orderData?.dtOrder || {};
   const yorksys = orderData?.yorksysOrder || {};
+
+  const remarks = inspectionDetails?.remarks;
+  const cartonQty = inspectionDetails?.cartonQty;
+  const shippingStage = inspectionDetails?.shippingStage;
 
   // Extract SKU Data (Collect from Yorksys if available)
   // Logic mirrors web: either direct `yorksysOrder.skuData` or from breakdown array
@@ -1091,7 +1170,14 @@ const OrderInfoSection = ({ orderData, selectedOrders, remarks }) => {
           </View>
 
           {/* Row 6 (Full Width) */}
-          <View style={[rowStyle, { borderBottomWidth: remarks ? 1 : 0 }]}>
+          <View
+            style={[
+              rowStyle,
+              {
+                borderBottomWidth: cartonQty || shippingStage || remarks ? 1 : 0
+              }
+            ]}
+          >
             <View style={{ width: "100%" }}>
               <DataItem
                 label="Fabric Content"
@@ -1102,7 +1188,34 @@ const OrderInfoSection = ({ orderData, selectedOrders, remarks }) => {
             </View>
           </View>
 
-          {/* --- Row 7: REMARKS SECTION --- */}
+          {/* --- ROW 7: Carton Qty & Shipping Stage --- */}
+          {(cartonQty || shippingStage) && (
+            <View style={[rowStyle, { borderBottomWidth: remarks ? 1 : 0 }]}>
+              {/* If Carton Qty exists, it takes the first slot (Left) */}
+              {cartonQty ? (
+                <>
+                  <View style={colStyle}>
+                    <DataItem label="Carton Qty" value={cartonQty} />
+                  </View>
+                  {/* Shipping Stage takes second slot (Right) if it also exists */}
+                  <View style={colStyle}>
+                    {shippingStage && (
+                      <DataItem label="Shipping Stage" value={shippingStage} />
+                    )}
+                  </View>
+                </>
+              ) : (
+                /* If Carton Qty is missing, Shipping Stage takes the first slot (Left) */
+                <View style={colStyle}>
+                  {shippingStage && (
+                    <DataItem label="Shipping Stage" value={shippingStage} />
+                  )}
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* --- Row 8: REMARKS SECTION --- */}
           {remarks && (
             <View style={{ marginTop: 6 }}>
               {/* Reusing existing 'remarkBox' styles for consistent Amber look */}
@@ -1113,6 +1226,11 @@ const OrderInfoSection = ({ orderData, selectedOrders, remarks }) => {
                 </Text>
               </View>
             </View>
+          )}
+          {/* ---SHIPPING STAGE SUMMARY --- */}
+          {/* Display only if shippingStage exists AND we have breakdown data */}
+          {shippingStage && shippingBreakdown && (
+            <ShippingStageSummary data={shippingBreakdown} />
           )}
         </View>
 
@@ -2063,6 +2181,8 @@ const PhotoDocumentationSection = ({ photoData }) => {
 // =============================================================================
 const YPivotQAReportPDFDocument = ({
   reportData,
+  inspectionDetails,
+  shippingBreakdown,
   orderData,
   inspectorInfo,
   definitions,
@@ -2113,7 +2233,9 @@ const YPivotQAReportPDFDocument = ({
         <OrderInfoSection
           orderData={orderData}
           selectedOrders={selectedOrders}
-          remarks={reportData?.inspectionDetails?.remarks}
+          //remarks={reportData?.inspectionDetails?.remarks}
+          inspectionDetails={inspectionDetails || reportData?.inspectionDetails}
+          shippingBreakdown={shippingBreakdown}
         />
       </Page>
 

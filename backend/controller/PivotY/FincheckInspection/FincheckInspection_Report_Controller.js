@@ -1421,3 +1421,130 @@ export const getActionRequiredCount = async (req, res) => {
     return res.status(200).json({ success: true, count: 0 });
   }
 };
+
+// ============================================================
+// Get Order Qty Breakdown in Shipping Stage
+// ============================================================
+
+export const getShippingStageBreakdown = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    // 1. Fetch Report to get Order Nos
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    }).select("orderNos");
+
+    if (!report || !report.orderNos || report.orderNos.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: "No orders linked to report"
+      });
+    }
+
+    // 2. Fetch all related DtOrders
+    // We use $in to get all matching orders (e.g., PTCOC335, PTCOC335A)
+    const orders = await DtOrder.find({
+      Order_No: { $in: report.orderNos }
+    })
+      .select("OrderColorShip")
+      .lean();
+
+    if (!orders || orders.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: "No order details found"
+      });
+    }
+
+    // 3. Aggregate Data
+    // Structure: { "ColorName": { "SeqNo": TotalQty } }
+    const colorMap = {};
+    const allSeqNos = new Set();
+
+    orders.forEach((order) => {
+      if (order.OrderColorShip && Array.isArray(order.OrderColorShip)) {
+        order.OrderColorShip.forEach((colorItem) => {
+          const colorName = colorItem.Color;
+          if (!colorName) return;
+
+          if (!colorMap[colorName]) {
+            colorMap[colorName] = {};
+          }
+
+          if (colorItem.ShipSeqNo && Array.isArray(colorItem.ShipSeqNo)) {
+            colorItem.ShipSeqNo.forEach((shipSeq) => {
+              const seqNo = shipSeq.seqNo;
+              allSeqNos.add(seqNo);
+
+              // Calculate total qty for this sequence (Sum of all sizes)
+              let seqQty = 0;
+              if (shipSeq.sizes && Array.isArray(shipSeq.sizes)) {
+                shipSeq.sizes.forEach((sizeObj) => {
+                  // Iterate values in the object (e.g., {XS: 100})
+                  Object.values(sizeObj).forEach((val) => {
+                    seqQty += Number(val) || 0;
+                  });
+                });
+              }
+
+              // Add to existing count (handling multiple orders with same color/seq)
+              colorMap[colorName][seqNo] =
+                (colorMap[colorName][seqNo] || 0) + seqQty;
+            });
+          }
+        });
+      }
+    });
+
+    // 4. Transform for Frontend
+    const sortedSeqNos = Array.from(allSeqNos).sort((a, b) => a - b);
+
+    // Prepare Rows
+    const rows = Object.keys(colorMap).map((color) => {
+      const seqData = colorMap[color];
+      let rowTotal = 0;
+
+      const rowSeqValues = {};
+      sortedSeqNos.forEach((seq) => {
+        const val = seqData[seq] || 0;
+        rowSeqValues[seq] = val;
+        rowTotal += val;
+      });
+
+      return {
+        color: color,
+        seqValues: rowSeqValues,
+        rowTotal: rowTotal
+      };
+    });
+
+    // Prepare Column Totals
+    const columnTotals = {};
+    let grandTotal = 0;
+
+    sortedSeqNos.forEach((seq) => {
+      let colSum = 0;
+      rows.forEach((row) => {
+        colSum += row.seqValues[seq];
+      });
+      columnTotals[seq] = colSum;
+      grandTotal += colSum;
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        seqColumns: sortedSeqNos,
+        rows: rows.sort((a, b) => a.color.localeCompare(b.color)),
+        columnTotals,
+        grandTotal
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching shipping stage breakdown:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
