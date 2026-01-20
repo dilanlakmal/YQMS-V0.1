@@ -248,6 +248,7 @@ import FincheckInspection_Approval from "./routes/PivotY/FincheckInspection/Finc
 import p88Upload from "./routes/PivotY/P88Data/uploadP88DataRoutes.js";
 import p88Summarydata from "./routes/PivotY/P88Data/summaryP88DataRoutes.js";
 import downloadP88Report from "./routes/PivotY/P88Data/downloadP88ReportRoutes.js";
+import p88failedReports from "./routes/PivotY/P88Data/p88failedReportsRoutes.js";
 
 /* -----------------------------
   After Ironing Import
@@ -564,6 +565,7 @@ app.use(FincheckInspection_Approval);
 app.use(p88Upload);
 app.use(p88Summarydata);
 app.use(downloadP88Report);
+app.use(p88failedReports);
 
 /* -----------------------------
 AI Routes

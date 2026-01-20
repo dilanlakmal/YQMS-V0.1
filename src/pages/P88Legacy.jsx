@@ -5,12 +5,14 @@ import {
   User,
   BarChart3,
   Upload,
-  Printer
+  Printer,
+  Octagon
 } from "lucide-react";
 import { useAuth } from "../components/authentication/AuthContext";
 import UploadP88Data from "../components/inspection/PivotY/P88Legacy/uploadP88Data";
 import SummaryP88Data from "../components/inspection/PivotY/P88Legacy/summaryP88DataTable";
 import PrintP88Report from "../components/inspection/PivotY/P88Legacy/printP88Report";
+import FailedReportsTable from "../components/inspection/PivotY/P88Legacy/FailedReportsTable";
 
 const P88Legacy = () => {
   const { user } = useAuth();
@@ -46,12 +48,19 @@ const P88Legacy = () => {
         id: "print_original_report",
         label: "Print Report",
         icon: <Printer size={20} />,
-        // Remove dataVersion prop to prevent refresh triggers
         component: <PrintP88Report />,
         description: "Print Report"
+      },
+       {
+        id: "failed_reports",
+        label: "Manual Report",
+        icon: <Octagon size={20} />,
+        // Remove dataVersion prop to prevent refresh triggers
+        component: <FailedReportsTable />,
+        description: "Download Error Report"
       }
     ],
-    [handleDataUploadSuccess] // Add dependency to prevent unnecessary re-renders
+    [handleDataUploadSuccess]
   );
 
   const activeComponent = useMemo(() => {
