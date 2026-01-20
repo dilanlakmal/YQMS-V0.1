@@ -1082,11 +1082,11 @@ const handleSave = async (status = 'draft') => {
                     <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 overflow-hidden">
                       <DrawingCanvas
                         ref={canvasRef}
-                        backgroundImage={mainSketchImage}
+                        // Pass the image URL or base64 here
+                        backgroundImage={mainSketchImage || originalImage} 
                         onSave={handleCanvasSave}
-                        width={900}
-                        height={550}
-                        className="w-full h-full"
+                        viewMode={viewMode}
+                        initialCanvasData={canvasData} // Pass the saved JSON objects here
                       />
                     </div>
                   </div>
@@ -1409,6 +1409,15 @@ const handleSave = async (status = 'draft') => {
           </div>
         )}
       </div>
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleMainImageUpload}
+        accept="image/*"
+        className="hidden"
+        style={{ display: 'none' }}
+      />
     </div>
   );
 };
