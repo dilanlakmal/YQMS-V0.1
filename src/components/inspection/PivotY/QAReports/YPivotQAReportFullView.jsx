@@ -1563,21 +1563,28 @@ const YPivotQAReportFullView = () => {
             {/* --- DECISION BUTTON --- */}
             {isApprover && (
               <button
-                onClick={() => setShowDecisionModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-800/40 hover:bg-indigo-900/40 text-white rounded-xl font-bold border border-indigo-400/30 transition-colors"
+                // Only allow click if status is 'completed'
+                onClick={() => {
+                  if (report.status === "completed") {
+                    setShowDecisionModal(true);
+                  }
+                }}
+                disabled={report.status !== "completed"}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold border transition-colors ${
+                  report.status === "completed"
+                    ? "bg-indigo-800/40 hover:bg-indigo-900/40 text-white border-indigo-400/30 cursor-pointer"
+                    : "bg-gray-400/20 text-gray-400 border-gray-500/20 cursor-not-allowed"
+                }`}
+                title={
+                  report.status !== "completed"
+                    ? "Report must be completed by QA first"
+                    : "Make Leader Decision"
+                }
               >
                 <Gavel className="w-4 h-4" />
                 <span className="hidden sm:inline">Decision</span>
               </button>
             )}
-
-            {/* <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-indigo-600 rounded-xl font-bold shadow-lg hover:bg-gray-50 transition-colors"
-            >
-              <Printer className="w-4 h-4" />
-              <span className="hidden sm:inline">Print</span>
-            </button> */}
 
             {/* New PDF Generator Button */}
             <YPivotQAReportPDFGenerator
