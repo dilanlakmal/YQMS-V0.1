@@ -316,10 +316,10 @@ const YPivotQAReport = () => {
       </div>
 
       {/* --- CONTENT AREA --- */}
-      <div className="flex-1 overflow-hidden pt-[90px] lg:pt-[70px] flex flex-col">
-        <div className="relative max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 pb-4 h-full flex flex-col min-h-0">
+      <div className="flex-1 overflow-hidden pt-[90px] lg:pt-[70px] flex flex-col w-full max-w-full">
+        <div className="relative w-full max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 pb-4 h-full flex flex-col min-h-0">
           {/* Render Active Component */}
-          <div className="h-full animate-fadeIn">
+          <div className="h-full w-full max-w-full animate-fadeIn flex flex-col min-h-0">
             {tabs.find((tab) => tab.id === activeTab)?.component}
           </div>
         </div>
