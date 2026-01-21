@@ -166,13 +166,12 @@ export const getMeasurementDataByStyleV2 = async (req, res) => {
       return res.status(404).json({ message: `No order found for Style No: ${styleNo}` });
     }
 
-    // Get sizes from SizeSpec only (in correct order)
+    // Get sizes from SizeSpec (fallback method)
     const getSizesFromSizeSpec = (sizeSpecs) => {
       const sizeOrder = [];
       const sizeOrderSet = new Set();
       
       if (sizeSpecs && Array.isArray(sizeSpecs) && sizeSpecs.length > 0) {
-        // Use the first SizeSpec entry to get the size order
         const firstSizeSpec = sizeSpecs[0];
         if (firstSizeSpec.Specs && Array.isArray(firstSizeSpec.Specs)) {
           firstSizeSpec.Specs.forEach((spec) => {
@@ -189,8 +188,50 @@ export const getMeasurementDataByStyleV2 = async (req, res) => {
       return sizeOrder;
     };
 
-    // Get sizes only from SizeSpec (maintain order)
-    const allSizes = getSizesFromSizeSpec(order.SizeSpec);
+    // Get sizes from BeforeWashSpecs or AfterWashSpecs
+    const getSizesFromWashSpecs = (washSpecs) => {
+      const sizeOrder = [];
+      const sizeOrderSet = new Set();
+      
+      if (washSpecs && Array.isArray(washSpecs) && washSpecs.length > 0) {
+        // Find the first spec that has actual size data
+        const firstSpecWithSizes = washSpecs.find(spec => 
+          spec.Specs && Array.isArray(spec.Specs) && spec.Specs.length > 0
+        );
+        
+        if (firstSpecWithSizes) {
+          firstSpecWithSizes.Specs.forEach((spec) => {
+            if (spec.size && spec.size.trim() !== '' && !sizeOrderSet.has(spec.size.trim())) {
+              sizeOrder.push(spec.size.trim());
+              sizeOrderSet.add(spec.size.trim());
+            }
+          });
+        }
+      }
+      
+      return sizeOrder;
+    };
+
+    // Determine which sizes to use based on available data
+    let allSizes = [];
+    
+    if (washType === 'beforeWash') {
+      // First try to get sizes from BeforeWashSpecs
+      allSizes = getSizesFromWashSpecs(order.BeforeWashSpecs);
+      
+      // If no sizes found in BeforeWashSpecs, fallback to SizeSpec
+      if (allSizes.length === 0) {
+        allSizes = getSizesFromSizeSpec(order.SizeSpec);
+      }
+    } else if (washType === 'afterWash') {
+      // First try to get sizes from AfterWashSpecs
+      allSizes = getSizesFromWashSpecs(order.AfterWashSpecs);
+      
+      // If no sizes found in AfterWashSpecs, fallback to SizeSpec
+      if (allSizes.length === 0) {
+        allSizes = getSizesFromSizeSpec(order.SizeSpec);
+      }
+    }
 
     if (allSizes.length === 0) {
       return res.status(404).json({ message: `No size specifications found for Style No: ${styleNo}` });
@@ -202,9 +243,17 @@ export const getMeasurementDataByStyleV2 = async (req, res) => {
         beforeWash: processSpecs(order.BeforeWashSpecs, allSizes)
       };
     } else if (washType === 'afterWash') {
-      measurementData = {
-        afterWash: processSizeSpecs(order.SizeSpec, allSizes)
-      };
+      // Check if AfterWashSpecs exists and has data
+      if (order.AfterWashSpecs && order.AfterWashSpecs.length > 0) {
+        measurementData = {
+          afterWash: processSpecs(order.AfterWashSpecs, allSizes)
+        };
+      } else {
+        // Fallback to SizeSpec if no AfterWashSpecs
+        measurementData = {
+          afterWash: processSizeSpecs(order.SizeSpec, allSizes)
+        };
+      }
     }
 
     const responseData = {
@@ -217,7 +266,6 @@ export const getMeasurementDataByStyleV2 = async (req, res) => {
     };
 
     res.status(200).json(responseData);
-
   } catch (error) {
     console.error("Error fetching measurement data:", error);
     res.status(500).json({
