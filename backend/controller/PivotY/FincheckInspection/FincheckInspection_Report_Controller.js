@@ -1165,7 +1165,9 @@ export const submitLeaderDecision = async (req, res) => {
       systemComment,
       additionalComment,
       leaderId,
-      leaderName
+      leaderName,
+      reworkPO,
+      reworkPOComment
     } = req.body;
 
     if (!reportId) {
@@ -1231,6 +1233,9 @@ export const submitLeaderDecision = async (req, res) => {
       decisionDoc.approvalEmpId = leaderId;
       decisionDoc.approvalEmpName = leaderName;
       decisionDoc.systemGeneratedComment = systemComment;
+      // Save Rework PO fields to top level
+      decisionDoc.reworkPO = reworkPO || "";
+      decisionDoc.reworkPOComment = reworkPOComment || "";
       decisionDoc.approvalHistory.push(historyEntry); // Add to history
 
       await decisionDoc.save();
@@ -1243,6 +1248,8 @@ export const submitLeaderDecision = async (req, res) => {
         approvalEmpName: leaderName,
         decisionStatus: status,
         systemGeneratedComment: systemComment,
+        reworkPO: reworkPO || "",
+        reworkPOComment: reworkPOComment || "",
         approvalHistory: [historyEntry] // Initialize history
       });
 
@@ -1284,14 +1291,6 @@ export const submitLeaderDecision = async (req, res) => {
         url: targetUrl, // New correct URL
         tag: `fincheck-${reportId}`
       };
-
-      // const payload = {
-      //   title: `Fincheck: Report ${status}`,
-      //   body: `Report #${reportId} was marked as ${status} by ${leaderName}. Click to view details.`,
-      //   icon: "/assets/Home/Fincheck_Inspection.png", // Path to icon on your server
-      //   url: `/fincheck-inspection/${reportId}`, // Where to go on click
-      //   tag: `fincheck-${reportId}` // Prevents duplicate notifications stacking
-      // };
 
       // Fire and forget (don't await, so UI doesn't lag)
       sendPushToUser(qaEmpId, payload);

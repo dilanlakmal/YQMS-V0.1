@@ -9,7 +9,8 @@ import {
   User,
   LayoutGrid,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  Bell
 } from "lucide-react";
 import axios from "axios";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -18,6 +19,7 @@ import { API_BASE_URL } from "../../config";
 // --- Import Tab Components ---
 import YPivotQAReportMain from "../components/inspection/PivotY/QAReports/YPivotQAReportMain";
 import FincheckApprovalAssignee from "../components/inspection/PivotY/QAReports/FincheckApprovalAssignee";
+import FincheckNotificationGroup from "../components/inspection/PivotY/QAReports/FincheckNotificationGroup";
 
 // --- Placeholder Components for Future Tabs ---
 const AnalyticsPlaceholder = () => (
@@ -122,13 +124,20 @@ const YPivotQAReport = () => {
       }
     ];
     if (!isLoadingPermission && isAdmin === true) {
-      console.log("✅ [TABS MEMO] Adding Assignees tab");
       baseTabs.push({
         id: "approval",
         label: "Assignees",
         icon: <ShieldCheck size={18} />,
         component: <FincheckApprovalAssignee />,
         color: "text-purple-600"
+      });
+      //  Notify Group Tab
+      baseTabs.push({
+        id: "notify",
+        label: "Notify Group",
+        icon: <Bell size={18} />,
+        component: <FincheckNotificationGroup />,
+        color: "text-pink-600"
       });
     }
     return baseTabs;

@@ -116,6 +116,7 @@ import createQASectionsTemplatesModel from "../../models/QA/QASectionsTemplates.
 import createFincheckUserPreferencesModel from "../../models/QA/FincheckUserPreferences.js";
 import createFincheckInspectionReportsModel from "../../models/QA/FincheckInspectionReports.js";
 import createFincheckApprovalAssigneeModel from "../../models/QA/FincheckApprovalAssignee.js";
+import createFincheckNotificationGroupModel from "../../models/QA/FincheckNotificationGroupSchema.js";
 import createFincheckInspectionDecisionModel from "../../models/QA/fincheck_inspection_decision.js";
 import createFincheckPushSubscriptionModel from "../../models/QA/FincheckPushSubscription.js";
 
@@ -305,6 +306,8 @@ export const FincheckInspectionReports =
   createFincheckInspectionReportsModel(ymProdConnection);
 export const FincheckApprovalAssignees =
   createFincheckApprovalAssigneeModel(ymProdConnection);
+export const FincheckNotificationGroup =
+  createFincheckNotificationGroupModel(ymProdConnection);
 
 export const FincheckInspectionDecision =
   createFincheckInspectionDecisionModel(ymProdConnection);

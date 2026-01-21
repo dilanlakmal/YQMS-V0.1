@@ -19,7 +19,8 @@ import {
   Minus,
   Volume2,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  FileWarning
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
@@ -99,6 +100,10 @@ const YPivotQAReportDecisionModal = ({
   // New input state (Always starts empty for new modifications)
   const [additionalComment, setAdditionalComment] = useState("");
 
+  // --- Rework PO ---
+  const [isReworkPO, setIsReworkPO] = useState(false);
+  const [reworkPOComment, setReworkPOComment] = useState("");
+
   const [leaderDetails, setLeaderDetails] = useState(null);
   const [loadingUser, setLoadingUser] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -160,6 +165,15 @@ const YPivotQAReportDecisionModal = ({
             // Pre-fill STATUS only
             if (decision.decisionStatus) setStatus(decision.decisionStatus);
 
+            // Load Saved Rework PO Data
+            if (decision.reworkPO === "Yes") {
+              setIsReworkPO(true);
+              setReworkPOComment(decision.reworkPOComment || "");
+            } else {
+              setIsReworkPO(false);
+              setReworkPOComment("");
+            }
+
             // LOGIC: Check for "Action Required"
             // Compare last Leader Decision Time vs Last QA Resubmission Time
             if (resubmissionHistory && resubmissionHistory.length > 0) {
@@ -211,6 +225,7 @@ Report Type: ${report.reportType}
 QA ID: ${report.empId}`;
 
       let statusMsg = "";
+
       if (status === "Approved") {
         statusMsg = `\n✅ DECISION: APPROVED by ${user.emp_id} - ${approverName}`;
       } else if (status === "Rework") {
@@ -219,16 +234,16 @@ QA ID: ${report.empId}`;
         statusMsg = `\n❌ DECISION: REJECTED by ${user.emp_id} - ${approverName}`;
       }
 
-      setAutoComment(`${baseInfo}\n${statusMsg}`);
+      // Add Critical Header if Rework PO is active
+      let criticalHeader = "";
+      if (isReworkPO) {
+        // Adding extra newlines for visibility in the textarea
+        criticalHeader = "!!! CRITICAL: REWORK PO OPEN CARTON REQUIRED !!!\n\n";
+      }
+      setAutoComment(`${criticalHeader}${baseInfo}\n${statusMsg}`);
+      //setAutoComment(`${baseInfo}\n${statusMsg}`);
     }
-
-    // Reset input fields when Approved is selected
-    if (status === "Approved") {
-      setAdditionalComment("");
-      setAudioBlob(null);
-      setAudioUrl(null);
-    }
-  }, [status, report, user, leaderDetails]);
+  }, [status, report, user, leaderDetails, isReworkPO]);
 
   // --- Date Formatter (+7 Hours) ---
   const formatDecisionDate = (dateString) => {
@@ -322,6 +337,10 @@ QA ID: ${report.empId}`;
       formData.append("status", status);
       formData.append("systemComment", autoComment);
       formData.append("additionalComment", additionalComment);
+
+      // Append Rework PO Data
+      formData.append("reworkPO", isReworkPO ? "Yes" : "");
+      formData.append("reworkPOComment", isReworkPO ? reworkPOComment : "");
 
       if (audioBlob) {
         formData.append("audioBlob", audioBlob, "recording.webm");
@@ -485,6 +504,66 @@ QA ID: ${report.empId}`;
                 </div>
               </div>
 
+              {/* Rework PO Toggle Section */}
+              <div
+                className={`p-4 rounded-xl border-2 transition-all ${
+                  isReworkPO
+                    ? "bg-red-50 border-red-500 dark:bg-red-900/20"
+                    : "bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`p-2 rounded-full ${
+                        isReworkPO
+                          ? "bg-red-500 text-white"
+                          : "bg-gray-200 text-gray-500"
+                      }`}
+                    >
+                      <FileWarning className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4
+                        className={`font-bold text-sm ${
+                          isReworkPO ? "text-red-700" : "text-gray-600"
+                        }`}
+                      >
+                        Rework PO Required
+                      </h4>
+                      <p className="text-xs text-gray-500">
+                        Flag this order for opening Cartons
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={isReworkPO}
+                      onChange={(e) => setIsReworkPO(e.target.checked)}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+                  </label>
+                </div>
+
+                {/* Specific Rework PO Comment Field - Only visible if Checked */}
+                {isReworkPO && (
+                  <div className="mt-3 animate-fadeIn">
+                    <label className="text-xs font-bold text-red-600 uppercase mb-1 block">
+                      Rework PO Reason (Internal)
+                    </label>
+                    <textarea
+                      className="w-full p-2 bg-white border border-red-200 rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-red-500 outline-none"
+                      rows="2"
+                      placeholder="Why is a Rework PO needed?"
+                      value={reworkPOComment}
+                      onChange={(e) => setReworkPOComment(e.target.value)}
+                    ></textarea>
+                  </div>
+                )}
+              </div>
+
               {/* Status Buttons */}
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase block mb-3">
@@ -566,7 +645,12 @@ QA ID: ${report.empId}`;
                 </label>
                 <textarea
                   disabled
-                  className="w-full h-full p-4 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl text-sm font-mono text-gray-500 dark:text-gray-400 resize-none cursor-not-allowed focus:outline-none opacity-80"
+                  className={`w-full h-full p-4 border rounded-xl text-sm font-mono resize-none cursor-not-allowed focus:outline-none opacity-80 ${
+                    isReworkPO
+                      ? "bg-red-50 text-red-800 border-red-200 font-bold"
+                      : "bg-gray-100 text-gray-500 border-gray-300"
+                  }`}
+                  //className="w-full h-full p-4 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl text-sm font-mono text-gray-500 dark:text-gray-400 resize-none cursor-not-allowed focus:outline-none opacity-80"
                   value={autoComment}
                 ></textarea>
               </div>
@@ -645,93 +729,81 @@ QA ID: ${report.empId}`;
 
               {/* 3. New Input Area (Conditional) */}
               <div className="flex-1 flex flex-col animate-fadeIn border-t border-gray-100 dark:border-gray-700 pt-4">
-                {status !== "Approved" ? (
-                  <>
-                    <label className="text-xs font-bold text-gray-800 dark:text-white uppercase mb-2">
-                      New Remarks <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      className="w-full min-h-[100px] p-4 mb-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-sans focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-shadow shadow-inner"
-                      placeholder={`Type NEW reasons for ${status}...`}
-                      value={additionalComment}
-                      onChange={(e) => setAdditionalComment(e.target.value)}
-                    ></textarea>
+                <>
+                  <label className="text-xs font-bold text-gray-800 dark:text-white uppercase mb-2">
+                    New Remarks <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    className="w-full min-h-[100px] p-4 mb-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-sans focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-shadow shadow-inner"
+                    placeholder={`Type NEW reasons for ${status}...`}
+                    value={additionalComment}
+                    onChange={(e) => setAdditionalComment(e.target.value)}
+                  ></textarea>
 
-                    {/* Audio Recorder */}
-                    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700 p-3 flex items-center justify-between">
-                      {!audioUrl && !isRecording && (
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-500">
-                            <Mic className="w-5 h-5" />
-                          </div>
-                          <span className="text-xs text-gray-500 font-medium">
-                            Add Voice Note (New)
-                          </span>
+                  {/* Audio Recorder */}
+                  <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700 p-3 flex items-center justify-between">
+                    {!audioUrl && !isRecording && (
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-500">
+                          <Mic className="w-5 h-5" />
                         </div>
+                        <span className="text-xs text-gray-500 font-medium">
+                          Add Voice Note (New)
+                        </span>
+                      </div>
+                    )}
+                    {isRecording && (
+                      <div className="flex items-center gap-3 text-red-500 animate-pulse">
+                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                        <span className="text-sm font-mono font-bold">
+                          {formatTime(recordingDuration)}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          Recording...
+                        </span>
+                      </div>
+                    )}
+                    {audioUrl && !isRecording && (
+                      <div className="flex-1 flex items-center gap-3">
+                        <audio
+                          controls
+                          src={audioUrl}
+                          className="h-8 w-full max-w-[200px]"
+                        />
+                        <span className="text-xs text-green-600 font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Recorded
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      {!isRecording && !audioUrl && (
+                        <button
+                          onClick={startRecording}
+                          className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                        >
+                          <Mic className="w-3 h-3" /> Record
+                        </button>
                       )}
                       {isRecording && (
-                        <div className="flex items-center gap-3 text-red-500 animate-pulse">
-                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                          <span className="text-sm font-mono font-bold">
-                            {formatTime(recordingDuration)}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            Recording...
-                          </span>
-                        </div>
+                        <button
+                          onClick={stopRecording}
+                          className="px-3 py-1.5 bg-gray-800 text-white hover:bg-black rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                        >
+                          <Square className="w-3 h-3 fill-current" /> Stop
+                        </button>
                       )}
-                      {audioUrl && !isRecording && (
-                        <div className="flex-1 flex items-center gap-3">
-                          <audio
-                            controls
-                            src={audioUrl}
-                            className="h-8 w-full max-w-[200px]"
-                          />
-                          <span className="text-xs text-green-600 font-bold flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Recorded
-                          </span>
-                        </div>
+                      {audioUrl && (
+                        <button
+                          onClick={deleteRecording}
+                          className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       )}
-                      <div className="flex items-center gap-2">
-                        {!isRecording && !audioUrl && (
-                          <button
-                            onClick={startRecording}
-                            className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
-                          >
-                            <Mic className="w-3 h-3" /> Record
-                          </button>
-                        )}
-                        {isRecording && (
-                          <button
-                            onClick={stopRecording}
-                            className="px-3 py-1.5 bg-gray-800 text-white hover:bg-black rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
-                          >
-                            <Square className="w-3 h-3 fill-current" /> Stop
-                          </button>
-                        )}
-                        {audioUrl && (
-                          <button
-                            onClick={deleteRecording}
-                            className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  // Placeholder for Approved Status
-                  <div className="flex-1 flex items-center justify-center border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900/30 min-h-[160px]">
-                    <div className="text-center text-gray-400">
-                      <CheckCircle2 className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                      <p className="text-xs font-medium">
-                        No additional comments needed for Approval.
-                      </p>
                     </div>
                   </div>
-                )}
+                </>
               </div>
             </div>
           </div>

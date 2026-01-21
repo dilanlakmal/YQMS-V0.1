@@ -208,6 +208,7 @@ PivotY - Fincheck Inspection
 import FincheckInspection from "./routes/PivotY/FincheckInspection/FincheckInspection_Route.js";
 import FincheckInspection_Report from "./routes/PivotY/FincheckInspection/FincheckInspection_Report_Route.js";
 import FincheckInspection_Approval from "./routes/PivotY/FincheckInspection/FincheckInspection_Approval_Route.js";
+import FincheckNotificationGroup from "./routes/PivotY/FincheckInspection/FincheckNotificationGroup_Routes.js";
 
 /* ------------------------------
  P88 Data Upoad Routes
@@ -519,6 +520,7 @@ PivotY - Fincheck Inspection routes
 app.use(FincheckInspection);
 app.use(FincheckInspection_Report);
 app.use(FincheckInspection_Approval);
+app.use(FincheckNotificationGroup);
 
 /* ------------------------------
  P88 Data Upoad Routes
