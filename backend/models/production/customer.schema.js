@@ -5,6 +5,12 @@ const styleSchema = {
     code: { 
         label: languageSchema,
         value: languageSchema
+    },
+    sample: {
+        img: {
+            type: Buffer
+        },
+        description: languageSchema
     }
 }
 
@@ -12,8 +18,15 @@ const styleSchema = {
 const customerSchema = {
     style: styleSchema,
     purchase:  purchaseSchema,
-    remark: {
-        value: languageSchema
+    packing: {
+        mark: {
+            label: languageSchema,
+            value: languageSchema
+        },
+        main: {
+            label: languageSchema,
+            value: languageSchema
+        }
     },
     manufacturingNote:  [languageSchema]
 }

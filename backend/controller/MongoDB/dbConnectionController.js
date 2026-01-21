@@ -97,17 +97,18 @@ import createQASectionsDefectCategoryModel from "../../models/QA/QASectionsDefec
 import createQASectionsProductLocationModel from "../../models/QA/QASectionsProductLocation.js";
 
 import createConversationModel from "../../models/chatbot/conversation.model.js";
-
+import createPTExtractionModel from "../../models/production/instruction/extraction/page.extractions.model.js";
+import createProductionModel from "../../models/production/production.model.js";
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
   // "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
-  process.env.MONGO_URI_PRODUCTION
+  process.env.MONGO_URI_PRODUCTION ?? "mongodb://yaidev:Yai%40Dev2025@192.167.4.7:28425/ym_prod?authSource=admin&retryWrites=true&w=majority"
   //"mongodb://localhost:27017/ym_prod"
 );
 
 export const ymEcoConnection = mongoose.createConnection(
   // "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin"
-  process.env.MONGO_URI_ECO
+  process.env.MONGO_URI_ECO ?? "mongodb://yaidev:Yai%40Dev2025@192.167.4.7:28425/ym_prod?authSource=admin&retryWrites=true&w=majority"
   //"mongodb://localhost:27017/ym_prod"
 );
 
@@ -236,7 +237,8 @@ export const QASectionsProductLocation =
 
 
 export const Conversation = createConversationModel(ymEcoConnection);
-
+export const PTExtraction = createPTExtractionModel(ymEcoConnection);
+export const ProductionTranModel = createProductionModel(ymEcoConnection);
 //Disconnect DB connection
 export async function disconnectMongoDB() {
   try {

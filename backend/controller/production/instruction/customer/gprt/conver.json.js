@@ -4,15 +4,15 @@ const textSchema = (description, originLang = "english", type= "string", ) => {
     const language = {
         khmer: {
             type: type,
-            description: description + " in khmer"
+            description: description 
         },
         english: {
             type: type,
-            description: description + " in english"
+            description: description 
         },
         chinese: {
             type: type,
-            description: description + " in chinese"
+            description: description
         }        
     }
     return {
@@ -69,9 +69,10 @@ const orderSchema = (originLang) => ({
         orderType: {
             type: "object",
             properties: {
-                value: textSchema("Order type (e.g., 'Retail单').", originLang),
+                label: textSchema("Label for the Order type field, usually written as 'Order Type' or similar.", originLang),
+                value: textSchema("the value of Order type (e.g., 'Retail单').", originLang),
             },
-            required: ["value"]
+            required: ["label", "value"]
         }
     },
     required: ["orderNumber", "orderType"]
@@ -103,18 +104,33 @@ const purchaseSchema = (originLan) => ({
 });
 
 
-const remarkSchema = (originLang) => ({
+const packingSchema = (originLang) => ({
     type: "object",
     properties: {
-        value: textSchema("Labeling or marking instruction indicating required information to be printed on labels or shipping marks, such as PO number and customer name.", originLang)
+        mark: {
+            type: "object",
+            properties: {
+            label: textSchema("Label for the marking instruction, usually written as 'Retail'.", originLang),
+            value: textSchema("The actual marking instruction or label value.", originLang)
+        }, 
+        required: ["label", "value"]
+        },
+        main: {
+            type: "object",
+            properties: {
+            label: textSchema("Label for the main packing instruction, usually written as 'Main Packing'.", originLang),
+            value: textSchema("The actual main packing instruction or label value.", originLang)
+        }, 
+        required: ["label", "value"]
+        }
     },
-    required: ["value"]
+    required: ["mark", "main"]
 })
 
 const manufacturingNoteSchema = (originLang) => ({
     type: "array",
     items: textSchema(
-        "A single production-related instruction. May include printing details, quantity rules, or references to attachments. Example: '1. GPRT00077C W02-490014 前幅印花(PP办评语看附页明细)'",
+        "A single production-related instruction. May include printing details, quantity rules, or references to attachments.",
         originLang
     ),
     description: "Special or production-related instructions as an array of strings. Each item represents a single instruction or remark, allowing multiple numbered items, quantity rules, printing details, and references to attachments."
@@ -129,11 +145,11 @@ const customerSchema = (originLang) => ({
     properties: {
         style: styleSchema(originLang),
         purchase: purchaseSchema(originLang),
-        remark: remarkSchema(originLang),
+        packing: packingSchema(originLang),
         manufacturingNote: manufacturingNoteSchema(originLang),
         // sample: sampleSchema
     },
-    required: ["style", "purchase", "remark", "manufacturingNote"]
+    required: ["style", "purchase", "packing", "manufacturingNote"]
 })
 
 const factoryIDSchema = (originLang) => ({
@@ -174,7 +190,8 @@ const cover2Production = async (
     const customerPurchase = customer.purchase;
     const customerPurchaseOrder = customerPurchase.order;
     const customerPurchaseQuantity = customerPurchase.quantity;
-    const customerRemark = customer.remark;
+    const customerRemark = customer.packing;
+    console.log("customerRemark:", JSON.stringify(customerRemark, null, 2));
     const customerManufacturingNote = customer.manufacturingNote;
     const factory = fieldExtracted.factory;
     const factoryID = factory.factoryID;
@@ -182,21 +199,38 @@ const cover2Production = async (
     await createProduction(
         originLang,
         documentId,
+
         title,
+
         CustomerStyle.code.label,
         CustomerStyle.code.value,
+
+        CustomerStyle.sample?.img,
+        CustomerStyle.sample.description,
+
         customerPurchaseOrder.orderNumber.label,
         customerPurchaseOrder.orderNumber.value,
+
+        customerPurchaseOrder.orderType.label,
         customerPurchaseOrder.orderType.value,
+
         customerPurchaseQuantity.label,
         customerPurchaseQuantity.value,
         customerPurchaseQuantity.unit,
+
+        customerPurchase.specs,
+
         customerRemark,
+
         customerManufacturingNote,
+
         factoryID.label,
         factoryID.value,
+
+        factory.factoryStamp.img,
+        factory.factoryStamp.description
     )
 }
 
 export default coverJson;
-export {cover2Production};
+export {cover2Production, textSchema};

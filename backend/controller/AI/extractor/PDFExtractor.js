@@ -47,7 +47,7 @@ class PDFExtractor {
     for (const item of items) {
       const t = item.text?.trim();
       if (!t) continue;
-      if (merged.length > 0 && /^[：:)单]$/.test(t)) merged[merged.length-1] += t;
+      if (merged.length > 0 && /^[：:)]$/.test(t)) merged[merged.length-1] += t;
       else merged.push(t);
     }
     return merged.join(" ");
@@ -98,7 +98,7 @@ class PDFExtractor {
     } else if (langCode === "khm") {
         this.language = "khmer";
     } else {
-        this.language = "unknown";
+        this.language = "english";
     }
 
     return this.language;

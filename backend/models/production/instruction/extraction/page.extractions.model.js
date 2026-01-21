@@ -3,7 +3,9 @@ import mongoose from "mongoose";
 const imageSchema = new mongoose.Schema({
     data: {type: Buffer},
     contentType: {type: String, default: "img/png"},
-    description: {type: String, default: ""}
+    type: {type: String, default: "image"},
+    description: {type: String, default: ""},
+    table: {type: Array, default: []}
 })
 
 const extractionSchema = new mongoose.Schema({

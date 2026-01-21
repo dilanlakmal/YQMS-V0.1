@@ -248,6 +248,15 @@ import QCOutputRoute from "./routes/QCOutput/QCOutputRoute.js";
 ------------------------------ */
 import conversationRoutes from "./routes/AI/conversation.route.js";
 import chatRoutes from "./routes/AI/chat.route.js";
+
+
+import productionInstructionRoutes from "./routes/production/instruction.route.js";
+import translationRoutes from "./routes/production/translation.route.js";
+
+app.use("/api/ai/production/instruction/extraction", productionInstructionRoutes);
+app.use("/api/production/instruction", translationRoutes);
+
+
 /* -----------------------------
   User Routes
 ------------------------------ */
@@ -356,7 +365,6 @@ app.use(qc2Rework);
 AI Routes
 ------------------------------ */
 app.use(AIChatBot);
-
 /* ------------------------------
   Cutting routes
 ------------------------------ */

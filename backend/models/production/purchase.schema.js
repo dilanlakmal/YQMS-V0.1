@@ -6,10 +6,11 @@ const orderSchema = {
         value: {type: languageSchema}
     }},
     orderType: {type: {
+        label: languageSchema,
         value: languageSchema
     }
     }
-}
+}   
 
 const quantitySchema = {
     label:  languageSchema,
@@ -17,9 +18,11 @@ const quantitySchema = {
     unit: languageSchema
 }
 
+
 const purchaseSchema = {
     order: orderSchema,
-    quantity: quantitySchema
+    quantity: quantitySchema,
+    specs: [[[languageSchema]]]
 }
 
 
