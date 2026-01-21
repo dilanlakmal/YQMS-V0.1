@@ -264,9 +264,28 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
 
 
 export const downloadBulkReportsAutoCancellable = async (req, res) => {
-    process.platform === 'linux' 
-        ? await  downloadBulkReportsUbuntu(req, res) 
-        : await downloadBulkReportsCancellable(req, res);
+    const { jobId } = req.body;
+    
+    // Create the job tracking object immediately
+    activeJobs.set(jobId, { 
+        status: 'running', 
+        startTime: new Date(), 
+        cancelled: false, 
+        progress: { processed: 0, total: 0, success: 0, failed: 0 },
+        jobDir: null,
+        zipPath: null
+    });
+
+    // Run the task in the background
+    // We pass req.body to the task runner
+    runDownloadTask(jobId, req.body, req.body.userId);
+
+    // IMMEDIATELY return to frontend so it can start polling
+    res.status(202).json({ 
+        success: true, 
+        message: 'Download job started', 
+        jobId 
+    });
 };
 
 export const initializeDownloadStatus = async (req, res) => {
@@ -698,7 +717,7 @@ const runDownloadTask = async (jobId, recordParams, userId) => {
 
         browser = await puppeteer.launch({ 
             headless: CONFIG.HEADLESS, 
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] 
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--disable-extensions'] 
         });
         jobInfo.browser = browser;
 
