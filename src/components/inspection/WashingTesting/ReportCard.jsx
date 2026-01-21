@@ -148,7 +148,7 @@ const ReportCard = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mt-2 text-xs md:text-sm">
           <div>
             <span className="text-gray-500 dark:text-gray-400">Type: </span>
-            <span className="font-medium text-blue-600 dark:text-blue-400">{report.reportType || "Home Wash/Garment Wash Test"}</span>
+            <span className="font-medium text-blue-600 dark:text-blue-400">{report.reportType || "Home Wash Test"}</span>
           </div>
           <div>
             <span className="text-gray-500 dark:text-gray-400">Buyer Style: </span>
@@ -186,7 +186,7 @@ const ReportCard = ({
                 Report Type
               </p>
               <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                {report.reportType || "Home Wash/Garment Wash Test"}
+                {report.reportType || "Home Wash Test"}
               </p>
             </div>
             <div>

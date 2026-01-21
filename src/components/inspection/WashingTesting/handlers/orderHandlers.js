@@ -23,7 +23,7 @@ export const handleOrderNoSearch = async (
     if (!searchTerm || searchTerm.length < VALIDATION_RULES.MIN_ORDER_NO_LENGTH) {
         setOrderNoSuggestions([]);
         setShowOrderNoSuggestions(false);
-        return;
+        return [];
     }
 
     setIsSearchingOrderNo(true);
@@ -31,10 +31,12 @@ export const handleOrderNoSearch = async (
         const suggestions = await searchOrderNoAPI(searchTerm);
         setOrderNoSuggestions(suggestions);
         setShowOrderNoSuggestions(suggestions.length > 0);
+        return suggestions;
     } catch (error) {
         console.error("Error searching Order_No:", error);
         setOrderNoSuggestions([]);
         setShowOrderNoSuggestions(false);
+        return [];
     } finally {
         setIsSearchingOrderNo(false);
     }
@@ -61,38 +63,53 @@ export const handleOrderNoSelection = async (
     fetchYorksysOrderETD,
     resetOrderData
 ) => {
+    // Determine which field we are using: 'ymStyle' (Home Wash/others) or 'style' (Garment Wash)
+    const styleField = formData.style !== undefined ? 'style' : 'ymStyle';
+
     // Use case-insensitive comparison
-    const currentStyle = (formData.ymStyle || "").trim().toUpperCase();
+    const currentStyle = (formData[styleField] || "").trim().toUpperCase();
     const selectedStyle = (orderNo || "").trim().toUpperCase();
 
     // If the selected order is the same as typed (even different casing),
     // just update casing and close suggestions without resetting data
     if (selectedStyle === currentStyle) {
-        setFormData(prev => ({ ...prev, ymStyle: orderNo }));
+        setFormData(prev => ({ ...prev, [styleField]: orderNo }));
         setShowOrderNoSuggestions(false);
         setOrderNoSuggestions([]);
 
         // Still trigger fetches (hook handles duplicate suppression case-insensitively)
         fetchOrderColors(orderNo, setFormData);
-        fetchYorksysOrderETD(orderNo);
+        fetchYorksysOrderETD(orderNo, setFormData);
         return;
     }
 
     // Truly new style selected: Clear color, PO, and ETD
-    setFormData(prev => ({
-        ...prev,
-        ymStyle: orderNo,
-        color: [],
-        po: [],
-        exFtyDate: [],
-    }));
+    setFormData(prev => {
+        const newData = {
+            ...prev,
+            [styleField]: orderNo,
+            color: [],
+            po: [],
+            exFtyDate: [],
+            buyerStyle: '',
+        };
+
+        // Only clear metadata if it's truly a different core style
+        // If we just added a trailing number or corrected casing, we keep the data
+        if (selectedStyle !== currentStyle) {
+            newData.custStyle = '';
+            newData.season = '';
+            newData.styleDescription = '';
+        }
+        return newData;
+    });
     setShowOrderNoSuggestions(false);
     setOrderNoSuggestions([]);
     resetOrderData();
 
     // Fetch colors and ETD for the new style
     await fetchOrderColors(orderNo, setFormData);
-    await fetchYorksysOrderETD(orderNo);
+    await fetchYorksysOrderETD(orderNo, setFormData);
 };
 
 /**

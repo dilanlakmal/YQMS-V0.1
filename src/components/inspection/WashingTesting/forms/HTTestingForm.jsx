@@ -17,6 +17,7 @@ const HTTestingForm = ({
     handleInputChange,
     handleSubmit,
     isSubmitting,
+    isCompleting,
     // Images
     handleFileInputChange,
     handleCameraInputChange,
@@ -870,14 +871,14 @@ const HTTestingForm = ({
                     {/* Notes Field */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Notes
+                            {isCompleting ? "Completion Notes" : "Notes"}
                         </label>
                         <textarea
-                            value={formData.notes || ''}
-                            onChange={(e) => handleInputChange("notes", e.target.value)}
+                            value={isCompleting ? (formData.completionNotes || "") : (formData.notes || "")}
+                            onChange={(e) => handleInputChange(isCompleting ? "completionNotes" : "notes", e.target.value)}
                             rows={4}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-vertical"
-                            placeholder="Add any additional notes or comments about this HT test report..."
+                            placeholder={isCompleting ? "Add completion notes..." : "Add any additional notes or comments about this HT test report..."}
                         />
                     </div>
                 </div>
@@ -894,7 +895,7 @@ const HTTestingForm = ({
                         ) : (
                             <Send className="w-4 h-4" />
                         )}
-                        {isSubmitting ? "Submitting..." : "Submit HT Test Report"}
+                        {isSubmitting ? "Submitting..." : isCompleting ? "Complete HT Test Report" : "Submit HT Test Report"}
                     </button>
                 </div>
             </form>

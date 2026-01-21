@@ -46,43 +46,58 @@ export const saveReportWashing = async (req, res) => {
 
     // Process uploaded images
     const imagePaths = [];
-    if (req.files && req.files.length > 0) {
+    const careLabelImagePaths = [];
+
+    if (req.files) {
       // Ensure directory exists
       if (!fs.existsSync(washingMachineTestUploadPath)) {
         fs.mkdirSync(washingMachineTestUploadPath, { recursive: true });
       }
 
-      for (const file of req.files) {
+      // Helper to process a file
+      const processFile = async (file, typePrefix = "washing-test") => {
+        const timestamp = Date.now();
+        const randomSuffix = Math.round(Math.random() * 1e9);
+        const sanitizedYmStyle = (ymStyle || "unknown")
+          .replace(/[\/\\]/g, "-")
+          .replace(/\s+/g, "-")
+          .replace(/[^a-zA-Z0-9._-]/g, "");
+        const filename = `${typePrefix}-${sanitizedYmStyle}-${timestamp}-${randomSuffix}.webp`;
+        const finalDiskPath = path.join(washingMachineTestUploadPath, filename);
+
+        await sharp(file.buffer)
+          .resize({
+            width: 1920,
+            height: 1920,
+            fit: "inside",
+            withoutEnlargement: true
+          })
+          .webp({ quality: 85 })
+          .toFile(finalDiskPath);
+
+        return `${API_BASE_URL}/storage/washing_machine_test/${filename}`;
+      };
+
+      // Handle images array (legacy or single field)
+      const imagesToProcess = Array.isArray(req.files) ? req.files : (req.files.images || []);
+      for (const file of imagesToProcess) {
         try {
-          // Generate unique filename
-          const timestamp = Date.now();
-          const randomSuffix = Math.round(Math.random() * 1e9);
-          const sanitizedYmStyle = (ymStyle || "unknown")
-            .replace(/[\/\\]/g, "-")
-            .replace(/\s+/g, "-")
-            .replace(/[^a-zA-Z0-9._-]/g, "");
-          const extension = path.extname(file.originalname) || ".webp";
-          const filename = `washing-test-${sanitizedYmStyle}-${timestamp}-${randomSuffix}.webp`;
-
-          const finalDiskPath = path.join(washingMachineTestUploadPath, filename);
-
-          // Process and save image using sharp
-          await sharp(file.buffer)
-            .resize({
-              width: 1920,
-              height: 1920,
-              fit: "inside",
-              withoutEnlargement: true
-            })
-            .webp({ quality: 85 })
-            .toFile(finalDiskPath);
-
-          // Store the public URL path
-          const publicUrlPath = `${API_BASE_URL}/storage/washing_machine_test/${filename}`;
+          const publicUrlPath = await processFile(file);
           imagePaths.push(publicUrlPath);
         } catch (imageError) {
           console.error("Error processing image:", imageError);
-          // Continue with other images even if one fails
+        }
+      }
+
+      // Handle careLabelImage field (Multiple images)
+      if (!Array.isArray(req.files) && req.files.careLabelImage && req.files.careLabelImage.length > 0) {
+        for (const file of req.files.careLabelImage) {
+          try {
+            const publicUrlPath = await processFile(file, "care-label");
+            careLabelImagePaths.push(publicUrlPath);
+          } catch (imageError) {
+            console.error("Error processing care label image:", imageError);
+          }
         }
       }
     }
@@ -105,6 +120,7 @@ export const saveReportWashing = async (req, res) => {
       reportDate: reportDate ? new Date(reportDate) : null,
       sendToHomeWashingDate: sendToHomeWashingDate ? new Date(sendToHomeWashingDate) : new Date(),
       images: imagePaths, // Store file paths instead of base64
+      careLabelImage: careLabelImagePaths,
       notes: notes ? notes.trim() : "", // Notes field
       userId: userId || "",
       userName: userName || "",
@@ -512,6 +528,73 @@ export const updateReportWashing = async (req, res) => {
       }
     }
 
+    // Handle care label images if uploaded
+    if (req.files && req.files.careLabelImage && req.files.careLabelImage.length > 0) {
+      const careLabelImagePaths = [];
+
+      for (const file of req.files.careLabelImage) {
+        try {
+          // Generate unique filename
+          const timestamp = Date.now();
+          const randomSuffix = Math.round(Math.random() * 1e9);
+          const sanitizedYmStyle = (ymStyle || "unknown")
+            .replace(/[\/\\]/g, "-")
+            .replace(/\s+/g, "-")
+            .replace(/[^a-zA-Z0-9._-]/g, "");
+          const filename = `care-label-${sanitizedYmStyle}-${timestamp}-${randomSuffix}.webp`;
+          const finalDiskPath = path.join(washingMachineTestUploadPath, filename);
+
+          // Process and save image using sharp
+          await sharp(file.buffer)
+            .resize({
+              width: 1920,
+              height: 1920,
+              fit: "inside",
+              withoutEnlargement: true
+            })
+            .webp({ quality: 85 })
+            .toFile(finalDiskPath);
+
+          // Store the public URL path
+          const publicUrlPath = `${API_BASE_URL}/storage/washing_machine_test/${filename}`;
+          careLabelImagePaths.push(publicUrlPath);
+        } catch (imageError) {
+          console.error("Error processing care label image:", imageError);
+        }
+      }
+
+      // If careLabelImageUrls is provided, use it to replace/merge the array
+      if (updateData.careLabelImageUrls) {
+        try {
+          const existingUrls = typeof updateData.careLabelImageUrls === "string" ? JSON.parse(updateData.careLabelImageUrls) : updateData.careLabelImageUrls;
+          updateData.careLabelImage = [...existingUrls, ...careLabelImagePaths];
+          delete updateData.careLabelImageUrls;
+        } catch (error) {
+          console.error("Error parsing careLabelImageUrls:", error);
+          if (existingReport && existingReport.careLabelImage && Array.isArray(existingReport.careLabelImage)) {
+            updateData.careLabelImage = [...existingReport.careLabelImage, ...careLabelImagePaths];
+          } else {
+            updateData.careLabelImage = careLabelImagePaths;
+          }
+        }
+      } else {
+        if (existingReport && existingReport.careLabelImage && Array.isArray(existingReport.careLabelImage)) {
+          updateData.careLabelImage = [...existingReport.careLabelImage, ...careLabelImagePaths];
+        } else {
+          updateData.careLabelImage = careLabelImagePaths;
+        }
+      }
+    } else if (updateData.careLabelImageUrls) {
+      // If only URLs are provided (no new files), replace the array
+      try {
+        const existingUrls = typeof updateData.careLabelImageUrls === "string" ? JSON.parse(updateData.careLabelImageUrls) : updateData.careLabelImageUrls;
+        updateData.careLabelImage = existingUrls;
+        delete updateData.careLabelImageUrls;
+      } catch (error) {
+        console.error("Error parsing careLabelImageUrls:", error);
+      }
+    }
+
     // Find and update the report
     const updatedReport = await ReportWashing.findByIdAndUpdate(
       id,
@@ -563,8 +646,9 @@ export const deleteReportWashing = async (req, res) => {
     const allImages = [
       ...(reportToDelete.images || []),
       ...(reportToDelete.receivedImages || []),
-      ...(reportToDelete.completionImages || [])
-    ];
+      ...(reportToDelete.completionImages || []),
+      ...(Array.isArray(reportToDelete.careLabelImage) ? reportToDelete.careLabelImage : [reportToDelete.careLabelImage])
+    ].filter(url => url && typeof url === 'string');
 
     // Delete associated files from filesystem
     if (allImages.length > 0) {

@@ -185,7 +185,7 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "") => {
 
     // --- General Info Section (2-Column Grid) ---
     addSectionHeader("GENERAL INFORMATION");
-    addInfoRow("Report Type:", report.reportType || "Home Wash/Garment Wash Test");
+    addInfoRow("Report Type:", report.reportType || "Home Wash Test");
     addInfoRow("YM Style:", report.ymStyle || "N/A", "Buyer Style:", report.buyerStyle || "N/A");
     addInfoRow("Factory:", report.factory || "N/A", "Status:", report.status || "N/A", true);
 

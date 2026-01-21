@@ -15,7 +15,10 @@ const router = express.Router();
 
 router.post(
   "/api/report-washing/submit",
-  uploadWashingMachineTestImage.array("images", 10), // Allow up to 10 images
+  uploadWashingMachineTestImage.fields([
+    { name: "images", maxCount: 10 },
+    { name: "careLabelImage", maxCount: 10 }
+  ]),
   saveReportWashing
 );
 router.get("/api/report-washing", getReportWashing);
@@ -25,8 +28,9 @@ router.put(
   uploadWashingMachineTestImage.fields([
     { name: "images", maxCount: 10 },
     { name: "receivedImages", maxCount: 10 },
-    { name: "completionImages", maxCount: 10 }
-  ]), // Allow up to 10 images for initial, received, and completion
+    { name: "completionImages", maxCount: 10 },
+    { name: "careLabelImage", maxCount: 10 }
+  ]), // Allow up to 10 images for initial, received, and completion, and care label image array
   updateReportWashing
 );
 router.delete("/api/report-washing/:id", deleteReportWashing);

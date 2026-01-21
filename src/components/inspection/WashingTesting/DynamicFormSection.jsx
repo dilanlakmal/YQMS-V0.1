@@ -9,14 +9,10 @@ import { REPORT_TYPES, getReportTypeConfig } from "./constants/reportTypes";
  * Dynamic Form Section Component
  * 
  * This component renders the appropriate form based on the selected report type.
- * It acts as a router/factory for different form types.
- * 
- * To add a new report type form:
- * 1. Create the form component in forms/ directory
- * 2. Import it here
- * 3. Add a case in the switch statement OR set formComponent in reportTypes.js config
+ * - When completing a scanned report (isCompleting=true): Uses the report's specific form type
+ * - When manually creating/editing (isCompleting=false): Always uses the default form
  */
-const DynamicFormSection = ({ formData, ...props }) => {
+const DynamicFormSection = ({ formData, isCompleting, ...props }) => {
     const reportType = formData?.reportType || REPORT_TYPES.HOME_WASH;
     const config = getReportTypeConfig(reportType);
 
@@ -25,19 +21,18 @@ const DynamicFormSection = ({ formData, ...props }) => {
         HTTestingForm,
         EMBTestingForm,
         PullingTestForm,
-        // Add more custom form components here as they are created
     };
 
-    // If a custom form is specified in config, use it
-    if (!config.useDefaultForm && config.formComponent) {
+    // Only use custom forms when completing a scanned report
+    if (isCompleting && !config.useDefaultForm && config.formComponent) {
         const CustomForm = formComponents[config.formComponent];
         if (CustomForm) {
-            return <CustomForm formData={formData} {...props} />;
+            return <CustomForm formData={formData} isCompleting={isCompleting} {...props} />;
         }
     }
 
-    // Default to standard form for all report types
-    return <FormSection formData={formData} {...props} />;
+    // Default to standard form for manual creation/editing
+    return <FormSection formData={formData} isCompleting={isCompleting} {...props} />;
 };
 
 export default DynamicFormSection;

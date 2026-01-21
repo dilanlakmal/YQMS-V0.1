@@ -23,7 +23,7 @@ export const useReportSubmission = (user, fetchReports) => {
       const formDataToSubmit = new FormData();
 
       // Add common form fields
-      formDataToSubmit.append("reportType", formData.reportType || "Home Wash/Garment Wash Test");
+      formDataToSubmit.append("reportType", formData.reportType || "Home Wash Test");
       formDataToSubmit.append("ymStyle", formData.ymStyle || "");
       formDataToSubmit.append("buyerStyle", formData.buyerStyle || "");
       formDataToSubmit.append("color", JSON.stringify(formData.color || []));
@@ -36,7 +36,7 @@ export const useReportSubmission = (user, fetchReports) => {
       formDataToSubmit.append("userName", user?.name || user?.username || "");
 
       // Add all other fields dynamically (avoiding already added ones, images, and complex objects)
-      const skipFields = ["reportType", "ymStyle", "buyerStyle", "color", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "notes", "images", "userId", "userName"];
+      const skipFields = ["reportType", "ymStyle", "buyerStyle", "color", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "notes", "images", "userId", "userName", "careLabelImage"];
       Object.keys(formData).forEach(key => {
         if (!skipFields.includes(key) && formData[key] !== undefined && formData[key] !== null) {
           if (Array.isArray(formData[key])) {
@@ -46,6 +46,24 @@ export const useReportSubmission = (user, fetchReports) => {
           }
         }
       });
+
+      // Handle careLabelImage as an array of files or URLs
+      if (formData.careLabelImage && Array.isArray(formData.careLabelImage)) {
+        formData.careLabelImage.forEach(item => {
+          if (item instanceof File) {
+            formDataToSubmit.append("careLabelImage", item);
+          }
+        });
+        // Also send existing URLs if any
+        const existingUrls = formData.careLabelImage.filter(item => typeof item === 'string');
+        if (existingUrls.length > 0) {
+          formDataToSubmit.append("careLabelImageUrls", JSON.stringify(existingUrls));
+        }
+      } else if (formData.careLabelImage instanceof File) {
+        formDataToSubmit.append("careLabelImage", formData.careLabelImage);
+      } else if (formData.careLabelImage && typeof formData.careLabelImage === 'string') {
+        formDataToSubmit.append("careLabelImageUrls", JSON.stringify([formData.careLabelImage]));
+      }
 
       // Validate and add image files
       if (formData.images && formData.images.length > 0) {
@@ -178,9 +196,32 @@ export const useReportSubmission = (user, fetchReports) => {
     }
   }, [fetchReports]);
 
+  // Helper to get completion notes field name based on report type
+  const getCompletionNotesField = (reportType) => {
+    switch (reportType) {
+      case "Home Wash Test":
+        return "completionNotes_HomeWash";
+      case "HT Testing":
+        return "completionNotes_HTTesting";
+      case "EMB/Printing Testing":
+        return "completionNotes_EMBPrinting";
+      case "Pulling Test":
+        return "completionNotes_Pulling";
+      default:
+        // Fallback or default
+        return "completionNotes";
+    }
+  };
+
   // Save completion status
-  const saveCompletionStatus = useCallback(async (reportId, completionImages, completionNotes, onSuccess) => {
+  const saveCompletionStatus = useCallback(async (reportId, completionImages, completionNotes, onSuccess, reportType) => {
     if (!reportId) return false;
+
+    // Determine the field name for completion notes
+    // If reportType is not provided, we might default to generic 'completionNotes' or try to fetch it first?
+    // For now assuming reportType is passed or we default to generic if missing, 
+    // but ideally we should know the type.
+    const noteFieldName = reportType ? getCompletionNotesField(reportType) : "completionNotes";
 
     setIsSavingCompletion(true);
     try {
@@ -188,7 +229,9 @@ export const useReportSubmission = (user, fetchReports) => {
       formDataToSubmit.append("status", "completed");
       formDataToSubmit.append("completedDate", new Date().toISOString().split("T")[0]);
       formDataToSubmit.append("completedAt", new Date().toISOString());
-      formDataToSubmit.append("completionNotes", completionNotes || "");
+
+      // Use the dynamic field name
+      formDataToSubmit.append(noteFieldName, completionNotes || "");
 
       completionImages.forEach((imageFile) => {
         if (imageFile instanceof File) {
@@ -248,7 +291,9 @@ export const useReportSubmission = (user, fetchReports) => {
 
     try {
       const formDataToSubmit = new FormData();
-      formDataToSubmit.append("reportType", editFormData.reportType || "Home Wash/Garment Wash Test");
+      const reportType = editFormData.reportType || "Home Wash Test";
+      formDataToSubmit.append("reportType", reportType);
+
       formDataToSubmit.append("color", JSON.stringify(editFormData.color || []));
       formDataToSubmit.append("buyerStyle", editFormData.buyerStyle || "");
       formDataToSubmit.append("po", JSON.stringify(editFormData.po || []));
@@ -257,7 +302,7 @@ export const useReportSubmission = (user, fetchReports) => {
       formDataToSubmit.append("sendToHomeWashingDate", editFormData.sendToHomeWashingDate || "");
 
       // Add all other fields dynamically
-      const skipFields = ["reportType", "color", "buyerStyle", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "images"];
+      const skipFields = ["reportType", "color", "buyerStyle", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "images", "completionNotes", "careLabelImage"];
       Object.keys(editFormData).forEach(key => {
         if (!skipFields.includes(key) && editFormData[key] !== undefined && editFormData[key] !== null) {
           if (Array.isArray(editFormData[key])) {
@@ -267,6 +312,30 @@ export const useReportSubmission = (user, fetchReports) => {
           }
         }
       });
+
+      // Handle careLabelImage as an array of files or URLs
+      if (editFormData.careLabelImage && Array.isArray(editFormData.careLabelImage)) {
+        editFormData.careLabelImage.forEach(item => {
+          if (item instanceof File) {
+            formDataToSubmit.append("careLabelImage", item);
+          }
+        });
+        // Also send existing URLs if any
+        const existingUrls = editFormData.careLabelImage.filter(item => typeof item === 'string');
+        if (existingUrls.length > 0) {
+          formDataToSubmit.append("careLabelImageUrls", JSON.stringify(existingUrls));
+        }
+      } else if (editFormData.careLabelImage instanceof File) {
+        formDataToSubmit.append("careLabelImage", editFormData.careLabelImage);
+      } else if (editFormData.careLabelImage && typeof editFormData.careLabelImage === 'string') {
+        formDataToSubmit.append("careLabelImageUrls", JSON.stringify([editFormData.careLabelImage]));
+      }
+
+      // Handle completionNotes separately to map to correct field
+      if (editFormData.completionNotes !== undefined) {
+        const noteFieldName = getCompletionNotesField(reportType);
+        formDataToSubmit.append(noteFieldName, editFormData.completionNotes);
+      }
 
       const response = await fetch(`${API_BASE_URL}/api/report-washing/${reportId}`, {
         method: "PUT",

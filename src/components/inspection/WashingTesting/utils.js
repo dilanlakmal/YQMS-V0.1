@@ -54,14 +54,14 @@ export const normalizeImageUrl = (imageUrl) => {
  */
 export const getImageFilename = (imageUrl) => {
   if (!imageUrl) return "Image";
-  
+
   // Remove query parameters if any
   const urlWithoutQuery = imageUrl.split('?')[0];
-  
+
   // Extract filename from URL
   const urlParts = urlWithoutQuery.split('/');
   let filename = urlParts[urlParts.length - 1];
-  
+
   // If filename is empty or just a path, try to get from the original URL
   if (!filename || filename === urlWithoutQuery) {
     // Try to extract from various URL patterns
@@ -73,7 +73,7 @@ export const getImageFilename = (imageUrl) => {
       return "Image";
     }
   }
-  
+
   // Remove file extension (everything after the last dot)
   if (filename && filename !== "Image") {
     const lastDotIndex = filename.lastIndexOf('.');
@@ -81,32 +81,28 @@ export const getImageFilename = (imageUrl) => {
       filename = filename.substring(0, lastDotIndex);
     }
   }
-  
+
   return filename || "Image";
 };
 
 /**
- * Normalize date to YYYY-MM-DD format for date input
+ * Get completion notes field name based on report type
  */
-export const normalizeDateForInput = (dateString) => {
-  if (!dateString) return new Date().toISOString().split("T")[0];
-
-  // If already in YYYY-MM-DD format, return as is
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-    return dateString;
+export const getCompletionNotesField = (reportType) => {
+  switch (reportType) {
+    case "Home Wash Test":
+      return "completionNotes_HomeWash";
+    case "HT Testing":
+      return "completionNotes_HTTesting";
+    case "EMB/Printing Testing":
+      return "completionNotes_EMBPrinting";
+    case "Pulling Test":
+      return "completionNotes_Pulling";
+    default:
+      // Fallback or default
+      return "completionNotes";
   }
-
-  // Try to parse the date and convert to YYYY-MM-DD
-  try {
-    const date = new Date(dateString);
-    if (!isNaN(date.getTime())) {
-      return date.toISOString().split("T")[0];
-    }
-  } catch (error) {
-    console.error("Error parsing date:", error);
-  }
-
-  // If parsing fails, return today's date
-  return new Date().toISOString().split("T")[0];
 };
+
+
 
