@@ -139,9 +139,33 @@ const getAvailableSpace = async (dirPath) => {
 };
 
 export const downloadBulkReportsUbuntu = async (req, res) => {
+  const { jobId } = req.body;
+
+  // 1. Initialize the job in the activeJobs map
+  activeJobs.set(jobId, {
+    status: "running",
+    startTime: new Date(),
+    cancelled: false,
+    progress: { processed: 0, total: 0, success: 0, failed: 0 },
+    jobDir: null,
+    driver: null // Store Selenium driver here so we can quit it on cancel
+  });
+
+  // 2. Start the background worker (Selenium version)
+  runDownloadTaskUbuntu(jobId, req.body);
+
+  // 3. Return 202 immediately to the frontend
+  res.status(202).json({
+    success: true,
+    message: "Download job started on Ubuntu server",
+    jobId
+  });
+};
+
+const runDownloadTaskUbuntu = async (jobId, params) => {
+  const jobInfo = activeJobs.get(jobId);
   let driver = null;
   let jobDir = null;
-  const { jobId } = req.body;
 
   try {
     const {
@@ -155,19 +179,12 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
       styleNumber,
       language = "english",
       includeDownloaded = false
-    } = req.body;
+    } = params;
 
-    activeJobs.set(jobId, {
-      status: "running",
-      startTime: new Date(),
-      cancelled: false,
-      jobDir: null,
-      driver: null
-    });
-
-    jobDir = path.join(baseTempDir, `selenium_${Date.now()}`);
-    fs.mkdirSync(jobDir, { recursive: true });
-    activeJobs.get(jobId).jobDir = jobDir;
+    // Setup Directory
+    jobDir = path.join(baseTempDir, `selenium_${jobId}_${Date.now()}`);
+    if (!fs.existsSync(jobDir)) fs.mkdirSync(jobDir, { recursive: true });
+    jobInfo.jobDir = jobDir;
 
     const records = await getInspectionRecords(
       startRange,
@@ -180,12 +197,16 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
       styleNumber,
       includeDownloaded
     );
-    if (records.length === 0)
-      return res.json({
-        success: false,
-        message: "No records matching criteria"
-      });
 
+    if (records.length === 0) {
+      jobInfo.status = "completed";
+      jobInfo.results = { total: 0, message: "No records matching criteria" };
+      return;
+    }
+
+    jobInfo.progress.total = records.length;
+
+    // Selenium Setup
     const options = new chrome.Options();
     options.addArguments(
       "--headless",
@@ -198,18 +219,12 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
       .forBrowser(Browser.CHROME)
       .setChromeOptions(options)
       .build();
-    activeJobs.get(jobId).driver = driver;
+    jobInfo.driver = driver;
 
     await driver.sendAndGetDevToolsCommand("Page.setDownloadBehavior", {
       behavior: "allow",
       downloadPath: jobDir
     });
-
-    let processedCount = 0;
-    let successCount = 0;
-    let failedCount = 0;
-    let failedReports = [];
-    const startTime = Date.now();
 
     // Login
     await driver.get(CONFIG.LOGIN_URL);
@@ -222,23 +237,27 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
     await driver.findElement(By.id("js-login-submit")).click();
     await driver.wait(until.urlContains("dashboard"), 20000);
 
+    let processedCount = 0;
+    let successCount = 0;
+    let failedCount = 0;
+    let failedReports = [];
+
     for (const record of records) {
-      const jobInfo = activeJobs.get(jobId);
-      if (!jobInfo || jobInfo.cancelled) {
-        break;
-      }
+      // Check for cancellation
+      if (jobInfo.cancelled) break;
 
       const inspNo =
         record.inspectionNumbers?.[0] ||
         record.inspectionNumbersKey?.split("-")[0];
-      if (!inspNo) continue;
+      if (!inspNo) {
+        processedCount++;
+        continue;
+      }
 
       try {
         await updateDownloadStatus(record._id, "In Progress");
-
         const filesBefore = fs.readdirSync(jobDir);
 
-        // Navigate to report
         await driver.get(`${CONFIG.BASE_REPORT_URL}${inspNo}`);
 
         const printBtn = await driver.wait(
@@ -249,9 +268,10 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
 
         const newFiles = await waitForNewFile(jobDir, filesBefore);
         const baseName = getFilename(record);
+
         newFiles.forEach((file, index) => {
           const oldPath = path.join(jobDir, file);
-          const newName = `${baseName}${
+          const newName = `${baseName}-${language}${
             newFiles.length > 1 ? `_${index + 1}` : ""
           }.pdf`;
           fs.renameSync(oldPath, path.join(jobDir, newName));
@@ -260,61 +280,53 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
         await updateDownloadStatus(record._id, "Downloaded");
         successCount++;
       } catch (err) {
-        console.error(`❌ Error on ${inspNo}:`, err.message);
         failedCount++;
-        failedReports.push({
-          inspectionNumber: inspNo,
-          groupNumber: record.groupNumber,
-          error: err.message
-        });
+        failedReports.push({ inspectionNumber: inspNo, error: err.message });
         await updateDownloadStatus(record._id, "Failed");
       }
 
       processedCount++;
-
-      // Update job progress
-      if (activeJobs.has(jobId)) {
-        activeJobs.get(jobId).progress = {
-          processed: processedCount,
-          total: records.length,
-          success: successCount,
-          failed: failedCount
-        };
-      }
+      jobInfo.progress = {
+        processed: processedCount,
+        total: records.length,
+        success: successCount,
+        failed: failedCount
+      };
     }
 
-    const endTime = Date.now();
-    const duration = Math.round((endTime - startTime) / 1000);
+    await driver.quit();
+    jobInfo.driver = null;
 
-    const downloadResults = {
+    // Generate ZIP
+    const zipName = `Reports_${jobId}.zip`;
+    const zipPath = path.join(baseTempDir, zipName);
+    const output = fs.createWriteStream(zipPath);
+    const archive = archiver("zip", { zlib: { level: 9 } });
+
+    const streamFinished = new Promise((resolve, reject) => {
+      output.on("close", resolve);
+      archive.on("error", reject);
+    });
+
+    archive.pipe(output);
+    archive.directory(jobDir, false);
+    await archive.finalize();
+    await streamFinished;
+
+    jobInfo.zipPath = zipPath;
+    jobInfo.status = "completed";
+    jobInfo.results = {
       total: processedCount,
       successful: successCount,
       failed: failedCount,
-      failedReports: failedReports,
-      duration: `${Math.floor(duration / 60)}m ${duration % 60}s`,
+      failedReports,
       completedAt: new Date().toISOString()
     };
-
-    await driver.quit();
-
-    if (activeJobs.has(jobId)) {
-      const job = activeJobs.get(jobId);
-      job.status = "completed";
-      job.results = downloadResults;
-      // Auto-cleanup after 5 minutes
-      setTimeout(() => {
-        if (activeJobs.has(jobId)) activeJobs.delete(jobId);
-      }, 300000);
-    }
-
-    await streamZipAndCleanup(jobDir, res, downloadResults);
   } catch (error) {
-    console.error("Download error:", error);
+    console.error("Ubuntu Worker Error:", error);
+    jobInfo.status = "failed";
+    jobInfo.error = error.message;
     if (driver) await driver.quit();
-    activeJobs.delete(jobId);
-    if (!res.headersSent) {
-      res.status(500).json({ success: false, error: error.message });
-    }
   }
 };
 
@@ -1036,12 +1048,21 @@ export const cancelBulkDownload = async (req, res) => {
     jobInfo.cancelled = true;
     jobInfo.cancelledAt = new Date();
 
-    // Close browser if it exists
+    // Close Puppeteer if it exists
     if (jobInfo.browser) {
       try {
         await jobInfo.browser.close();
-      } catch (error) {
-        console.error("Error closing browser during cancellation:", error);
+      } catch (e) {
+        // Ignore errors when closing browser
+      }
+    }
+
+    // Close Selenium if it exists
+    if (jobInfo.driver) {
+      try {
+        await jobInfo.driver.quit();
+      } catch (e) {
+        // Ignore errors when closing driver
       }
     }
 
