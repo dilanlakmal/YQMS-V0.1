@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/Chatbot/ui/button";
-import { ScrollArea } from "@/components/Chatbot/ui/scroll-area";
+import { Button } from "../ui/Button";
+import { ScrollArea } from "../ui/ScrollArea";
 import {
   MessageSquare,
   Plus,
@@ -12,17 +12,17 @@ import {
   Trash2,
   Edit3,
 } from "lucide-react";
-import { cn } from "@/components/chatbot/lib/utils";
+import { cn } from "../utils";
 import {
   deleteConversation,
   editConversationTitle,
-} from "./lib/api/conversation";
-import { ChatMessageTyping } from "./ChatMessage";
+} from "../services/conversation";
+import { ChatMessageTyping } from "./Message";
 import { MdKeyboardArrowRight, MdKeyboardArrowDown } from "react-icons/md";
 import { MdGTranslate } from "react-icons/md";
 import { IoSearch } from "react-icons/io5";
-import ChatGuide from "./ChatStepIntro";
-import { updateConversationStatus } from "./lib/api/conversation";
+import ChatGuide from "./StepIntro";
+import { updateConversationStatus } from "../services/conversation";
 // Reusable user profile component
 function UserProfile({ userData, center }) {
   return (
@@ -175,7 +175,7 @@ function ExpandedSidebar({
       console.error(error);
     }
   };
-  const handleConversationSelection = async(_id) => {
+  const handleConversationSelection = async (_id) => {
     onSelectConversation(_id);
     const activeConversation = conversations.find((conv) => conv._id === _id);
     setModel(activeConversation.model);

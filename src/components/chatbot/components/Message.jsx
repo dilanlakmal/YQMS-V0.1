@@ -1,4 +1,4 @@
-import { cn } from "@/components/chatbot/lib/utils";
+import { cn } from "../utils";
 import { useState, useEffect, useRef } from "react";
 import { marked } from "marked";
 import { LuBot } from "react-icons/lu";
@@ -24,7 +24,7 @@ export function ChatMessage({
   const isUser = message.role === "user";
 
   const handleCopy = (e) => {
-    if (!isUser){
+    if (!isUser) {
       navigator.clipboard.writeText(message.content);
     }
   }
@@ -82,7 +82,7 @@ export function ChatMessage({
           {!isUser && (
             <div className="relative top-4 left-0 w-full gap-3 flex items-center">
               <button className="border-none">
-                <FaRegCopy className="w-4 h-4" onClick={handleCopy}/>
+                <FaRegCopy className="w-4 h-4" onClick={handleCopy} />
               </button>
               <button className="border-none">
                 <AiOutlineLike className="w-4 h-4" />
@@ -136,8 +136,8 @@ export function ChatMessageTyping({ message, speed = 10, onFinish }) {
       <div ref={bottomRef} />
     </>
   )
-  
-  ;
+
+    ;
 }
 export function MarkdownViewer({ text = "" }) {
   const rawHtml = marked.parse(text);

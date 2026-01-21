@@ -1,7 +1,7 @@
 "use client"
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
 
-import { cn } from "@/components/chatbot/lib/utils"
+import { cn } from "../utils"
 
 function ScrollArea({ className, children, ...props }) {
   return (

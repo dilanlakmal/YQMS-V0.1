@@ -1,75 +1,75 @@
 import axios from "axios";
-import { API_BASE_URL } from "../../../../../config";
+import { API_BASE_URL } from "../../../../config";
 
 // Helper to get token
 export const getToken = () =>
-    localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken");
+  localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken");
 
 // Fetch user profile
 export const fetchUserProfile = async () => {
-    const token = getToken();
-    if (!token) throw new Error("No token found!");
+  const token = getToken();
+  if (!token) throw new Error("No token found!");
 
-    const response = await axios.get(`${API_BASE_URL}/api/user-profile`, {
-        headers: {Authorization: `Bearer ${token}`},
-    })
+  const response = await axios.get(`${API_BASE_URL}/api/user-profile`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
 
-    return response.data;
+  return response.data;
 }
 
 
 // Fetch conversations for a user
 export const fetchUserConversation = async (emp_id) => {
-    const token = getToken();
-    if (!token) throw new Error("Token not found!");
+  const token = getToken();
+  if (!token) throw new Error("Token not found!");
 
-    const response = await axios.get(`${API_BASE_URL}/api/ai/conversation/${emp_id}`, {
-        headers: {Authorization: `Bearer ${token}`},
-    }); 
+  const response = await axios.get(`${API_BASE_URL}/api/ai/conversation/${emp_id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 
-    return response.data;
+  return response.data;
 }
 
 
 // Create a new conversation
 export const createConversation = async (conversation) => {
-    const token = getToken();
-    if (!token) {
-        throw new Error("Token not found!");
-    };
+  const token = getToken();
+  if (!token) {
+    throw new Error("Token not found!");
+  };
 
-    const response = await axios.post(`${API_BASE_URL}/api/ai/conversation`, conversation, {
-        headers: {Authorization: `Bearer ${token}`}
-    });
+  const response = await axios.post(`${API_BASE_URL}/api/ai/conversation`, conversation, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
 
-    return response.data;
+  return response.data;
 }
 
 // Add new message
 export const addMessages = async (conversationID, newMessages) => {
-    const token = getToken();
-    if (!token) throw new Error("Token not found!");
+  const token = getToken();
+  if (!token) throw new Error("Token not found!");
 
-    const response = await axios.post(`${API_BASE_URL}/api/ai/conversation/${conversationID}/addMessage`, 
-        newMessages,
-        {
-            headers: `Bearer ${token}`
-        }
-    );
+  const response = await axios.post(`${API_BASE_URL}/api/ai/conversation/${conversationID}/addMessage`,
+    newMessages,
+    {
+      headers: `Bearer ${token}`
+    }
+  );
 
-    return response.data;
+  return response.data;
 }
 
 //DELETE conversation
 export const deleteConversation = async (conversationID) => {
-    const token = getToken();
-    if (!token) throw new Error("Token not found!");
+  const token = getToken();
+  if (!token) throw new Error("Token not found!");
 
-    const response = await axios.delete(`${API_BASE_URL}/api/ai/conversation/${conversationID}`,{
-        headers: `Bearer ${token}`
-    }
-    );
-    return response.data;
+  const response = await axios.delete(`${API_BASE_URL}/api/ai/conversation/${conversationID}`, {
+    headers: `Bearer ${token}`
+  }
+  );
+  return response.data;
 }
 
 // UPDATE conversation title

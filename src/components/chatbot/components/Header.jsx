@@ -1,7 +1,7 @@
-import { Button } from "@/components/Chatbot/ui/button";
+import { Button } from "../ui/Button";
 import { X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { MarqueeText } from "./ChatInput";
+import { MarqueeText } from "./Input";
 
 export default function BotHeader({ onClose }) {
   const navigate = useNavigate();

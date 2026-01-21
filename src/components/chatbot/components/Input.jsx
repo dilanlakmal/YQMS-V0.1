@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { Send } from "lucide-react";
 import { MdOutlineKeyboardVoice } from "react-icons/md";
-import { Button } from "@/components/Chatbot/ui/button";
-import {Textarea} from "./ui/textarea";
-import { editConversationModel } from "./lib/api/conversation";
+import { Button } from "../ui/Button";
+import { Textarea } from "../ui/Textarea";
+import { editConversationModel } from "../services/conversation";
 import { motion } from "framer-motion";
-import ChatGuide from "./ChatStepIntro";
-import { getModels } from "./lib/api/chat";
+import ChatGuide from "./StepIntro";
+import { getModels } from "../services/chat";
 
 export default function ChatInput({
   setConversations,
@@ -32,7 +32,7 @@ export default function ChatInput({
     .find(conv => conv._id === activeConversationId)
     ?.messages
     ?.filter(msg => msg.role === "user") || [];
-  
+
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -44,10 +44,10 @@ export default function ChatInput({
   const handleKeyUp = (e) => {
     if (e.key === "ArrowUp") {
       let newIndex;
-      if (historyIndex === 0){
-        newIndex = userMessages.length -1;
+      if (historyIndex === 0) {
+        newIndex = userMessages.length - 1;
       } else {
-        newIndex = Math.max(historyIndex -1, 0);
+        newIndex = Math.max(historyIndex - 1, 0);
       }
       setHistoryIndex(newIndex)
 
@@ -56,7 +56,7 @@ export default function ChatInput({
       } else {
         const message = userMessages[newIndex];
         setInput(message?.content || "");
-      } 
+      }
     } else if (e.key == "ArrowDown") {
       const newIndex = Math.min(historyIndex + 1, -1);
       setHistoryIndex(newIndex);
@@ -87,7 +87,7 @@ export default function ChatInput({
   const handleChangeModel = async (e) => {
     const newModel = e.target.value;
     setModel(newModel);
-    const updatedConversations = conversations.map(conv => conv._id === activeConversationId ? {...conv, model: newModel}: conv)
+    const updatedConversations = conversations.map(conv => conv._id === activeConversationId ? { ...conv, model: newModel } : conv)
     setConversations(updatedConversations);
     await editConversationModel(activeConversationId, newModel);
   };
@@ -121,8 +121,8 @@ export default function ChatInput({
             bg-muted
             pl-4
             py-4
-            pr-4      /* space for send button */
-            pb-14      /* space for model selector */
+            pr-4      
+            pb-[3em]      
             text-base
             focus-visible:ring-1
             focus-visible:ring-ring
@@ -147,9 +147,8 @@ export default function ChatInput({
           "
           >
             <Send
-              className={`h-4 w-4 ${
-                lastMessage ? "animate-spin text-white/70" : ""
-              }`}
+              className={`h-4 w-4 ${lastMessage ? "animate-spin text-white/70" : ""
+                }`}
             />
           </Button>
 
