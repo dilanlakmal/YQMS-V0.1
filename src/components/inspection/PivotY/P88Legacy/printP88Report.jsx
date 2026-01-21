@@ -294,144 +294,107 @@ const PrintP88Report = () => {
     };
 
     const handleConfirmDownload = async () => {
-        if (pathValidation && !pathValidation.isValid) {
-            setStatus({ message: 'Please select a valid download path', type: 'error' });
-            return;
-        }
+    setLoading(true);
+    setStatus({ message: 'Initializing background job...', type: 'warning' });
 
-        // Handle case where dateFilteredStats might be null
-        const totalRecords = dateFilteredStats?.totalRecords || 0;
-        if (totalRecords === 0) {
-            setStatus({ message: 'No records found matching your criteria', type: 'error' });
-            return;
-        }
+    const token = localStorage.getItem('token') || 
+                  localStorage.getItem('authToken') || 
+                  localStorage.getItem('accessToken');
 
-        const reportsCount = downloadMode === 'range' 
-            ? (Math.min(endRange, totalRecords) - startRange + 1)
-            : totalRecords;
-        
-        const estimatedSeconds = 60 + (reportsCount * 25); 
-        setTimeRemaining(estimatedSeconds);
-        setLoading(true);
-        setIsCancelling(false);
-        setShowDownloadDialog(false);
-        setStatus({ message: 'Generating reports and preparing ZIP... Please wait.', type: 'warning' });
-        
-        // Generate unique job ID
-        const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        setCurrentJobId(jobId);
-        
-        // Create new AbortController for this request
-        abortControllerRef.current = new AbortController();
-        
-        try {
-            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
-            const endpoint = 'download-bulk-reports-cancellable'; 
-            
-            const body = { 
-                jobId: jobId,
-                userId: user?.emp_id,
-                userName: user?.eng_name,
-                downloadPath: selectedPath,
-                startRange: downloadMode === 'range' ? startRange : null,
-                endRange: downloadMode === 'range' ? endRange : null,
-                downloadAll: downloadMode === 'all',
-                startDate: startDate || null,
-                endDate: endDate || null,
-                factoryName: factoryName || null,
-                poNumber: poNumber || null,
-                styleNumber: styleNumber || null,
-                includeDownloaded: includeDownloaded,
-                language: language
-            };
+    if (!token || token === 'undefined') {
+        setLoading(false);
+        setStatus({ 
+            message: 'Authentication error: Please log out and log back in to refresh your session.', 
+            type: 'error' 
+        });
+        console.error("Auth Token missing from localStorage. Available keys:", Object.keys(localStorage));
+        return;
+    }
+    
+    
+    const jobId = `job_${Date.now()}`;
+    setCurrentJobId(jobId);
 
-            const token = localStorage.getItem('authToken') || localStorage.getItem('token');
-            
-            const response = await fetch(`${apiBaseUrl}/api/scraping/${endpoint}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(body),
-                signal: abortControllerRef.current.signal // Add abort signal
-            });
-            
-            if (!response.ok) throw new Error('Failed to generate reports');
-            
-            // CHECK CONTENT TYPE: Is it a ZIP file or a JSON error?
-            const contentType = response.headers.get("content-type");
-            if (contentType && contentType.includes("application/json")) {
-                // If the server sends JSON (usually an error or "no records found")
-                const data = await response.json();
-                if (data.downloadStats) {
-                setDownloadResults(data.downloadStats);
-                setShowResults(true);
-            }
-                setStatus({ message: data.message || 'No records found', type: 'info' });
-            } else {
-                // IF IT IS A FILE (The ZIP)
-                
-                let resultsLoaded = false;
-
-                // Try to get results from header first
-               // 1. TRY TO GET RESULTS FROM HEADER
-                const base64Header = response.headers.get('X-Download-Results');
-                let results = null;
-
-                if (base64Header) {
-                    try {
-                        const decodedJson = atob(base64Header); // Decode Base64
-                        results = JSON.parse(decodedJson);
-                    } catch (e) {
-                        console.error("Error parsing results header", e);
-                    }
-                }
-
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.setAttribute('download', `P88_Reports_${new Date().toISOString().split('T')[0]}.zip`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-
-                // 3. IF HEADER WAS MISSING, POLL THE DATA
-                if (!results) {
-                    // Wait 2 seconds for server to finalize job object
-                    await new Promise(r => setTimeout(r, 2000));
-                    const resultRes = await fetch(`${apiBaseUrl}/api/scraping/download-results/${jobId}`);
-                    if (resultRes.ok) {
-                        const data = await resultRes.json();
-                        results = data.results;
-                    }
-                }
-
-                // 4. DISPLAY THE MODAL
-                if (results) {
-                    setDownloadResults(results);
-                    setShowResults(true); // This triggers your "Download Results Modal"
-                    setStatus({ message: 'Download completed successfully!', type: 'success' });
-                }
-            }
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                // Request was aborted (cancelled)
-                setStatus({ message: 'Download was cancelled by user', type: 'info' });
-            } else {
-                console.error('Download Error:', error);
-                setStatus({ message: `Download failed: ${error.message}`, type: 'error' });
-            }
-        } finally {
-            setLoading(false);
-            setTimeRemaining(null);
-            setCurrentJobId(null);
-            setIsCancelling(false);
-            abortControllerRef.current = null;
-        }
+    // FIX: Define the filters object explicitly from state
+    const filters = {
+        startDate,
+        endDate,
+        factoryName,
+        poNumber,
+        styleNumber,
+        startRange,
+        endRange,
+        downloadMode,
+        downloadAll: downloadMode === 'all',
+        includeDownloaded,
+        language
     };
+
+    try {
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+        const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+        
+        // 1. START THE JOB
+        const response = await fetch(`${apiBaseUrl}/api/scraping/download-bulk-reports-cancellable`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ ...filters, jobId, userId: user?.emp_id })
+        });
+
+        if (!response.ok) throw new Error('Could not start download job');
+
+        // 2. POLL FOR STATUS
+        const pollInterval = setInterval(async () => {
+            try {
+                const statusRes = await fetch(`${apiBaseUrl}/api/scraping/job-status/${jobId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!statusRes.ok) return;
+                
+                const data = await statusRes.json();
+
+                if (data.jobInfo.status === 'running') {
+                    const prog = data.jobInfo.progress;
+                    if (prog && prog.total > 0) {
+                        setStatus({ 
+                            message: `Processing: ${prog.processed} / ${prog.total} reports... (${prog.success} success, ${prog.failed || 0} failed)`, 
+                            type: 'warning' 
+                        });
+                    }
+                } else if (data.jobInfo.status === 'completed') {
+                        clearInterval(pollInterval);
+                        setStatus({ message: 'ZIP ready! Starting download...', type: 'success' });
+
+                        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+                        
+                        // ✅ No token needed in the URL now
+                        const downloadUrl = `${apiBaseUrl}/api/scraping/job-download/${jobId}`;
+                        
+                        const link = document.createElement('a');
+                        link.href = downloadUrl;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+
+                        fetchDownloadResults(jobId);
+                        setLoading(false);
+                    
+                } else if (data.jobInfo.status === 'failed') {
+                    clearInterval(pollInterval);
+                    setLoading(false);
+                    setStatus({ message: `Job Failed: ${data.jobInfo.error || 'Unknown Error'}`, type: 'error' });
+                }
+            } catch (err) {
+                console.error("Polling error", err);
+            }
+        }, 3000); 
+
+    } catch (error) {
+        setStatus({ message: error.message, type: 'error' });
+        setLoading(false);
+    }
+};
 
     const fetchDownloadResults = async (jobId) => {
     try {

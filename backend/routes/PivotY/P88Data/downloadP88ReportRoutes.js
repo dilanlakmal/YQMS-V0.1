@@ -23,7 +23,8 @@ import {
     getCrossFilteredOptions,
     searchSuppliers,
     searchPONumbers,
-    searchStyles
+    searchStyles,
+    getJobZip,
 } from '../../../controller/PivotY/P88Data/downoloadP88ReportController.js';
 
 const router = express.Router();
@@ -52,6 +53,6 @@ router.get('/api/scraping/cross-filtered-options', getCrossFilteredOptions);
 router.get('/api/scraping/search-suppliers', searchSuppliers);
 router.get('/api/scraping/search-po-numbers', searchPONumbers);
 router.get('/api/scraping/search-styles', searchStyles);
-
+router.get('/api/scraping/job-download/:jobId', getJobZip);
 
 export default router;

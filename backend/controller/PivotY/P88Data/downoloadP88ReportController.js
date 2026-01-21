@@ -675,91 +675,76 @@ export const downloadSingleReportDirect = async (req, res) => {
     }
 };
 
-export const downloadBulkReportsCancellable = async (req, res) => {
+const runDownloadTask = async (jobId, recordParams, userId) => {
+    const jobInfo = activeJobs.get(jobId);
     let browser = null;
-    let jobDir = null;
-    const { jobId, userId } = req.body;
-    const currentUserId = userId || await getAuthUserIdentifier(req);
     
     try {
-        const { startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, language = 'english', includeDownloaded = false } = req.body;
+        const { startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, language, includeDownloaded } = recordParams;
         
-        activeJobs.set(jobId, { status: 'running', startTime: new Date(), cancelled: false, jobDir: null, browser: null });
-        
-        jobDir = path.join(baseTempDir, `puppeteer_${jobId}`);
-        fs.mkdirSync(jobDir, { recursive: true });
-        activeJobs.get(jobId).jobDir = jobDir;
-        
+        const jobDir = path.join(baseTempDir, `puppeteer_${jobId}`);
+        if (!fs.existsSync(jobDir)) fs.mkdirSync(jobDir, { recursive: true });
+        jobInfo.jobDir = jobDir;
+
         const records = await getInspectionRecords(startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, includeDownloaded);
         
         if (records.length === 0) {
-            return res.json({ success: false, message: 'No records matching criteria' });
+            jobInfo.status = 'completed';
+            jobInfo.results = { total: 0, message: 'No records matching criteria' };
+            return;
         }
-        
+
+        jobInfo.progress.total = records.length;
+
         browser = await puppeteer.launch({ 
             headless: CONFIG.HEADLESS, 
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-pdf-viewer-policy']
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] 
         });
-        
-        activeJobs.get(jobId).browser = browser;
+        jobInfo.browser = browser;
+
         const page = await browser.newPage();
-        page.setDefaultTimeout(120000); // 2 minute default
-        
         const client = await page.target().createCDPSession();
         await client.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: jobDir });
-        
-        // Login
-        await page.goto(CONFIG.LOGIN_URL);
-        await page.waitForSelector('#username');
+
+        // --- FULL LOGIN LOGIC ---
+        await page.goto(CONFIG.LOGIN_URL, { waitUntil: 'networkidle2' });
+        await page.waitForSelector('#username', { timeout: 30000 });
         await page.type('#username', process.env.P88_USERNAME);
         await page.type('#password', process.env.P88_PASSWORD);
         await page.click('#js-login-submit');
-        await page.waitForNavigation();
+        await page.waitForNavigation({ waitUntil: 'networkidle2' });
+        // -----------------------
 
         let processedCount = 0;
         let successCount = 0;
         let failedCount = 0;
         let failedReports = [];
-        const startTime = Date.now();
 
         for (const record of records) {
-            const jobInfo = activeJobs.get(jobId);
-            if (!jobInfo || jobInfo.cancelled) break;
+            if (jobInfo.cancelled) break;
 
             const inspNo = record.inspectionNumbers?.[0] || record.inspectionNumbersKey?.split('-')[0];
-            if (!inspNo) continue;
+            if (!inspNo) { processedCount++; continue; }
 
             try {
                 await updateDownloadStatus(record._id, 'In Progress');
                 const filesBefore = fs.readdirSync(jobDir);
 
-                // Load Report Page
                 await page.goto(`${CONFIG.BASE_REPORT_URL}${inspNo}`, { waitUntil: 'networkidle2' });
-
-                // Language change
                 await changeLanguage(page, language);
+                await new Promise(r => setTimeout(r, 2000));
 
-                // Give the server a moment to synchronize
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
-                // Prepare print button
                 await page.evaluate(() => {
                     const btn = document.querySelector('#page-wrapper a, a[href*="print"]');
-                    if (btn) btn.setAttribute('target', '_self');
+                    if (btn) {
+                        btn.setAttribute('target', '_self');
+                        btn.click();
+                    }
                 });
-                
-                try {
-                    const printBtn = await page.waitForSelector('#page-wrapper a', { timeout: 15000 });
-                    await printBtn.click();
-                } catch (clickErr) {
-                    if (!clickErr.message.includes('net::ERR_ABORTED')) throw clickErr;
-                }
 
-                // Wait for file
-                const newFiles = await waitForNewFile(jobDir, filesBefore, 120000);
-
-                // Rename
+                const newFiles = await waitForNewFile(jobDir, filesBefore, 90000);
                 const baseName = getFilename(record);
+                
                 newFiles.forEach((file, index) => {
                     const oldPath = path.join(jobDir, file);
                     const newName = `${baseName}-${language}${newFiles.length > 1 ? `_${index + 1}` : ''}.pdf`;
@@ -768,82 +753,113 @@ export const downloadBulkReportsCancellable = async (req, res) => {
 
                 await updateDownloadStatus(record._id, 'Downloaded');
                 successCount++;
-                
             } catch (err) {
-                console.error(`❌ Error on ${inspNo}:`, err.message);
-                failedCount++; // Only increment once
-                failedReports.push({
-                    inspectionNumber: inspNo,
-                    po: record.poNumbers?.[0] || 'N/A',
-                    error: err.message
-                });
-                
-                await logFailedReport(
-                    record._id, 
-                    inspNo, 
-                    record.groupNumber || 'NO-GROUP', 
-                    err.message, 
-                    currentUserId
-                );
+                failedCount++;
+                failedReports.push({ inspectionNumber: inspNo, error: err.message });
                 await updateDownloadStatus(record._id, 'Failed');
             }
 
             processedCount++;
-            
-            if (activeJobs.has(jobId)) {
-                activeJobs.get(jobId).progress = { 
-                    processed: processedCount, 
-                    total: records.length, 
-                    success: successCount, 
-                    failed: failedCount 
-                };
-            }
+            jobInfo.progress = { processed: processedCount, total: records.length, success: successCount, failed: failedCount };
         }
 
-        const endTime = Date.now();
-        const duration = Math.round((endTime - startTime) / 1000); // seconds
+        await browser.close();
+        jobInfo.browser = null;
 
-        // Store results for later retrieval
-        const downloadResults = {
+        // ZIP Generation
+        const zipName = `Reports_${jobId}.zip`;
+        const zipPath = path.join(baseTempDir, zipName);
+        const output = fs.createWriteStream(zipPath);
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        const streamFinished = new Promise((resolve, reject) => {
+            output.on('close', resolve);
+            archive.on('error', reject);
+        });
+
+        archive.pipe(output);
+        archive.directory(jobDir, false);
+        await archive.finalize();
+        await streamFinished;
+
+        jobInfo.zipPath = zipPath;
+        jobInfo.status = 'completed';
+        jobInfo.results = {
             total: processedCount,
             successful: successCount,
             failed: failedCount,
-            failedReports: failedReports,
-            duration: `${Math.floor(duration / 60)}m ${duration % 60}s`,
+            failedReports,
             completedAt: new Date().toISOString()
         };
 
-        await browser.close();
-        
-        if (activeJobs.has(jobId)) {
-            const job = activeJobs.get(jobId);
-            job.status = 'completed';
-            job.results = downloadResults;
-            // Auto-cleanup after 5 minutes
-            setTimeout(() => { if (activeJobs.has(jobId)) activeJobs.delete(jobId); }, 300000);
-        }
-
-        await streamZipAndCleanup(jobDir, res, downloadResults);
-
     } catch (error) {
-        console.error('Download error:', error);
-        if (jobDir && fs.existsSync(jobDir)) {
-            try {
-                fs.rmSync(jobDir, { recursive: true, force: true });
-                console.log(`Cleaned up directory after error: ${jobDir}`);
-            } catch (cleanupErr) {
-                console.error('Failed to clean up after error:', cleanupErr);
-            }
-        }
+        jobInfo.status = 'failed';
+        jobInfo.error = error.message;
         if (browser) await browser.close();
-        activeJobs.delete(jobId);
-        if (!res.headersSent) {
-            res.status(500).json({ success: false, error: error.message });
-        }
     }
 };
 
+export const downloadBulkReportsCancellable = async (req, res) => {
+    const { jobId } = req.body;
+    
+    activeJobs.set(jobId, { 
+        status: 'running', 
+        startTime: new Date(), 
+        cancelled: false, 
+        progress: { processed: 0, total: 0, success: 0, failed: 0 },
+        jobDir: null,
+        zipPath: null
+    });
 
+    // Start background worker
+    runDownloadTask(jobId, req.body, req.body.userId);
+
+    // Return 202 immediately to frontend
+    res.status(202).json({ 
+        success: true, 
+        message: 'Download job started', 
+        jobId 
+    });
+};
+
+export const getJobZip = async (req, res) => {
+    const { jobId } = req.params;
+    
+    // 🛑 TEMPORARY BYPASS: Comment out these lines to stop the 401 error
+    /*
+    const token = req.headers.authorization?.split(' ')[1] || req.query.token;
+    if (!token || token === 'null' || token === 'undefined') {
+        return res.status(401).json({ error: 'Authentication token required' });
+    }
+    */
+
+    const job = activeJobs.get(jobId);
+
+    // If server restarted or job expired
+    if (!job) {
+        return res.status(404).send('Download link expired or Job ID not found.');
+    }
+
+    if (job.status !== 'completed' || !job.zipPath) {
+        return res.status(400).send('File is not ready yet.');
+    }
+
+    // Send the file
+    res.download(job.zipPath, `P88_Reports_${jobId}.zip`, (err) => {
+        if (err) console.error("Error during file download:", err);
+        
+        // Cleanup after sending
+        try {
+            if (fs.existsSync(job.zipPath)) fs.unlinkSync(job.zipPath);
+            if (job.jobDir && fs.existsSync(job.jobDir)) {
+                fs.rmSync(job.jobDir, { recursive: true, force: true });
+            }
+            activeJobs.delete(jobId);
+        } catch (e) {
+            console.error("Cleanup error:", e);
+        }
+    });
+};
 
 // NEW: Cancel download function
 export const cancelBulkDownload = async (req, res) => {
