@@ -117,6 +117,7 @@ import createFincheckUserPreferencesModel from "../../models/QA/FincheckUserPref
 import createFincheckInspectionReportsModel from "../../models/QA/FincheckInspectionReports.js";
 import createFincheckApprovalAssigneeModel from "../../models/QA/FincheckApprovalAssignee.js";
 import createFincheckInspectionDecisionModel from "../../models/QA/fincheck_inspection_decision.js";
+import createFincheckPushSubscriptionModel from "../../models/QA/FincheckPushSubscription.js";
 
 //P88Data
 import createP88DataSchema from "../../models/P88/p88LegacyData.js";
@@ -307,6 +308,8 @@ export const FincheckApprovalAssignees =
 
 export const FincheckInspectionDecision =
   createFincheckInspectionDecisionModel(ymProdConnection);
+export const FincheckPushSubscription =
+  createFincheckPushSubscriptionModel(ymProdConnection);
 
 export const p88LegacyData = createP88DataSchema(ymProdConnection);
 export const p88FailedReport = p88failedReportsModel(ymProdConnection);

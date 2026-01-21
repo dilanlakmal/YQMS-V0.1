@@ -21,6 +21,11 @@ import {
   getShippingStageBreakdown
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Report_Controller.js";
 
+import {
+  getVapidPublicKey,
+  subscribeUser
+} from "../../../controller/PivotY/FincheckInspection/FincheckNotificationController.js";
+
 const router = express.Router();
 
 // Get filtered inspection reports
@@ -105,5 +110,9 @@ router.get(
   "/api/fincheck-inspection/report/:reportId/shipping-stage-breakdown",
   getShippingStageBreakdown
 );
+
+// PUSH NOTIFICATION ROUTES
+router.get("/api/fincheck-reports/push/vapid-key", getVapidPublicKey);
+router.post("/api/fincheck-reports/push/subscribe", subscribeUser);
 
 export default router;

@@ -22,6 +22,9 @@ import {
   ClipboardList
 } from "lucide-react";
 
+// --- Import Push Manager ---
+import FincheckPushManager from "../components/inspection/PivotY/QAReports/FincheckPushManager";
+
 // --- Theme Hook for Dark Mode ---
 const useTheme = () => {
   const [theme, setTheme] = useState(
@@ -662,6 +665,9 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">
+      {/* --- Fincheck Push Notification Manager (Invisible) --- */}
+      {user && <FincheckPushManager user={user} />}
+
       <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
