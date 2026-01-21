@@ -7,7 +7,8 @@ import {
   QASectionsProductLocation,
   FincheckUserPreferences,
   FincheckApprovalAssignees,
-  FincheckInspectionDecision
+  FincheckInspectionDecision,
+  FincheckNotificationGroup
 } from "../../MongoDB/dbConnectionController.js";
 
 import { sendPushToUser } from "./FincheckNotificationController.js";
@@ -1259,42 +1260,104 @@ export const submitLeaderDecision = async (req, res) => {
     /* -------------------------------------------
       TRIGGER PUSH NOTIFICATION
     ------------------------------------------- */
-    // Only notify if Action is Required (Rework or Rejected)
+
+    // Common Data for Notifications
+    const qaEmpId = report.empId;
+    const dateObj = new Date(report.inspectionDate);
+    const dateStr = dateObj.toLocaleDateString("en-US");
+    const orderStr =
+      report.orderNosString ||
+      (report.orderNos ? report.orderNos.join(", ") : "N/A");
+    const targetUrl = `/fincheck-reports/view/${reportId}`;
+
+    // --- SCENARIO A: Critical Rework PO Notification ---
+    // Target: FincheckNotificationGroup (Excluding QA)
+    if (reworkPO === "Yes") {
+      try {
+        const groupMembers = await FincheckNotificationGroup.find({});
+
+        // Prepare Message
+        const poCommentText = reworkPOComment
+          ? `\nReason: ${reworkPOComment}`
+          : "";
+        const criticalBody = `Order: ${orderStr} | QA: ${qaEmpId}\nLeader: ${leaderName}${poCommentText}`;
+
+        const criticalPayload = {
+          title: `🚨 CRITICAL: Rework PO Required #${reportId}`,
+          body: criticalBody,
+          icon: "/assets/Home/Fincheck_Critical.png", // Optional: Different icon for critical
+          url: targetUrl,
+          tag: `rework-po-${reportId}`,
+          isCritical: true // Flag for SW to vibrate longer
+        };
+
+        // Loop and Send
+        for (const member of groupMembers) {
+          // DO NOT send to the QA (as per requirement)
+          if (member.empId === qaEmpId) continue;
+
+          // Send (Fire and Forget)
+          sendPushToUser(member.empId, criticalPayload);
+        }
+      } catch (err) {
+        console.error("Error sending notification group push:", err);
+      }
+    }
+
+    // --- SCENARIO B: QA Feedback Notification ---
+    // Target: QA User Only (If Action Required)
     if (status === "Rework" || status === "Rejected") {
-      const qaEmpId = report.empId; // The user who created the report
-
-      // 1. Format Date (e.g., 1/21/2026)
-      const dateObj = new Date(report.inspectionDate);
-      const dateStr = dateObj.toLocaleDateString("en-US");
-
-      // 2. Get Order String
-      // Fallback to orderNos array join if string is empty
-      const orderStr =
-        report.orderNosString ||
-        (report.orderNos ? report.orderNos.join(", ") : "N/A");
-
-      // 3. Construct Detailed Message Body
-      const bodyText = `Report #${reportId} [Inspection Date: ${dateStr}, Order No: ${orderStr}, Report Type: ${
+      const qaBodyText = `Report #${reportId} [${
         report.reportType
-      }, QA ID: ${
-        report.empId
-      }] Marked for ${status.toUpperCase()} by ${leaderId} - ${leaderName}`;
+      }] marked for ${status.toUpperCase()} by ${leaderName}.`;
 
-      // 4. Construct Correct URL
-      // This is the relative path. The Service Worker will attach the domain.
-      const targetUrl = `/fincheck-reports/view/${reportId}`;
-
-      const payload = {
+      const qaPayload = {
         title: `Fincheck: Report ${status}`,
-        body: bodyText, // New detailed text
+        body: qaBodyText,
         icon: "/assets/Home/Fincheck_Inspection.png",
-        url: targetUrl, // New correct URL
+        url: targetUrl,
         tag: `fincheck-${reportId}`
       };
 
-      // Fire and forget (don't await, so UI doesn't lag)
-      sendPushToUser(qaEmpId, payload);
+      sendPushToUser(qaEmpId, qaPayload);
     }
+
+    // // Only notify if Action is Required (Rework or Rejected)
+    // if (status === "Rework" || status === "Rejected") {
+    //   const qaEmpId = report.empId; // The user who created the report
+
+    //   // 1. Format Date (e.g., 1/21/2026)
+    //   const dateObj = new Date(report.inspectionDate);
+    //   const dateStr = dateObj.toLocaleDateString("en-US");
+
+    //   // 2. Get Order String
+    //   // Fallback to orderNos array join if string is empty
+    //   const orderStr =
+    //     report.orderNosString ||
+    //     (report.orderNos ? report.orderNos.join(", ") : "N/A");
+
+    //   // 3. Construct Detailed Message Body
+    //   const bodyText = `Report #${reportId} [Inspection Date: ${dateStr}, Order No: ${orderStr}, Report Type: ${
+    //     report.reportType
+    //   }, QA ID: ${
+    //     report.empId
+    //   }] Marked for ${status.toUpperCase()} by ${leaderId} - ${leaderName}`;
+
+    //   // 4. Construct Correct URL
+    //   // This is the relative path. The Service Worker will attach the domain.
+    //   const targetUrl = `/fincheck-reports/view/${reportId}`;
+
+    //   const payload = {
+    //     title: `Fincheck: Report ${status}`,
+    //     body: bodyText, // New detailed text
+    //     icon: "/assets/Home/Fincheck_Inspection.png",
+    //     url: targetUrl, // New correct URL
+    //     tag: `fincheck-${reportId}`
+    //   };
+
+    //   // Fire and forget (don't await, so UI doesn't lag)
+    //   sendPushToUser(qaEmpId, payload);
+    // }
 
     return res.status(200).json({
       success: true,
