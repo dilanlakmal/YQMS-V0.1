@@ -108,14 +108,18 @@ const LaundryWashingMachineTest = () => {
     availableColors,
     availablePOs,
     availableETDs,
+    availableSizes,
     fabrication,
     season,
     styleDescription,
     custStyle,
     isLoadingColors,
+    isLoadingSpecs,
     fetchOrderColors,
     fetchYorksysOrderETD,
+    fetchAnfSpecs,
     resetOrderData,
+    anfSpecs,
   } = useOrderData();
 
   const {
@@ -254,7 +258,7 @@ const LaundryWashingMachineTest = () => {
   const [showEditReceivedImagesModal, setShowEditReceivedImagesModal] = useState(false);
   const [showEditCompletionImagesModal, setShowEditCompletionImagesModal] = useState(false);
   const [editingImageReport, setEditingImageReport] = useState(null);
-  const [editingImageType, setEditingImageType] = useState(null); // 'initial', 'received', 'completion'
+  const [editingImageType, setEditingImageType] = useState(null); // 'initial', 'received', 'completion'  
   const [editingImages, setEditingImages] = useState([]);
   const [editingNotes, setEditingNotes] = useState("");
   const [isUpdatingImages, setIsUpdatingImages] = useState(false);
@@ -2054,10 +2058,14 @@ const LaundryWashingMachineTest = () => {
               fileInputRef={fileInputRef}
               cameraInputRef={cameraInputRef}
               imageRotations={imageRotations}
+              availableSizes={availableSizes}
               season={season}
               styleDescription={styleDescription}
               custStyle={custStyle}
               fabrication={fabrication}
+              anfSpecs={anfSpecs}
+              isLoadingSpecs={isLoadingSpecs}
+              fetchAnfSpecs={fetchAnfSpecs}
               isReportTypeOpen={isReportTypeOpen}
               setIsReportTypeOpen={setIsReportTypeOpen}
               dropdownRef={dropdownRef}

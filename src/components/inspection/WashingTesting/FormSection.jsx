@@ -31,6 +31,7 @@ const FormSection = ({
   setShowPODropdown,
   // ETD
   availableETDs,
+  availableSizes,
   showETDDropdown,
   setShowETDDropdown,
   // Factory
@@ -56,6 +57,10 @@ const FormSection = ({
   season,
   styleDescription,
   custStyle,
+  // ANF Specs
+  anfSpecs,
+  isLoadingSpecs,
+  fetchAnfSpecs,
 }) => {
 
   // Common props shared by all forms
@@ -132,6 +137,10 @@ const FormSection = ({
           fabrication={fabrication}
           showColorDropdown={showColorDropdown}
           setShowColorDropdown={setShowColorDropdown}
+          availableSizes={availableSizes}
+          anfSpecs={anfSpecs}
+          isLoadingSpecs={isLoadingSpecs}
+          fetchAnfSpecs={fetchAnfSpecs}
         />;
       case "Home Wash Test":
       default:

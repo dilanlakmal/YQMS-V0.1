@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Upload, Camera, X, Send, RotateCw, Plus, Trash2, Calendar, CheckCircle2, XCircle, Check } from "lucide-react";
-import { DatePicker as AntDatePicker } from "antd";
+import { Upload, Camera, X, Send, RotateCw, Plus, Trash2, Calendar, CheckCircle2, XCircle, Check, Hash, Maximize2 } from "lucide-react";
+import { DatePicker } from "antd";
 import dayjs from "dayjs";
+import { API_BASE_URL } from "../../../../../config";
 
 /**
  * Garment Wash Report Form Component
@@ -12,6 +13,44 @@ import dayjs from "dayjs";
  * - Visual Assessment
  * - Flat Measurements (Shrinkage)
  */
+
+const decimalToFractionString = (decimal) => {
+    if (decimal === null || decimal === undefined || isNaN(decimal)) return " ";
+    if (decimal === 0) return "0";
+
+    const sign = decimal < 0 ? "-" : "+";
+    const absDecimal = Math.abs(decimal);
+
+    const fractions = [
+        { v: 0.0625, f: "1/16" },
+        { v: 0.125, f: "1/8" },
+        { v: 0.1875, f: "3/16" },
+        { v: 0.25, f: "1/4" },
+        { v: 0.3125, f: "5/16" },
+        { v: 0.375, f: "3/8" },
+        { v: 0.4375, f: "7/16" },
+        { v: 0.5, f: "1/2" },
+        { v: 0.5625, f: "9/16" },
+        { v: 0.625, f: "5/8" },
+        { v: 0.6875, f: "11/16" },
+        { v: 0.75, f: "3/4" },
+        { v: 0.8125, f: "13/16" },
+        { v: 0.875, f: "7/8" },
+        { v: 0.9375, f: "15/16" }
+    ];
+
+    const tolerance = 0.01;
+    const closest = fractions.find(
+        (fr) => Math.abs(absDecimal - fr.v) < tolerance
+    );
+
+    if (closest) {
+        return `${sign}${closest.f}`;
+    }
+
+    return `${sign}${absDecimal.toFixed(3)}`;
+};
+
 const GarmentWashForm = ({
     formData,
     handleInputChange,
@@ -42,16 +81,57 @@ const GarmentWashForm = ({
     setShowColorDropdown,
     fabrication,
     custStyle,
-    fetchYorksysOrderETD
+    availableSizes,
+    fetchYorksysOrderETD,
+    // ANF Specs
+    anfSpecs,
+    isLoadingSpecs,
+    fetchAnfSpecs
 }) => {
 
     const colorDropdownRef = useRef(null);
+    const sizeDropdownRef = useRef(null);
     const styleFetchTimerRef = useRef(null);
     const careLabelFileInputRef = useRef(null);
     const careLabelCameraInputRef = useRef(null);
+    const prevAvailableColorsRef = useRef([]);
     const [keypadOpen, setKeypadOpen] = useState(false);
+    const [showSizeDropdown, setShowSizeDropdown] = useState(false);
     const [keypadTarget, setKeypadTarget] = useState({ field: '', index: null, key: '' });
     const [tempValue, setTempValue] = useState('');
+    const [showSizeComparisonModal, setShowSizeComparisonModal] = useState(false);
+
+    // Added for Enhanced Header and specific page functionality
+    const [showAll, setShowAll] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
+
+    // Measurement specs state (same as MeasurementDetailsSection)
+    const [measurementSpecs, setMeasurementSpecs] = useState({ 
+        beforeWash: [], 
+        afterWash: [], 
+        beforeWashGrouped: {}, 
+        afterWashGrouped: {} 
+    });
+    const [isLoadingMeasurementSpecs, setIsLoadingMeasurementSpecs] = useState(false);
+
+    // Derived values for the header
+    const filterCriteria = {
+        styleNo: formData.style || 'N/A',
+        washType: 'Garment Wash'
+    };
+    const anfPoints = anfSpecs || [];
+
+    const handleExportPDF = () => {
+        setIsExporting(true);
+        setTimeout(() => setIsExporting(false), 1000);
+        console.log("Export PDF not implemented");
+    };
+
+    const handleExportExcel = () => {
+        setIsExporting(true);
+        setTimeout(() => setIsExporting(false), 1000);
+        console.log("Export Excel not implemented");
+    };
 
     // Cleanup timer on unmount
     useEffect(() => {
@@ -80,6 +160,22 @@ const GarmentWashForm = ({
             document.removeEventListener("mousedown", handleClickOutside);
         };
     }, [showColorDropdown, setShowColorDropdown]);
+
+    // Click outside handler for Size Dropdown
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showSizeDropdown &&
+                sizeDropdownRef.current &&
+                !sizeDropdownRef.current.contains(event.target)) {
+                setShowSizeDropdown(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [showSizeDropdown]);
 
     // Initialize defaults if missing or empty strings
     useEffect(() => {
@@ -114,13 +210,9 @@ const GarmentWashForm = ({
             }
         }
 
-        if (!formData.shrinkageRows) {
+        if (!formData.shrinkageRows || formData.shrinkageRows.length === 0) {
             handleInputChange('shrinkageRows', [
-                { location: 'CHEST', original: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' },
-                { location: 'BOTTOM', original: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' },
-                { location: 'SLV LENGTH (L)', original: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' },
-                { location: 'SLV LENGTH (R)', original: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' },
-                { location: 'FRT BODY LENGTH', original: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' },
+                { location: '', original: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' }
             ]);
         }
 
@@ -135,7 +227,170 @@ const GarmentWashForm = ({
                 { item: 'Others / Care label', accepted: true, rejected: false, comments: '' },
             ]);
         }
+
+        if (!formData.washType) {
+            handleInputChange('washType', 'Before Wash');
+        }
     }, [formData.reportType]);
+
+    // Fetch measurement specs from the same API as MeasurementDetailsSection
+    const fetchMeasurementSpecs = async (orderNo) => {
+        if (!orderNo || orderNo.trim().length < 3) {
+            setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
+            return;
+        }
+
+        setIsLoadingMeasurementSpecs(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}`);
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                const beforeWashGrouped = data.beforeWashGrouped || {};
+                const afterWashGrouped = data.afterWashGrouped || {};
+                
+                setMeasurementSpecs({
+                    beforeWash: data.beforeWashSpecs || [],
+                    afterWash: data.afterWashSpecs || [],
+                    beforeWashGrouped: beforeWashGrouped,
+                    afterWashGrouped: afterWashGrouped
+                });
+            } else {
+                setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
+            }
+        } catch (error) {
+            console.error('Error fetching measurement specs:', error);
+            setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
+        } finally {
+            setIsLoadingMeasurementSpecs(false);
+        }
+    };
+
+    // Helper function to get size-specific spec value
+    const getSizeSpecValue = (spec, size) => {
+        if (Array.isArray(spec.Specs)) {
+            const sizeSpec = spec.Specs.find(s => s.size === size);
+            return sizeSpec ? sizeSpec.fraction : (spec.Specs?.fraction || spec.Specs || '');
+        }
+        return spec.Specs?.fraction || spec.Specs || '';
+    };
+
+    // Helper function to get all sizes with their specs for comparison
+    const getAllSizeSpecs = () => {
+        const washType = formData.washType || 'Before Wash';
+        const isBeforeWash = washType === 'Before Wash';
+        const specsSource = isBeforeWash ? measurementSpecs.beforeWash : measurementSpecs.afterWash;
+        const groupedSpecs = isBeforeWash ? measurementSpecs.beforeWashGrouped : measurementSpecs.afterWashGrouped;
+        
+        // Get the first available K-value or use flat array
+        let specsToUse = [];
+        if (Object.keys(groupedSpecs).length > 0) {
+            const firstKValue = Object.keys(groupedSpecs)[0];
+            specsToUse = groupedSpecs[firstKValue] || [];
+        } else if (Array.isArray(specsSource) && specsSource.length > 0) {
+            specsToUse = specsSource;
+        }
+
+        // Extract all available sizes from specs
+        const allSizes = new Set();
+        specsToUse.forEach(spec => {
+            if (Array.isArray(spec.Specs)) {
+                spec.Specs.forEach(s => {
+                    if (s.size) allSizes.add(s.size);
+                });
+            }
+        });
+
+        // Sort sizes in a logical order
+        const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '4XL', '5XL'];
+        const sortedSizes = Array.from(allSizes).sort((a, b) => {
+            const indexA = sizeOrder.indexOf(a);
+            const indexB = sizeOrder.indexOf(b);
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+            if (indexA !== -1) return -1;
+            if (indexB !== -1) return 1;
+            return a.localeCompare(b);
+        });
+
+        // Build comparison data
+        const comparisonData = specsToUse.map(spec => {
+            const row = {
+                measurementPoint: spec.MeasurementPointEngName || spec.measurementPoint || 'UNKNOWN',
+                sizes: {}
+            };
+            
+            sortedSizes.forEach(size => {
+                row.sizes[size] = getSizeSpecValue(spec, size);
+            });
+            
+            return row;
+        });
+
+        return { sizes: sortedSizes, data: comparisonData };
+    };
+
+    // 1. Fetch measurement specs when orderNo (style) is available
+    const lastFetchedOrderNoRef = useRef('');
+    useEffect(() => {
+        const orderNo = (formData.style || '').trim().toUpperCase();
+        
+        if (orderNo && orderNo.length >= 3 && orderNo !== lastFetchedOrderNoRef.current) {
+            lastFetchedOrderNoRef.current = orderNo;
+            fetchMeasurementSpecs(orderNo);
+        } else if (!orderNo || orderNo.length < 3) {
+            setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
+        }
+    }, [formData.style]);
+
+    // 2. Update shrinkageRows when measurement specs, size, or wash type change
+    useEffect(() => {
+        const size = formData.sampleSize;
+        const washType = formData.washType || 'Before Wash';
+        
+        if (!size || isLoadingMeasurementSpecs) {
+            return;
+        }
+
+        // Determine which specs to use based on wash type
+        const isBeforeWash = washType === 'Before Wash';
+        const specsSource = isBeforeWash ? measurementSpecs.beforeWash : measurementSpecs.afterWash;
+        const groupedSpecs = isBeforeWash ? measurementSpecs.beforeWashGrouped : measurementSpecs.afterWashGrouped;
+        
+        // Get the first available K-value or use flat array
+        let specsToUse = [];
+        if (Object.keys(groupedSpecs).length > 0) {
+            // Use the first K-value group
+            const firstKValue = Object.keys(groupedSpecs)[0];
+            specsToUse = groupedSpecs[firstKValue] || [];
+        } else if (Array.isArray(specsSource) && specsSource.length > 0) {
+            specsToUse = specsSource;
+        }
+
+        if (specsToUse.length > 0) {
+            // Transform specs to shrinkageRows format, filtering by size
+            const dynamicRows = specsToUse.map((spec, idx) => {
+                const specValue = getSizeSpecValue(spec, size);
+                
+                return {
+                    no: idx + 1,
+                    location: spec.MeasurementPointEngName || spec.measurementPoint || 'UNKNOWN',
+                    original: specValue || '',
+                    beforeWash: '',
+                    afterWash: '',
+                    shrinkage: '',
+                    requirement: '±5%', // Default shrinkage requirement
+                    passFail: 'PASS',
+                    isFromSpec: true,
+                    id: Math.random().toString(36).substr(2, 9)
+                };
+            });
+            
+            handleInputChange('shrinkageRows', dynamicRows);
+        } else if (!isLoadingMeasurementSpecs && size) {
+            // If fetch finished but no specs found, clear rows
+            handleInputChange('shrinkageRows', []);
+        }
+    }, [measurementSpecs, formData.sampleSize, formData.washType, isLoadingMeasurementSpecs]);
 
     // Synchronization effects for derived metadata
     // These ensure that data fetched by the hook correctly enters the form's local state
@@ -163,12 +418,15 @@ const GarmentWashForm = ({
         }
     }, [custStyle, formData.custStyle]);
 
-    // Auto-populate Colors when available
+    // Auto-populate Colors when available (Only on new data)
     useEffect(() => {
-        if (availableColors && availableColors.length > 0 && (!formData.color || formData.color.length === 0)) {
+        const isNewColors = JSON.stringify(availableColors) !== JSON.stringify(prevAvailableColorsRef.current);
+
+        if (isNewColors && availableColors && availableColors.length > 0) {
             handleInputChange('color', [...availableColors]);
+            prevAvailableColorsRef.current = availableColors;
         }
-    }, [availableColors, formData.color]);
+    }, [availableColors, handleInputChange]);
 
     // Auto-update table rows color when header color changes
     useEffect(() => {
@@ -247,36 +505,40 @@ const GarmentWashForm = ({
         if (!rows[index]) return; // Safety check
         rows[index] = { ...rows[index], [key]: value };
 
-        // Auto-calculate Shrinkage % if updating measurement rows
-        if (field === 'shrinkageRows' && (key === 'beforeWash' || key === 'afterWash')) {
-            const beforeVal = key === 'beforeWash' ? value : rows[index].beforeWash;
-            const afterVal = key === 'afterWash' ? value : rows[index].afterWash;
+        // Auto-calculate Shrinkage % and Pass/Fail if updating measurement rows
+        if (field === 'shrinkageRows') {
+            const row = rows[index];
+            const beforeVal = key === 'beforeWash' ? value : row.beforeWash;
+            const afterVal = key === 'afterWash' ? value : row.afterWash;
 
             const before = parseFraction(beforeVal);
             const after = parseFraction(afterVal);
 
+            // 1. In this version, we no longer validate measurement against TOL- and TOL+
+            let isMeasurementOk = true;
+
+            // 2. Determine Shrinkage Pass/Fail
+            let isShrinkageOk = true;
             if (before !== 0 && beforeVal !== '' && afterVal !== '') {
                 const shrinkage = ((after - before) / before) * 100;
-                rows[index].shrinkage = shrinkage.toFixed(2) + '%';
+                rows[index].shrinkage = (shrinkage >= 0 ? '+' : '') + shrinkage.toFixed(2) + '%';
 
                 // Get requirement threshold (default 5% if not specified)
                 let req = 5;
-                const reqStr = rows[index].requirement || '';
+                const reqStr = row.requirement || '';
                 const match = reqStr.match(/(\d+)/);
                 if (match) req = parseInt(match[1]);
 
-                // Auto-update Pass/Fail status
-                if (Math.abs(shrinkage) <= req) {
-                    rows[index].passFail = 'PASS';
-                } else {
-                    rows[index].passFail = 'FAIL';
-                }
-            } else {
+                isShrinkageOk = Math.abs(shrinkage) <= req;
+            } else if (key === 'beforeWash' || key === 'afterWash') {
                 rows[index].shrinkage = '';
-                // Don't reset passFail if user manually toggled it, but if both blank, reset
-                if (beforeVal === '' && afterVal === '') {
-                    rows[index].passFail = 'PASS'; // Default to PASS as requested earlier
-                }
+            }
+
+            // 3. Final Pass/Fail Status
+            if (beforeVal !== '' || afterVal !== '') {
+                rows[index].passFail = (isMeasurementOk && isShrinkageOk) ? 'PASS' : 'FAIL';
+            } else {
+                rows[index].passFail = 'PASS';
             }
         }
 
@@ -284,12 +546,19 @@ const GarmentWashForm = ({
     };
 
     // Helper to add a new row to Color Fastness tables
+    // Helper to add a new row to tables
     const addRow = (field) => {
         const rows = [...(formData[field] || [])];
         const headerColor = Array.isArray(formData.color) ? formData.color.join(', ') : (formData.color || '');
-        const newRow = field === 'colorFastnessRows'
-            ? { fabricType: '', color: headerColor, colorChange: '5', ratingAfterWash: '', requirement: '4-5', passFail: 'PASS' }
-            : { fabricType: '', color: headerColor, colorStaining: '5', ratingAfterWash: '', requirement: '4-5', passFail: 'PASS' };
+
+        let newRow = {};
+        if (field === 'colorFastnessRows') {
+            newRow = { fabricType: '', color: headerColor, colorChange: '5', ratingAfterWash: '', requirement: '4-5', passFail: 'PASS' };
+        } else if (field === 'colorStainingRows') {
+            newRow = { fabricType: '', color: headerColor, colorStaining: '5', ratingAfterWash: '', requirement: '4-5', passFail: 'PASS' };
+        } else if (field === 'shrinkageRows') {
+            newRow = { location: '', original: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' };
+        }
 
         handleInputChange(field, [...rows, newRow]);
     };
@@ -538,7 +807,7 @@ const GarmentWashForm = ({
                     {/* CUST. STYLE */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">CUST STYLE :
-                            <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto)</span>
+                            <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto-filled)</span>
                         </label>
                         <input placeholder="Auto-filled Cust" type="text" value={formData.custStyle || ''} onChange={(e) => handleInputChange("custStyle", e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white cursor-not-allowed" required readOnly />
@@ -547,7 +816,7 @@ const GarmentWashForm = ({
                     {/* COLOR Dropdown - Matching HomeWashForm UI */}
                     <div className="relative color-dropdown-container" ref={colorDropdownRef}>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">COLOR :
-                            <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto)</span>
+                            <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto-filled)</span>
                         </label>
                         <div className="relative">
                             <button
@@ -657,7 +926,7 @@ const GarmentWashForm = ({
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             SEASON :
-                            <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto)</span>
+                            <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto-filled)</span>
                         </label>
                         <input
                             type="text"
@@ -672,7 +941,7 @@ const GarmentWashForm = ({
                     <div className="md:col-span-2 lg:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             STYLE DESCRIPTION :
-                            <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto)</span>
+                            <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto-filled)</span>
                         </label>
                         <textarea
                             value={formData.styleDescription || ''}
@@ -872,6 +1141,8 @@ const GarmentWashForm = ({
                     </div>
                 </div>
 
+           
+
                 {/* 4. Color Staining Table */}
                 <div>
                     <div className="flex justify-between items-center mb-2">
@@ -979,105 +1250,299 @@ const GarmentWashForm = ({
 
                 {/* 6. Flat Measurements (Shrinkage) */}
                 <div>
-                    <div className="flex justify-between items-center mb-2">
+                    <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-4 gap-4">
                         <div className="flex items-center gap-4">
-                            <h3 className="font-bold text-gray-800 dark:text-white">Flat Measurements & Shrinkage</h3>
-
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-all hover:border-blue-300 dark:hover:border-blue-700">
-                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.1em]">Test Size</span>
-                                <div className="h-4 w-[1px] bg-gray-200 dark:bg-gray-700"></div>
-                                <select
-                                    value={formData.sampleSize || ''}
-                                    onChange={(e) => handleInputChange('sampleSize', e.target.value)}
-                                    className="bg-transparent text-sm font-bold text-blue-600 dark:text-blue-400 focus:outline-none cursor-pointer pr-1 min-w-[3rem]"
-                                >
-                                    <option value="">Select</option>
-                                    {['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'LT', 'XLT', '2XLT'].map(s => (
-                                        <option key={s} value={s}>{s}</option>
-                                    ))}
-                                </select>
+                            <div className="flex flex-col">
+                                <h3 className="text-lg font-black text-gray-800 dark:text-white leading-tight">Flat Measurements & Shrinkage</h3>
+                                <p className="text-xs text-gray-400 font-medium">Enter standard measurements to calculate shrinkage</p>
                             </div>
                         </div>
+
+                        <div className="flex items-center gap-3">
+                            {/* Wash Type Button Selector */}
+                            <div className="relative group">
+                                <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-xl blur-sm group-hover:blur-md transition-all duration-300 opacity-50"></div>
+                                <div className="relative flex items-center gap-3 px-4 py-1.5 bg-white dark:bg-gray-800 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm transition-all hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md">
+                                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.1em]">Wash Type</span>
+                                    <div className="h-4 w-[1px] bg-gray-100 dark:bg-gray-700"></div>
+                                    <div className="flex bg-gray-50 dark:bg-gray-900/50 p-1 rounded-lg border border-gray-100 dark:border-gray-700">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleInputChange('washType', 'Before Wash')}
+                                            className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${formData.washType === 'Before Wash'
+                                                ? 'bg-blue-600 text-white shadow-sm'
+                                                : 'text-gray-400 hover:text-blue-500 hover:bg-white'
+                                                }`}
+                                        >
+                                            Before
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleInputChange('washType', 'After Wash')}
+                                            className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${formData.washType === 'After Wash'
+                                                ? 'bg-blue-600 text-white shadow-sm'
+                                                : 'text-gray-400 hover:text-blue-500 hover:bg-white'
+                                                }`}
+                                        >
+                                            After
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="relative group">
+                                <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-xl blur-sm group-hover:blur-md transition-all duration-300 opacity-50"></div>
+                                <div className="relative flex items-center gap-3 px-4 py-2 bg-white dark:bg-gray-800 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm transition-all hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md">
+                                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.1em]">Test Size</span>
+                                    <div className="h-4 w-[1px] bg-gray-100 dark:bg-gray-700"></div>
+                                    <div className="relative" ref={sizeDropdownRef}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowSizeDropdown(!showSizeDropdown)}
+                                            className="flex items-center gap-2 text-base font-black text-blue-600 dark:text-blue-400 focus:outline-none cursor-pointer min-w-[3rem] justify-center"
+                                        >
+                                            <span className="tabular-nums">{formData.sampleSize || '--'}</span>
+                                            <svg className={`transition-transform duration-200 ${showSizeDropdown ? 'rotate-180' : ''}`} width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                        </button>
+
+                                        {/* Dropdown Menu */}
+                                        {showSizeDropdown && (
+                                            <div className="absolute top-full right-0 mt-3 min-w-[140px] bg-white dark:bg-gray-800 border border-blue-100 dark:border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ring-4 ring-blue-50/50 dark:ring-blue-900/20">
+                                                <div className="max-h-64 overflow-y-auto p-1.5 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600">
+                                                    {(availableSizes || []).length === 0 ? (
+                                                        <div className="px-4 py-3 text-xs text-gray-400 text-center font-medium italic">No sizes available</div>
+                                                    ) : (
+                                                        (availableSizes || []).map((s) => (
+                                                            <button
+                                                                key={s}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    handleInputChange('sampleSize', s);
+                                                                    setShowSizeDropdown(false);
+                                                                }}
+                                                                className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold transition-all mb-0.5 last:mb-0 flex items-center justify-between group
+                                                                    ${formData.sampleSize === s
+                                                                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400'
+                                                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-300'
+                                                                    }`}
+                                                            >
+                                                                {s}
+                                                                {formData.sampleSize === s && (
+                                                                    <Check size={14} strokeWidth={3} className="opacity-100 transition-opacity" />
+                                                                )}
+                                                            </button>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* View All Sizes Button */}
+                            {formData.sampleSize && (formData.shrinkageRows || []).length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSizeComparisonModal(true)}
+                                    className="relative group flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border border-blue-200 dark:border-blue-700 rounded-xl shadow-sm hover:shadow-md transition-all hover:from-blue-100 hover:to-indigo-100 dark:hover:from-blue-900/50 dark:hover:to-indigo-900/50"
+                                    title="View all sizes comparison"
+                                >
+                                    <Maximize2 size={16} className="text-blue-600 dark:text-blue-400" />
+                                    <span className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">View All Sizes</span>
+                                </button>
+                            )}
+
+
+                        </div>
                     </div>
-                    <div className="overflow-x-auto border rounded-md">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold">
+
+                    <div className="relative overflow-x-auto border rounded-xl shadow-sm bg-white dark:bg-gray-900 overflow-hidden">
+                        {/* Loading Overlay */}
+                        {(isLoadingSpecs || isLoadingMeasurementSpecs) && (
+                            <div className="absolute inset-0 z-10 bg-white/60 dark:bg-gray-900/60 backdrop-blur-[2px] flex items-center justify-center animate-in fade-in duration-300">
+                                <div className="flex flex-col items-center gap-3">
+                                    <div className="w-10 h-10 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+                                    <span className="text-sm font-bold text-blue-600 animate-pulse">Fetching Specs...</span>
+                                </div>
+                            </div>
+                        )}
+
+                        <table className="w-full text-sm text-left border-collapse">
+                            <thead className="sticky top-0 z-10 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur-md text-gray-500 dark:text-gray-400 font-extrabold text-[10px] uppercase tracking-wider shadow-sm">
                                 <tr>
-                                    <th className="p-2 border">Measurement Point</th>
-                                    <th className="p-2 border w-24">Order</th>
-                                    <th className="p-2 border w-24">Before</th>
-                                    <th className="p-2 border w-24">After</th>
-                                    <th className="p-2 border w-40 text-center">Shrinkage %</th>
-                                    <th className="p-2 border w-24 text-center">Requirement</th>
-                                    <th className="p-2 border text-center w-20">PASS</th>
-                                    <th className="p-2 border text-center w-20">FAIL</th>
+                                    <th className="p-4 border-b dark:border-gray-700 w-14 text-center first:rounded-tl-xl">NO</th>
+                                    <th className="p-4 border-b dark:border-gray-700">MEASUREMENT POINT</th>
+                                    <th className="p-4 border-b dark:border-gray-700 w-28 text-center bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l border-r border-blue-100 dark:border-blue-800">
+                                        SPECIFICATION
+                                        <div className="h-0.5 w-8 bg-blue-200 dark:bg-blue-600 mx-auto mt-1 rounded-full"></div>
+                                    </th>
+                                    <th className="p-4 border-b dark:border-gray-700 w-32 text-center text-gray-700 dark:text-gray-300">
+                                        Before Wash (G1)
+                                    </th>
+                                    <th className="p-4 border-b dark:border-gray-700 w-32 text-center text-gray-700 dark:text-gray-300">
+                                        After Wash (G2)
+                                    </th>
+                                    <th className="p-4 border-b dark:border-gray-700 w-32 text-center">Shrinkage %</th>
+                                    <th className="p-4 border-b dark:border-gray-700 w-24 text-center">Req.</th>
+                                    <th className="p-4 border-b dark:border-gray-700 text-center w-20">PASS</th>
+                                    <th className="p-4 border-b dark:border-gray-700 text-center w-20">FAIL</th>
+                                    <th className="p-4 border-b dark:border-gray-700 w-12 last:rounded-tr-xl"></th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {(formData.shrinkageRows || []).map((row, index) => (
-                                    <tr key={index} className="dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                                        <td className="p-2 border font-medium bg-gray-50/50 dark:bg-gray-800/20">
-                                            {row.location}
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                {(!formData.sampleSize) ? (
+                                    <tr>
+                                        <td colSpan={10} className="p-12 text-center">
+                                            <div className="flex flex-col items-center justify-center opacity-40">
+                                                <RotateCw size={40} className="mb-4 text-gray-400" />
+                                                <p className="text-lg font-bold text-gray-500">Select a Test Size to Load Specifications</p>
+                                                <p className="text-sm">Specifications will automatically load once a size is selected</p>
+                                            </div>
                                         </td>
-                                        <td className="p-2 border">
-                                            <input
-                                                type="text"
-                                                value={row.original}
-                                                onClick={() => openKeypad('shrinkageRows', index, 'original', row.original)}
-                                                readOnly
-                                                className="w-full bg-transparent border-none focus:ring-0 p-0 text-center cursor-pointer hover:bg-blue-50/50 dark:hover:bg-blue-900/10 placeholder-gray-300"
-                                                placeholder="..."
-                                            />
+                                    </tr>
+                                ) : (formData.shrinkageRows || []).length === 0 && !isLoadingSpecs && !isLoadingMeasurementSpecs ? (
+                                    <tr>
+                                        <td colSpan={10} className="p-12 text-center">
+                                            <div className="flex flex-col items-center justify-center opacity-40">
+                                                <XCircle size={40} className="mb-4 text-red-400" />
+                                                <p className="text-lg font-bold text-gray-500">No Specifications Found</p>
+                                            </div>
                                         </td>
-                                        <td className="p-2 border">
-                                            <input
-                                                type="text"
-                                                value={row.beforeWash}
-                                                onClick={() => openKeypad('shrinkageRows', index, 'beforeWash', row.beforeWash)}
-                                                readOnly
-                                                className="w-full bg-transparent border-none focus:ring-0 p-0 text-center cursor-pointer hover:bg-blue-50/50 dark:hover:bg-blue-900/10 placeholder-gray-300 font-bold"
-                                                placeholder="0"
-                                            />
+                                    </tr>
+                                ) : (formData.shrinkageRows || []).map((row, index) => (
+                                    <tr key={row.id || index} className="group dark:border-gray-700 border-b border-gray-50 last:border-none hover:bg-blue-50/60 dark:hover:bg-blue-900/10 transition-colors duration-200">
+                                        <td className="p-3 text-center text-gray-400 font-extrabold font-mono text-xs group-hover:text-blue-500 transition-colors">
+                                            {row.no || (index + 1)}
                                         </td>
-                                        <td className="p-2 border">
-                                            <input
-                                                type="text"
-                                                value={row.afterWash}
-                                                onClick={() => openKeypad('shrinkageRows', index, 'afterWash', row.afterWash)}
-                                                readOnly
-                                                className="w-full bg-transparent border-none focus:ring-0 p-0 text-center cursor-pointer hover:bg-blue-50/50 dark:hover:bg-blue-900/10 placeholder-gray-300 font-bold"
-                                                placeholder="0"
-                                            />
-                                        </td>
-                                        <td className="p-2 border text-center">
-                                            {row.shrinkage ? (
-                                                <span className={`px-2 py-1 rounded-full text-xs font-bold ${row.passFail === 'FAIL' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                                                    {row.shrinkage}
-                                                </span>
+                                        <td className="p-3 font-medium">
+                                            {row.isFromSpec ? (
+                                                <div className="px-1 text-gray-700 dark:text-gray-200 font-bold text-sm leading-tight flex items-center">
+                                                    {row.location}
+                                                </div>
                                             ) : (
-                                                <span className="text-gray-300 text-xs">-%</span>
+                                                <input
+                                                    type="text"
+                                                    value={row.location}
+                                                    onChange={(e) => updateRow('shrinkageRows', index, 'location', e.target.value)}
+                                                    className="w-full bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:ring-0 p-1 font-bold text-gray-700 dark:text-gray-300 placeholder:italic transition-colors"
+                                                    placeholder="Enter point name..."
+                                                />
                                             )}
                                         </td>
-                                        <td className="p-2 border text-center">
-                                            <span className="text-gray-500 font-medium">{row.requirement}</span>
+                                        <td className="p-3 bg-blue-50/30 dark:bg-blue-900/10 border-l border-r border-blue-50 dark:border-blue-900/30">
+                                            <div className="flex flex-col items-center justify-center gap-0.5">
+                                                {row.isFromSpec ? (
+                                                    <div className="relative">
+                                                        <span className="text-blue-600 dark:text-blue-400 font-black text-lg tracking-tight tabular-nums">
+                                                            {row.original}
+                                                        </span>
+                                                        <span className="absolute -top-1 -right-3 text-[9px] font-bold text-blue-300">IN</span>
+                                                    </div>
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        value={row.original}
+                                                        onClick={() => openKeypad('shrinkageRows', index, 'original', row.original)}
+                                                        readOnly
+                                                        className="w-full bg-white/50 dark:bg-gray-800/50 border border-blue-100 dark:border-blue-800 rounded px-1 text-center cursor-pointer hover:bg-white dark:hover:bg-gray-800 text-blue-600 font-black text-lg"
+                                                        placeholder="-"
+                                                    />
+                                                )}
+                                                {row.original && (
+                                                    <span className="text-[10px] text-gray-400 font-mono font-medium">
+                                                        {parseFraction(row.original).toFixed(3)}"
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
-                                        <td className="p-2 border text-center">
+                                        <td className="p-3 relative">
+                                            <div
+                                                onClick={() => openKeypad('shrinkageRows', index, 'beforeWash', row.beforeWash)}
+                                                className={`cursor-pointer rounded-xl border transition-all duration-200 flex flex-col items-center justify-center h-14 w-full relative group/input
+                                                    ${row.beforeWash ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 shadow-sm' : 'bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700 border-dashed hover:border-blue-300 hover:bg-white'}`}
+                                            >
+                                                {row.beforeWash ? (
+                                                    <>
+                                                        <span className="text-lg font-black text-gray-800 dark:text-white tabular-nums">{row.beforeWash}</span>
+                                                        <span className="text-[10px] text-gray-400 font-mono">{parseFraction(row.beforeWash).toFixed(3)}"</span>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-gray-300 group-hover/input:text-blue-400 transition-colors">
+                                                        <Hash size={16} />
+                                                    </span>
+                                                )}
+
+                                            </div>
+                                        </td>
+                                        <td className="p-3">
+                                            <div
+                                                onClick={() => openKeypad('shrinkageRows', index, 'afterWash', row.afterWash)}
+                                                className={`cursor-pointer rounded-xl border transition-all duration-200 flex flex-col items-center justify-center h-14 w-full relative group/input
+                                                    ${row.afterWash ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 shadow-sm' : 'bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700 border-dashed hover:border-blue-300 hover:bg-white'}`}
+                                            >
+                                                {row.afterWash ? (
+                                                    <>
+                                                        <span className="text-lg font-black text-gray-800 dark:text-white tabular-nums">{row.afterWash}</span>
+                                                        <span className="text-[10px] text-gray-400 font-mono">{parseFraction(row.afterWash).toFixed(3)}"</span>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-gray-300 group-hover/input:text-blue-400 transition-colors">
+                                                        <Hash size={16} />
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            {row.shrinkage ? (
+                                                <div className={`py-1.5 px-3 rounded-lg inline-flex items-center gap-1.5 border transition-all duration-500 shadow-sm
+                                                    ${row.passFail === 'FAIL'
+                                                        ? 'bg-red-50 border-red-100 text-red-600 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 animate-pulse-soft'
+                                                        : 'bg-green-50 border-green-100 text-green-600 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400'}`}>
+                                                    <span className="text-sm font-black tabular-nums">{row.shrinkage}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-gray-300 font-bold text-xs uppercase tracking-wider">Pending</span>
+                                            )}
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            <span className="inline-block px-2 py-1 bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 font-bold rounded-md text-[11px] border border-gray-200 dark:border-gray-600">
+                                                {row.requirement}
+                                            </span>
+                                        </td>
+                                        <td className="p-3 text-center">
                                             <button
                                                 type="button"
                                                 onClick={() => updateRow('shrinkageRows', index, 'passFail', 'PASS')}
-                                                className={`transition-all duration-300 ${row.passFail === 'PASS' ? 'text-green-600 scale-125' : 'text-gray-100 hover:text-gray-200'}`}
+                                                className={`transition-all duration-300 mx-auto transform active:scale-95
+                                                    ${row.passFail === 'PASS'
+                                                        ? 'text-green-500 scale-125 drop-shadow-sm'
+                                                        : 'text-gray-200 hover:text-gray-400'}`}
                                             >
-                                                <Check size={24} strokeWidth={4} />
+                                                <Check size={28} strokeWidth={5} />
                                             </button>
                                         </td>
-                                        <td className="p-2 border text-center">
+                                        <td className="p-3 text-center">
                                             <button
                                                 type="button"
                                                 onClick={() => updateRow('shrinkageRows', index, 'passFail', 'FAIL')}
-                                                className={`transition-all duration-300 ${row.passFail === 'FAIL' ? 'text-red-600 scale-125' : 'text-gray-100 hover:text-gray-200'}`}
+                                                className={`transition-all duration-300 mx-auto transform active:scale-95
+                                                    ${row.passFail === 'FAIL'
+                                                        ? 'text-red-500 scale-125 drop-shadow-sm'
+                                                        : 'text-gray-200 hover:text-gray-400'}`}
                                             >
-                                                <X size={24} strokeWidth={4} />
+                                                <X size={28} strokeWidth={5} />
                                             </button>
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            {!row.isFromSpec && (
+                                                <button type="button" onClick={() => removeRow('shrinkageRows', index)}
+                                                    className="w-full h-full flex items-center justify-center text-gray-300 hover:text-red-500 transition-colors p-2 rounded-full hover:bg-red-50">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
@@ -1085,6 +1550,8 @@ const GarmentWashForm = ({
                         </table>
                     </div>
                 </div>
+
+
 
                 {/* 7. Comments Sections */}
                 <div className="space-y-4">
@@ -1121,14 +1588,14 @@ const GarmentWashForm = ({
 
                         {/* Checked By */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">CHECKED BY :</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">CHECKED BY:</label>
                             <input type="text" value={formData.checkedBy || ''} onChange={(e) => handleInputChange("checkedBy", e.target.value)}
                                 className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Name" />
                         </div>
 
                         {/* Approved By */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">APPROVED BY :</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">APPROVED BY:</label>
                             <input type="text" value={formData.approvedBy || ''} onChange={(e) => handleInputChange("approvedBy", e.target.value)}
                                 className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Name" />
                         </div>
@@ -1137,7 +1604,7 @@ const GarmentWashForm = ({
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">DATE :</label>
                             <div className="relative group ant-datepicker-container">
-                                <AntDatePicker
+                                <DatePicker
                                     value={formData.date ? dayjs(formData.date) : null}
                                     onChange={(date, dateString) => handleInputChange("date", dateString ? dayjs(date).format('YYYY-MM-DD') : '')}
                                     format="MM/DD/YYYY"
@@ -1153,7 +1620,7 @@ const GarmentWashForm = ({
                 <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md border border-gray-200 dark:border-gray-700">
                     <h3 className="font-medium mb-3">Images & Additional Notes</h3>
 
-                    {/* Image Upload UI (Similar to other forms) */}
+                    {/* Image Upload UI(Similar to other forms) */}
                     <div className="mb-4">
                         <div className="flex gap-2">
                             <button type="button" onClick={triggerCameraInput} disabled={formData.images?.length >= 5} className="flex items-center px-4 py-2 border rounded-md bg-white hover:bg-gray-50">
@@ -1218,7 +1685,114 @@ const GarmentWashForm = ({
                 initialValue={tempValue}
                 onConfirm={handleKeypadSubmit}
             />
-        </div>
+
+            {/* Size Comparison Modal */}
+            {showSizeComparisonModal && (() => {
+                const comparisonData = getAllSizeSpecs();
+                return (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-700 flex flex-col animate-in zoom-in-95 duration-200">
+                            {/* Modal Header */}
+                            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30">
+                                <div>
+                                    <h3 className="text-2xl font-black text-gray-800 dark:text-white">Size Comparison</h3>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                        {formData.washType || 'Before Wash'} - {formData.style || 'N/A'}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSizeComparisonModal(false)}
+                                    className="p-2 rounded-lg hover:bg-white/50 dark:hover:bg-gray-700/50 transition-colors"
+                                >
+                                    <X size={24} className="text-gray-500 dark:text-gray-400" />
+                                </button>
+                            </div>
+
+                            {/* Modal Content - Scrollable Table */}
+                            <div className="flex-1 overflow-auto p-6">
+                                {comparisonData.sizes.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                                        <XCircle size={48} className="mb-4" />
+                                        <p className="text-lg font-bold">No size data available</p>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full border-collapse text-sm">
+                                            <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700">
+                                                <tr>
+                                                    <th className="p-4 text-left font-black text-gray-700 dark:text-gray-300 border-b-2 border-gray-300 dark:border-gray-600 min-w-[250px]">
+                                                        MEASUREMENT POINT
+                                                    </th>
+                                                    {comparisonData.sizes.map(size => (
+                                                        <th
+                                                            key={size}
+                                                            className={`p-4 text-center font-black border-b-2 border-gray-300 dark:border-gray-600 min-w-[120px] ${
+                                                                size === formData.sampleSize
+                                                                    ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
+                                                                    : 'text-gray-700 dark:text-gray-300'
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                                                {size}
+                                                                {size === formData.sampleSize && (
+                                                                    <Check size={16} className="text-blue-600 dark:text-blue-400" />
+                                                                )}
+                                                            </div>
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {comparisonData.data.map((row, index) => (
+                                                    <tr
+                                                        key={index}
+                                                        className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                                    >
+                                                        <td className="p-4 font-bold text-gray-700 dark:text-gray-300">
+                                                            {row.measurementPoint}
+                                                        </td>
+                                                        {comparisonData.sizes.map(size => (
+                                                            <td
+                                                                key={size}
+                                                                className={`p-4 text-center border-l border-gray-100 dark:border-gray-700 ${
+                                                                    size === formData.sampleSize
+                                                                        ? 'bg-blue-50/50 dark:bg-blue-900/20 font-black text-blue-700 dark:text-blue-300'
+                                                                        : 'text-gray-600 dark:text-gray-400'
+                                                                }`}
+                                                            >
+                                                                {row.sizes[size] || '-'}
+                                                            </td>
+                                                        ))}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Showing {comparisonData.data.length} measurement points across {comparisonData.sizes.length} sizes
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowSizeComparisonModal(false);
+                                    }}
+                                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+        </div >
     );
 };
 

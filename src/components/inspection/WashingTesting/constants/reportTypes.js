@@ -504,6 +504,8 @@ const PULLING_TEST_FIELDS = {
 const GARMENT_WASH_FIELDS = {
     // Header
     style: { type: FIELD_TYPES.TEXT, label: 'STYLE', required: true },
+    washType: { type: FIELD_TYPES.SELECT, label: 'Wash Type', required: true, options: ['Before Wash', 'After Wash'] },
+    moNo: { type: FIELD_TYPES.TEXT, label: 'MO NO', required: false, readonly: true },
     custStyle: { type: FIELD_TYPES.TEXT, label: 'CUST. STYLE', required: true },
     color: { type: FIELD_TYPES.MULTI_SELECT, label: 'COLOR', required: true },
     season: { type: FIELD_TYPES.TEXT, label: 'SEASON', required: true },
@@ -696,7 +698,7 @@ export const REPORT_TYPE_CONFIGS = {
         label: 'Garment Wash Report',
         description: 'Detailed Garment Wash Test Report',
         fields: [
-            'style', 'custStyle', 'color', 'season', 'styleDescription',
+            'style', 'washType', 'moNo', 'custStyle', 'color', 'season', 'styleDescription',
             'mainFabric', 'liningInserts', 'detergent', 'washingMethod',
             'colorFastnessRows', 'colorStainingRows', 'visualAssessmentRows', 'shrinkageRows',
             'beforeWashComments', 'afterWashComments',
@@ -818,13 +820,9 @@ export const getInitialFormData = (reportType) => {
                             { item: 'Others / Care label', accepted: true, rejected: false, comments: '' },
                         ];
                     } else if (fieldName === 'shrinkageRows') {
-                        // Initialize default rows for Shrinkage
+                        // Initialize with one empty row by default
                         initialData[fieldName] = [
-                            { location: 'CHEST', original: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' },
-                            { location: 'BOTTOM', original: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' },
-                            { location: 'SLV LENGTH (L)', original: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' },
-                            { location: 'SLV LENGTH (R)', original: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' },
-                            { location: 'FRT BODY LENGTH', original: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' },
+                            { location: '', original: '', tolMinus: '-1/2', tolPlus: '1/2', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' }
                         ];
                     } else if (fieldName === 'sampleSize') {
                         initialData[fieldName] = 'M';
