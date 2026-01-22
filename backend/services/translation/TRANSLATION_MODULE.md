@@ -2,32 +2,24 @@
 # Translation Module Documentation
 
 ## Overview
-This module handles the end-to-end translation of instruction documents using **Azure Cognitive Services (Translator)**. It converts complex nested JSON data into HTML, manages file transfers to Azure Blob Storage, orchestrates the translation job, and reconstructs the data back into JSON.
+This module handles the end-to-end translation of instruction documents using **Azure Cognitive Services (Translator)**. It converts complex nested JSON data into HTML, manages translation jobs, and re-synthesizes the result into a clean, single-page A4 PDF output.
 
-## Architecture
+## Architecture & Streamlined Workflow
 
-The module is refactored into a layered architecture:
-
-- **Controller (`backend/controller/production/instruction/translation.controller.js`)**: Orchestrates the workflow. Validates input, calls services, and handles HTTP responses.
-- **Service (`backend/services/translation/azure.translator.service.js`)**: Encapsulates the core translation business logic (Submit -> Poll -> Retrieve).
-- **Storage (`backend/storage/azure.blob.storage.js`)**: Manages physical interactions with Azure Blob Storage (Upload, Download, standard SAS generation).
-- **Utils**:
-  - `backend/Utils/translation/file.convertor.js`: Pure functions for JSON-HTML flattening and reconstruction.
-  - `backend/Utils/translation/logger.js`: Centralized structured logging.
-- **Config (`backend/Config/translation.config.js`)**: Centralized configuration management using `process.env`.
+The application follows a 4-step wizard process:
+1. **Team Selection**: Loads specific GPRT architectural templates.
+2. **Document Upload**: Extraction of text and high-res assets from source PDFs.
+3. **Language Configuration**: Selection of target languages (english, chinese, khmer) and glossary injection.
+4. **Finalize & Export**: Multi-language preview and single-page PDF generation.
 
 ## Process Flow
 
-1.  **Request**: POST API received with `docId` and `toLanguages`.
-2.  **Validation**: Check inputs; retrieve Document & Instruction from DB.
-3.  **Flattening**: `flattenLocalizedStrings` converts nested JSON to flat key-value pairs. `generateHtmlFromEntries` creates an HTML file where `id` = key.
-4.  **Submission**:
-    - HTML uploaded to `source` container.
-    - Translation Job submitted to Azure Batch API with SAS tokens.
-5.  **Polling**: System polls Azure every 5s (configurable) until `Succeeded` or `Failed`.
-6.  **Retrieval**: Translated HTMLs downloaded from `target` container.
-7.  **Reconstruction**: `reconstructObjectFromHtml` parses HTML back to text and `deepMergeObjects` updates the original JSON.
-8.  **Update**: Database updated with new translations.
+1.  **Request**: POST API received with `docId` and full language names (e.g., `chinese`).
+2.  **Flattening**: JSON converted to HTML keys for block-based translation.
+3.  **Submission**: HTML translation job submitted to Azure Batch API.
+4.  **Retrieval**: Translated content merged into the `production` state.
+5.  **Synthesis**: Frontend uses `html2canvas` and `jsPDF` to scale the document into a high-quality single-page A4 PDF.
+6.  **Export**: Correct language version is saved as a PDF locally by the user.
 
 ## Configuration
 
