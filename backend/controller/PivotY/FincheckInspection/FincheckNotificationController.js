@@ -79,3 +79,35 @@ export const sendPushToUser = async (empId, payload) => {
     console.error("Global Push Error:", error);
   }
 };
+
+// 4. Verify Subscription Exists in Database
+export const verifySubscription = async (req, res) => {
+  try {
+    const { empId, endpoint } = req.body;
+
+    if (!empId || !endpoint) {
+      return res.status(400).json({
+        success: false,
+        exists: false,
+        message: "empId and endpoint required"
+      });
+    }
+
+    const subscription = await FincheckPushSubscription.findOne({
+      empId: empId,
+      endpoint: endpoint
+    });
+
+    return res.status(200).json({
+      success: true,
+      exists: !!subscription
+    });
+  } catch (error) {
+    console.error("Verify subscription error:", error);
+    return res.status(500).json({
+      success: false,
+      exists: false,
+      error: error.message
+    });
+  }
+};

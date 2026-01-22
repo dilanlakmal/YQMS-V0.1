@@ -1322,43 +1322,6 @@ export const submitLeaderDecision = async (req, res) => {
       sendPushToUser(qaEmpId, qaPayload);
     }
 
-    // // Only notify if Action is Required (Rework or Rejected)
-    // if (status === "Rework" || status === "Rejected") {
-    //   const qaEmpId = report.empId; // The user who created the report
-
-    //   // 1. Format Date (e.g., 1/21/2026)
-    //   const dateObj = new Date(report.inspectionDate);
-    //   const dateStr = dateObj.toLocaleDateString("en-US");
-
-    //   // 2. Get Order String
-    //   // Fallback to orderNos array join if string is empty
-    //   const orderStr =
-    //     report.orderNosString ||
-    //     (report.orderNos ? report.orderNos.join(", ") : "N/A");
-
-    //   // 3. Construct Detailed Message Body
-    //   const bodyText = `Report #${reportId} [Inspection Date: ${dateStr}, Order No: ${orderStr}, Report Type: ${
-    //     report.reportType
-    //   }, QA ID: ${
-    //     report.empId
-    //   }] Marked for ${status.toUpperCase()} by ${leaderId} - ${leaderName}`;
-
-    //   // 4. Construct Correct URL
-    //   // This is the relative path. The Service Worker will attach the domain.
-    //   const targetUrl = `/fincheck-reports/view/${reportId}`;
-
-    //   const payload = {
-    //     title: `Fincheck: Report ${status}`,
-    //     body: bodyText, // New detailed text
-    //     icon: "/assets/Home/Fincheck_Inspection.png",
-    //     url: targetUrl, // New correct URL
-    //     tag: `fincheck-${reportId}`
-    //   };
-
-    //   // Fire and forget (don't await, so UI doesn't lag)
-    //   sendPushToUser(qaEmpId, payload);
-    // }
-
     return res.status(200).json({
       success: true,
       message: "Decision saved successfully",

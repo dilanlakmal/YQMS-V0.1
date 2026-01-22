@@ -23,7 +23,8 @@ import {
 
 import {
   getVapidPublicKey,
-  subscribeUser
+  subscribeUser,
+  verifySubscription
 } from "../../../controller/PivotY/FincheckInspection/FincheckNotificationController.js";
 
 const router = express.Router();
@@ -114,5 +115,6 @@ router.get(
 // PUSH NOTIFICATION ROUTES
 router.get("/api/fincheck-reports/push/vapid-key", getVapidPublicKey);
 router.post("/api/fincheck-reports/push/subscribe", subscribeUser);
+router.post("/api/fincheck-reports/push/verify", verifySubscription);
 
 export default router;

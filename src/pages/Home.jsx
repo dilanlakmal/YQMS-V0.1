@@ -865,33 +865,75 @@ const SettingsModal = ({
   const [successMessage, setSuccessMessage] = useState(null);
   const [checkingSubscription, setCheckingSubscription] = useState(true);
 
+  // Check subscription status - runs on mount and when user changes
   useEffect(() => {
-    if (!isOpen) return;
-
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    if (!user?.emp_id) {
       setCheckingSubscription(false);
       return;
     }
 
-    setPermission(Notification.permission);
+    const checkSubscriptionStatus = async () => {
+      setCheckingSubscription(true);
 
-    navigator.serviceWorker.ready
-      .then(async (registration) => {
-        try {
-          const sub = await registration.pushManager.getSubscription();
-          if (sub) {
+      // Check browser support
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        console.log("Push Messaging not supported");
+        setCheckingSubscription(false);
+        return;
+      }
+
+      // Get current permission
+      setPermission(Notification.permission);
+
+      try {
+        // Wait for service worker to be ready
+        const registration = await navigator.serviceWorker.ready;
+        const browserSubscription =
+          await registration.pushManager.getSubscription();
+
+        if (browserSubscription) {
+          // Browser has a subscription - verify it exists in our database
+          try {
+            const response = await axios.post(
+              `${API_BASE_URL}/api/fincheck-reports/push/verify`,
+              {
+                empId: user.emp_id,
+                endpoint: browserSubscription.endpoint
+              }
+            );
+
+            if (response.data.success && response.data.exists) {
+              setIsSubscribed(true);
+            } else {
+              // Browser has subscription but not in our DB - user needs to re-subscribe
+              setIsSubscribed(false);
+            }
+          } catch (verifyError) {
+            // If verify endpoint doesn't exist or fails, fall back to local check
+            console.log("Verify API not available, using local check");
             setIsSubscribed(true);
           }
-        } catch (e) {
-          console.error("Error checking subscription", e);
-        } finally {
-          setCheckingSubscription(false);
+        } else {
+          // No browser subscription
+          setIsSubscribed(false);
         }
-      })
-      .catch((e) => {
-        console.log("Service Worker not ready yet");
+      } catch (e) {
+        console.error("Error checking subscription:", e);
+        setIsSubscribed(false);
+      } finally {
         setCheckingSubscription(false);
-      });
+      }
+    };
+
+    checkSubscriptionStatus();
+  }, [user?.emp_id]);
+
+  // Reset states when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setDebugError(null);
+      setSuccessMessage(null);
+    }
   }, [isOpen]);
 
   const subscribeToPush = async () => {
@@ -901,6 +943,7 @@ const SettingsModal = ({
     setSuccessMessage(null);
 
     try {
+      // --- STEP 1: Request Permission ---
       const perm = await Notification.requestPermission();
       setPermission(perm);
 
@@ -910,6 +953,7 @@ const SettingsModal = ({
         );
       }
 
+      // --- STEP 2: Register Service Worker ---
       let registration;
       try {
         registration = await navigator.serviceWorker.register("/sw.js");
@@ -918,6 +962,7 @@ const SettingsModal = ({
         throw new Error(`SW Register Failed: ${swError.message}`);
       }
 
+      // --- STEP 3: Get VAPID Public Key ---
       let publicVapidKey;
       try {
         const keyRes = await axios.get(
@@ -928,6 +973,17 @@ const SettingsModal = ({
         throw new Error(`API VAPID Key Error: ${apiError.message}`);
       }
 
+      // --- STEP 4: Unsubscribe existing subscription first (to get fresh one) ---
+      try {
+        const existingSub = await registration.pushManager.getSubscription();
+        if (existingSub) {
+          await existingSub.unsubscribe();
+        }
+      } catch (unsubError) {
+        console.log("No existing subscription to remove");
+      }
+
+      // --- STEP 5: Subscribe to Push Manager ---
       let subscription;
       try {
         const convertedKey = urlBase64ToUint8Array(publicVapidKey);
@@ -939,6 +995,7 @@ const SettingsModal = ({
         throw new Error(`PushManager Subscribe Error: ${subError.message}`);
       }
 
+      // --- STEP 6: Send to Backend ---
       try {
         await axios.post(
           `${API_BASE_URL}/api/fincheck-reports/push/subscribe`,
@@ -952,6 +1009,7 @@ const SettingsModal = ({
         throw new Error(`Backend Save Error: ${backendError.message}`);
       }
 
+      // Success
       setIsSubscribed(true);
       setSuccessMessage("Notifications enabled successfully!");
     } catch (error) {
@@ -1043,11 +1101,6 @@ const SettingsModal = ({
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Checking status...
               </div>
-            ) : permission === "granted" && isSubscribed ? (
-              <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                Notifications are enabled
-              </div>
             ) : permission === "denied" ? (
               <div className="text-sm text-slate-500 dark:text-slate-400 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
                 <p className="font-medium text-yellow-700 dark:text-yellow-400 mb-1">
@@ -1057,6 +1110,11 @@ const SettingsModal = ({
                   Please enable them in your browser settings and refresh the
                   page.
                 </p>
+              </div>
+            ) : permission === "granted" && isSubscribed ? (
+              <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                Notifications are enabled
               </div>
             ) : (
               <button
@@ -1914,7 +1972,7 @@ function Home() {
   // --- Mobile Layout ---
   if (isMobile) {
     return (
-      <div className="fixed inset-0 top-12 bg-gray-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 flex flex-col overflow-hidden">
+      <>
         {/* Settings Modal */}
         <SettingsModal
           isOpen={settingsOpen}
@@ -1924,81 +1982,82 @@ function Home() {
           theme={theme}
           toggleTheme={toggleTheme}
         />
-
-        {/* Mobile Header */}
-        <header className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between px-4 h-12">
-            <div className="flex items-center gap-2">
-              {currentSection && (
-                <>
-                  <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                    {React.cloneElement(currentSection.icon, {
-                      className: "w-4 h-4 text-blue-600 dark:text-blue-400",
-                      style: { margin: 0 }
-                    })}
-                  </div>
-                  <h1 className="text-sm font-bold text-slate-800 dark:text-white">
-                    {currentSection.title}
-                  </h1>
-                </>
-              )}
-            </div>
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
-            >
-              <Settings className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-            </button>
-          </div>
-        </header>
-
-        {/* Error Message */}
-        {errorMessage && (
-          <div className="mx-3 mt-2 bg-red-500 text-white text-center py-2 rounded-lg text-xs font-medium">
-            {errorMessage}
-          </div>
-        )}
-
-        {/* Mobile Content */}
-        <main className="p-2 pb-24">
-          {currentSectionItems.length > 0 ? (
-            <div className="grid grid-cols-4 gap-2">
-              {currentSectionItems.map((item, index) => (
-                <MobileGridItem
-                  key={index}
-                  item={item}
-                  onClick={() => handleNavigation(item)}
-                  fincheckActionCount={fincheckActionCount}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 dark:bg-slate-800 rounded-full flex items-center justify-center">
-                <HomeIcon className="w-8 h-8 text-gray-400" />
+        <div className="fixed inset-0 top-12 bg-gray-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 flex flex-col overflow-hidden">
+          {/* Mobile Header */}
+          <header className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm">
+            <div className="flex items-center justify-between px-4 h-12">
+              <div className="flex items-center gap-2">
+                {currentSection && (
+                  <>
+                    <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                      {React.cloneElement(currentSection.icon, {
+                        className: "w-4 h-4 text-blue-600 dark:text-blue-400",
+                        style: { margin: 0 }
+                      })}
+                    </div>
+                    <h1 className="text-sm font-bold text-slate-800 dark:text-white">
+                      {currentSection.title}
+                    </h1>
+                  </>
+                )}
               </div>
-              <p className="text-slate-500 dark:text-slate-400 text-sm">
-                No items available in this section
-              </p>
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <Settings className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+              </button>
+            </div>
+          </header>
+
+          {/* Error Message */}
+          {errorMessage && (
+            <div className="mx-3 mt-2 bg-red-500 text-white text-center py-2 rounded-lg text-xs font-medium">
+              {errorMessage}
             </div>
           )}
-        </main>
 
-        {/* Mobile Bottom Navigation */}
-        <MobileBottomNav
-          sections={accessibleSections}
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
-          onSettingsClick={() => setSettingsOpen(true)}
-        />
-      </div>
+          {/* Mobile Content */}
+          <main className="p-2 pb-24">
+            {currentSectionItems.length > 0 ? (
+              <div className="grid grid-cols-4 gap-2">
+                {currentSectionItems.map((item, index) => (
+                  <MobileGridItem
+                    key={index}
+                    item={item}
+                    onClick={() => handleNavigation(item)}
+                    fincheckActionCount={fincheckActionCount}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 dark:bg-slate-800 rounded-full flex items-center justify-center">
+                  <HomeIcon className="w-8 h-8 text-gray-400" />
+                </div>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">
+                  No items available in this section
+                </p>
+              </div>
+            )}
+          </main>
+
+          {/* Mobile Bottom Navigation */}
+          <MobileBottomNav
+            sections={accessibleSections}
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            onSettingsClick={() => setSettingsOpen(true)}
+          />
+        </div>
+      </>
     );
   }
 
   // --- Tablet Layout ---
   if (isTablet) {
     return (
-      <div className="fixed inset-0 top-12 bg-gray-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 flex flex-col overflow-hidden">
+      <>
         {/* Settings Modal */}
         <SettingsModal
           isOpen={settingsOpen}
@@ -2008,74 +2067,75 @@ function Home() {
           theme={theme}
           toggleTheme={toggleTheme}
         />
-
-        {/* Tablet Header */}
-        <header className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between px-4 h-14">
-            <div className="flex items-center gap-2">
-              {currentSection && (
-                <>
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                    {React.cloneElement(currentSection.icon, {
-                      className: "w-5 h-5 text-blue-600 dark:text-blue-400",
-                      style: { margin: 0 }
-                    })}
-                  </div>
-                  <h1 className="text-base font-bold text-slate-800 dark:text-white">
-                    {currentSection.title}
-                  </h1>
-                </>
-              )}
-            </div>
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
-            >
-              <Settings className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-            </button>
-          </div>
-        </header>
-
-        {/* Error Message */}
-        {errorMessage && (
-          <div className="mx-4 mt-2 bg-red-500 text-white text-center py-2 rounded-lg text-sm font-medium">
-            {errorMessage}
-          </div>
-        )}
-
-        {/* Tablet Content */}
-        <main className="p-4 pb-24">
-          {currentSectionItems.length > 0 ? (
-            <div className="grid grid-cols-4 gap-3">
-              {currentSectionItems.map((item, index) => (
-                <TabletGridItem
-                  key={index}
-                  item={item}
-                  onClick={() => handleNavigation(item)}
-                  fincheckActionCount={fincheckActionCount}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <div className="w-20 h-20 mx-auto mb-4 bg-gray-200 dark:bg-slate-800 rounded-full flex items-center justify-center">
-                <HomeIcon className="w-10 h-10 text-gray-400" />
+        <div className="fixed inset-0 top-12 bg-gray-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 flex flex-col overflow-hidden">
+          {/* Tablet Header */}
+          <header className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm">
+            <div className="flex items-center justify-between px-4 h-14">
+              <div className="flex items-center gap-2">
+                {currentSection && (
+                  <>
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                      {React.cloneElement(currentSection.icon, {
+                        className: "w-5 h-5 text-blue-600 dark:text-blue-400",
+                        style: { margin: 0 }
+                      })}
+                    </div>
+                    <h1 className="text-base font-bold text-slate-800 dark:text-white">
+                      {currentSection.title}
+                    </h1>
+                  </>
+                )}
               </div>
-              <p className="text-slate-500 dark:text-slate-400">
-                No items available in this section
-              </p>
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <Settings className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+              </button>
+            </div>
+          </header>
+
+          {/* Error Message */}
+          {errorMessage && (
+            <div className="mx-4 mt-2 bg-red-500 text-white text-center py-2 rounded-lg text-sm font-medium">
+              {errorMessage}
             </div>
           )}
-        </main>
 
-        {/* Tablet Bottom Navigation */}
-        <MobileBottomNav
-          sections={accessibleSections}
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
-          onSettingsClick={() => setSettingsOpen(true)}
-        />
-      </div>
+          {/* Tablet Content */}
+          <main className="p-4 pb-24">
+            {currentSectionItems.length > 0 ? (
+              <div className="grid grid-cols-4 gap-3">
+                {currentSectionItems.map((item, index) => (
+                  <TabletGridItem
+                    key={index}
+                    item={item}
+                    onClick={() => handleNavigation(item)}
+                    fincheckActionCount={fincheckActionCount}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16">
+                <div className="w-20 h-20 mx-auto mb-4 bg-gray-200 dark:bg-slate-800 rounded-full flex items-center justify-center">
+                  <HomeIcon className="w-10 h-10 text-gray-400" />
+                </div>
+                <p className="text-slate-500 dark:text-slate-400">
+                  No items available in this section
+                </p>
+              </div>
+            )}
+          </main>
+
+          {/* Tablet Bottom Navigation */}
+          <MobileBottomNav
+            sections={accessibleSections}
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            onSettingsClick={() => setSettingsOpen(true)}
+          />
+        </div>
+      </>
     );
   }
 
