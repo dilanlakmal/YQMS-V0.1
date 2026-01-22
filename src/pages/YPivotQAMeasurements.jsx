@@ -12,7 +12,8 @@ import {
   GitMerge, // Sub: Sync,
   Ruler,
   FileText,
-  Scissors
+  Scissors,
+  Pencil,
 } from "lucide-react";
 import { useAuth } from "../components/authentication/AuthContext";
 
@@ -22,6 +23,7 @@ import UploadWashingSpecs from "./UploadWashingSpecs";
 import Measurement from "./Measurement";
 import QASectionsMeasurementSpecsSelection from "../components/inspection/PivotY/QAMeasurement/QASectionsMeasurementSpecsSelection";
 import QASectionsMeasurementAWSelection from "../components/inspection/PivotY/QAMeasurement/QASectionsMeasurementAWSelection";
+import ModifyDTSpec from "../components/inspection/PivotY/QAMeasurement/ModifyDTSpec";
 
 // --- PLACEHOLDER ---
 const PlaceholderComponent = ({ title, icon: Icon }) => {
@@ -90,6 +92,13 @@ const YPivotQAMeasurements = () => {
         label: "AW Mes. Specs",
         icon: <FileText size={20} />,
         component: <QASectionsMeasurementAWSelection />,
+        description: "Select Measurement Specs (After Wash)"
+      },
+      {
+        id: "modify-dt-measurement",
+        label: "Modify DT Spec",
+        icon: <Pencil size={20} />,
+        component: <ModifyDTSpec />,
         description: "Select Measurement Specs (After Wash)"
       }
     ],
