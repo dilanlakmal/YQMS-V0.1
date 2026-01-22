@@ -254,7 +254,7 @@ import productionInstructionRoutes from "./routes/production/instruction.route.j
 import translationRoutes from "./routes/production/translation.route.js";
 
 app.use("/api/ai/production/instruction/extraction", productionInstructionRoutes);
-app.use("/api/production/instruction", translationRoutes);
+app.use("/api/ai/production/instruction", translationRoutes);
 
 
 /* -----------------------------
@@ -525,16 +525,6 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-import { getMoNumber,getMoNumberTools } from "./controller/AI/qc_assistance/QC.tools.js";
-
-app.get('/test-mo', async (req, res) => {
-    try {
-        const moNumbers = await getMoNumber();
-        res.json({ moNumbers });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`HTTPS Server is running on https://localhost:${PORT}`);

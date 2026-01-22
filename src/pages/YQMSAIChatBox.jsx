@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import ChatInterface from "@/components/chatbot/ChatInterface";
+import Chatbot from "@/components/chatbot";
 // import {
 //   fetchUserData,
 //   fetchUserConversation,
@@ -9,8 +9,8 @@ import {
   fetchUserConversation,
   fetchUserProfile,
   createConversation,
-} from "../components/chatbot/lib/api/conversation";
-import { getModels } from "../components/chatbot/lib/api/chat";
+} from "../components/chatbot/services/conversation";
+import { getModels } from "../components/chatbot/services/chat";
 export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
   const [userData, setUserData] = useState({
     emp_id: "",
@@ -32,8 +32,8 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [model, setModel] = useState("");
   const [currentService, setCurrentService] = useState("");
-  const [models, setModels] = useState([{name: "Loading"}]);
-  
+  const [models, setModels] = useState([{ name: "Loading" }]);
+
 
   const initialMessages = [
     {
@@ -107,7 +107,7 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
   const messages = activeConversation?.messages || [];
 
   return (
-    <ChatInterface
+    <Chatbot
       models={models}
       currentService={currentService}
       setCurrentService={setCurrentService}

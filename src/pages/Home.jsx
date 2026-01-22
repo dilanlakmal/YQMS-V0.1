@@ -446,12 +446,12 @@ function Home() {
       },
       {
         id: "ai-services",
-        title: "AI services",
+        title: "YDT",
         icon: <FaRobot className="w-6 h-6 mr-2"/>,
         bgColor:"bg-blue-50",
         items: [
           {
-            title: "Production Instruction Translation",
+            title: "Instruction Translation",
             description: "Translate your final report",
             path: "/ai/instruction-translation",
             image: "assets/Home/icon-instruction.png",

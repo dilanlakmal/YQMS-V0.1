@@ -44,7 +44,7 @@ const azureTranslateController = async (req, res) => {
         // We extract content based on the SOURCE language (e.g., "english"). 
         // We assume "english" is the source for now. 
         // If we want to support multiple source languages, we need to know which one to pick.
-        let instructionObject = {...instruction};
+        let instructionObject = { ...instruction };
         if (Object.getPrototypeOf(instruction) !== Object.prototype) {
             instructionObject = instruction.toObject();
         }
@@ -105,4 +105,14 @@ const azureTranslateController = async (req, res) => {
     }
 };
 
+const getLanguages = async (req, res) => {
+    try {
+        const languages = await AzureTranslatorService.getSupportedLanguages();
+        return res.json(languages);
+    } catch (error) {
+        return res.status(500).json({ message: "Failed to fetch languages", error: error.message });
+    }
+};
+
+export { getLanguages };
 export default azureTranslateController;

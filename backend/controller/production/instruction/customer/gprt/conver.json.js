@@ -1,19 +1,19 @@
 import createProduction from "../../../production.controller.js";
 
-const textSchema = (description, originLang = "english", type= "string", ) => {
+const textSchema = (description, originLang = "english", type = "string",) => {
     const language = {
         khmer: {
             type: type,
-            description: description 
+            description: description
         },
         english: {
             type: type,
-            description: description 
+            description: description
         },
         chinese: {
             type: type,
             description: description
-        }        
+        }
     }
     return {
         type: "object",
@@ -22,7 +22,7 @@ const textSchema = (description, originLang = "english", type= "string", ) => {
         },
         required: [originLang]
     }
-} 
+}
 
 
 
@@ -58,11 +58,11 @@ const orderSchema = (originLang) => ({
                 label: textSchema(
                     "Extract the field name or label that refers to the order number (e.g., 'Order No', 'PO#', 'Purchase Order').",
                     originLang
-                    ),
+                ),
                 value: textSchema(
                     "Extract the actual order number value exactly as shown in the document. Do not modify or infer missing characters.",
                     originLang
-                    )
+                )
             },
             required: ["label", "value"]
         },
@@ -78,23 +78,23 @@ const orderSchema = (originLang) => ({
     required: ["orderNumber", "orderType"]
 })
 
-const purchaseSchema = (originLan) => ({
+const purchaseSchema = (originLang) => ({
     type: "object",
     properties: {
-        order: orderSchema(originLan),
+        order: orderSchema(originLang),
         quantity: {
             type: "object",
             properties: {
                 label: textSchema(
                     "Extract the field name or label that refers to quantity (e.g., 'Qty', 'Quantity', 'Total Quantity').",
-                    originLan
-                    ),
+                    originLang
+                ),
                 value: textSchema(
                     "Extract the numeric quantity value only. Return a whole number without units or text.",
-                    originLan,
+                    originLang,
                     "integer"
-                    ),
-                unit: textSchema("a unit of quantity", originLan)
+                ),
+                unit: textSchema("a unit of quantity", originLang)
             },
             required: ["label", "value", "unit"]
         },
@@ -110,18 +110,18 @@ const packingSchema = (originLang) => ({
         mark: {
             type: "object",
             properties: {
-            label: textSchema("Label for the marking instruction, usually written as 'Retail'.", originLang),
-            value: textSchema("The actual marking instruction or label value.", originLang)
-        }, 
-        required: ["label", "value"]
+                label: textSchema("Label for the marking instruction, usually written as 'Retail'.", originLang),
+                value: textSchema("The actual marking instruction or label value.", originLang)
+            },
+            required: ["label", "value"]
         },
         main: {
             type: "object",
             properties: {
-            label: textSchema("Label for the main packing instruction, usually written as 'Main Packing'.", originLang),
-            value: textSchema("The actual main packing instruction or label value.", originLang)
-        }, 
-        required: ["label", "value"]
+                label: textSchema("Label for the main packing instruction, usually written as 'Main Packing'.", originLang),
+                value: textSchema("The actual main packing instruction or label value.", originLang)
+            },
+            required: ["label", "value"]
         }
     },
     required: ["mark", "main"]
@@ -153,7 +153,7 @@ const customerSchema = (originLang) => ({
 })
 
 const factoryIDSchema = (originLang) => ({
-    type: "object", 
+    type: "object",
     properties: {
         label: textSchema("Field label for factory code, usually written as '廠號'.", originLang),
         value: textSchema("Factory or manufacturer identifier code associated with the order.", originLang)
@@ -180,7 +180,7 @@ const coverJson = (originLang) => ({
 })
 
 const cover2Production = async (
-    fieldExtracted, 
+    fieldExtracted,
     originLang,
     documentId
 ) => {
@@ -206,7 +206,7 @@ const cover2Production = async (
         CustomerStyle.code.value,
 
         CustomerStyle.sample?.img,
-        CustomerStyle.sample.description,
+        CustomerStyle.sample?.description,
 
         customerPurchaseOrder.orderNumber.label,
         customerPurchaseOrder.orderNumber.value,
@@ -218,7 +218,7 @@ const cover2Production = async (
         customerPurchaseQuantity.value,
         customerPurchaseQuantity.unit,
 
-        customerPurchase.specs,
+        customerPurchase?.specs,
 
         customerRemark,
 
@@ -227,10 +227,10 @@ const cover2Production = async (
         factoryID.label,
         factoryID.value,
 
-        factory.factoryStamp.img,
-        factory.factoryStamp.description
+        factory.factoryStamp?.img,
+        factory.factoryStamp?.description
     )
 }
 
 export default coverJson;
-export {cover2Production, textSchema};
+export { cover2Production, textSchema };

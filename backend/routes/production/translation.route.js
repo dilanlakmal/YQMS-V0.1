@@ -1,8 +1,14 @@
 
 import express from "express";
-import azureTranslateController from "../../controller/production/instruction/translation.controller.js";
+import azureTranslateController, { getLanguages } from "../../controller/production/instruction/translation.controller.js";
 
 const router = express.Router();
+
+/**
+ * GET /languages
+ * Returns supported languages for translation.
+ */
+router.get("/languages", getLanguages);
 
 /**
  * POST /translation

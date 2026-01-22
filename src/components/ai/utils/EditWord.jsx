@@ -9,7 +9,7 @@ const EditWord = ({ word, onChange }) => {
         setValue(word);
     }, [word]);
   return (
-    <span className="inline-block align-middle">
+    <span className="inline-block align-middle p-1">
       {editing ? (
         <input
           className="inline-block w-full"
@@ -22,7 +22,7 @@ const EditWord = ({ word, onChange }) => {
           autoFocus
         />
       ) : (
-        <span onClick={() => setEditing(true)}>{value}</span>
+        <span onClick={() => setEditing(true)}>{ value}</span>
       )}
     </span>
   );

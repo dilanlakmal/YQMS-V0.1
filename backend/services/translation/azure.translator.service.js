@@ -106,7 +106,7 @@ const AzureTranslatorService = {
                 const response = await axios.get(pollUrl, { headers: HEADERS });
                 const { status, error } = response.data;
 
-                    // If status is not active (Running/NotStarted), it's terminal.
+                // If status is not active (Running/NotStarted), it's terminal.
                 if (!["Running", "NotStarted"].includes(status)) {
                     if (status === "Succeeded" ||
                         error?.innerError?.code === "TargetFileAlreadyExists") {
@@ -160,7 +160,7 @@ const AzureTranslatorService = {
                     results.push({
                         name: match,
                         content: content,
-                        toLang: Object.keys(LANGUAGE_MAP).find(key => LANGUAGE_MAP[key] === lang)   
+                        toLang: Object.keys(LANGUAGE_MAP).find(key => LANGUAGE_MAP[key] === lang)
                     });
                 } else {
                     logger.warn("Translated file not found", { pageName: file.pageName, lang });
@@ -171,7 +171,21 @@ const AzureTranslatorService = {
         return results;
     },
 
-    formHtmlFile: (pageName, content) => ({ pageName, content })
+    formHtmlFile: (pageName, content) => ({ pageName, content }),
+
+    /**
+     * Gets supported languages for translation.
+     * Currently returns hardcoded list as requested.
+     */
+    getSupportedLanguages: async () => {
+        // In a real scenario, this could call Azure's languages API
+        // https://api.cognitive.microsofttranslator.com/languages?api-version=3.0
+        return [
+            { code: "zh-Hans", name: "Chinese (Simplified)", value: "chinese" },
+            { code: "en", name: "English", value: "english" },
+            { code: "km", name: "Khmer", value: "khmer" }
+        ];
+    }
 };
 
 export default AzureTranslatorService;
