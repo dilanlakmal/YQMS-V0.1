@@ -9,7 +9,7 @@ import { Builder, Browser, By, until } from 'selenium-webdriver';
 import chrome from 'selenium-webdriver/chrome.js';
 import archiver from 'archiver';
 import { Buffer } from 'buffer';
-import {  logFailedReport, getAuthUserIdentifier } from "./p88failedReportController.js";
+import {  logFailedReport } from "./p88failedReportController.js";
 
 const stat = promisify(fs.stat);
 const readdir = promisify(fs.readdir);
@@ -129,7 +129,7 @@ const getAvailableSpace = async (dirPath) => {
 };
 
 export const downloadBulkReportsUbuntu = async (req, res) => {
-    const { jobId } = req.body;
+    const { jobId, userId } = req.body;
 
     // 1. Initialize the job in the activeJobs map
     activeJobs.set(jobId, {
@@ -142,7 +142,7 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
     });
 
     // 2. Start the background worker (Selenium version)
-    runDownloadTaskUbuntu(jobId, req.body);
+    runDownloadTaskUbuntu(jobId, req.body, userId);
 
     // 3. Return 202 immediately to the frontend
     res.status(202).json({ 
@@ -152,7 +152,7 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
     });
 };
 
-const runDownloadTaskUbuntu = async (jobId, params) => {
+const runDownloadTaskUbuntu = async (jobId, params,  userId) => {
     const jobInfo = activeJobs.get(jobId);
     let driver = null;
     let jobDir = null;
@@ -229,6 +229,17 @@ const runDownloadTaskUbuntu = async (jobId, params) => {
                 failedCount++;
                 failedReports.push({ inspectionNumber: inspNo, error: err.message });
                 await updateDownloadStatus(record._id, 'Failed');
+
+                // FIX: Pass individual arguments in the correct order
+                if (typeof logFailedReport === 'function') {
+                    await logFailedReport(
+                        record._id,           // legacyId
+                        inspNo,               // inspNo
+                        record.groupNumber,   // groupId
+                        err.message,          // reason
+                        userId                // empId
+                    );
+                }
             }
 
             processedCount++;
@@ -766,6 +777,17 @@ const runDownloadTask = async (jobId, recordParams, userId) => {
                 failedCount++;
                 failedReports.push({ inspectionNumber: inspNo, error: err.message });
                 await updateDownloadStatus(record._id, 'Failed');
+
+                // FIX: Add the database log call here
+                if (typeof logFailedReport === 'function') {
+                    await logFailedReport(
+                        record._id, 
+                        inspNo, 
+                        record.groupNumber, 
+                        err.message, 
+                        userId
+                    );
+                }
             }
 
             processedCount++;
@@ -1044,7 +1066,7 @@ export const downloadBulkReports = async (req, res) => {
     let jobDir = null;
     
     try {
-        const { startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, language = 'english', includeDownloaded = false } = req.body;
+        const {userId, startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, language = 'english', includeDownloaded = false } = req.body;
         
         jobDir = path.join(baseTempDir, `puppeteer_${Date.now()}`);
         fs.mkdirSync(jobDir, { recursive: true });
@@ -1123,12 +1145,19 @@ export const downloadBulkReports = async (req, res) => {
             } catch (err) {
                 console.error(`❌ Error on ${inspNo}:`, err.message);
                 failedCount++;
-                failedReports.push({
-                    inspectionNumber: inspNo,
-                    groupNumber: record.groupNumber,
-                    error: err.message
-                });
+                failedReports.push({ inspectionNumber: inspNo, groupNumber: record.groupNumber, error: err.message });
                 await updateDownloadStatus(record._id, 'Failed');
+
+                // FIX: Add the database log call here
+                if (typeof logFailedReport === 'function') {
+                    await logFailedReport(
+                        record._id, 
+                        inspNo, 
+                        record.groupNumber, 
+                        err.message, 
+                        userId
+                    );
+                }
             }
             
             processedCount++;
