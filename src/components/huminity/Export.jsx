@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { API_BASE_URL } from '../../../config';
 import PaperPreview from './PaperPreview';
+import PaperPreviewReitmans from './PaperPreviewReitmans';
 import HistoryModal from './HistoryModal';
+import HistoryModelReitmans from './HistoryModelReitmans';
 import UpdateModel from './UpdateModel';
+import UpdateModelReimans from './UpdateModelReimans';
 import { useAuth } from '../authentication/AuthContext';
 
 export default function ExportPanel() {
@@ -30,9 +33,12 @@ export default function ExportPanel() {
     const itemsPerPage = 10;
 
     useEffect(() => {
-        const today = new Date().toISOString().split('T')[0];
-        setStartDate(today);
-        setEndDate(today);
+        const today = new Date();
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(today.getMonth() - 1);
+
+        setStartDate(oneMonthAgo.toISOString().split('T')[0]);
+        setEndDate(today.toISOString().split('T')[0]);
 
         const fetchData = async () => {
             try {
@@ -146,7 +152,14 @@ export default function ExportPanel() {
             }
 
             // Generate HTML locally
-            const reportsHtml = docs.map(doc => renderToStaticMarkup(<PaperPreview data={doc} />)).join('');
+            const reportsHtml = docs.map(doc => {
+                const isReitmans = (doc.customer || '').toLowerCase() === 'reitmans';
+                return `
+                    <div class="page-break-after-always">
+                        ${renderToStaticMarkup(isReitmans ? <PaperPreviewReitmans data={doc} /> : <PaperPreview data={doc} />)}
+                    </div>
+                `;
+            }).join('');
             const fullHtml = `
                 <!DOCTYPE html>
                 <html>
@@ -363,21 +376,21 @@ export default function ExportPanel() {
                     <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1">Factory Style No</label>
                         <div className="relative">
-                            <select
+                            <input
+                                type="text"
                                 value={factoryStyleFilter}
                                 onChange={e => setFactoryStyleFilter(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg bg-white appearance-none pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="">Select...</option>
-                                {[...new Set([
-                                    ...(Array.isArray(ordersRaw) ? ordersRaw.map(o => (o.factoryStyleNo || o.moNo || o.style || '').toString()).filter(Boolean) : [])
-                                ])].map(f => <option key={f} value={f}>{f}</option>)}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                                <svg className="fill-current h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                    <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                                </svg>
-                            </div>
+                                placeholder="Search Style No..."
+                                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            {factoryStyleFilter && (
+                                <button
+                                    onClick={() => setFactoryStyleFilter('')}
+                                    className="absolute inset-y-0 right-0 px-2 text-gray-400 hover:text-gray-600"
+                                >
+                                    ✕
+                                </button>
+                            )}
                         </div>
                     </div>
                     <div className="relative">
@@ -626,21 +639,52 @@ export default function ExportPanel() {
                 )}
             </div>
 
-            <HistoryModal
-                open={isHistoryModalOpen}
-                onCancel={() => setIsHistoryModalOpen(false)}
-                report={selectedReportForHistory}
-                formatDate={formatDate}
-                formatTime={formatTime}
-            />
+            {selectedReportForHistory && (() => {
+                const isReitmans = (selectedReportForHistory.customer || '').toLowerCase() === 'reitmans';
+                if (isReitmans) {
+                    return (
+                        <HistoryModelReitmans
+                            open={isHistoryModalOpen}
+                            onCancel={() => setIsHistoryModalOpen(false)}
+                            report={selectedReportForHistory}
+                            formatDate={formatDate}
+                            formatTime={formatTime}
+                        />
+                    );
+                }
+                return (
+                    <HistoryModal
+                        open={isHistoryModalOpen}
+                        onCancel={() => setIsHistoryModalOpen(false)}
+                        report={selectedReportForHistory}
+                        formatDate={formatDate}
+                        formatTime={formatTime}
+                    />
+                );
+            })()}
 
             {selectedReportForUpdate && (
-                <UpdateModel
-                    open={isUpdateModelOpen}
-                    onCancel={() => setIsUpdateModelOpen(false)}
-                    report={selectedReportForUpdate}
-                    onUpdate={handleUpdateSuccess}
-                />
+                (() => {
+                    const isReitmans = (selectedReportForUpdate.customer || '').toLowerCase() === 'reitmans';
+                    if (isReitmans) {
+                        return (
+                            <UpdateModelReimans
+                                open={isUpdateModelOpen}
+                                onCancel={() => setIsUpdateModelOpen(false)}
+                                report={selectedReportForUpdate}
+                                onUpdate={handleUpdateSuccess}
+                            />
+                        );
+                    }
+                    return (
+                        <UpdateModel
+                            open={isUpdateModelOpen}
+                            onCancel={() => setIsUpdateModelOpen(false)}
+                            report={selectedReportForUpdate}
+                            onUpdate={handleUpdateSuccess}
+                        />
+                    );
+                })()
             )}
 
         </div >

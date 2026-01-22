@@ -30,6 +30,7 @@ const FormPage = () => {
         customer: '',
         fabrication: '',
         aquaboySpec: '',
+        aquaboySpecRibs: '',
         colorName: '',
         beforeDryRoom: '',
         beforeDryRoomTime: '',
@@ -271,7 +272,6 @@ const FormPage = () => {
                     // Auto-fill Reitmans specific fields
                     productName: order.style || prev.productName,
                     composition: fabricationStr || prev.composition,
-                    poNumber: order.poNo || order.po || prev.poNumber || '',
                     poLine: poLine || prev.poLine || ''
                 }));
 
@@ -286,8 +286,17 @@ const FormPage = () => {
                         if (Array.isArray(c.ColorQty)) c.ColorQty.forEach(col => col.ColorName && colors.push(col.ColorName));
                     });
                 }
-                setAvailableColors([...new Set(colors)]);
-                addCalcStep(`Available colors detected: ${[...new Set(colors)].length}`);
+                const uniqueColors = [...new Set(colors)];
+                setAvailableColors(uniqueColors);
+                if (uniqueColors.length === 1) {
+                    const color = uniqueColors[0];
+                    setFormData(prev => ({
+                        ...prev,
+                        colorName: color,
+                        inspectionRecords: (prev.inspectionRecords || []).map(r => ({ ...r, colorName: color }))
+                    }));
+                }
+                addCalcStep(`Available colors detected: ${uniqueColors.length}${uniqueColors.length === 1 ? ' (auto-selected)' : ''}`);
                 try {
                     const detectRibsAvailable = (ord) => {
                         if (!ord) return false;
@@ -443,17 +452,23 @@ const FormPage = () => {
                         if (!section) return 'fail';
                         const bodyVal = parseFloat(section.body);
                         const ribsVal = parseFloat(section.ribs);
-                        const specVal = parseFloat(report.aquaboySpec);
-                        if (!isNaN(specVal)) {
-                            const maxReading = Math.max(
-                                !isNaN(bodyVal) ? bodyVal : -Infinity,
-                                !isNaN(ribsVal) ? ribsVal : -Infinity
-                            );
-                            if (maxReading !== -Infinity) {
-                                return maxReading <= specVal ? 'pass' : 'fail';
-                            }
+                        const bodySpecVal = parseFloat(report.aquaboySpec);
+                        const ribsSpecVal = parseFloat(report.aquaboySpecRibs);
+
+                        const isBodyFail = !isNaN(bodyVal) && !isNaN(bodySpecVal) && bodyVal > bodySpecVal;
+                        const isRibsFail = !isNaN(ribsVal) && !isNaN(ribsSpecVal) && ribsVal > ribsSpecVal;
+
+                        if (isBodyFail || isRibsFail) return 'fail';
+
+                        const isBodyPass = !isNaN(bodyVal) && !isNaN(bodySpecVal) && bodyVal <= bodySpecVal;
+                        const isRibsPass = !isNaN(ribsVal) && !isNaN(ribsSpecVal) && ribsVal <= ribsSpecVal;
+
+                        // To be 'pass' overall, it needs to pass on all available readings
+                        // If one is missing but the other passes, it's still pending/fail in this logic
+                        if (ribsAvailable) {
+                            return (isBodyPass && isRibsPass) ? 'pass' : 'fail';
                         }
-                        return 'fail';
+                        return isBodyPass ? 'pass' : 'fail';
                     };
 
                     historyArray.forEach(historyEntry => {
@@ -475,7 +490,9 @@ const FormPage = () => {
                             bottomRibsReading: historyEntry.bottom?.ribs || '',
                             beforeDryRoom: historyEntry.beforeDryRoom || historyEntry.beforeDryRoomTime || '',
                             afterDryRoom: historyEntry.afterDryRoom || historyEntry.afterDryRoomTime || '',
-                            images: historyEntry.images || []
+                            images: historyEntry.images || [],
+                            aquaboySpec: report.aquaboySpec || '',
+                            aquaboySpecRibs: report.aquaboySpecRibs || ''
                         });
                     });
                 });
@@ -550,7 +567,8 @@ const FormPage = () => {
 
     const updateSectionData = (index, section, field, value) => {
         setFormData(prev => {
-            const specNum = Number(prev.aquaboySpec);
+            const bodySpecNum = Number(prev.aquaboySpec);
+            const ribsSpecNum = Number(prev.aquaboySpecRibs);
             const inspectionRecords = prev.inspectionRecords.map((record, i) => {
                 if (i !== index) return record;
 
@@ -563,34 +581,69 @@ const FormPage = () => {
                     if (s === '') return NaN;
                     // remove any non-numeric characters except dot and minus
                     const cleaned = s.replace(/[^0-9.\-]/g, '');
-                    if (cleaned.length < 2) return NaN;
+                    if (cleaned.length === 0) return NaN;
                     const n = Number(cleaned);
                     return Number.isFinite(n) ? n : NaN;
                 };
 
                 const bodyVal = parseNumber(updatedSection.body);
                 const ribsVal = parseNumber(updatedSection.ribs);
-                // choose the strongest signal: prefer the max numeric reading if both present
-                let reading = NaN;
-                if (!Number.isNaN(bodyVal)) reading = bodyVal;
-                if (!Number.isNaN(ribsVal)) {
-                    reading = Number.isNaN(reading) ? ribsVal : Math.max(reading, ribsVal);
+
+                // Body Status
+                const bodyStr = String(updatedSection.body || '').trim();
+                if (bodyStr.length >= 2 && !Number.isNaN(bodyVal) && !Number.isNaN(bodySpecNum)) {
+                    updatedSection.bodyPass = bodyVal <= bodySpecNum;
+                    updatedSection.bodyFail = bodyVal > bodySpecNum;
+                    updatedSection.bodyStatus = bodyVal <= bodySpecNum ? 'pass' : 'fail';
+                } else {
+                    updatedSection.bodyPass = false;
+                    updatedSection.bodyFail = false;
+                    updatedSection.bodyStatus = '';
                 }
 
-                // If we have a valid numeric reading and a numeric spec, auto-set pass/fail
-                if (!Number.isNaN(reading) && !Number.isNaN(specNum)) {
-                    // PASS when reading is less than or equal to spec; FAIL when reading is greater than spec
-                    if (reading <= specNum) {
-                        updatedSection.pass = true;
-                        updatedSection.fail = false;
-                    } else {
-                        updatedSection.pass = false;
-                        updatedSection.fail = true;
-                    }
+                // Ribs Status
+                const ribsStr = String(updatedSection.ribs || '').trim();
+                if (ribsStr.length >= 2 && !Number.isNaN(ribsVal) && !Number.isNaN(ribsSpecNum)) {
+                    updatedSection.ribsPass = ribsVal <= ribsSpecNum;
+                    updatedSection.ribsFail = ribsVal > ribsSpecNum;
+                    updatedSection.ribsStatus = ribsVal <= ribsSpecNum ? 'pass' : 'fail';
                 } else {
-                    // Clear pass/fail when there's no numeric reading or no numeric spec
+                    updatedSection.ribsPass = false;
+                    updatedSection.ribsFail = false;
+                    updatedSection.ribsStatus = '';
+                }
+
+                // Overall Status (Synthesis)
+                // We wait for all available inputs before showing a row-level verdict
+                const isBodyMissing = Number.isNaN(bodyVal);
+                const isRibsMissing = ribsAvailable && Number.isNaN(ribsVal);
+
+                if (isBodyMissing || isRibsMissing) {
                     updatedSection.pass = false;
                     updatedSection.fail = false;
+                    updatedSection.status = '';
+                } else {
+                    const hasFail = updatedSection.bodyFail || (ribsAvailable && updatedSection.ribsFail);
+                    let hasPass = false;
+                    if (ribsAvailable) {
+                        hasPass = updatedSection.bodyPass && updatedSection.ribsPass;
+                    } else {
+                        hasPass = updatedSection.bodyPass;
+                    }
+
+                    if (hasFail) {
+                        updatedSection.pass = false;
+                        updatedSection.fail = true;
+                        updatedSection.status = 'fail';
+                    } else if (hasPass) {
+                        updatedSection.pass = true;
+                        updatedSection.fail = false;
+                        updatedSection.status = 'pass';
+                    } else {
+                        updatedSection.pass = false;
+                        updatedSection.fail = false;
+                        updatedSection.status = '';
+                    }
                 }
 
                 return { ...record, [section]: updatedSection };
@@ -602,7 +655,8 @@ const FormPage = () => {
 
     const updateAdditionalSectionData = (index, section, field, value) => {
         setFormData(prev => {
-            const specNum = Number(prev.aquaboySpec);
+            const bodySpecNum = Number(prev.aquaboySpec);
+            const ribsSpecNum = Number(prev.aquaboySpecRibs);
             const inspectionRecords = prev.inspectionRecords.map((record, i) => {
                 if (i !== index) return record;
 
@@ -616,30 +670,68 @@ const FormPage = () => {
                     const s = String(v).trim();
                     if (s === '') return NaN;
                     const cleaned = s.replace(/[^0-9.\-]/g, '');
-                    if (cleaned.length < 2) return NaN;
+                    if (cleaned.length === 0) return NaN;
                     const n = Number(cleaned);
                     return Number.isFinite(n) ? n : NaN;
                 };
 
                 const bodyVal = parseNumber(updatedSection.body);
                 const ribsVal = parseNumber(updatedSection.ribs);
-                let reading = NaN;
-                if (!Number.isNaN(bodyVal)) reading = bodyVal;
-                if (!Number.isNaN(ribsVal)) {
-                    reading = Number.isNaN(reading) ? ribsVal : Math.max(reading, ribsVal);
+
+                // Body Status
+                const bodyStr = String(updatedSection.body || '').trim();
+                if (bodyStr.length >= 2 && !Number.isNaN(bodyVal) && !Number.isNaN(bodySpecNum)) {
+                    updatedSection.bodyPass = bodyVal <= bodySpecNum;
+                    updatedSection.bodyFail = bodyVal > bodySpecNum;
+                    updatedSection.bodyStatus = bodyVal <= bodySpecNum ? 'pass' : 'fail';
+                } else {
+                    updatedSection.bodyPass = false;
+                    updatedSection.bodyFail = false;
+                    updatedSection.bodyStatus = '';
                 }
 
-                if (!Number.isNaN(reading) && !Number.isNaN(specNum)) {
-                    if (reading <= specNum) {
-                        updatedSection.pass = true;
-                        updatedSection.fail = false;
-                    } else {
-                        updatedSection.pass = false;
-                        updatedSection.fail = true;
-                    }
+                // Ribs Status
+                const ribsStr = String(updatedSection.ribs || '').trim();
+                if (ribsStr.length >= 2 && !Number.isNaN(ribsVal) && !Number.isNaN(ribsSpecNum)) {
+                    updatedSection.ribsPass = ribsVal <= ribsSpecNum;
+                    updatedSection.ribsFail = ribsVal > ribsSpecNum;
+                    updatedSection.ribsStatus = ribsVal <= ribsSpecNum ? 'pass' : 'fail';
                 } else {
+                    updatedSection.ribsPass = false;
+                    updatedSection.ribsFail = false;
+                    updatedSection.ribsStatus = '';
+                }
+
+                // Overall Status (Synthesis)
+                const isBodyMissing = Number.isNaN(bodyVal);
+                const isRibsMissing = ribsAvailable && Number.isNaN(ribsVal);
+
+                if (isBodyMissing || isRibsMissing) {
                     updatedSection.pass = false;
                     updatedSection.fail = false;
+                    updatedSection.status = '';
+                } else {
+                    const hasFail = updatedSection.bodyFail || (ribsAvailable && updatedSection.ribsFail);
+                    let hasPass = false;
+                    if (ribsAvailable) {
+                        hasPass = updatedSection.bodyPass && updatedSection.ribsPass;
+                    } else {
+                        hasPass = updatedSection.bodyPass;
+                    }
+
+                    if (hasFail) {
+                        updatedSection.pass = false;
+                        updatedSection.fail = true;
+                        updatedSection.status = 'fail';
+                    } else if (hasPass) {
+                        updatedSection.pass = true;
+                        updatedSection.fail = false;
+                        updatedSection.status = 'pass';
+                    } else {
+                        updatedSection.pass = false;
+                        updatedSection.fail = false;
+                        updatedSection.status = '';
+                    }
                 }
 
                 return {
@@ -650,6 +742,48 @@ const FormPage = () => {
 
             return { ...prev, inspectionRecords };
         });
+    };
+
+    const handleReadingInput = (index, section, field, value) => {
+        updateSectionData(index, section, field, value);
+
+        if (value.length >= 2) {
+            let nextId = '';
+            const sectionsList = ['top', 'middle', 'bottom'];
+            const curIdx = sectionsList.indexOf(section);
+
+            if (field === 'body' && ribsAvailable) {
+                nextId = `body-${index}-${section}-ribs`;
+            } else if (curIdx < 2) {
+                nextId = `body-${index}-${sectionsList[curIdx + 1]}-body`;
+            }
+
+            if (nextId) {
+                const el = document.getElementById(nextId);
+                if (el) el.focus();
+            }
+        }
+    };
+
+    const handleAdditionalReadingInput = (index, section, field, value) => {
+        updateAdditionalSectionData(index, section, field, value);
+
+        if (value.length >= 2) {
+            let nextId = '';
+            const sectionsList = ['top', 'middle', 'bottom'];
+            const curIdx = sectionsList.indexOf(section);
+
+            if (field === 'body' && ribsAvailable) {
+                nextId = `add-body-${index}-${section}-ribs`;
+            } else if (curIdx < 2) {
+                nextId = `add-body-${index}-${sectionsList[curIdx + 1]}-body`;
+            }
+
+            if (nextId) {
+                const el = document.getElementById(nextId);
+                if (el) el.focus();
+            }
+        }
     };
 
     const setPassFail = (index, section, isPass) => {
@@ -765,24 +899,36 @@ const FormPage = () => {
 
     const validateForm = () => {
         const newErrors = {};
+        const isReitmans = (formData.customer || '').toLowerCase() === 'reitmans' || formData.customer === 'Reitmans_Form';
 
         // if (!orderNoSearch.trim()) newErrors.orderNo = 'Order No / Style is required';
         if (!formData.buyerStyle.trim()) newErrors.buyerStyle = 'Buyer style is required';
         if (!formData.factoryStyleNo.trim()) newErrors.factoryStyleNo = 'Factory style number is required';
         if (!formData.customer.trim()) newErrors.customer = 'Customer is required';
         if (!formData.fabrication.trim()) newErrors.fabrication = 'Fabrication is required';
-        if (!formData.aquaboySpec.trim()) newErrors.aquaboySpec = 'Aquaboy spec is required';
+        if (!formData.colorName?.trim()) newErrors.colorName = 'Color Name is required';
 
-        // Only require beforeDryRoomTime for the first check
-        if (checkHistory.length === 0) {
-            if (!formData.beforeDryRoomTime || !formData.beforeDryRoomTime.toString().trim()) {
-                newErrors.beforeDryRoomTime = 'Before dry room time is required';
-            }
+        // Reitmans uses upperCentisimalIndex instead of aquaboySpec in its UI, 
+        // though they are often mapped to each other
+        if (!formData.aquaboySpec.trim() && !isReitmans) {
+            newErrors.aquaboySpec = 'Aquaboy spec is required';
+        } else if (isReitmans && !formData.aquaboySpec.trim() && !formData.upperCentisimalIndex?.trim()) {
+            newErrors.aquaboySpec = 'Upper Centisimal index is required';
         }
 
-        if (checkHistory.length > 0) {
-            if (!formData.afterDryRoomTime || !formData.afterDryRoomTime.toString().trim()) {
-                newErrors.afterDryRoomTime = 'After dry room time is required';
+        // Only require dry room times for non-Reitmans flows
+        if (!isReitmans) {
+            // Only require beforeDryRoomTime for the first check
+            if (checkHistory.length === 0) {
+                if (!formData.beforeDryRoomTime || !formData.beforeDryRoomTime.toString().trim()) {
+                    newErrors.beforeDryRoomTime = 'Before dry room time is required';
+                }
+            }
+
+            if (checkHistory.length > 0) {
+                if (!formData.afterDryRoomTime || !formData.afterDryRoomTime.toString().trim()) {
+                    newErrors.afterDryRoomTime = 'After dry room time is required';
+                }
             }
         }
 
@@ -802,6 +948,8 @@ const FormPage = () => {
             beforeDryRoomTime: check.beforeDryRoom,
             afterDryRoom: check.afterDryRoom,
             afterDryRoomTime: check.afterDryRoom,
+            aquaboySpec: check.aquaboySpec || prev.aquaboySpec || '',
+            aquaboySpecRibs: check.aquaboySpecRibs || prev.aquaboySpecRibs || '',
             date: check.date ? check.date.split('T')[0] : prev.date,
             inspectionRecords: [
                 {
@@ -873,8 +1021,11 @@ const FormPage = () => {
 
         setIsSaving(true);
         try {
+            const isReitmans = (formData.customer || '').toLowerCase() === 'reitmans' || formData.customer === 'Reitmans_Form';
+
             const payload = {
                 ...formData,
+                ribsAvailable: ribsAvailable,
                 beforeDryRoom: formData.beforeDryRoomTime || formData.beforeDryRoom || '',
                 afterDryRoom: formData.afterDryRoomTime || formData.afterDryRoom || '',
                 firstCheckDate: firstCheckDate || new Date().toISOString(),
@@ -882,7 +1033,19 @@ const FormPage = () => {
                     ...rec,
                     beforeDryRoom: rec.beforeDryRoomTime || rec.beforeDryRoom || '',
                     afterDryRoom: rec.afterDryRoomTime || rec.afterDryRoom || '',
-                    images: rec.images || [] // Explicitly include images
+                    images: rec.images || [], // Explicitly include images
+                    // Add Reitmans fields if customer is Reitmans for history snapshots
+                    ...(isReitmans && {
+                        timeChecked: formData.timeChecked,
+                        moistureRateBeforeDehumidify: formData.moistureRateBeforeDehumidify,
+                        noPcChecked: formData.noPcChecked,
+                        timeIn: formData.timeIn,
+                        timeOut: formData.timeOut,
+                        moistureRateAfter: formData.moistureRateAfter,
+                        upperCentisimalIndex: formData.upperCentisimalIndex,
+                        poLine: formData.poLine,
+                        composition: formData.composition
+                    })
                 }))
             };
 
@@ -927,6 +1090,7 @@ const FormPage = () => {
                     customer: '',
                     fabrication: '',
                     aquaboySpec: '',
+                    aquaboySpecRibs: '',
                     colorName: '',
                     beforeDryRoom: '',
                     beforeDryRoomTime: '',
@@ -948,6 +1112,16 @@ const FormPage = () => {
                         }
                     ],
                     generalRemark: '',
+                    // Reitmans fields
+                    composition: '',
+                    poLine: '',
+                    timeChecked: '',
+                    moistureRateBeforeDehumidify: '',
+                    noPcChecked: '',
+                    timeIn: '',
+                    timeOut: '',
+                    moistureRateAfter: '',
+                    upperCentisimalIndex: '',
                     inspectorSignature: '',
                     qamSignature: ''
                 });
@@ -1067,6 +1241,7 @@ const FormPage = () => {
                             setShowOrderNoDropdown={setShowOrderNoDropdown}
                             isLoadingOrderData={isLoadingOrderData}
                             handleOrderNoSelect={handleOrderNoSelect}
+                            availableColors={availableColors}
                         />
                     ) : (<>
 
@@ -1110,30 +1285,58 @@ const FormPage = () => {
                                             </div>
                                             <h3 className="text-lg font-bold text-slate-700 tracking-tight">Fabric → Fiber Calculations</h3>
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             {fabricFiberMatches.map((m, idx) => (
-                                                <div key={idx} className="p-2 border rounded bg-gray-50 text-sm">
-                                                    <div><span className="font-medium">Fabric:</span> {m.fabricName} {m.percentageValue !== null ? `(${m.percentageValue})` : ''}</div>
-                                                    <div><span className="font-medium">Matched fiber limit:</span> {m.matchedFiberLimit ?? '—'}</div>
-                                                    <div>
-                                                        <span className="font-medium">Result:</span>{' '}
-                                                        {m.computedValue !== null && m.computedValue !== undefined
-                                                            ? (
-                                                                <span className="font-mono">{Number(m.computedValue)}</span>
-                                                            )
-                                                            : '—'}
+                                                <div key={idx} className="p-3 border border-blue-200 rounded-xl bg-gray-50/50 hover:bg-white hover:shadow-sm transition-all text-sm">
+                                                    <div className="flex items-center gap-2 mb-1.5">
+                                                        <svg className="w-4 h-4 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                                        </svg>
+                                                        <div className="flex flex-wrap items-center gap-1.5">
+                                                            <span className="font-bold text-slate-700">Fabric:</span>
+                                                            <span className="text-slate-600">{m.fabricName} {m.percentageValue !== null ? `(${m.percentageValue})` : ''}</span>
+                                                        </div>
                                                     </div>
+
+                                                    <div className="flex items-center gap-2 mb-1.5">
+                                                        <svg className="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                                        </svg>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="font-bold text-slate-700">Limit:</span>
+                                                            <span className="text-slate-600">{m.matchedFiberLimit ?? 'N/A'}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 mb-3">
+                                                        <svg className="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                                        </svg>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="font-bold text-slate-700">Result:</span>
+                                                            <span className="font-mono font-bold text-blue-600 text-base">
+                                                                {m.computedValue !== null && m.computedValue !== undefined ? Number(m.computedValue) : 'N/A'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
                                                     {/* Show calculation formula when possible */}
                                                     {m.computedValue !== null && m.computedValue !== undefined && m.percentageNumber !== undefined && m.matchedFiberLimitNumber !== undefined ? (
-                                                        <div className="text-xs text-gray-600 mt-1">
-                                                            <div>Formula: ({m.percentageNumber} * {m.matchedFiberLimitNumber}) / 100 = {Number(m.computedValue)}</div>
+                                                        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-blue-50 border border-blue-100 text-[13px] text-blue-600 font-mono">
+                                                            <svg className="w-4 h-4 opacity-70 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                            </svg>
+                                                            <span>({m.percentageNumber} × {m.matchedFiberLimitNumber}) ÷ 100 = {Number(m.computedValue)}</span>
                                                         </div>
                                                     ) : (
-                                                        <div className="text-xs text-gray-500 mt-1">
+                                                        <div className="flex items-center gap-2 px-2 py-1 text-[10px] text-slate-400 italic">
+                                                            <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
                                                             {m.matchedFiberName ? (
-                                                                <div>Could not compute (missing numeric percentage or limit)</div>
+                                                                <span>Could not compute (missing numeric percentage or limit)</span>
                                                             ) : (
-                                                                <div>No matched fiber limit found for this buyer</div>
+                                                                <span>No matched fiber limit found for this buyer</span>
                                                             )}
                                                         </div>
                                                     )}
@@ -1319,11 +1522,11 @@ const FormPage = () => {
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Aquaboy Reading Spec
+                                            {ribsAvailable ? 'Aquaboy Reading Spec (Body)' : 'Aquaboy Reading Spec'}
                                             <span className="text-red-500 ml-1">*</span>
                                         </label>
                                         <div className="relative">
-                                            <label className="sr-only">Aquaboy Reading Spec</label>
+                                            <label className="sr-only">Aquaboy Reading Spec (Body)</label>
                                             <div className={`w-full rounded-lg p-1 border ${errors.aquaboySpec ? 'border-blue-300 bg-red-50' : 'border-blue-200 bg-gradient-to-r from-blue-50/60 to-white'} shadow-inner`}>
                                                 <div className="relative">
                                                     <input
@@ -1334,12 +1537,10 @@ const FormPage = () => {
                                                         placeholder=""
                                                         required
                                                         aria-required="true"
-                                                        disabled
+                                                        disabled={!formData.factoryStyleNo}
                                                     />
                                                     <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                                                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12h3l3-8 4 16 3-8h3" />
-                                                        </svg>
+                                                        <span className="text-gray-400 text-sm">% RH</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1408,6 +1609,35 @@ const FormPage = () => {
                                             className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
                                         />
                                     </div>
+                                    {ribsAvailable && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Aquaboy Reading Spec (Ribs)
+                                                <span className="text-red-500 ml-1">*</span>
+                                            </label>
+                                            <div className="relative">
+                                                <label className="sr-only">Aquaboy Reading Spec (Ribs)</label>
+                                                <div className={`w-full rounded-lg p-1 border ${errors.aquaboySpecRibs ? 'border-blue-300 bg-red-50' : 'border-blue-200 bg-gradient-to-r from-blue-50/60 to-white'} shadow-inner`}>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="text"
+                                                            value={formData.aquaboySpecRibs}
+                                                            onChange={(e) => setFormData(prev => ({ ...prev, aquaboySpecRibs: e.target.value }))}
+                                                            className={`w-full px-4 py-1 bg-transparent rounded-md focus:ring-blue-300 transition-colors ${errors.aquaboySpecRibs ? 'text-blue-700' : 'text-blue-900'}`}
+                                                            placeholder=""
+                                                            required
+                                                            aria-required="true"
+                                                            disabled={!formData.factoryStyleNo}
+                                                        />
+                                                        <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                                            <span className="text-gray-400 text-sm">% RH</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {errors.aquaboySpecRibs && <p className="text-red-500 text-sm mt-1">{errors.aquaboySpecRibs}</p>}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="w-full bg-blue-50 p-8 mb-6 mt-6 rounded-xl shadow-md border border-blue-200">
@@ -1441,83 +1671,71 @@ const FormPage = () => {
                                                         </h4>
 
                                                         {/* Make each row a single column full width */}
-                                                        <div className="flex flex-col md:flex-row gap-3 w-full items-end">
-                                                            <input
-                                                                type="number"
-                                                                value={record[section].body}
-                                                                onChange={(e) =>
-                                                                    updateSectionData(index, section, 'body', e.target.value)
-                                                                }
-                                                                placeholder="Body"
-                                                                className="w-full md:flex-1 md:min-w-0 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                                                disabled={!formData.factoryStyleNo}
-                                                            />
-
-                                                            {ribsAvailable ? (
-                                                                <input
-                                                                    type="number"
-                                                                    value={record[section].ribs}
-                                                                    onChange={(e) =>
-                                                                        updateSectionData(index, section, 'ribs', e.target.value)
-                                                                    }
-                                                                    placeholder="Ribs"
-                                                                    className="w-full md:flex-1 md:min-w-0 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                                                    disabled={!formData.factoryStyleNo}
-                                                                />
-                                                            ) : null}
-                                                            <div className="flex items-center w-full md:w-auto mb-2 md:mb-0">
-                                                                <div className="sr-only">
-                                                                    <label className="flex items-center gap-1">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={record[section].pass}
-                                                                            disabled={record[section].fail}
-                                                                            onChange={() => setPassFail(index, section, true)}
-                                                                            className="w-4 h-4 text-green-500 border-green-500 focus:ring-green-300 cursor-pointer"
-                                                                        />
-                                                                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-50 text-green-600 font-semibold text-sm">
-                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                            </svg>
-                                                                            Pass
-                                                                        </span>
-                                                                    </label>
-                                                                    <label className="flex items-center gap-1">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={record[section].fail}
-                                                                            disabled={record[section].pass}
-                                                                            onChange={() => setPassFail(index, section, false)}
-                                                                            className="w-4 h-4 text-red-500 focus:ring-red-300 cursor-pointer"
-                                                                        />
-                                                                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-50 text-red-500 font-semibold text-sm">
-                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                                            </svg>
-                                                                            Fail
-                                                                        </span>
-                                                                    </label>
+                                                        <div className="flex flex-col md:flex-row gap-4 w-full items-center">
+                                                            {/* Body Reading + Status */}
+                                                            <div className="flex flex-1 items-center gap-2 w-full">
+                                                                <div className="flex-1">
+                                                                    <input
+                                                                        id={`body-${index}-${section}-body`}
+                                                                        type="number"
+                                                                        value={record[section].body}
+                                                                        onChange={(e) => handleReadingInput(index, section, 'body', e.target.value)}
+                                                                        placeholder="Body"
+                                                                        className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                                                                        disabled={!formData.factoryStyleNo}
+                                                                    />
                                                                 </div>
-
-                                                                {/* Visual badge shown to user */}
-                                                                {record[section].pass ? (
-                                                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-sm">
+                                                                {record[section].bodyPass ? (
+                                                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
                                                                         <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                                                         </svg>
                                                                         Pass
                                                                     </span>
-                                                                ) : record[section].fail ? (
-                                                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-sm">
+                                                                ) : record[section].bodyFail ? (
+                                                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
                                                                         <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                                         </svg>
                                                                         Fail
                                                                     </span>
                                                                 ) : (
-                                                                    <span className="text-gray-500 text-sm">N/A</span>
+                                                                    <span className="text-gray-400 text-xs px-2 italic">N/A</span>
                                                                 )}
                                                             </div>
+
+                                                            {ribsAvailable ? (
+                                                                <div className="flex flex-1 items-center gap-2 w-full">
+                                                                    <div className="flex-1">
+                                                                        <input
+                                                                            id={`body-${index}-${section}-ribs`}
+                                                                            type="number"
+                                                                            value={record[section].ribs}
+                                                                            onChange={(e) => handleReadingInput(index, section, 'ribs', e.target.value)}
+                                                                            placeholder="Ribs"
+                                                                            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                                                                            disabled={!formData.factoryStyleNo}
+                                                                        />
+                                                                    </div>
+                                                                    {record[section].ribsPass ? (
+                                                                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
+                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                            </svg>
+                                                                            Pass
+                                                                        </span>
+                                                                    ) : record[section].ribsFail ? (
+                                                                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
+                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                            </svg>
+                                                                            Fail
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-gray-400 text-xs px-2 italic">N/A</span>
+                                                                    )}
+                                                                </div>
+                                                            ) : null}
                                                         </div>
                                                     </div>
                                                 ))}
@@ -1683,34 +1901,71 @@ const FormPage = () => {
                                                         {['top', 'middle', 'bottom'].map(addSec => (
                                                             <div key={addSec} className="w-full">
                                                                 <h4 className="font-bold capitalize text-gray-700 text-base text-start mb-1">{addSec}</h4>
-                                                                <div className="flex flex-col md:flex-row gap-3 w-full items-end">
-                                                                    <input
-                                                                        type="number"
-                                                                        value={record.additional?.[addSec]?.body || ''}
-                                                                        onChange={(e) => updateAdditionalSectionData(recIdx, addSec, 'body', e.target.value)}
-                                                                        placeholder="Body"
-                                                                        className="w-full md:flex-1 md:min-w-0 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                                                        disabled={!formData.factoryStyleNo}
-                                                                    />
-                                                                    {ribsAvailable ? (
-                                                                        <input
-                                                                            type="number"
-                                                                            value={record.additional?.[addSec]?.ribs || ''}
-                                                                            onChange={(e) => updateAdditionalSectionData(recIdx, addSec, 'ribs', e.target.value)}
-                                                                            placeholder="Ribs"
-                                                                            className="w-full md:flex-1 md:min-w-0 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                                                            disabled={!formData.factoryStyleNo}
-                                                                        />
-                                                                    ) : null}
-                                                                    <div className="flex items-center w-full md:w-auto mb-2 md:mb-0">
-                                                                        {record.additional?.[addSec]?.pass ? (
-                                                                            <span className="px-3 py-1 rounded bg-green-100 text-green-800 font-semibold">Pass</span>
-                                                                        ) : record.additional?.[addSec]?.fail ? (
-                                                                            <span className="px-3 py-1 rounded bg-red-100 text-red-800 font-semibold">Fail</span>
+                                                                <div className="flex flex-col md:flex-row gap-4 w-full items-center">
+                                                                    {/* Body Reading + Status */}
+                                                                    <div className="flex flex-1 items-center gap-2 w-full">
+                                                                        <div className="flex-1">
+                                                                            <input
+                                                                                id={`add-body-${recIdx}-${addSec}-body`}
+                                                                                type="number"
+                                                                                value={record.additional?.[addSec]?.body || ''}
+                                                                                onChange={(e) => handleAdditionalReadingInput(recIdx, addSec, 'body', e.target.value)}
+                                                                                placeholder="Body"
+                                                                                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                                                                                disabled={!formData.factoryStyleNo}
+                                                                            />
+                                                                        </div>
+                                                                        {record.additional?.[addSec]?.bodyPass ? (
+                                                                            <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
+                                                                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                                </svg>
+                                                                                Pass
+                                                                            </span>
+                                                                        ) : record.additional?.[addSec]?.bodyFail ? (
+                                                                            <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
+                                                                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                                </svg>
+                                                                                Fail
+                                                                            </span>
                                                                         ) : (
-                                                                            <span className="text-gray-500 text-sm">—</span>
+                                                                            <span className="text-gray-400 text-xs px-2 italic">N/A</span>
                                                                         )}
                                                                     </div>
+
+                                                                    {ribsAvailable ? (
+                                                                        <div className="flex flex-1 items-center gap-2 w-full">
+                                                                            <div className="flex-1">
+                                                                                <input
+                                                                                    id={`add-body-${recIdx}-${addSec}-ribs`}
+                                                                                    type="number"
+                                                                                    value={record.additional?.[addSec]?.ribs || ''}
+                                                                                    onChange={(e) => handleAdditionalReadingInput(recIdx, addSec, 'ribs', e.target.value)}
+                                                                                    placeholder="Ribs"
+                                                                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                                                                                    disabled={!formData.factoryStyleNo}
+                                                                                />
+                                                                            </div>
+                                                                            {record.additional?.[addSec]?.ribsPass ? (
+                                                                                <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
+                                                                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                                    </svg>
+                                                                                    Pass
+                                                                                </span>
+                                                                            ) : record.additional?.[addSec]?.ribsFail ? (
+                                                                                <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
+                                                                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                                    </svg>
+                                                                                    Fail
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="text-gray-400 text-xs px-2 italic">N/A</span>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : null}
                                                                 </div>
                                                             </div>
                                                         ))}

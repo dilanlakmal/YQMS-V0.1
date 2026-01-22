@@ -4,17 +4,23 @@ const historySchema = new mongoose.Schema(
   {
     top: {
       body: { type: String, default: "" },
+      bodyStatus: { type: String, default: "" },
       ribs: { type: String, default: "" },
+      ribsStatus: { type: String, default: "" },
       status: { type: String, default: "" },
     },
     middle: {
       body: { type: String, default: "" },
+      bodyStatus: { type: String, default: "" },
       ribs: { type: String, default: "" },
+      ribsStatus: { type: String, default: "" },
       status: { type: String, default: "" },
     },
     bottom: {
       body: { type: String, default: "" },
+      bodyStatus: { type: String, default: "" },
       ribs: { type: String, default: "" },
+      ribsStatus: { type: String, default: "" },
       status: { type: String, default: "" },
     },
     images: [
@@ -40,8 +46,10 @@ const humidityReportSchema = new mongoose.Schema(
     customer: { type: String, default: "" },
     inspectionType: { type: String, default: "Inline" },
     fabrication: { type: String, default: "" },
-    aquaboySpec: { type: String, default: "" },
+    aquaboySpecBody: { type: String, default: "" },
+    aquaboySpecRibs: { type: String, default: "" },
     colorName: { type: String, default: "" },
+    ribsAvailable: { type: Boolean, default: true },
     beforeDryRoom: { type: String, default: "" },
     afterDryRoom: { type: String, default: "" },
     date: { type: String, default: "" },
@@ -51,8 +59,8 @@ const humidityReportSchema = new mongoose.Schema(
     qamSignature: { type: String, default: "" },
     status: {
       type: String,
-      enum: ['in_progress', 'completed'],
-      default: 'in_progress'
+      enum: ['Failed', 'Passed'],
+      default: 'Failed'
     },
     createdBy: {
       empId: { type: String },

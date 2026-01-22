@@ -9,6 +9,8 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         customer: '',
         fabrication: '',
         aquaboySpec: '',
+        aquaboySpecBody: '',
+        aquaboySpecRibs: '',
         colorName: '',
         beforeDryRoom: '',
         beforeDryRoomTime: '',
@@ -29,7 +31,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
     const [showColorDropdown, setShowColorDropdown] = useState(false);
     const colorRef = useRef(null);
 
-    const ribsAvailable = true; // Assume true for edit or derive from data
+    const ribsAvailable = report?.ribsAvailable ?? true;
 
     useEffect(() => {
         if (open && report) {
@@ -37,13 +39,35 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                 ? report.inspectionRecords
                 : (report.history && report.history.length > 0 ? report.history : []);
 
+            const specLimit = Number(report.aquaboySpec);
+            const parseNumberInternal = (v) => {
+                if (v === undefined || v === null) return NaN;
+                const s = String(v).trim();
+                if (s === '') return NaN;
+                const cleaned = s.replace(/[^0-9.\-]/g, '');
+                if (cleaned.length === 0) return NaN;
+                const n = Number(cleaned);
+                return Number.isFinite(n) ? n : NaN;
+            };
+
             const safeRecords = sourceRecords.map(rec => {
-                const processSection = (sec) => ({
-                    body: sec?.body || '',
-                    ribs: sec?.ribs || '',
-                    pass: sec?.pass === true || sec?.status === 'pass',
-                    fail: sec?.fail === true || sec?.status === 'fail'
-                });
+                const processSection = (sec) => {
+                    const body = sec?.body || '';
+                    const ribs = sec?.ribs || '';
+                    const bodyVal = parseNumberInternal(body);
+                    const ribsVal = parseNumberInternal(ribs);
+
+                    return {
+                        body,
+                        ribs,
+                        bodyPass: !Number.isNaN(bodyVal) && !Number.isNaN(specLimit) ? bodyVal <= specLimit : (sec?.bodyPass || false),
+                        bodyFail: !Number.isNaN(bodyVal) && !Number.isNaN(specLimit) ? bodyVal > specLimit : (sec?.bodyFail || false),
+                        ribsPass: !Number.isNaN(ribsVal) && !Number.isNaN(specLimit) ? ribsVal <= specLimit : (sec?.ribsPass || false),
+                        ribsFail: !Number.isNaN(ribsVal) && !Number.isNaN(specLimit) ? ribsVal > specLimit : (sec?.ribsFail || false),
+                        pass: sec?.pass === true || sec?.status === 'pass' || (sec?.bodyPass && (!ribsAvailable || sec?.ribsPass)),
+                        fail: sec?.fail === true || sec?.status === 'fail' || (sec?.bodyFail || (ribsAvailable && sec?.ribsFail))
+                    };
+                };
 
                 return {
                     ...rec,
@@ -55,9 +79,9 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                         middle: processSection(rec.additional.middle),
                         bottom: processSection(rec.additional.bottom)
                     } : {
-                        top: { body: '', ribs: '', pass: false, fail: false },
-                        middle: { body: '', ribs: '', pass: false, fail: false },
-                        bottom: { body: '', ribs: '', pass: false, fail: false }
+                        top: { body: '', ribs: '', bodyPass: false, bodyFail: false, ribsPass: false, ribsFail: false, pass: false, fail: false },
+                        middle: { body: '', ribs: '', bodyPass: false, bodyFail: false, ribsPass: false, ribsFail: false, pass: false, fail: false },
+                        bottom: { body: '', ribs: '', bodyPass: false, bodyFail: false, ribsPass: false, ribsFail: false, pass: false, fail: false }
                     },
                     images: rec.images || []
                 };
@@ -65,13 +89,13 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
 
             if (safeRecords.length === 0) {
                 safeRecords.push({
-                    top: { body: '', ribs: '', pass: false, fail: false },
-                    middle: { body: '', ribs: '', pass: false, fail: false },
-                    bottom: { body: '', ribs: '', pass: false, fail: false },
+                    top: { body: '', ribs: '', bodyPass: false, bodyFail: false, ribsPass: false, ribsFail: false, pass: false, fail: false },
+                    middle: { body: '', ribs: '', bodyPass: false, bodyFail: false, ribsPass: false, ribsFail: false, pass: false, fail: false },
+                    bottom: { body: '', ribs: '', bodyPass: false, bodyFail: false, ribsPass: false, ribsFail: false, pass: false, fail: false },
                     additional: {
-                        top: { body: '', ribs: '', pass: false, fail: false },
-                        middle: { body: '', ribs: '', pass: false, fail: false },
-                        bottom: { body: '', ribs: '', pass: false, fail: false }
+                        top: { body: '', ribs: '', bodyPass: false, bodyFail: false, ribsPass: false, ribsFail: false, pass: false, fail: false },
+                        middle: { body: '', ribs: '', bodyPass: false, bodyFail: false, ribsPass: false, ribsFail: false, pass: false, fail: false },
+                        bottom: { body: '', ribs: '', bodyPass: false, bodyFail: false, ribsPass: false, ribsFail: false, pass: false, fail: false }
                     },
                     images: []
                 });
@@ -97,6 +121,8 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                 customer: report.customer || '',
                 fabrication: report.fabrication || '',
                 aquaboySpec: report.aquaboySpec || '',
+                aquaboySpecBody: report.aquaboySpecBody || report.aquaboySpec || '',
+                aquaboySpecRibs: report.aquaboySpecRibs || report.aquaboySpec || '',
                 colorName: report.colorName || '',
                 beforeDryRoom: report.beforeDryRoom || '',
                 beforeDryRoomTime: initialBeforeTime,
@@ -166,7 +192,8 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
             };
 
             // Auto-grading logic
-            const specNum = Number(prev.aquaboySpec);
+            const specNumBody = Number(prev.aquaboySpecBody) || Number(prev.aquaboySpec);
+            const specNumRibs = Number(prev.aquaboySpecRibs) || Number(prev.aquaboySpec);
 
             // Try to parse numeric readings from body and ribs (allow strings like "51")
             const parseNumber = (v) => {
@@ -174,7 +201,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                 const s = String(v).trim();
                 if (s === '') return NaN;
                 const cleaned = s.replace(/[^0-9.\-]/g, '');
-                if (cleaned.length < 1) return NaN;
+                if (cleaned.length === 0) return NaN;
                 const n = Number(cleaned);
                 return Number.isFinite(n) ? n : NaN;
             };
@@ -185,23 +212,59 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
             const bodyVal = parseNumber(bodyStr);
             const ribsVal = parseNumber(ribsStr);
 
-            let reading = NaN;
-            if (!Number.isNaN(bodyVal) && bodyStr.length >= 2) reading = bodyVal;
-            if (!Number.isNaN(ribsVal) && ribsStr.length >= 2) {
-                reading = Number.isNaN(reading) ? ribsVal : Math.max(reading, ribsVal);
+            // Body Status
+            if (!Number.isNaN(bodyVal) && !Number.isNaN(specNumBody)) {
+                updatedRecord[section].bodyPass = bodyVal <= specNumBody;
+                updatedRecord[section].bodyFail = bodyVal > specNumBody;
+                updatedRecord[section].bodyStatus = bodyVal <= specNumBody ? 'pass' : 'fail';
+            } else {
+                updatedRecord[section].bodyPass = false;
+                updatedRecord[section].bodyFail = false;
+                updatedRecord[section].bodyStatus = '';
             }
 
-            if (!Number.isNaN(reading) && !Number.isNaN(specNum)) {
-                if (reading <= specNum) {
-                    updatedRecord[section].pass = true;
-                    updatedRecord[section].fail = false;
-                } else {
-                    updatedRecord[section].pass = false;
-                    updatedRecord[section].fail = true;
-                }
+            // Ribs Status
+            if (!Number.isNaN(ribsVal) && !Number.isNaN(specNumRibs)) {
+                updatedRecord[section].ribsPass = ribsVal <= specNumRibs;
+                updatedRecord[section].ribsFail = ribsVal > specNumRibs;
+                updatedRecord[section].ribsStatus = ribsVal <= specNumRibs ? 'pass' : 'fail';
             } else {
+                updatedRecord[section].ribsPass = false;
+                updatedRecord[section].ribsFail = false;
+                updatedRecord[section].ribsStatus = '';
+            }
+
+            // Overall Status (Synthesis)
+            // We wait for all available inputs before showing a row-level verdict
+            const isBodyMissing = Number.isNaN(bodyVal);
+            const isRibsMissing = ribsAvailable && Number.isNaN(ribsVal);
+
+            if (isBodyMissing || isRibsMissing) {
                 updatedRecord[section].pass = false;
                 updatedRecord[section].fail = false;
+                updatedRecord[section].status = '';
+            } else {
+                const hasFail = updatedRecord[section].bodyFail || (ribsAvailable && updatedRecord[section].ribsFail);
+                let hasPass = false;
+                if (ribsAvailable) {
+                    hasPass = updatedRecord[section].bodyPass && updatedRecord[section].ribsPass;
+                } else {
+                    hasPass = updatedRecord[section].bodyPass;
+                }
+
+                if (hasFail) {
+                    updatedRecord[section].pass = false;
+                    updatedRecord[section].fail = true;
+                    updatedRecord[section].status = 'fail';
+                } else if (hasPass) {
+                    updatedRecord[section].pass = true;
+                    updatedRecord[section].fail = false;
+                    updatedRecord[section].status = 'pass';
+                } else {
+                    updatedRecord[section].pass = false;
+                    updatedRecord[section].fail = false;
+                    updatedRecord[section].status = '';
+                }
             }
 
             newRecords[recordIndex] = updatedRecord;
@@ -234,14 +297,15 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
             };
 
             // Auto-grading logic for additional readings
-            const specNum = Number(prev.aquaboySpec);
+            const specNumBody = Number(prev.aquaboySpecBody) || Number(prev.aquaboySpec);
+            const specNumRibs = Number(prev.aquaboySpecRibs) || Number(prev.aquaboySpec);
 
             const parseNumber = (v) => {
                 if (v === undefined || v === null) return NaN;
                 const s = String(v).trim();
                 if (s === '') return NaN;
                 const cleaned = s.replace(/[^0-9.\-]/g, '');
-                if (cleaned.length < 1) return NaN;
+                if (cleaned.length === 0) return NaN;
                 const n = Number(cleaned);
                 return Number.isFinite(n) ? n : NaN;
             };
@@ -252,23 +316,58 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
             const bodyVal = parseNumber(bodyStr);
             const ribsVal = parseNumber(ribsStr);
 
-            let reading = NaN;
-            if (!Number.isNaN(bodyVal) && bodyStr.length >= 2) reading = bodyVal;
-            if (!Number.isNaN(ribsVal) && ribsStr.length >= 2) {
-                reading = Number.isNaN(reading) ? ribsVal : Math.max(reading, ribsVal);
+            // Body Status
+            if (!Number.isNaN(bodyVal) && !Number.isNaN(specNumBody)) {
+                newRecords[recordIndex].additional[section].bodyPass = bodyVal <= specNumBody;
+                newRecords[recordIndex].additional[section].bodyFail = bodyVal > specNumBody;
+                newRecords[recordIndex].additional[section].bodyStatus = bodyVal <= specNumBody ? 'pass' : 'fail';
+            } else {
+                newRecords[recordIndex].additional[section].bodyPass = false;
+                newRecords[recordIndex].additional[section].bodyFail = false;
+                newRecords[recordIndex].additional[section].bodyStatus = '';
             }
 
-            if (!Number.isNaN(reading) && !Number.isNaN(specNum)) {
-                if (reading <= specNum) {
-                    newRecords[recordIndex].additional[section].pass = true;
-                    newRecords[recordIndex].additional[section].fail = false;
-                } else {
-                    newRecords[recordIndex].additional[section].pass = false;
-                    newRecords[recordIndex].additional[section].fail = true;
-                }
+            // Ribs Status
+            if (!Number.isNaN(ribsVal) && !Number.isNaN(specNumRibs)) {
+                newRecords[recordIndex].additional[section].ribsPass = ribsVal <= specNumRibs;
+                newRecords[recordIndex].additional[section].ribsFail = ribsVal > specNumRibs;
+                newRecords[recordIndex].additional[section].ribsStatus = ribsVal <= specNumRibs ? 'pass' : 'fail';
             } else {
+                newRecords[recordIndex].additional[section].ribsPass = false;
+                newRecords[recordIndex].additional[section].ribsFail = false;
+                newRecords[recordIndex].additional[section].ribsStatus = '';
+            }
+
+            // Overall Status (Synthesis)
+            const isBodyMissing = Number.isNaN(bodyVal);
+            const isRibsMissing = ribsAvailable && Number.isNaN(ribsVal);
+
+            if (isBodyMissing || isRibsMissing) {
                 newRecords[recordIndex].additional[section].pass = false;
                 newRecords[recordIndex].additional[section].fail = false;
+                newRecords[recordIndex].additional[section].status = '';
+            } else {
+                const hasFail = newRecords[recordIndex].additional[section].bodyFail || (ribsAvailable && newRecords[recordIndex].additional[section].ribsFail);
+                let hasPass = false;
+                if (ribsAvailable) {
+                    hasPass = newRecords[recordIndex].additional[section].bodyPass && newRecords[recordIndex].additional[section].ribsPass;
+                } else {
+                    hasPass = newRecords[recordIndex].additional[section].bodyPass;
+                }
+
+                if (hasFail) {
+                    newRecords[recordIndex].additional[section].pass = false;
+                    newRecords[recordIndex].additional[section].fail = true;
+                    newRecords[recordIndex].additional[section].status = 'fail';
+                } else if (hasPass) {
+                    newRecords[recordIndex].additional[section].pass = true;
+                    newRecords[recordIndex].additional[section].fail = false;
+                    newRecords[recordIndex].additional[section].status = 'pass';
+                } else {
+                    newRecords[recordIndex].additional[section].pass = false;
+                    newRecords[recordIndex].additional[section].fail = false;
+                    newRecords[recordIndex].additional[section].status = '';
+                }
             }
 
             return { ...prev, inspectionRecords: newRecords };
@@ -394,6 +493,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
             const payload = {
                 ...formData,
                 history: newHistory,
+                ribsAvailable: ribsAvailable,
                 inspectionRecords: [lastEditedRecord]
             };
 
@@ -543,8 +643,8 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                                         <div
                                                             key={idx}
                                                             className={`px-4 py-2 cursor-pointer text-sm font-medium transition-colors border-b border-gray-50 last:border-0 ${formData.colorName === color
-                                                                    ? 'bg-blue-50 text-blue-700'
-                                                                    : 'hover:bg-blue-600 hover:text-white text-gray-700'
+                                                                ? 'bg-blue-50 text-blue-700'
+                                                                : 'hover:bg-blue-600 hover:text-white text-gray-700'
                                                                 }`}
                                                             onClick={() => {
                                                                 setFormData({ ...formData, colorName: color });
@@ -563,11 +663,11 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Aquaboy Reading Spec</label>
+                                <label className="block text-sm font-medium text-gray-700">Aquaboy Reading Spec (Body)</label>
                                 <input
                                     type="text"
-                                    value={formData.aquaboySpec}
-                                    onChange={e => setFormData({ ...formData, aquaboySpec: e.target.value })}
+                                    value={formData.aquaboySpecBody}
+                                    onChange={e => setFormData({ ...formData, aquaboySpecBody: e.target.value })}
                                     readOnly
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
                                 />
@@ -579,6 +679,16 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                     value={formData.beforeDryRoomTime}
                                     onChange={e => setFormData({ ...formData, beforeDryRoomTime: e.target.value })}
                                     disabled
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Aquaboy Reading Spec (Ribs)</label>
+                                <input
+                                    type="text"
+                                    value={formData.aquaboySpecRibs}
+                                    onChange={e => setFormData({ ...formData, aquaboySpecRibs: e.target.value })}
+                                    readOnly
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
                                 />
                             </div>
@@ -635,60 +745,69 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                             {isExpanded && (
                                                 <div className="space-y-4">
                                                     {['top', 'middle', 'bottom'].map(section => (
-                                                        <div key={section} className="flex flex-col md:flex-row gap-4 items-center p-3 rounded shadow-sm bg-white">
-                                                            <div className="w-20 font-semibold capitalize">{section}</div>
-                                                            <div className="flex-1">
-                                                                <input
-                                                                    type="number"
-                                                                    placeholder="Body"
-                                                                    value={record[section].body}
-                                                                    onChange={e => updateSectionData(index, section, 'body', e.target.value)}
-                                                                    className="px-3 w-full border rounded p-1"
-                                                                />
-                                                            </div>
-                                                            {ribsAvailable && (
+                                                        <div key={section} className="flex flex-col md:flex-row gap-4 w-full items-center p-3 rounded-xl shadow-sm bg-white border border-gray-100">
+                                                            <div className="w-20 font-bold capitalize text-gray-700">{section}</div>
+
+                                                            {/* Body Reading + Status */}
+                                                            <div className="flex flex-1 items-center gap-2 w-full">
                                                                 <div className="flex-1">
                                                                     <input
                                                                         type="number"
-                                                                        placeholder="Ribs"
-                                                                        value={record[section].ribs}
-                                                                        onChange={e => updateSectionData(index, section, 'ribs', e.target.value)}
-                                                                        className="px-3 w-full border rounded p-1"
+                                                                        placeholder="Body"
+                                                                        value={record[section].body}
+                                                                        onChange={e => updateSectionData(index, section, 'body', e.target.value)}
+                                                                        className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
                                                                     />
                                                                 </div>
-                                                            )}
-                                                            <div className="flex items-center gap-2">
-                                                                {!record[section].fail && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setPassFail(index, section, true)}
-                                                                        className={`inline-flex items-center px-2 py-1 rounded-full text-sm font-semibold transition-colors ${record[section].pass
-                                                                            ? 'bg-green-100 text-green-600'
-                                                                            : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                                                                            }`}
-                                                                    >
+                                                                {record[section].bodyPass ? (
+                                                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
                                                                         <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                                                         </svg>
                                                                         Pass
-                                                                    </button>
-                                                                )}
-                                                                {!record[section].pass && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setPassFail(index, section, false)}
-                                                                        className={`inline-flex items-center px-2 py-1 rounded-full text-sm font-semibold transition-colors ${record[section].fail
-                                                                            ? 'bg-red-100 text-red-500'
-                                                                            : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                                                                            }`}
-                                                                    >
+                                                                    </span>
+                                                                ) : record[section].bodyFail ? (
+                                                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
                                                                         <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                                         </svg>
                                                                         Fail
-                                                                    </button>
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-gray-400 text-xs px-2 italic">N/A</span>
                                                                 )}
                                                             </div>
+
+                                                            {ribsAvailable && (
+                                                                <div className="flex flex-1 items-center gap-2 w-full">
+                                                                    <div className="flex-1">
+                                                                        <input
+                                                                            type="number"
+                                                                            placeholder="Ribs"
+                                                                            value={record[section].ribs}
+                                                                            onChange={e => updateSectionData(index, section, 'ribs', e.target.value)}
+                                                                            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                                                                        />
+                                                                    </div>
+                                                                    {record[section].ribsPass ? (
+                                                                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
+                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                            </svg>
+                                                                            Pass
+                                                                        </span>
+                                                                    ) : record[section].ribsFail ? (
+                                                                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
+                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                            </svg>
+                                                                            Fail
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-gray-400 text-xs px-2 italic">N/A</span>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     ))}
                                                 </div>
@@ -760,23 +879,68 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                                 <h4 className="font-semibold">Record #{index + 1} Additional</h4>
                                             </div>
                                             {['top', 'middle', 'bottom'].map(section => (
-                                                <div key={section} className="flex gap-4 mb-2 items-center">
-                                                    <span className="w-16 capitalize text-sm font-medium">{section}</span>
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Body"
-                                                        value={record.additional?.[section]?.body || ''}
-                                                        onChange={e => updateAdditionalSectionData(index, section, 'body', e.target.value)}
-                                                        className="border rounded p-1 w-24"
-                                                    />
+                                                <div key={section} className="flex flex-col md:flex-row gap-4 w-full items-center mb-3">
+                                                    <span className="w-20 font-bold capitalize text-gray-700">{section}</span>
+
+                                                    {/* Body Reading + Status */}
+                                                    <div className="flex flex-1 items-center gap-2 w-full">
+                                                        <div className="flex-1">
+                                                            <input
+                                                                type="number"
+                                                                placeholder="Body"
+                                                                value={record.additional?.[section]?.body || ''}
+                                                                onChange={(e) => updateAdditionalSectionData(index, section, 'body', e.target.value)}
+                                                                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                                                            />
+                                                        </div>
+                                                        {record.additional?.[section]?.bodyPass ? (
+                                                            <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
+                                                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                </svg>
+                                                                Pass
+                                                            </span>
+                                                        ) : record.additional?.[section]?.bodyFail ? (
+                                                            <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
+                                                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                </svg>
+                                                                Fail
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-gray-400 text-xs px-2 italic">N/A</span>
+                                                        )}
+                                                    </div>
+
                                                     {ribsAvailable && (
-                                                        <input
-                                                            type="number"
-                                                            placeholder="Ribs"
-                                                            value={record.additional?.[section]?.ribs || ''}
-                                                            onChange={e => updateAdditionalSectionData(index, section, 'ribs', e.target.value)}
-                                                            className="border rounded p-1 w-24"
-                                                        />
+                                                        <div className="flex flex-1 items-center gap-2 w-full">
+                                                            <div className="flex-1">
+                                                                <input
+                                                                    type="number"
+                                                                    placeholder="Ribs"
+                                                                    value={record.additional?.[section]?.ribs || ''}
+                                                                    onChange={(e) => updateAdditionalSectionData(index, section, 'ribs', e.target.value)}
+                                                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                                                                />
+                                                            </div>
+                                                            {record.additional?.[section]?.ribsPass ? (
+                                                                <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
+                                                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                    </svg>
+                                                                    Pass
+                                                                </span>
+                                                            ) : record.additional?.[section]?.ribsFail ? (
+                                                                <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
+                                                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                    </svg>
+                                                                    Fail
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-gray-400 text-xs px-2 italic">N/A</span>
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </div>
                                             ))}

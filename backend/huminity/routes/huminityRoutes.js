@@ -1,6 +1,7 @@
 import express from "express";
-import { getHumidityData, getHumidityDataByMoNo, getHumiditySummaryByMoNo, getHumidityReports, exportHumidityReportsXlsx, createHumidityReport, exportHumidityReportsPaper, approveHumidityReport, getReitmansHumidityByMoNo, updateHumidityReport }
+import { getHumidityData, getHumidityDataByMoNo, getHumiditySummaryByMoNo, getHumidityReports, exportHumidityReportsXlsx, createHumidityReport, exportHumidityReportsPaper, approveHumidityReport, updateHumidityReport }
     from "../controller/huminityController.js";
+import { getReitmansHumidityByMoNo } from "../controller/ReimansController.js";
 
 const router = express.Router();
 router.get("/api/humidity-data", getHumidityData);

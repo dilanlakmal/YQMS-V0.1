@@ -92,6 +92,7 @@ import createPlanPackingListModel from "../../models/PlanPackingList.js";
 
 import createYorksysOrdersModel from "../../models/YorksysOrders.js";
 import createHumidityModel from "../../huminity/models/HumidityReport.js";
+import createReitmansReportModel from "../../huminity/models/ReitmansReport.js";
 
 import createQASectionsProductType from "../../models/QA/QASectionsProductType.js";
 import createQASectionsHomeModel from "../../models/QA/QASectionsHome.js";
@@ -252,6 +253,7 @@ export const CuttingInlineOrders = CuttingInlineOrdersModel(ymProdConnection);
 export const PlanPackingList = createPlanPackingListModel(ymProdConnection);
 export const YorksysOrders = createYorksysOrdersModel(ymProdConnection);
 export const HumidityReport = createHumidityModel(ymProdConnection);
+export const ReitmansReport = createReitmansReportModel(ymProdConnection);
 
 export const QASectionsProductType =
   createQASectionsProductType(ymProdConnection);
