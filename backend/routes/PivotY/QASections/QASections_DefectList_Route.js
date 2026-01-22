@@ -5,7 +5,8 @@ import {
   GetDefects,
   GetSpecificDefect,
   UpdateDefect,
-  DeleteDefect
+  DeleteDefect,
+  BulkUpdateStatusByBuyer
 } from "../../../controller/PivotY/QASections/QASections_DefectList_Controller.js";
 const router = express.Router();
 
@@ -38,5 +39,11 @@ router.put("/api/qa-sections-defect-list/:id", UpdateDefect);
  * Route: Deletes a specific defect
  */
 router.delete("/api/qa-sections-defect-list/:id", DeleteDefect);
+
+// ROUTE for bulk updating the statusByBuyer array for all defects
+router.put(
+  "/api/qa-sections-defect-list/bulk-update/status-by-buyer",
+  BulkUpdateStatusByBuyer
+);
 
 export default router;

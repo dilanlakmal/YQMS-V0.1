@@ -20,15 +20,14 @@ export const __dirname = path.dirname(__filename);
 // Define a base directory for the backend root
 export const __backendDir = path.resolve(__dirname, "..");
 
-export const API_BASE_URL =
-  process.env.API_BASE_URL || "https://192.167.12.162:5001";
+export const API_BASE_URL = process.env.API_BASE_URL;
 
 const options = {
   key: fs.readFileSync(
-    path.resolve(path.dirname(__filename), "192.167.12.162-key.pem")
+    path.resolve(path.dirname(__filename), "192.167.6.207-key.pem")
   ),
   cert: fs.readFileSync(
-    path.resolve(path.dirname(__filename), "192.167.12.162.pem")
+    path.resolve(path.dirname(__filename), "192.167.6.207.pem")
   )
 };
 
@@ -37,7 +36,7 @@ export const server = https.createServer(options, app);
 // Initialize Socket.io
 export const io = new SocketIO(server, {
   cors: {
-    origin: "https://192.167.12.162:3001",
+    origin: "https://192.167.6.207:3001",
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
@@ -50,7 +49,7 @@ const allowedOrigins = [
   "http://localhost:3001",
   "https://localhost:3001",
   "https://yqms.yaikh.com",
-  "https://192.167.12.162:3001"
+  "https://192.167.6.207:3001"
 ];
 
 // CORS configuration
@@ -77,7 +76,8 @@ const corsOptions = {
     "Last-Modified",
     "If-Modified-Since",
     "If-None-Match",
-    "ETag"
+    "ETag",
+    "Mode"
   ],
   exposedHeaders: [
     "Content-Length",
@@ -94,14 +94,24 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Body parser configuration
-app.use(bodyParser.json({ limit: "50mb" }));
-app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
+app.use(bodyParser.json({ limit: "1000mb" }));
+app.use(bodyParser.urlencoded({ limit: "1000mb", extended: true }));
 app.use(express.json());
 
 // Static file serving with simplified CORS
 app.use(
   "/storage",
   express.static(path.join(__backendDir, "public/storage"), {
+    setHeaders: (res, path) => {
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header("Cache-Control", "public, max-age=3600");
+    }
+  })
+);
+
+app.use(
+  "/storage/PivotY",
+  express.static(path.join(__backendDir, "storage/PivotY"), {
     setHeaders: (res, path) => {
       res.header("Access-Control-Allow-Origin", "*");
       res.header("Cache-Control", "public, max-age=3600");

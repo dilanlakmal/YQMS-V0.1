@@ -27,7 +27,8 @@ import {
   MessageSquare,
   Award,
   Activity,
-  ArrowLeftRight
+  ArrowLeftRight,
+  CalendarDays
 } from "lucide-react";
 import axios from "axios";
 
@@ -501,6 +502,72 @@ const QCWashingFullReportModal = ({
                         </p>
                         <p className="text-lg font-bold text-green-900 dark:text-green-100">
                           {processedReportData.buyer || "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-br from-violet-50 to-violet-100 dark:from-violet-900/20 dark:to-violet-800/20 rounded-xl p-4 border border-violet-200 dark:border-violet-800">
+                    <div className="flex items-center">
+                      <div className="bg-violet-500 p-2 rounded-lg">
+                        <CalendarDays className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-xs font-medium text-violet-600 dark:text-violet-300 uppercase tracking-wide">
+                          Inspection Date
+                        </p>
+                        <p className="text-lg font-bold text-violet-900 dark:text-violet-100">
+                          {(() => {
+                            // Try multiple possible date fields
+                            const inspectionDate = processedReportData.date;
+
+                            if (!inspectionDate) return "N/A";
+
+                            try {
+                              let dateObj;
+                              let dateString = inspectionDate;
+
+                              // Handle MongoDB's extended JSON format for dates
+                              if (
+                                typeof inspectionDate === "object" &&
+                                inspectionDate !== null &&
+                                inspectionDate.$date
+                              ) {
+                                dateString = inspectionDate.$date;
+                              }
+
+                              // Create a date object
+                              dateObj = new Date(dateString);
+
+                              if (isNaN(dateObj.getTime())) {
+                                console.warn(
+                                  "Invalid inspection date:",
+                                  inspectionDate
+                                );
+                                return "Invalid Date";
+                              }
+
+                              // Format the date
+                              const formattedDate = dateObj.toLocaleDateString(
+                                "en-US",
+                                {
+                                  year: "numeric",
+                                  month: "2-digit",
+                                  day: "2-digit",
+                                  timeZone: "UTC"
+                                }
+                              );
+
+                              return formattedDate;
+                            } catch (error) {
+                              console.error(
+                                "Date parsing error:",
+                                error,
+                                "for value:",
+                                inspectionDate
+                              );
+                              return "Error parsing date";
+                            }
+                          })()}
                         </p>
                       </div>
                     </div>
@@ -2079,6 +2146,69 @@ const QCWashingFullReportModal = ({
                             </div>
                           </div>
                         )}
+                      <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
+                        <div className="flex items-center">
+                          <div className="bg-purple-500 p-2 rounded-lg">
+                            <ClipboardCheck className="w-5 h-5 text-white" />
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-xs font-medium text-purple-600 dark:text-purple-300 uppercase tracking-wide">
+                              Reference Sample Approve Date
+                            </p>
+                            <p className="text-lg font-bold text-purple-900 dark:text-purple-100">
+                              {(() => {
+                                const approveDate =
+                                  processedReportData.inspectionDetails
+                                    ?.referenceSampleApproveDate;
+                                if (!approveDate) return "N/A";
+                                try {
+                                  let dateObj;
+                                  let dateString = approveDate;
+
+                                  // Handle MongoDB's extended JSON format for dates
+                                  if (
+                                    typeof approveDate === "object" &&
+                                    approveDate !== null &&
+                                    approveDate.$date
+                                  ) {
+                                    dateString = approveDate.$date;
+                                  }
+
+                                  // Create a date object. The string is assumed to be in UTC format.
+                                  dateObj = new Date(dateString);
+
+                                  if (isNaN(dateObj.getTime())) {
+                                    console.warn(
+                                      "Invalid approve date:",
+                                      approveDate
+                                    );
+                                    return "Invalid Date";
+                                  }
+
+                                  // Format the date using UTC parts to avoid timezone shifts.
+                                  const formattedDate =
+                                    dateObj.toLocaleDateString("en-US", {
+                                      year: "numeric",
+                                      month: "2-digit",
+                                      day: "2-digit",
+                                      timeZone: "UTC" // Important: interpret the date in UTC
+                                    });
+
+                                  return formattedDate;
+                                } catch (error) {
+                                  console.error(
+                                    "Date parsing error:",
+                                    error,
+                                    "for value:",
+                                    approveDate
+                                  );
+                                  return "Error parsing date";
+                                }
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );

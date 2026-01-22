@@ -1,77 +1,36 @@
 import express from "express";
-
 import {
+  upload, // Import multer middleware
   CreateProductType,
   GetProductTypes,
-  GetSpecificProductType,
   UpdateProductType,
   DeleteProductType,
-  AddProductLocation,
-  UpdateProductLocation,
-  DeleteProductLocation
+  GetProductImage
 } from "../../../controller/PivotY/QASections/QASections_ProductType_Controller.js";
+
 const router = express.Router();
 
-/* ================================================
-   CRUD for the main Product Type Document
-   ================================================ */
+// CREATE: upload.single('image') processes a single file from the 'image' field
+router.post(
+  "/api/qa-sections-product-type",
+  upload.single("image"),
+  CreateProductType
+);
 
-/**
- * POST
- * Route: Creates a new product type
- */
-router.post("/api/qa-sections-product-type", CreateProductType);
-
-/**
- * GET
- * Route: Retrieves all product types sorted by no
- */
+// READ
 router.get("/api/qa-sections-product-type", GetProductTypes);
 
-/**
- * GET
- * Route: Retrieves a specific product type by ID
- */
-router.get("/api/qa-sections-product-type/:id", GetSpecificProductType);
+// UPDATE: upload.single('image') also used here to handle optional new image uploads
+router.put(
+  "/api/qa-sections-product-type/:id",
+  upload.single("image"),
+  UpdateProductType
+);
 
-/**
- * PUT
- * Route: Updates a specific product type
- */
-router.put("/api/qa-sections-product-type/:id", UpdateProductType);
-
-/**
- * DELETE
- * Route: Deletes a specific product type
- */
+// DELETE
 router.delete("/api/qa-sections-product-type/:id", DeleteProductType);
 
-/* ================================================
-   🆕 CRUD for managing Product Locations (sub-documents)
-   ================================================ */
-
-/**
- * POST
- * Route: Adds a new location to a specific product type.
- */
-router.post("/api/qa-sections-product-type/:id/locations", AddProductLocation);
-
-/**
- * PUT
- * Route: Updates a specific location within a product type.
- */
-router.put(
-  "/api/qa-sections-product-type/:id/locations/:locationId",
-  UpdateProductLocation
-);
-
-/**
- * DELETE
- * Route: Deletes a specific location from a product type.
- */
-router.delete(
-  "/api/qa-sections-product-type/:id/locations/:locationId",
-  DeleteProductLocation
-);
+// NEW ROUTE: To serve the static image files
+router.get("/api/qa-sections-product-type/image/:filename", GetProductImage);
 
 export default router;

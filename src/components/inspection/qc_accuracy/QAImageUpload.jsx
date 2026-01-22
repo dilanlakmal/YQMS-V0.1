@@ -80,7 +80,8 @@ const QAImageUpload = ({ imageUrl, onImageChange, uploadMetadata }) => {
     return (
       <div className="relative group w-16 h-12">
         <img
-          src={imageUrl}
+          //src={imageUrl}
+          src={`${API_BASE_URL}${imageUrl}`}
           alt="Defect"
           className="w-full h-full object-cover rounded"
         />

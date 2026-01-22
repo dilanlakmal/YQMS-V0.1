@@ -21,6 +21,13 @@ const getProfileImageUrl = (user) => {
 export const loginUser = async (req, res) => {
   try {
     const { username, password, rememberMe } = req.body;
+
+    if (!username || !password) {
+      return res
+        .status(400)
+        .json({ message: "Username and password are required" });
+    }
+
     if (!ymProdConnection.readyState) {
       return res.status(500).json({ message: "Database not connected" });
     }

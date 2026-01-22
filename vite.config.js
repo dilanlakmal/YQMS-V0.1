@@ -20,10 +20,10 @@ export default defineConfig({
     open: true,
     https: {
       key: fs.readFileSync(
-        "./backend/Config/192.167.12.162-key.pem"
+        "./backend/Config/192.167.6.207-key.pem"
       ),
       cert: fs.readFileSync(
-        "./backend/Config/192.167.12.162.pem"
+        "./backend/Config/192.167.6.207.pem"
       )
     }
   },

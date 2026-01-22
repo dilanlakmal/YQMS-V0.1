@@ -1,5 +1,5 @@
 import axios from "axios";
-import { Check, Edit2, Plus, Save, Trash2, X } from "lucide-react";
+import { Check, Edit2, Plus, Save, Trash2, X, Layers } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../../config";
@@ -199,19 +199,24 @@ const YPivotQASectionsProductCategory = () => {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-indigo-200 dark:border-indigo-800 border-t-indigo-600 dark:border-t-indigo-400 rounded-full animate-spin"></div>
+          <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            Loading categories...
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Add New Category Button */}
       <div className="flex justify-end">
         <button
           onClick={handleShowAddNew}
           disabled={isAddingNew}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-all"
+          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200"
         >
           <Plus size={18} />
           Add New Category
@@ -220,14 +225,24 @@ const YPivotQASectionsProductCategory = () => {
 
       {/* Add New Category Form */}
       {isAddingNew && (
-        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-900/20 dark:to-blue-900/20 p-6 rounded-lg shadow-lg border-2 border-indigo-200 dark:border-indigo-700">
-          <h3 className="text-lg font-bold text-indigo-700 dark:text-indigo-300 mb-4">
-            Add New Category
-          </h3>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border-2 border-indigo-200 dark:border-indigo-700">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2.5 rounded-lg shadow-md">
+              <Plus size={20} className="text-white" />
+            </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
+                Add New Category
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Category No will be auto-generated
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
                 Category Code <span className="text-red-500">*</span>
               </label>
               <input
@@ -240,13 +255,13 @@ const YPivotQASectionsProductCategory = () => {
                   })
                 }
                 placeholder="e.g., ACC, SEW, FIN"
-                className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 transition-all outline-none"
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                Category Name (English) <span className="text-red-500">*</span>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                English Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -258,13 +273,13 @@ const YPivotQASectionsProductCategory = () => {
                   })
                 }
                 placeholder="English name..."
-                className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 transition-all outline-none"
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                Category Name (Khmer)
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                Khmer Name
               </label>
               <input
                 type="text"
@@ -276,13 +291,13 @@ const YPivotQASectionsProductCategory = () => {
                   })
                 }
                 placeholder="ឈ្មោះជាភាសាខ្មែរ..."
-                className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 transition-all outline-none"
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                Category Name (Chinese)
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                Chinese Name
               </label>
               <input
                 type="text"
@@ -294,27 +309,23 @@ const YPivotQASectionsProductCategory = () => {
                   })
                 }
                 placeholder="中文名称..."
-                className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 transition-all outline-none"
               />
             </div>
           </div>
 
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
-            <strong>Note:</strong> Category No will be auto-generated
-          </p>
-
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 mt-6">
+          <div className="flex justify-end gap-3">
             <button
               onClick={handleCancelAddNew}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white font-semibold rounded-lg hover:bg-gray-600"
+              className="flex items-center gap-2 px-5 py-2.5 bg-gray-500 dark:bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-600 dark:hover:bg-gray-700 shadow-md transition-all"
             >
               <X size={16} />
               Cancel
             </button>
             <button
               onClick={handleSaveNew}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700"
+              className="flex items-center gap-2 px-5 py-2.5 bg-green-600 dark:bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 dark:hover:bg-green-700 shadow-md transition-all"
             >
               <Check size={16} />
               Save Category
@@ -324,189 +335,243 @@ const YPivotQASectionsProductCategory = () => {
       )}
 
       {/* Manage Category Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-        <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 dark:from-indigo-700 dark:to-blue-700">
-          <h2 className="text-xl font-bold text-white">Manage Categories</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2.5 rounded-lg backdrop-blur-sm">
+              <Layers size={22} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">
+                Manage Categories
+              </h2>
+              <p className="text-indigo-100 text-xs mt-0.5">
+                <span className="font-semibold text-white">
+                  {categories.length}
+                </span>{" "}
+                Total Categories
+                {editingId && (
+                  <>
+                    <span className="mx-2">•</span>
+                    <span className="font-semibold text-white">1</span> Editing
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-100 dark:bg-gray-700">
-              <tr>
-                <th className="px-6 py-4 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20">
-                  No
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                  Category Code
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                  English
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                  Khmer
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                  Chinese
-                </th>
-                <th className="px-6 py-4 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-40">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {categories.map((category) => (
-                <tr
-                  key={category._id}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  {/* No - Not Editable */}
-                  <td className="px-6 py-4 text-center">
-                    <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-bold">
-                      {category.no}
-                    </span>
-                  </td>
-
-                  {/* Category Code */}
-                  <td className="px-6 py-4">
-                    {editingId === category._id ? (
-                      <input
-                        type="text"
-                        value={editData.CategoryCode}
-                        onChange={(e) =>
-                          setEditData({
-                            ...editData,
-                            CategoryCode: e.target.value
-                          })
-                        }
-                        className="w-full p-2 border-2 border-indigo-300 dark:border-indigo-600 rounded-md bg-white dark:bg-gray-700 focus:ring-2 focus:ring-indigo-500"
-                      />
-                    ) : (
-                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        {category.CategoryCode}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* English */}
-                  <td className="px-6 py-4">
-                    {editingId === category._id ? (
-                      <input
-                        type="text"
-                        value={editData.CategoryNameEng}
-                        onChange={(e) =>
-                          setEditData({
-                            ...editData,
-                            CategoryNameEng: e.target.value
-                          })
-                        }
-                        className="w-full p-2 border-2 border-indigo-300 dark:border-indigo-600 rounded-md bg-white dark:bg-gray-700 focus:ring-2 focus:ring-indigo-500"
-                      />
-                    ) : (
-                      <span className="text-sm text-gray-900 dark:text-gray-100">
-                        {category.CategoryNameEng}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Khmer */}
-                  <td className="px-6 py-4">
-                    {editingId === category._id ? (
-                      <input
-                        type="text"
-                        value={editData.CategoryNameKhmer}
-                        onChange={(e) =>
-                          setEditData({
-                            ...editData,
-                            CategoryNameKhmer: e.target.value
-                          })
-                        }
-                        className="w-full p-2 border-2 border-indigo-300 dark:border-indigo-600 rounded-md bg-white dark:bg-gray-700 focus:ring-2 focus:ring-indigo-500"
-                      />
-                    ) : (
-                      <span className="text-sm text-gray-900 dark:text-gray-100">
-                        {category.CategoryNameKhmer || "-"}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Chinese */}
-                  <td className="px-6 py-4">
-                    {editingId === category._id ? (
-                      <input
-                        type="text"
-                        value={editData.CategoryNameChinese}
-                        onChange={(e) =>
-                          setEditData({
-                            ...editData,
-                            CategoryNameChinese: e.target.value
-                          })
-                        }
-                        className="w-full p-2 border-2 border-indigo-300 dark:border-indigo-600 rounded-md bg-white dark:bg-gray-700 focus:ring-2 focus:ring-indigo-500"
-                      />
-                    ) : (
-                      <span className="text-sm text-gray-900 dark:text-gray-100">
-                        {category.CategoryNameChinese || "-"}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Actions */}
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-center gap-2">
-                      {editingId === category._id ? (
-                        <>
-                          <button
-                            onClick={() => handleSaveEdit(category._id)}
-                            className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-md transition-all"
-                            title="Save changes"
-                          >
-                            <Save size={16} />
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="p-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 shadow-md transition-all"
-                            title="Cancel"
-                          >
-                            <X size={16} />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => handleEdit(category)}
-                            className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md transition-all"
-                            title="Edit category"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleDelete(
-                                category._id,
-                                category.CategoryNameEng
-                              )
-                            }
-                            className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-md transition-all"
-                            title="Delete category"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
+          <div className="max-h-[600px] overflow-y-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
+                <tr>
+                  <th className="px-6 py-3 text-center text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider w-20">
+                    No
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                    Code
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                    English
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                    Khmer
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                    Chinese
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider w-32">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {categories.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="text-center py-12">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-full">
+                          <Layers
+                            size={28}
+                            className="text-gray-400 dark:text-gray-500"
+                          />
+                        </div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          No categories available. Click "Add New Category" to
+                          create one.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  categories.map((category) => (
+                    <tr
+                      key={category._id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                    >
+                      {/* No - Not Editable */}
+                      <td className="px-6 py-3 text-center">
+                        <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-bold text-sm">
+                          {category.no}
+                        </span>
+                      </td>
+
+                      {/* Category Code */}
+                      <td className="px-6 py-3">
+                        {editingId === category._id ? (
+                          <input
+                            type="text"
+                            value={editData.CategoryCode}
+                            onChange={(e) =>
+                              setEditData({
+                                ...editData,
+                                CategoryCode: e.target.value
+                              })
+                            }
+                            className="w-full px-3 py-2 text-sm border-2 border-indigo-300 dark:border-indigo-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 outline-none"
+                          />
+                        ) : (
+                          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                            {category.CategoryCode}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* English */}
+                      <td className="px-6 py-3">
+                        {editingId === category._id ? (
+                          <input
+                            type="text"
+                            value={editData.CategoryNameEng}
+                            onChange={(e) =>
+                              setEditData({
+                                ...editData,
+                                CategoryNameEng: e.target.value
+                              })
+                            }
+                            className="w-full px-3 py-2 text-sm border-2 border-indigo-300 dark:border-indigo-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 outline-none"
+                          />
+                        ) : (
+                          <span className="text-sm text-gray-900 dark:text-gray-100">
+                            {category.CategoryNameEng}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Khmer */}
+                      <td className="px-6 py-3">
+                        {editingId === category._id ? (
+                          <input
+                            type="text"
+                            value={editData.CategoryNameKhmer}
+                            onChange={(e) =>
+                              setEditData({
+                                ...editData,
+                                CategoryNameKhmer: e.target.value
+                              })
+                            }
+                            className="w-full px-3 py-2 text-sm border-2 border-indigo-300 dark:border-indigo-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 outline-none"
+                          />
+                        ) : (
+                          <span className="text-sm text-gray-900 dark:text-gray-100">
+                            {category.CategoryNameKhmer || (
+                              <span className="text-gray-400 dark:text-gray-500 italic">
+                                -
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Chinese */}
+                      <td className="px-6 py-3">
+                        {editingId === category._id ? (
+                          <input
+                            type="text"
+                            value={editData.CategoryNameChinese}
+                            onChange={(e) =>
+                              setEditData({
+                                ...editData,
+                                CategoryNameChinese: e.target.value
+                              })
+                            }
+                            className="w-full px-3 py-2 text-sm border-2 border-indigo-300 dark:border-indigo-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 outline-none"
+                          />
+                        ) : (
+                          <span className="text-sm text-gray-900 dark:text-gray-100">
+                            {category.CategoryNameChinese || (
+                              <span className="text-gray-400 dark:text-gray-500 italic">
+                                -
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-6 py-3">
+                        <div className="flex items-center justify-center gap-2">
+                          {editingId === category._id ? (
+                            <>
+                              <button
+                                onClick={() => handleSaveEdit(category._id)}
+                                className="p-2 bg-green-500 dark:bg-green-600 text-white rounded-lg hover:bg-green-600 dark:hover:bg-green-700 shadow-sm transition-all transform hover:scale-110"
+                                title="Save changes"
+                              >
+                                <Save size={16} />
+                              </button>
+                              <button
+                                onClick={handleCancelEdit}
+                                className="p-2 bg-gray-500 dark:bg-gray-600 text-white rounded-lg hover:bg-gray-600 dark:hover:bg-gray-700 shadow-sm transition-all transform hover:scale-110"
+                                title="Cancel"
+                              >
+                                <X size={16} />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleEdit(category)}
+                                className="p-2 bg-blue-500 dark:bg-blue-600 text-white rounded-lg hover:bg-blue-600 dark:hover:bg-blue-700 shadow-sm transition-all transform hover:scale-110"
+                                title="Edit category"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleDelete(
+                                    category._id,
+                                    category.CategoryNameEng
+                                  )
+                                }
+                                className="p-2 bg-red-500 dark:bg-red-600 text-white rounded-lg hover:bg-red-600 dark:hover:bg-red-700 shadow-sm transition-all transform hover:scale-110"
+                                title="Delete category"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {/* Empty State */}
-        {categories.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500 dark:text-gray-400">
-              No categories available. Click "Add New Category" to create one.
-            </p>
+        {/* Footer */}
+        {categories.length > 0 && (
+          <div className="bg-gray-50 dark:bg-gray-700 px-6 py-3 border-t border-gray-200 dark:border-gray-600">
+            <div className="text-sm text-gray-600 dark:text-gray-300">
+              Total:{" "}
+              <span className="font-semibold text-gray-900 dark:text-white">
+                {categories.length}
+              </span>{" "}
+              {categories.length === 1 ? "category" : "categories"}
+            </div>
           </div>
         )}
       </div>

@@ -9,6 +9,18 @@ export const saveSccDailyTesting = async (req, res) => {
   try {
     const { _id, operatorData, ...dataToSave } = req.body; // Destructure operatorData
 
+    // --- Sanitize Image Path ---
+    if (
+      dataToSave.afterWashImage &&
+      typeof dataToSave.afterWashImage === "string" &&
+      dataToSave.afterWashImage.startsWith("undefined/")
+    ) {
+      dataToSave.afterWashImage = dataToSave.afterWashImage.replace(
+        "undefined",
+        ""
+      );
+    }
+
     dataToSave.inspectionDate = formatDateToMMDDYYYY(dataToSave.inspectionDate);
     dataToSave.remarks = dataToSave.remarks?.trim() || "NA";
 

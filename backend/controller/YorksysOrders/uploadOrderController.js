@@ -122,7 +122,10 @@ export const getYorksysOrderFilterOptions = async (req, res) => {
 export const getYorksysOrdersPagination = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    // Allow limit to be 0 for "all records", otherwise default to 10
+    let limit = parseInt(req.query.limit);
+    if (isNaN(limit)) limit = 10;
+
     const skip = (page - 1) * limit;
 
     // --- Build Filter Object ---
@@ -137,11 +140,15 @@ export const getYorksysOrdersPagination = async (req, res) => {
       filter.style = { $regex: new RegExp(req.query.style, "i") };
 
     // Fetch filtered data and total count in parallel
+    let query = YorksysOrders.find(filter).sort({ createdAt: -1 });
+
+    // Apply pagination only if limit is greater than 0
+    if (limit > 0) {
+      query = query.skip(skip).limit(limit);
+    }
+
     const [orders, totalRecords] = await Promise.all([
-      YorksysOrders.find(filter) // Apply the filter
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
+      query,
       YorksysOrders.countDocuments(filter) // Count only filtered documents
     ]);
 
@@ -287,6 +294,50 @@ export const bulkUpdateProductTypeFromCutting = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error during bulk update.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+// Updates ONLY the Rib Content for a specific Yorksys order
+// ============================================================
+export const updateYorksysOrderRibContent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { ribContent } = req.body; // Expecting array: [{ fabricName, percentageValue }]
+
+    // Basic Validation
+    if (!Array.isArray(ribContent)) {
+      return res.status(400).json({
+        success: false,
+        message: "Rib Content must be an array."
+      });
+    }
+
+    const updatedOrder = await YorksysOrders.findByIdAndUpdate(
+      id,
+      { RibContent: ribContent },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedOrder) {
+      return res.status(404).json({
+        success: false,
+        message: `Order with ID ${id} not found.`
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Rib Content for MO ${updatedOrder.moNo} updated successfully!`,
+      data: updatedOrder
+    });
+  } catch (error) {
+    console.error("Error updating Rib Content:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while updating Rib Content.",
       error: error.message
     });
   }

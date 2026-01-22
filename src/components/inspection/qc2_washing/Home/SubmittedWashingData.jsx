@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Buffer } from "buffer";
 import { API_BASE_URL } from "../../../../../config";
-import { MoreVertical, Eye, FileText, Download, Trash2 } from "lucide-react";
+import { MoreVertical, Eye, FileText, Download } from "lucide-react";
 import SubmittedWashingDataFilter from "./SubmittedWashingDataFilter";
 import QCWashingViewDetailsModal from "./QCWashingViewDetailsModal";
 import QCWashingFullReportModal from "./QCWashingFullReportModal";
-import { PDFDownloadLink } from "@react-pdf/renderer";
 import Swal from "sweetalert2";
 
 // Polyfill Buffer for client-side PDF generation
@@ -13,6 +12,7 @@ window.Buffer = window.Buffer || Buffer;
 
 const SubmittedWashingDataPage = () => {
   const [submittedData, setSubmittedData] = useState([]);
+  const [processedData, setProcessedData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [currentFilters, setCurrentFilters] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,6 +41,68 @@ const SubmittedWashingDataPage = () => {
   });
   const [isqcWashingPDF, setIsQcWashingPDF] = useState(false);
   const [checkpointDefinitions, setCheckpointDefinitions] = useState([]);
+
+  //  const [isRefreshing, setIsRefreshing] = useState(false);
+  // const [refreshStatus, setRefreshStatus] = useState(null);
+
+  // const handleRefreshActualWashQty = async () => {
+  //   try {
+  //     setIsRefreshing(true);
+  //     setRefreshStatus(null);
+
+  //     const response = await fetch(`${API_BASE_URL}/api/qc-washing/refresh-actual-wash-qty`, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //     });
+
+  //     const result = await response.json();
+
+  //     if (result.success) {
+  //       setRefreshStatus({
+  //         type: 'success',
+  //         message: result.message,
+  //         details: result.data
+  //       });
+
+  //       // Show success message
+  //       Swal.fire({
+  //         title: "Success!",
+  //         text: result.message,
+  //         icon: "success",
+  //         timer: 5000,
+  //         showConfirmButton: true,
+  //       });
+
+  //       // Refresh the current data
+  //       await fetchSubmittedData(false); // Refresh data without showing loading
+
+  //       // Reset processed data to trigger re-processing with new actual values
+  //       setProcessedData([]);
+
+  //     } else {
+  //       throw new Error(result.message || 'Failed to refresh actual wash quantities');
+  //     }
+
+  //   } catch (error) {
+  //     console.error('Error refreshing actual wash quantities:', error);
+  //     setRefreshStatus({
+  //       type: 'error',
+  //       message: error.message
+  //     });
+
+  //     Swal.fire({
+  //       title: "Error!",
+  //       text: `Failed to refresh: ${error.message}`,
+  //       icon: "error",
+  //       timer: 5000,
+  //       showConfirmButton: true,
+  //     });
+  //   } finally {
+  //     setIsRefreshing(false);
+  //   }
+  // };
 
   // Single handleViewDetails function (removed the duplicate)
   const handleViewDetails = (record) => {
@@ -150,23 +212,35 @@ const SubmittedWashingDataPage = () => {
 
   useEffect(() => {
     const processDataForView = async () => {
-      if (isLoading) return;
+      if (isLoading || submittedData.length === 0) return;
 
       if (viewMode === "estimated") {
         const dataToProcess = submittedData.map((record) => ({
           ...record,
           displayWashQty: record.washQty,
-          isActualWashQty: false
+          isActualWashQty: false,
+          displayCheckedQty: record.checkedQty
         }));
-        applyFilters(currentFilters || {}, false, dataToProcess);
+        setProcessedData(dataToProcess);
+        applyFilters(
+          currentFilters || {},
+          currentFilters ? false : true,
+          dataToProcess
+        );
       } else {
-        // Show estimated data immediately, then process actual data in background
+        // For actual mode, show estimated data first, then process actual data
         const estimatedData = submittedData.map((record) => ({
           ...record,
           displayWashQty: record.washQty,
-          isActualWashQty: false
+          isActualWashQty: false,
+          displayCheckedQty: record.checkedQty
         }));
-        applyFilters(currentFilters || {}, false, estimatedData);
+        setProcessedData(estimatedData);
+        applyFilters(
+          currentFilters || {},
+          currentFilters ? false : true,
+          estimatedData
+        );
 
         setIsProcessing(true);
 
@@ -180,60 +254,29 @@ const SubmittedWashingDataPage = () => {
             const batchResults = await Promise.all(
               batch.map(async (record) => {
                 const washQtyData = await fetchRealWashQty(record);
-                let finalRecord = { ...record, ...washQtyData };
-
-                // If we have an actual wash quantity, fetch the corresponding AQL sample size for display.
-                if (
-                  finalRecord.isActualWashQty &&
-                  finalRecord.displayWashQty > 0 &&
-                  aqlEndpointAvailable &&
-                  record.reportType?.toLowerCase() === "inline" // Only update for 'inline' reports
-                ) {
-                  try {
-                    const aqlResponse = await fetch(
-                      `${API_BASE_URL}/api/qc-washing/aql-chart/find`,
-                      {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          lotSize: finalRecord.displayWashQty,
-                          orderNo: record.orderNo
-                        })
-                      }
-                    );
-
-                    if (aqlResponse.ok) {
-                      const aqlResult = await aqlResponse.json();
-                      if (aqlResult.success && aqlResult.aqlData) {
-                        // Temporarily override checkedQty for display purposes only.
-                        finalRecord.checkedQty = aqlResult.aqlData.sampleSize;
-                      }
-                    }
-                  } catch (e) {
-                    console.error("AQL fetch for display failed:", e);
-                  }
-                }
-
-                return finalRecord;
+                return { ...record, ...washQtyData };
               })
             );
             actualData.push(...batchResults);
 
             // Update UI progressively
             if (actualData.length % 20 === 0) {
-              applyFilters(currentFilters || {}, false, [
+              const progressData = [
                 ...actualData,
-                ...submittedData
-                  .slice(actualData.length)
-                  .map((r) => ({
-                    ...r,
-                    displayWashQty: r.washQty,
-                    isActualWashQty: false
-                  }))
-              ]);
+                ...submittedData.slice(actualData.length).map((r) => ({
+                  ...r,
+                  displayWashQty: r.washQty,
+                  isActualWashQty: false,
+                  displayCheckedQty: r.checkedQty
+                }))
+              ];
+              setProcessedData(progressData);
+              applyFilters(currentFilters || {}, false, progressData);
             }
           }
 
+          // Store final processed data and apply current filters
+          setProcessedData(actualData);
           applyFilters(currentFilters || {}, false, actualData);
           setIsProcessing(false);
         }, 100);
@@ -241,10 +284,37 @@ const SubmittedWashingDataPage = () => {
     };
 
     processDataForView();
-  }, [viewMode, submittedData, currentFilters, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [viewMode, submittedData, isLoading]);
 
   const fetchRealWashQty = async (record) => {
     try {
+      // For estimated mode, return original data
+      if (viewMode === "estimated") {
+        return {
+          displayWashQty: record.washQty || 0,
+          isActualWashQty: false,
+          originalWashQty: record.washQty || 0,
+          source: "original",
+          displayCheckedQty: record.checkedQty || "N/A"
+        };
+      }
+
+      // For actual mode, check if record already has actualWashQty
+      if (record.actualWashQty !== undefined && record.actualWashQty !== null) {
+        const actualCheckedQty =
+          record.actualAQLValue?.sampleSize || record.checkedQty || "N/A";
+
+        return {
+          displayWashQty: record.actualWashQty,
+          isActualWashQty: true,
+          originalWashQty: record.washQty || 0,
+          source: "qcwashing_actual",
+          displayCheckedQty: actualCheckedQty,
+          actualAQLValue: record.actualAQLValue
+        };
+      }
+
+      // Handle special report types
       if (
         record.reportType &&
         (record.reportType.toLowerCase() === "first output" ||
@@ -257,128 +327,118 @@ const SubmittedWashingDataPage = () => {
           isFirstOutput: !isSOP,
           isSOP: isSOP,
           originalWashQty: record.washQty || 0,
-          source: isSOP ? "sop" : "first_output"
+          source: isSOP ? "sop" : "first_output",
+          displayCheckedQty: record.checkedQty || "N/A"
         };
       }
 
-      if (!record.reportType || record.reportType.toLowerCase() !== "inline") {
-        return {
-          displayWashQty: record.washQty || 0,
-          isActualWashQty: false,
-          isFirstOutput: false,
-          originalWashQty: record.washQty || 0,
-          source: "original"
-        };
-      }
+      // For inline reports without actualWashQty, try to fetch from external source (YM factory)
+      if (record.reportType?.toLowerCase() === "inline") {
+        const factoryName = record.factoryName || "";
 
-      const factoryName = record.factoryName || "";
+        if (factoryName.toUpperCase() === "YM") {
+          const dateStr = record.date
+            ? new Date(record.date).toISOString().split("T")[0]
+            : "";
+          const styleNo = record.orderNo || "";
+          let color = record.color || "";
 
-      if (factoryName.toUpperCase() === "YM") {
-        const dateStr = record.date
-          ? new Date(record.date).toISOString().split("T")[0]
-          : "";
-        const styleNo = record.orderNo || "";
-        let color = record.color || "";
+          if (!dateStr || !styleNo || !color) {
+            return {
+              displayWashQty: record.washQty || 0,
+              isActualWashQty: false,
+              originalWashQty: record.washQty || 0,
+              source: "original",
+              displayCheckedQty: record.checkedQty || "N/A"
+            };
+          }
 
-        if (!dateStr || !styleNo || !color) {
-          return {
-            displayWashQty: record.washQty || 0,
-            isActualWashQty: false,
-            isFirstOutput: false,
-            originalWashQty: record.washQty || 0,
-            source: "original"
-          };
-        }
+          const colorMatch = color.match(/\[([^\]]+)\]/);
+          if (colorMatch) {
+            color = colorMatch[1];
+          }
 
-        const colorMatch = color.match(/\[([^\]]+)\]/);
-        if (colorMatch) {
-          color = colorMatch[1];
-        }
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+            const response = await fetch(
+              `${API_BASE_URL}/api/qc-real-washing-qty/search?` +
+                new URLSearchParams({
+                  inspectionDate: dateStr,
+                  styleNo: styleNo,
+                  color: color
+                }),
+              {
+                signal: controller.signal
+              }
+            );
+            clearTimeout(timeoutId);
 
-          const response = await fetch(
-            `${API_BASE_URL}/api/qc-real-washing-qty/search?` +
-              new URLSearchParams({
-                inspectionDate: dateStr,
-                styleNo: styleNo,
-                color: color
-              }),
-            {
-              signal: controller.signal
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success && data.found && data.washQty > 0) {
+                return {
+                  displayWashQty: data.washQty,
+                  isActualWashQty: true,
+                  originalWashQty: record.washQty || 0,
+                  source: "qc_real_wash_qty_ym",
+                  details: data.details,
+                  displayCheckedQty: record.checkedQty || "N/A"
+                };
+              }
             }
-          );
-          clearTimeout(timeoutId);
-
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success && data.found && data.washQty > 0) {
-              return {
-                displayWashQty: data.washQty,
-                isActualWashQty: true,
-                isFirstOutput: false,
-                originalWashQty: record.washQty || 0,
-                source: "qc_real_wash_qty_ym",
-                details: data.details
-              };
+          } catch (error) {
+            if (error.name === "AbortError") {
+              console.warn(
+                "Real wash qty request timed out for:",
+                record.orderNo
+              );
+            } else {
+              console.error(
+                "Error fetching real wash qty from qc_real_washing_qty:",
+                error
+              );
             }
           }
-        } catch (error) {
-          if (error.name === "AbortError") {
-            console.warn(
-              "Real wash qty request timed out for:",
-              record.orderNo
-            );
-          } else {
-            console.error(
-              "Error fetching real wash qty from qc_real_washing_qty:",
-              error
-            );
+        } else {
+          // For non-YM factories, check for edited actual wash qty
+          if (
+            record.editedActualWashQty !== null &&
+            record.editedActualWashQty !== undefined
+          ) {
+            return {
+              displayWashQty: record.editedActualWashQty,
+              isActualWashQty: true,
+              originalWashQty: record.washQty || 0,
+              source: "edited_actual_wash_qty",
+              details: {
+                recordId: record._id,
+                editedValue: record.editedActualWashQty,
+                lastEditedAt: record.lastEditedAt
+              },
+              displayCheckedQty: record.checkedQty || "N/A"
+            };
           }
         }
-        return {
-          displayWashQty: record.washQty || 0,
-          isActualWashQty: false,
-          isFirstOutput: false,
-          originalWashQty: record.washQty || 0,
-          source: "original"
-        };
-      } else {
-        if (
-          record.editedActualWashQty !== null &&
-          record.editedActualWashQty !== undefined
-        ) {
-          return {
-            displayWashQty: record.editedActualWashQty,
-            isActualWashQty: true,
-            isFirstOutput: false,
-            originalWashQty: record.washQty || 0,
-            source: "edited_actual_wash_qty",
-            details: {
-              recordId: record._id,
-              editedValue: record.editedActualWashQty,
-              lastEditedAt: record.lastEditedAt
-            }
-          };
-        }
-        return {
-          displayWashQty: record.washQty || 0,
-          isActualWashQty: false,
-          isFirstOutput: false,
-          originalWashQty: record.washQty || 0,
-          source: "original"
-        };
       }
+
+      // Default fallback
+      return {
+        displayWashQty: record.washQty || 0,
+        isActualWashQty: false,
+        originalWashQty: record.washQty || 0,
+        source: "original",
+        displayCheckedQty: record.checkedQty || "N/A"
+      };
     } catch (error) {
       console.error("Error in fetchRealWashQty:", error);
       return {
         displayWashQty: record.washQty || 0,
         isActualWashQty: false,
-        isFirstOutput: false,
         originalWashQty: record.washQty || 0,
-        source: "error"
+        source: "error",
+        displayCheckedQty: record.checkedQty || "N/A"
       };
     }
   };
@@ -480,786 +540,274 @@ const SubmittedWashingDataPage = () => {
     });
   };
 
-  // Skip image conversion due to CORS issues - use placeholders
-  const convertImageToBase64 = async (imagePath, API_BASE_URL) => {
-    if (!imagePath) return null;
-
-    // If it's already base64, return it
-    if (imagePath.startsWith("data:image/")) {
-      return imagePath;
-    }
-    return null;
-  };
-
-  // Process images for PDF rendering
-  const processImagesInRecord = async (record, API_BASE_URL) => {
-    try {
-      const processedRecord = JSON.parse(JSON.stringify(record)); // Deep clone
-
-      // Process defect images
-      if (processedRecord.defectDetails?.defectsByPc) {
-        for (
-          let pcIndex = 0;
-          pcIndex < processedRecord.defectDetails.defectsByPc.length;
-          pcIndex++
-        ) {
-          const pcDefect = processedRecord.defectDetails.defectsByPc[pcIndex];
-
-          if (pcDefect.pcDefects) {
-            for (
-              let defectIndex = 0;
-              defectIndex < pcDefect.pcDefects.length;
-              defectIndex++
-            ) {
-              const defect = pcDefect.pcDefects[defectIndex];
-
-              if (defect.defectImages && Array.isArray(defect.defectImages)) {
-                const processedImages = [];
-                for (const imagePath of defect.defectImages) {
-                  // Skip if already base64
-                  if (imagePath && imagePath.startsWith("data:image/")) {
-                    processedImages.push(imagePath);
-                    continue;
-                  }
-
-                  // For CORS-blocked images, add placeholder info
-                  processedImages.push({
-                    isPlaceholder: true,
-                    originalUrl: imagePath,
-                    type: "defect"
-                  });
-                }
-
-                // IMPORTANT: Assign the processed images back to the correct location
-                processedRecord.defectDetails.defectsByPc[pcIndex].pcDefects[
-                  defectIndex
-                ].defectImages = processedImages;
-              }
-            }
-          }
-        }
-      }
-
-      // Process additional images
-      if (
-        processedRecord.defectDetails?.additionalImages &&
-        Array.isArray(processedRecord.defectDetails.additionalImages)
-      ) {
-        const processedAdditionalImages = [];
-        for (const imagePath of processedRecord.defectDetails
-          .additionalImages) {
-          // Skip if already base64
-          if (imagePath && imagePath.startsWith("data:image/")) {
-            processedAdditionalImages.push(imagePath);
-            continue;
-          }
-
-          processedAdditionalImages.push({
-            isPlaceholder: true,
-            originalUrl: imagePath,
-            type: "additional"
-          });
-        }
-
-        // IMPORTANT: Assign the processed images back
-        processedRecord.defectDetails.additionalImages =
-          processedAdditionalImages;
-      }
-
-      // Process inspection images
-      if (processedRecord.inspectionDetails?.checkedPoints) {
-        for (
-          let pointIndex = 0;
-          pointIndex < processedRecord.inspectionDetails.checkedPoints.length;
-          pointIndex++
-        ) {
-          const point =
-            processedRecord.inspectionDetails.checkedPoints[pointIndex];
-
-          // Process point image
-          if (point.image) {
-            try {
-              if (!point.image.startsWith("data:image/")) {
-                const processedImage = await convertImageToBase64(
-                  point.image,
-                  API_BASE_URL
-                );
-                processedRecord.inspectionDetails.checkedPoints[
-                  pointIndex
-                ].image = processedImage || null;
-              }
-            } catch (error) {
-              console.warn(
-                `Skipping corrupted point image: ${point.image}`,
-                error.message
-              );
-              processedRecord.inspectionDetails.checkedPoints[
-                pointIndex
-              ].image = null;
-            }
-          }
-
-          // Process comparison images in inspection points
-          if (point.comparison && Array.isArray(point.comparison)) {
-            const processedComparisonImages = [];
-            for (const imagePath of point.comparison) {
-              if (imagePath.startsWith("data:image/")) {
-                processedComparisonImages.push(imagePath);
-              } else {
-                console.log(
-                  `🖼️ Adding comparison image placeholder for: ${imagePath}`
-                );
-                processedComparisonImages.push({
-                  isPlaceholder: true,
-                  originalUrl: imagePath,
-                  type: "comparison"
-                });
-              }
-            }
-            processedRecord.inspectionDetails.checkedPoints[
-              pointIndex
-            ].comparison = processedComparisonImages;
-          }
-        }
-      }
-
-      // Process machine process images
-      if (processedRecord.inspectionDetails?.machineProcesses) {
-        for (
-          let machineIndex = 0;
-          machineIndex <
-          processedRecord.inspectionDetails.machineProcesses.length;
-          machineIndex++
-        ) {
-          const machine =
-            processedRecord.inspectionDetails.machineProcesses[machineIndex];
-          if (machine.image) {
-            try {
-              if (!machine.image.startsWith("data:image/")) {
-                const processedImage = await convertImageToBase64(
-                  machine.image,
-                  API_BASE_URL
-                );
-                processedRecord.inspectionDetails.machineProcesses[
-                  machineIndex
-                ].image = processedImage || null;
-              }
-            } catch (error) {
-              console.warn(
-                `Skipping corrupted machine image: ${machine.image}`,
-                error.message
-              );
-              processedRecord.inspectionDetails.machineProcesses[
-                machineIndex
-              ].image = null;
-            }
-          }
-        }
-      }
-
-      return processedRecord;
-    } catch (error) {
-      console.error("❌ Error processing images in record:", error);
-      return record; // Return original record if processing fails
-    }
-  };
-
-  const processImageToBase64 = async (imagePath) => {
-    try {
-      const cleanPath = imagePath.replace("./public/", "");
-      const response = await fetch(`${API_BASE_URL}/${cleanPath}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-
-      // Validate JPEG header (SOI marker: 0xFF 0xD8)
-      if (uint8Array.length < 2) {
-        throw new Error("Image data too short");
-      }
-
-      if (uint8Array[0] !== 0xff || uint8Array[1] !== 0xd8) {
-        // Sometimes the header gets corrupted, try to find the actual start
-        let soi = -1;
-        for (let i = 0; i < Math.min(100, uint8Array.length - 1); i++) {
-          if (uint8Array[i] === 0xff && uint8Array[i + 1] === 0xd8) {
-            soi = i;
-            break;
-          }
-        }
-
-        if (soi > 0) {
-          // Create new array starting from the actual SOI
-          const correctedArray = uint8Array.slice(soi);
-          const base64 = btoa(String.fromCharCode.apply(null, correctedArray));
-          return `data:image;base64,${base64}`;
-        } else {
-          throw new Error("No valid JPEG SOI marker found");
-        }
-      }
-
-      // Convert to base64 using chunks to avoid call stack issues
-      let binary = "";
-      const chunkSize = 8192;
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.subarray(i, i + chunkSize);
-        binary += String.fromCharCode.apply(null, chunk);
-      }
-
-      const base64 = btoa(binary);
-      const dataUrl = `data:image/jpeg;base64,${base64}`;
-
-      // Final validation
-      try {
-        atob(base64);
-      } catch (e) {
-        console.error("❌ Base64 validation failed:", e);
-        return null;
-      }
-
-      return dataUrl;
-    } catch (error) {
-      console.error("❌ Error processing image:", imagePath, error);
-      return null;
-    }
-  };
-
   const handleDownloadPDF = async (record) => {
     try {
       setIsQcWashingPDF(true);
-      if (!API_BASE_URL) throw new Error("API_BASE_URL is not defined");
 
-      // -------------------------------
-      // 1️⃣ Fetch inspector details
-      // -------------------------------
+      // Show initial loading message
+      Swal.fire({
+        title: "Preparing PDF Report",
+        html: `
+        <div class="text-left">
+          <div id="progress-inspector">⏳ Loading inspector details...</div>
+          <div id="progress-images">⏳ Loading images...</div>
+          <div id="progress-pdf">⏳ Waiting...</div>
+        </div>
+      `,
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      // 1. Fetch inspector details
       let inspectorDetails = null;
       if (record.userId) {
         try {
-          const res = await fetch(`${API_BASE_URL}/api/users/${record.userId}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data && !data.error) inspectorDetails = data;
+          const response = await fetch(
+            `${API_BASE_URL}/api/users/${record.userId}`
+          );
+          if (response.ok) {
+            inspectorDetails = await response.json();
+            document.getElementById("progress-inspector").innerHTML =
+              "✅ Inspector details loaded";
           } else {
-            console.warn("⚠️ Failed to fetch inspector:", res.status);
+            document.getElementById("progress-inspector").innerHTML =
+              "⚠️ Inspector details not found";
           }
-        } catch (err) {
-          console.warn("❌ Inspector fetch failed:", err.message);
+        } catch (error) {
+          console.warn("Failed to fetch inspector details:", error);
+          document.getElementById("progress-inspector").innerHTML =
+            "⚠️ Inspector details failed to load";
         }
+      } else {
+        document.getElementById("progress-inspector").innerHTML =
+          "✅ No inspector details needed";
       }
 
-      // -------------------------------
-      // 2️⃣ Fetch comparison data
-      // -------------------------------
-      let comparisonData = null;
-      if (record.measurementDetails?.measurement?.length > 0) {
-        try {
-          const params = new URLSearchParams({
-            orderNo: record.orderNo,
-            color: record.color,
-            washType: record.washType,
-            reportType: record.reportType,
-            factory: record.factoryName
-          });
-          const res = await fetch(
-            `${API_BASE_URL}/api/qc-washing/results?${params}`
-          );
-          if (res.ok) {
-            const data = await res.json();
-            const opposite =
-              record.before_after_wash === "Before Wash"
-                ? "After Wash"
-                : "Before Wash";
-            comparisonData = data.find(
-              (r) =>
-                r.orderNo === record.orderNo &&
-                r.color === record.color &&
-                r.washType === record.washType &&
-                r.reportType === record.reportType &&
-                r.factoryName === record.factoryName &&
-                r.before_after_wash === opposite
-            );
-          }
-        } catch (err) {
-          console.warn("❌ Comparison fetch failed:", err.message);
-        }
-      }
+      // 2. Use your existing endpoint to get all images for this record
+      let preloadedImages = {};
+      let imageStats = { total: 0, loaded: 0 };
 
-      // -------------------------------
-      // 3️⃣ Preload only record-related images (NEW optimized API)
-      // -------------------------------
-      const preloadedImages = {};
       try {
-        const res = await fetch(
-          `${API_BASE_URL}/api/image-proxy-selected/${record._id}`
+        document.getElementById("progress-images").innerHTML =
+          "⏳ Fetching images from server...";
+
+        const imageResponse = await fetch(
+          `${API_BASE_URL}/api/qc-washing/image-proxy-selected/${record._id}`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json"
+            }
+          }
         );
-        if (res.ok) {
-          const data = await res.json();
-          Object.assign(preloadedImages, data.images || {});
+
+        if (imageResponse.ok) {
+          const imageData = await imageResponse.json();
+          preloadedImages = imageData.images || {};
+          imageStats = {
+            total: imageData.total || 0,
+            loaded: imageData.loaded || 0
+          };
+
+          document.getElementById(
+            "progress-images"
+          ).innerHTML = `✅ Images loaded: ${imageStats.loaded}/${imageStats.total}`;
         } else {
-          console.warn("⚠️ Could not load record images:", res.statusText);
+          throw new Error(`Failed to fetch images: ${imageResponse.status}`);
         }
-      } catch (err) {
-        console.error("❌ Image preload failed:", err.message);
+      } catch (error) {
+        console.error("Error fetching images:", error);
+        document.getElementById(
+          "progress-images"
+        ).innerHTML = `⚠️ Image loading failed: ${error.message}`;
+        // Continue with empty images - PDF will still generate
       }
 
-      // -------------------------------
-      // 4️⃣ Add inspector photo (if available)
-      // -------------------------------
-      if (inspectorDetails?.face_photo) {
+      // 3. CRITICAL FIX: Load inspector image separately through proxy
+      if (inspectorDetails && inspectorDetails.face_photo) {
         try {
-          const res = await fetch(
-            `${API_BASE_URL}/api/image-proxy/${encodeURIComponent(
-              inspectorDetails.face_photo
-            )}`
+          document.getElementById(
+            "progress-images"
+          ).innerHTML = `⏳ Loading inspector image... (${imageStats.loaded}/${imageStats.total} other images loaded)`;
+
+          // Use the image proxy for inspector photo
+          const inspectorImageUrl = inspectorDetails.face_photo.startsWith(
+            "http"
+          )
+            ? inspectorDetails.face_photo
+            : `${API_BASE_URL}${
+                inspectorDetails.face_photo.startsWith("/") ? "" : "/"
+              }${inspectorDetails.face_photo}`;
+
+          const inspectorImageResponse = await fetch(
+            `${API_BASE_URL}/api/qc-washing/image-proxy/${encodeURIComponent(
+              inspectorImageUrl
+            )}`,
+            {
+              method: "GET",
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json"
+              }
+            }
           );
-          if (res.ok) {
-            const data = await res.json();
-            if (data.dataUrl?.startsWith("data:")) {
-              preloadedImages[inspectorDetails.face_photo] = data.dataUrl;
+
+          if (inspectorImageResponse.ok) {
+            const inspectorImageData = await inspectorImageResponse.json();
+            if (
+              inspectorImageData.dataUrl &&
+              inspectorImageData.dataUrl.startsWith("data:")
+            ) {
+              // Add inspector image to preloaded images
+              preloadedImages[inspectorDetails.face_photo] =
+                inspectorImageData.dataUrl;
+              preloadedImages[inspectorImageUrl] = inspectorImageData.dataUrl;
+
+              document.getElementById(
+                "progress-images"
+              ).innerHTML = `✅ Images loaded: ${imageStats.loaded}/${imageStats.total} + inspector image`;
             }
           } else {
-            console.warn("⚠️ Inspector photo failed:", res.statusText);
+            console.warn("Failed to load inspector image through proxy");
           }
-        } catch (err) {
-          console.error("❌ Inspector photo error:", err.message);
+        } catch (error) {
+          console.warn("Error loading inspector image:", error);
         }
       }
 
-      // -------------------------------
-      // 5️⃣ Generate PDF (React PDF)
-      // -------------------------------
-      const { pdf } = await import("@react-pdf/renderer");
-      const { QcWashingFullReportPDF } = await import(
-        "./qcWashingFullReportPDF"
+      // 4. Fetch checkpoint definitions
+      let checkpointDefinitions = [];
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc-washing-checklist`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data)) {
+            checkpointDefinitions = data;
+          }
+        }
+      } catch (error) {
+        console.warn("Failed to fetch checkpoint definitions:", error);
+      }
+
+      // 5. Prepare clean data for PDF
+      const cleanRecordData = JSON.parse(
+        JSON.stringify(record, (key, value) => {
+          if (value === "" || value === null || value === undefined) {
+            return undefined;
+          }
+          return value;
+        })
       );
 
-      if (!record?._id) throw new Error("Invalid record data");
+      // 6. Generate PDF
+      document.getElementById("progress-pdf").innerHTML =
+        "⏳ Generating PDF document...";
 
-      const blob = await pdf(
-        React.createElement(QcWashingFullReportPDF, {
-          recordData: record,
-          comparisonData,
+      // Wait a moment to ensure all operations are complete
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      try {
+        const { pdf } = await import("@react-pdf/renderer");
+        const { QcWashingFullReportPDF } = await import(
+          "./qcWashingFullReportPDF"
+        );
+
+        // Create the PDF element with all required props
+        const pdfElement = React.createElement(QcWashingFullReportPDF, {
+          recordData: cleanRecordData,
+          comparisonData: null,
           API_BASE_URL,
-          checkpointDefinitions,
+          checkpointDefinitions: checkpointDefinitions || [],
           preloadedImages,
-          skipImageLoading: false,
-          inspectorDetails
-        })
-      ).toBlob();
+          inspectorDetails: inspectorDetails || {},
+          // Add these additional props to ensure proper rendering
+          isLoading: false,
+          skipImageLoading: false
+        });
 
-      // -------------------------------
-      // 6️⃣ Download the file
-      // -------------------------------
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `QC_Washing_Report_${record.orderNo}_${
-        record.color
-      }_${record.before_after_wash.replace(" ", "_")}_${
-        new Date().toISOString().split("T")[0]
-      }.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+        const blob = await pdf(pdfElement).toBlob();
 
-      Swal.fire({
-        title: "Success!",
-        text: "PDF downloaded successfully!",
-        icon: "success",
-        timer: 4000,
-        showConfirmButton: false
-      });
+        document.getElementById("progress-pdf").innerHTML =
+          "✅ PDF generated successfully";
+
+        // Close loading dialog
+        Swal.close();
+
+        // 7. Download the PDF
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `QC_Washing_Report_${record.orderNo || "Unknown"}_${
+          record.color || "Unknown"
+        }_${new Date().toISOString().split("T")[0]}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        // Success message
+        Swal.fire({
+          title: "Success!",
+          html: `
+          <div class="text-left">
+            <div>✅ PDF downloaded successfully!</div>
+            <div class="text-sm text-gray-600 mt-2">
+              Inspector details: ${
+                inspectorDetails ? "Loaded" : "Not available"
+              }<br>
+              Inspector image: ${
+                inspectorDetails?.face_photo &&
+                preloadedImages[inspectorDetails.face_photo]
+                  ? "Loaded"
+                  : "Not available"
+              }<br>
+              Images loaded: ${imageStats.loaded}/${imageStats.total}<br>
+              PDF size: ${(blob.size / 1024 / 1024).toFixed(2)} MB<br>
+              ${
+                imageStats.total > 0 && imageStats.loaded === imageStats.total
+                  ? "All images loaded successfully"
+                  : imageStats.total > 0
+                  ? `${
+                      imageStats.total - imageStats.loaded
+                    } images failed to load`
+                  : "No images found"
+              }
+            </div>
+          </div>
+        `,
+          icon: "success",
+          timer: 5000,
+          showConfirmButton: true
+        });
+      } catch (pdfError) {
+        console.error("PDF generation specific error:", pdfError);
+        throw new Error(`PDF generation failed: ${pdfError.message}`);
+      }
     } catch (error) {
-      console.error("❌ PDF generation failed:", error);
-
-      let errorMessage = "Failed to generate PDF";
-      if (error.message.includes("SOI not found"))
-        errorMessage = "Image format error (corrupt image).";
-      else if (error.message.includes("string child"))
-        errorMessage = "Formatting issue in PDF content.";
-      else if (error.message.includes("CORS"))
-        errorMessage = "Network access error.";
-
       Swal.fire({
         title: "Error!",
-        text: `${errorMessage}: ${error.message}`,
+        html: `
+        <div class="text-left">
+          <div>❌ Failed to generate PDF</div>
+          <div class="text-sm text-gray-600 mt-2">
+            Error: ${error.message}<br>
+            Please check the console for more details.
+          </div>
+        </div>
+      `,
         icon: "error",
-        timer: 5000,
-        showConfirmButton: false
+        timer: 10000,
+        showConfirmButton: true
       });
     } finally {
       setIsQcWashingPDF(false);
     }
-  };
-
-  // FIXED: Add this helper function to preload images
-  const preloadImagesForRecord = async (record, API_BASE_URL) => {
-    const imageCollection = new Map();
-    const imageMap = {};
-
-    // Helper function to normalize image keys (same as in PDF component)
-    const normalizeImageKey = (src) => {
-      if (typeof src === "string") {
-        return src.trim();
-      } else if (typeof src === "object" && src !== null) {
-        return (
-          src.originalUrl ||
-          src.url ||
-          src.src ||
-          src.path ||
-          JSON.stringify(src)
-        );
-      }
-      return JSON.stringify(src);
-    };
-
-    // Helper function to add images to collection
-    const addImageToCollection = (img, context = "") => {
-      if (!img) return;
-
-      // Generate all possible keys for this image (same logic as PDF component)
-      const generateStorageKeys = (img) => {
-        const keys = new Set();
-
-        if (typeof img === "string") {
-          const cleanImg = img.trim();
-          keys.add(cleanImg);
-          keys.add(img); // untrimmed
-
-          // Handle different URL formats
-          if (cleanImg.startsWith("/")) {
-            keys.add(cleanImg.substring(1));
-          } else {
-            keys.add("/" + cleanImg);
-          }
-
-          // Handle full URLs - extract path for 192.167.12.85:5000
-          if (cleanImg.includes("192.167.12.85:5000")) {
-            const urlParts = cleanImg.split("192.167.12.85:5000");
-            if (urlParts.length > 1) {
-              const path = urlParts[1];
-              keys.add(path);
-              keys.add(path.startsWith("/") ? path.substring(1) : "/" + path);
-            }
-          }
-
-          // Handle yqms.yaikh.com URLs - extract path
-          if (cleanImg.includes("yqms.yaikh.com")) {
-            const urlParts = cleanImg.split("yqms.yaikh.com");
-            if (urlParts.length > 1) {
-              const path = urlParts[1];
-              keys.add(path);
-              keys.add(path.startsWith("/") ? path.substring(1) : "/" + path);
-            }
-          }
-
-          // Handle storage/public paths
-          if (cleanImg.includes("/storage/") || cleanImg.includes("/public/")) {
-            const pathMatch = cleanImg.match(/(\/(?:storage|public)\/.+)/);
-            if (pathMatch) {
-              keys.add(pathMatch[1]);
-              keys.add(pathMatch[1].substring(1));
-            }
-          }
-        } else if (typeof img === "object" && img !== null) {
-          const possibleUrls = [
-            img.originalUrl,
-            img.url,
-            img.src,
-            img.path
-          ].filter(Boolean);
-
-          possibleUrls.forEach((url) => {
-            if (typeof url === "string") {
-              const subKeys = generateStorageKeys(url);
-              subKeys.forEach((key) => keys.add(key));
-            }
-          });
-
-          keys.add(JSON.stringify(img));
-        }
-
-        return Array.from(keys);
-      };
-
-      const possibleKeys = generateStorageKeys(img);
-
-      // Store all possible keys pointing to the same image source
-      possibleKeys.forEach((key) => {
-        if (key && key.trim()) {
-          imageCollection.set(key.trim(), img);
-        }
-      });
-    };
-
-    // Collect defect images (both captured and uploaded)
-    if (record.defectDetails?.defectsByPc) {
-      record.defectDetails.defectsByPc.forEach((pc, pcIndex) => {
-        if (pc.pcDefects) {
-          pc.pcDefects.forEach((defect, defectIndex) => {
-            // Collect captured defect images
-            if (defect.defectImages && Array.isArray(defect.defectImages)) {
-              defect.defectImages.forEach((img, imgIndex) => {
-                addImageToCollection(
-                  img,
-                  `defect-pc${pcIndex}-defect${defectIndex}-captured${imgIndex}`
-                );
-              });
-            }
-            // Collect uploaded defect images
-            if (defect.uploadedImages && Array.isArray(defect.uploadedImages)) {
-              defect.uploadedImages.forEach((img, imgIndex) => {
-                addImageToCollection(
-                  img,
-                  `defect-pc${pcIndex}-defect${defectIndex}-uploaded${imgIndex}`
-                );
-              });
-            }
-          });
-        }
-      });
-    }
-
-    // Collect additional images
-    if (
-      record.defectDetails?.additionalImages &&
-      Array.isArray(record.defectDetails.additionalImages)
-    ) {
-      record.defectDetails.additionalImages.forEach((img, index) => {
-        addImageToCollection(img, `additional-${index}`);
-      });
-    }
-
-    // Collect new inspection images (both captured and uploaded)
-    if (record.inspectionDetails?.checkpointInspectionData) {
-      record.inspectionDetails.checkpointInspectionData.forEach(
-        (checkpoint, checkIndex) => {
-          // Collect captured comparison images
-          if (
-            checkpoint.comparisonImages &&
-            Array.isArray(checkpoint.comparisonImages)
-          ) {
-            checkpoint.comparisonImages.forEach((img, imgIndex) => {
-              addImageToCollection(
-                img,
-                `checkpoint${checkIndex}-main-captured${imgIndex}`
-              );
-            });
-          }
-          // Collect uploaded comparison images
-          if (
-            checkpoint.uploadedImages &&
-            Array.isArray(checkpoint.uploadedImages)
-          ) {
-            checkpoint.uploadedImages.forEach((img, imgIndex) => {
-              addImageToCollection(
-                img,
-                `checkpoint${checkIndex}-main-uploaded${imgIndex}`
-              );
-            });
-          }
-          if (checkpoint.subPoints) {
-            checkpoint.subPoints.forEach((subPoint, subIndex) => {
-              // Collect captured sub-point images
-              if (
-                subPoint.comparisonImages &&
-                Array.isArray(subPoint.comparisonImages)
-              ) {
-                subPoint.comparisonImages.forEach((img, imgIndex) => {
-                  addImageToCollection(
-                    img,
-                    `checkpoint${checkIndex}-sub${subIndex}-captured${imgIndex}`
-                  );
-                });
-              }
-              // Collect uploaded sub-point images
-              if (
-                subPoint.uploadedImages &&
-                Array.isArray(subPoint.uploadedImages)
-              ) {
-                subPoint.uploadedImages.forEach((img, imgIndex) => {
-                  addImageToCollection(
-                    img,
-                    `checkpoint${checkIndex}-sub${subIndex}-uploaded${imgIndex}`
-                  );
-                });
-              }
-            });
-          }
-        }
-      );
-    }
-
-    // Collect legacy inspection images (both captured and uploaded)
-    if (record.inspectionDetails?.checkedPoints) {
-      record.inspectionDetails.checkedPoints.forEach((point, pointIndex) => {
-        // Collect captured comparison images
-        if (point.comparison && Array.isArray(point.comparison)) {
-          point.comparison.forEach((img, imgIndex) => {
-            addImageToCollection(
-              img,
-              `legacy-point${pointIndex}-captured${imgIndex}`
-            );
-          });
-        }
-        // Collect uploaded comparison images
-        if (point.uploadedImages && Array.isArray(point.uploadedImages)) {
-          point.uploadedImages.forEach((img, imgIndex) => {
-            addImageToCollection(
-              img,
-              `legacy-point${pointIndex}-uploaded${imgIndex}`
-            );
-          });
-        }
-      });
-    }
-
-    // Collect machine images
-    if (record.inspectionDetails?.machineProcesses) {
-      record.inspectionDetails.machineProcesses.forEach(
-        (machine, machineIndex) => {
-          if (machine.image) {
-            addImageToCollection(machine.image, `machine${machineIndex}`);
-          }
-        }
-      );
-    }
-
-    // ENHANCED: Load images with better error handling and validation
-    const loadImageAsBase64 = async (src, API_BASE_URL) => {
-      let imageUrl = src;
-
-      // Handle different image data formats
-      if (typeof src === "object" && src !== null) {
-        if (src.originalUrl) {
-          imageUrl = src.originalUrl;
-        } else {
-          imageUrl = src.url || src.src || src.path || JSON.stringify(src);
-        }
-      }
-
-      if (typeof src === "string" && src.startsWith("{")) {
-        try {
-          const parsed = JSON.parse(src);
-          if (parsed.originalUrl) {
-            imageUrl = parsed.originalUrl;
-          } else {
-            imageUrl = parsed.url || parsed.src || parsed.path || src;
-          }
-        } catch (e) {
-          imageUrl = src;
-        }
-      }
-
-      if (!imageUrl || typeof imageUrl !== "string") {
-        console.warn("Invalid image URL:", src);
-        return null;
-      }
-
-      // If already base64, validate and return
-      if (imageUrl.startsWith("data:")) {
-        try {
-          const base64Parts = imageUrl.split(",");
-          if (base64Parts.length === 2 && base64Parts[1].length > 100) {
-            // Test decode to ensure validity
-            atob(base64Parts[1].substring(0, 100));
-            return imageUrl;
-          }
-        } catch (e) {
-          console.warn("Invalid base64 data:", e.message);
-          return null;
-        }
-      }
-
-      try {
-        // Clean and normalize the URL;
-
-        const response = await fetch({
-          method: "GET",
-          headers: {
-            Accept: "application/json"
-          }
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-
-          if (data.dataUrl && data.dataUrl.startsWith("data:")) {
-            return data.dataUrl;
-          }
-        }
-
-        return null;
-      } catch (error) {
-        console.warn("❌ Error loading image:", imageUrl, error.message);
-        return null;
-      }
-    };
-
-    // Load all images with enhanced error handling
-    const loadPromises = Array.from(imageCollection.entries()).map(
-      async ([key, url], index) => {
-        try {
-          // Add progressive delay to avoid overwhelming server
-          await new Promise((resolve) => setTimeout(resolve, index * 50));
-
-          const base64 = await loadImageAsBase64(url, API_BASE_URL);
-
-          if (base64 && base64.startsWith("data:")) {
-            // Additional validation for base64 data
-            const base64Parts = base64.split(",");
-            if (base64Parts.length === 2 && base64Parts[1].length > 100) {
-              try {
-                // Test decode to ensure validity
-                atob(base64Parts[1].substring(0, 100));
-                imageMap[key] = base64;
-                return { success: true, key };
-              } catch (decodeError) {
-                return {
-                  success: false,
-                  key,
-                  error: "Base64 validation failed"
-                };
-              }
-            } else {
-              return { success: false, key, error: "Invalid base64 format" };
-            }
-          } else {
-            return { success: false, key, error: "No valid base64 data" };
-          }
-        } catch (error) {
-          return { success: false, key, error: error.message };
-        }
-      }
-    );
-
-    // Wait for all images to load with timeout
-    const results = await Promise.allSettled(loadPromises);
-
-    let successCount = 0;
-    let failCount = 0;
-    const failedImages = [];
-
-    results.forEach((result) => {
-      if (result.status === "fulfilled" && result.value.success) {
-        successCount++;
-      } else {
-        failCount++;
-        if (result.status === "fulfilled") {
-          failedImages.push(result.value.key);
-        }
-      }
-    });
-
-    if (failedImages.length > 0) {
-      console.log("❌ Failed images:", failedImages.slice(0, 5)); // Show first 5 failed
-    }
-
-    return imageMap;
   };
 
   const toggleDropdown = (recordId) => {
@@ -1283,6 +831,35 @@ const SubmittedWashingDataPage = () => {
     dataToFilter = submittedData
   ) => {
     let filtered = [...dataToFilter];
+
+    // Check if filters are empty (cleared)
+    const hasFilters =
+      filters &&
+      Object.keys(filters).some((key) => {
+        const value = filters[key];
+        if (key === "dateRange") {
+          return value && (value.startDate || value.endDate);
+        }
+        return value && value !== "";
+      });
+
+    // If no filters, show last 7 days of records (most recent)
+    if (!hasFilters) {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0); // Set to the beginning of the day
+
+      filtered = filtered.filter((item) => {
+        if (!item.date) return false;
+        const itemDate = new Date(item.date);
+        return itemDate >= sevenDaysAgo;
+      });
+
+      // Sort by date descending to get most recent records first
+      filtered = filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+      setFilteredData(filtered);
+      return;
+    }
 
     // Date range filter
     if (
@@ -1340,11 +917,6 @@ const SubmittedWashingDataPage = () => {
       });
     }
 
-    // Buyer filter
-    // if (filters.buyer) {
-    //   filtered = filtered.filter(item => item.buyer === filters.buyer);
-    // }
-
     // Factory name filter
     if (filters.factoryName) {
       filtered = filtered.filter(
@@ -1373,33 +945,133 @@ const SubmittedWashingDataPage = () => {
 
     setFilteredData(filtered);
     if (resetPage) {
-      setCurrentPage(1); // Reset to first page only when filters change
+      setCurrentPage(1);
     }
   };
 
   // Handle filter changes
   const handleFilterChange = (filters) => {
     setCurrentFilters(filters);
-    // The main useEffect hook will now handle applying filters when `currentFilters` changes.
+    // Apply filters to the processed data (which has actual wash qty)
+    applyFilters(
+      filters,
+      true,
+      processedData.length > 0 ? processedData : submittedData
+    );
   };
 
   // Reset filters
   const handleFilterReset = () => {
     setCurrentFilters({});
-    // The main useEffect hook will handle this state change.
+    // Apply empty filters to show last 20 records
+    applyFilters(
+      {},
+      true,
+      processedData.length > 0 ? processedData : submittedData
+    );
   };
 
-  // This useEffect was causing the processed 'actual' data to be overwritten by raw 'submittedData'.
-  // The main `processDataForView` useEffect now correctly handles updates when `submittedData` changes.
+  // Process AQL for current page records only
   useEffect(() => {
-    // Update paginated data when filtered data or current page changes
+    const processCurrentPageAQL = async () => {
+      if (!aqlEndpointAvailable || viewMode !== "actual") return;
+
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const currentPageRecords = filteredData.slice(startIndex, endIndex);
+
+      const updatedRecords = await Promise.all(
+        currentPageRecords.map(async (record) => {
+          // Only process AQL for inline reports with actual wash qty
+          if (
+            record.isActualWashQty &&
+            record.displayWashQty > 0 &&
+            record.reportType?.toLowerCase() === "inline"
+          ) {
+            try {
+              const aqlResponse = await fetch(
+                `${API_BASE_URL}/api/qc-washing/aql-chart/find`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    lotSize: record.displayWashQty,
+                    orderNo: record.orderNo
+                  })
+                }
+              );
+
+              if (aqlResponse.ok) {
+                const aqlResult = await aqlResponse.json();
+                if (aqlResult.success && aqlResult.aqlData) {
+                  return {
+                    ...record,
+                    checkedQty: aqlResult.aqlData.sampleSize
+                  };
+                }
+              } else if (aqlResponse.status === 404) {
+                setAqlEndpointAvailable(false);
+              }
+            } catch (e) {
+              console.error("AQL fetch failed:", e);
+              setAqlEndpointAvailable(false);
+            }
+          }
+          return record;
+        })
+      );
+
+      setPaginatedData(updatedRecords);
+    };
+
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    setPaginatedData(filteredData.slice(startIndex, endIndex));
-  }, [filteredData, currentPage, itemsPerPage]);
+    const currentPageRecords = filteredData.slice(startIndex, endIndex);
 
-  // This useEffect ensures that if a modal is open while the view mode changes,
-  // the data inside the modal is refreshed to match the new view.
+    // Set initial paginated data
+    setPaginatedData(currentPageRecords);
+
+    // Process AQL for current page only
+    processCurrentPageAQL();
+  }, [filteredData, currentPage, itemsPerPage, aqlEndpointAvailable, viewMode]);
+
+  // NEW: useEffect to fetch actual wash qty for the current page
+  useEffect(() => {
+    const fetchActualsForCurrentPage = async () => {
+      // Only run in 'actual' mode and if there's data
+      if (viewMode !== "actual" || paginatedData.length === 0) return;
+
+      const recordsToUpdate = paginatedData.filter(
+        (record) => !record.isActualWashQty // Only fetch for records we haven't processed yet
+      );
+
+      if (recordsToUpdate.length === 0) return;
+
+      const updatedRecords = await Promise.all(
+        recordsToUpdate.map(async (record) => {
+          const washQtyData = await fetchRealWashQty(record);
+          return { ...record, ...washQtyData };
+        })
+      );
+
+      // Merge the updated records back into the main processedData list
+      setProcessedData((prevData) => {
+        const newData = [...prevData];
+        updatedRecords.forEach((updatedRecord) => {
+          const index = newData.findIndex(
+            (item) => item._id === updatedRecord._id
+          );
+          if (index !== -1) {
+            newData[index] = updatedRecord;
+          }
+        });
+        return newData;
+      });
+    };
+
+    fetchActualsForCurrentPage();
+  }, [paginatedData, viewMode]); // Runs when the page changes or viewMode switches to 'actual'
+
   useEffect(() => {
     if (viewDetailsModal.isOpen && viewDetailsModal.itemData?._id) {
       const updatedItemData = filteredData.find(
@@ -1502,6 +1174,11 @@ const SubmittedWashingDataPage = () => {
                   (Processing actual data...)
                 </span>
               )}
+              {/* {isRefreshing && (
+        <span className="ml-2 text-sm text-orange-600 dark:text-orange-400">
+          (Refreshing actual wash quantities...)
+        </span>
+      )}             */}
             </h2>
             <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-1">
               <button
@@ -1524,6 +1201,29 @@ const SubmittedWashingDataPage = () => {
               >
                 Actual
               </button>
+              {/* <button
+      onClick={handleRefreshActualWashQty}
+      disabled={isRefreshing || isLoading}
+      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+        isRefreshing || isLoading
+          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          : 'bg-blue-600 hover:bg-blue-700 text-white'
+      }`}
+    >
+      {isRefreshing ? (
+        <>
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+          Refreshing...
+        </>
+      ) : (
+        <>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh Actual Wash Qty
+        </>
+      )}
+    </button> */}
             </div>
           </div>
           <div className="flex items-center gap-6">
@@ -1552,7 +1252,22 @@ const SubmittedWashingDataPage = () => {
             </div>
           </div>
         </div>
-
+        {/* {refreshStatus && (
+  <div className={`mb-4 p-4 rounded-lg ${
+    refreshStatus.type === 'success' 
+      ? 'bg-green-50 border border-green-200 text-green-800' 
+      : 'bg-red-50 border border-red-200 text-red-800'
+  }`}>
+    <div className="font-medium">{refreshStatus.message}</div>
+    {refreshStatus.details && (
+      <div className="text-sm mt-2">
+        <div>Records processed: {refreshStatus.details.qcRealWashingQty?.total || 0}</div>
+        <div>Records updated: {refreshStatus.details.qcWashing?.modified || 0}</div>
+        <div>Operations executed: {refreshStatus.details.qcWashing?.operations || 0}</div>
+      </div>
+    )}
+  </div>
+)} */}
         {filteredData.length === 0 ? (
           <div className="text-center py-8">
             <div className="text-gray-400 dark:text-gray-500 text-lg mb-2">
@@ -1763,7 +1478,10 @@ const SubmittedWashingDataPage = () => {
                       </td>
 
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                        {record.checkedQty || "N/A"}
+                        {viewMode === "actual" &&
+                        record.displayCheckedQty !== undefined
+                          ? record.displayCheckedQty
+                          : record.checkedQty || "N/A"}
                       </td>
 
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">

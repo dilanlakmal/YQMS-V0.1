@@ -5,11 +5,7 @@ import {
   FileUp,
   Loader,
   Save,
-  XCircle,
-  UploadCloud,
-  View,
-  Layers,
-  GitMerge
+  XCircle
 } from "lucide-react";
 import React, { useCallback, useState } from "react";
 import { read, utils } from "xlsx";
@@ -19,9 +15,10 @@ import YorksysOrderPreview from "../components/inspection/qa-pivot/YorksysOrderP
 import YorksysOrdersView from "../components/inspection/qa-pivot/YorksysOrdersView";
 import YorksysProductTypeView from "../components/inspection/qa-pivot/YorksysProductTypeView";
 import YorksysCuttingSyncView from "../components/inspection/qa-pivot/YorksysCuttingSyncView";
+import YorkSysOrdersRibContentSave from "../components/inspection/qa-pivot/YorkSysOrdersRibContentSave";
 
-const UploadYorksysOrders = () => {
-  // --- State for Upload Tab ---
+const UploadYorksysOrders = ({ activeSubTab }) => {
+  // --- State for Upload Logic ---
   const [selectedFile, setSelectedFile] = useState(null);
   const [orderData, setOrderData] = useState(null);
   const [error, setError] = useState("");
@@ -29,9 +26,6 @@ const UploadYorksysOrders = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState({ message: "", type: "" });
   const [isDragging, setIsDragging] = useState(false);
-
-  // --- State for Active Tab ---
-  const [activeTab, setActiveTab] = useState("upload");
 
   const resetState = () => {
     setOrderData(null);
@@ -122,34 +116,21 @@ const UploadYorksysOrders = () => {
     }
   }, [selectedFile]);
 
-  // ============================================================
-  // 🆕 NEW: Helper function to transform data for MongoDB
-  // ============================================================
-  /**
-   * Transforms the preview data into the format required by MongoDB schema
-   * @param {Object} data - The cleaned order data from preview
-   * @returns {Object} Transformed data matching MongoDB schema
-   */
+  // --- Data Transformation Logic ---
   const transformOrderDataForSave = (data) => {
-    // 1. Parse Fabric Content string into array
-    // Example: "COTTON: 60%, POLYESTER: 40%" -> [{fabricName: "COTTON", percentageValue: 60}, ...]
     const parseFabricContent = (fabricContentStr) => {
       if (!fabricContentStr || fabricContentStr === "N/A") return [];
-
       return fabricContentStr.split(",").map((item) => {
         const parts = item.trim().split(":");
         const fabricName = parts[0]?.trim() || "";
         const percentageStr = parts[1]?.trim().replace("%", "") || "0";
         const percentageValue = parseInt(percentageStr, 10) || 0;
-
         return { fabricName, percentageValue };
       });
     };
 
-    // 2. Transform PO Summary
     const transformMOSummary = (poSummary) => {
       if (!poSummary || poSummary.length === 0) return [];
-
       return poSummary.map((po) => ({
         TotalSku: po.totalSkus || 0,
         AllETD: po.uniqueEtds ? po.uniqueEtds.split(", ") : [],
@@ -162,10 +143,8 @@ const UploadYorksysOrders = () => {
       }));
     };
 
-    // 3. Transform SKU Details
     const transformSKUData = (skuDetails) => {
       if (!skuDetails || skuDetails.length === 0) return [];
-
       return skuDetails.map((sku) => ({
         sku: sku.sku || "",
         ETD: sku.etd || "",
@@ -176,12 +155,9 @@ const UploadYorksysOrders = () => {
       }));
     };
 
-    // 4. Transform Order Qty by Country
     const transformOrderQtyByCountry = (orderQtyByCountry) => {
       if (!orderQtyByCountry || orderQtyByCountry.length === 0) return [];
-
       return orderQtyByCountry.map((country) => {
-        // Parse the qtyByColor string "Black: 100, White: 200" into array
         const colorQtyArray =
           country.qtyByColor && country.qtyByColor !== "N/A"
             ? country.qtyByColor.split(", ").map((item) => {
@@ -192,7 +168,6 @@ const UploadYorksysOrders = () => {
                 };
               })
             : [];
-
         return {
           CountryID: country.countryId || "",
           TotalQty: country.totalQty || 0,
@@ -201,7 +176,6 @@ const UploadYorksysOrders = () => {
       });
     };
 
-    // Build the final payload
     return {
       buyer: data.buyer || "N/A",
       factory: data.factory || "N/A",
@@ -219,43 +193,33 @@ const UploadYorksysOrders = () => {
       OrderQtyByCountry: transformOrderQtyByCountry(data.orderQtyByCountry)
     };
   };
-  // ============================================================
 
-  // ============================================================
-  // 🆕 MODIFIED: Transform data before sending to backend
-  // ============================================================
   const handleSave = async () => {
     if (!orderData) {
       setError("No data to save. Please preview a file first.");
       return;
     }
-
     setIsSaving(true);
     setSaveStatus({ message: "", type: "" });
     setError("");
 
     try {
-      // Transform the data to match MongoDB schema
       const transformedData = transformOrderDataForSave(orderData);
-
-      console.log("Transformed Data:", transformedData); // For debugging
-
       const response = await fetch(`${API_BASE_URL}/api/yorksys-orders/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(transformedData)
       });
-
       const result = await response.json();
-
       if (!response.ok) {
         throw new Error(result.message || "Failed to save data.");
       }
-
       setSaveStatus({
         message: result.message || "Order saved successfully!",
         type: "success"
       });
+      setOrderData(null); // This hides the Preview window
+      setSelectedFile(null); // This clears the file selection state
     } catch (err) {
       console.error("Save Error:", err);
       setSaveStatus({ message: err.message, type: "error" });
@@ -263,74 +227,13 @@ const UploadYorksysOrders = () => {
       setIsSaving(false);
     }
   };
-  // ============================================================
 
+  // --- Content Rendering based on SubTab ---
   return (
-    <div className="mx-auto p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
-      <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
-          Yorkmars (Cambodia) Garment MFG Co., LTD
-        </h1>
-        <p className="text-md text-gray-600">Yorksys Order Upload</p>
-      </div>
-
-      {/* 🆕 Tab Navigation */}
-      <div className="max-w-4xl mx-auto mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-            <button
-              onClick={() => setActiveTab("upload")}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                activeTab === "upload"
-                  ? "border-indigo-500 text-indigo-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <UploadCloud className="h-5 w-5" />
-              Upload Order
-            </button>
-            <button
-              onClick={() => setActiveTab("view")}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                activeTab === "view"
-                  ? "border-indigo-500 text-indigo-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <View className="h-5 w-5" />
-              View Orders
-            </button>
-            {/* Product Type Tab */}
-            <button
-              onClick={() => setActiveTab("productType")}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                activeTab === "productType"
-                  ? "border-indigo-500 text-indigo-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <Layers className="h-5 w-5" />
-              Product Type
-            </button>
-            {/* Sync from Cutting Tab */}
-            <button
-              onClick={() => setActiveTab("cuttingSync")}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                activeTab === "cuttingSync"
-                  ? "border-indigo-500 text-indigo-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <GitMerge className="h-5 w-5" />
-              Sync from Cutting
-            </button>
-          </nav>
-        </div>
-      </div>
-
-      {activeTab === "upload" && (
+    <div className="animate-fadeIn">
+      {activeSubTab === "upload" && (
         <>
-          <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md">
+          <div className="max-w-4xl mx-auto bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg mb-6 transition-colors duration-300">
             <div className="flex flex-col gap-4">
               <label
                 htmlFor="file-upload"
@@ -338,18 +241,20 @@ const UploadYorksysOrders = () => {
                 onDragLeave={handleDragLeave}
                 onDragOver={handleDragEvents}
                 onDrop={handleDrop}
-                className={`flex flex-col items-center justify-center w-full px-4 py-8 border-2 border-dashed rounded-md cursor-pointer transition-colors ${
+                className={`flex flex-col items-center justify-center w-full px-4 py-10 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-300 ${
                   isDragging
-                    ? "border-indigo-600 bg-indigo-50"
-                    : "border-gray-300 hover:bg-gray-100"
+                    ? "border-indigo-600 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-900/30"
+                    : "border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                 }`}
               >
-                <FileUp className="w-10 h-10 text-gray-400 mb-3" />
-                <span className="font-semibold text-gray-700">
-                  Drag & drop your .xls file here
+                <div className="p-4 bg-indigo-50 dark:bg-indigo-900/50 rounded-full mb-3">
+                  <FileUp className="w-8 h-8 text-indigo-500 dark:text-indigo-400" />
+                </div>
+                <span className="text-lg font-semibold text-gray-700 dark:text-gray-200">
+                  Yorksys Orders | Drag & drop your .xls file here
                 </span>
-                <span className="text-sm text-gray-500">
-                  or click to browse
+                <span className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  or click to browse from your computer
                 </span>
                 <input
                   id="file-upload"
@@ -359,10 +264,16 @@ const UploadYorksysOrders = () => {
                   onChange={handleFileChange}
                 />
               </label>
+
               {selectedFile && (
-                <div className="text-center text-sm text-gray-600 bg-gray-100 p-2 rounded-md">
-                  Selected File:{" "}
-                  <span className="font-semibold">{selectedFile.name}</span>
+                <div className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-md">
+                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                    Selected File:{" "}
+                    <span className="font-semibold text-gray-800 dark:text-gray-100">
+                      {selectedFile.name}
+                    </span>
+                  </div>
+                  <CheckCircle className="w-4 h-4 text-green-500" />
                 </div>
               )}
 
@@ -370,7 +281,7 @@ const UploadYorksysOrders = () => {
                 <button
                   onClick={handlePreview}
                   disabled={!selectedFile || isLoading || isSaving}
-                  className="w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md shadow-sm hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed transition-colors"
+                  className="w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-sm disabled:bg-indigo-300 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed transition-all transform active:scale-95"
                 >
                   {isLoading ? (
                     <>
@@ -386,7 +297,7 @@ const UploadYorksysOrders = () => {
                 <button
                   onClick={handleSave}
                   disabled={!orderData || isLoading || isSaving}
-                  className="w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-green-600 text-white font-semibold rounded-md shadow-sm hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors"
+                  className="w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-sm disabled:bg-green-300 dark:disabled:bg-green-900/50 disabled:cursor-not-allowed transition-all transform active:scale-95"
                 >
                   {isSaving ? (
                     <>
@@ -402,50 +313,54 @@ const UploadYorksysOrders = () => {
             </div>
 
             {error && (
-              <div className="mt-4 flex items-center p-3 bg-red-50 text-red-700 border border-red-200 rounded-md">
-                <AlertTriangle className="w-5 h-5 mr-2" /> <span>{error}</span>
+              <div className="mt-6 flex items-center p-4 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 rounded-lg animate-fadeIn">
+                <AlertTriangle className="w-5 h-5 mr-3 flex-shrink-0" />
+                <span className="font-medium">{error}</span>
               </div>
             )}
             {saveStatus.message && (
               <div
-                className={`mt-4 flex items-center p-3 rounded-md border ${
+                className={`mt-6 flex items-center p-4 rounded-lg border animate-fadeIn ${
                   saveStatus.type === "success"
-                    ? "bg-green-50 text-green-700 border-green-200"
-                    : "bg-red-50 text-red-700 border-red-200"
+                    ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+                    : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800"
                 }`}
               >
                 {saveStatus.type === "success" ? (
-                  <CheckCircle className="w-5 h-5 mr-2" />
+                  <CheckCircle className="w-5 h-5 mr-3 flex-shrink-0" />
                 ) : (
-                  <XCircle className="w-5 h-5 mr-2" />
+                  <XCircle className="w-5 h-5 mr-3 flex-shrink-0" />
                 )}
-                <span>{saveStatus.message}</span>
+                <span className="font-medium">{saveStatus.message}</span>
               </div>
             )}
           </div>
-
           {orderData && <YorksysOrderPreview orderData={orderData} />}
         </>
       )}
-      {activeTab === "view" && (
+
+      {activeSubTab === "view" && (
         <div className="max-w-8xl mx-auto">
-          {" "}
-          {/* 👈 Add this wrapper div */}
           <YorksysOrdersView />
         </div>
       )}
 
-      {/* Render Product Type view when active */}
-      {activeTab === "productType" && (
+      {activeSubTab === "productType" && (
         <div className="max-w-8xl mx-auto">
           <YorksysProductTypeView />
         </div>
       )}
 
-      {/* Render Cutting Sync view when active */}
-      {activeTab === "cuttingSync" && (
+      {activeSubTab === "cuttingSync" && (
         <div className="max-w-8xl mx-auto">
           <YorksysCuttingSyncView />
+        </div>
+      )}
+
+      {/* SUB TAB FOR RIB CONTENT */}
+      {activeSubTab === "ribContent" && (
+        <div className="max-w-8xl mx-auto">
+          <YorkSysOrdersRibContentSave />
         </div>
       )}
     </div>

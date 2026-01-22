@@ -17,16 +17,14 @@ const SubConEdit = () => {
     const fetchSubmittedData = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch(
-          `${API_BASE_URL}/api/qc-washing/all-submitted`
-        );
-
+        const response = await fetch(`${API_BASE_URL}/api/qc-washing/all-submitted`);
+        
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-
+        
         const data = await response.json();
-
+        
         if (data.success) {
           const filteredRecords = data.data.filter(
             (record) =>
@@ -140,26 +138,19 @@ const SubConEdit = () => {
 
   const handleCancel = () => {
     setEditingRecord(null);
-    setEditWashQty("");
+    setEditWashQty('');
   };
 
   // ADD THESE MISSING FILTER FUNCTIONS:
   const applyFilters = (filters) => {
     let filtered = [...submittedData];
 
-    if (
-      filters.dateRange &&
-      (filters.dateRange.startDate || filters.dateRange.endDate)
-    ) {
-      filtered = filtered.filter((item) => {
+    if (filters.dateRange && (filters.dateRange.startDate || filters.dateRange.endDate)) {
+      filtered = filtered.filter(item => {
         const itemDate = new Date(item.date);
-        const startDate = filters.dateRange.startDate
-          ? new Date(filters.dateRange.startDate)
-          : null;
-        const endDate = filters.dateRange.endDate
-          ? new Date(filters.dateRange.endDate)
-          : null;
-
+        const startDate = filters.dateRange.startDate ? new Date(filters.dateRange.startDate) : null;
+        const endDate = filters.dateRange.endDate ? new Date(filters.dateRange.endDate) : null;
+        
         if (startDate && endDate) {
           return itemDate >= startDate && itemDate <= endDate;
         } else if (startDate) {
@@ -172,35 +163,31 @@ const SubConEdit = () => {
     }
 
     if (filters.orderNo) {
-      filtered = filtered.filter((item) =>
+      filtered = filtered.filter(item => 
         item.orderNo?.toLowerCase().includes(filters.orderNo.toLowerCase())
       );
     }
 
     if (filters.color) {
-      filtered = filtered.filter((item) => item.color === filters.color);
+      filtered = filtered.filter(item => item.color === filters.color);
     }
 
     if (filters.qcId) {
-      filtered = filtered.filter((item) =>
+      filtered = filtered.filter(item => 
         item.userId?.toLowerCase().includes(filters.qcId.toLowerCase())
       );
     }
 
     if (filters.reportType) {
-      filtered = filtered.filter(
-        (item) => item.reportType === filters.reportType
-      );
+      filtered = filtered.filter(item => item.reportType === filters.reportType);
     }
 
     if (filters.washType) {
-      filtered = filtered.filter((item) => item.washType === filters.washType);
+      filtered = filtered.filter(item => item.washType === filters.washType);
     }
 
     if (filters.before_after_wash) {
-      filtered = filtered.filter(
-        (item) => item.before_after_wash === filters.before_after_wash
-      );
+      filtered = filtered.filter(item => item.before_after_wash === filters.before_after_wash);
     }
 
     setFilteredData(filtered);
@@ -223,9 +210,7 @@ const SubConEdit = () => {
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <div className="text-gray-600 dark:text-gray-300">
-            Loading data...
-          </div>
+          <div className="text-gray-600 dark:text-gray-300">Loading data...</div>
         </div>
       </div>
     );
@@ -235,9 +220,7 @@ const SubConEdit = () => {
     return (
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
         <div className="text-center py-8">
-          <div className="text-red-600 dark:text-red-400 text-lg font-semibold mb-2">
-            ⚠️ Error
-          </div>
+          <div className="text-red-600 dark:text-red-400 text-lg font-semibold mb-2">⚠️ Error</div>
           <div className="text-gray-600 dark:text-gray-300">{error}</div>
         </div>
       </div>
@@ -252,8 +235,7 @@ const SubConEdit = () => {
             Sub-Con QC Washing Data
           </h2>
           <div className="text-sm text-gray-500 dark:text-gray-400">
-            Showing {filteredData.length} of {submittedData.length} records
-            (Non-YM factories, Inline reports only)
+            Showing {filteredData.length} of {submittedData.length} records (Non-YM factories, Inline reports only)
           </div>
         </div>
 
@@ -267,9 +249,7 @@ const SubConEdit = () => {
 
         {filteredData.length === 0 ? (
           <div className="text-center py-8">
-            <div className="text-gray-400 dark:text-gray-500 text-lg mb-2">
-              📋
-            </div>
+            <div className="text-gray-400 dark:text-gray-500 text-lg mb-2">📋</div>
             <div className="text-gray-600 dark:text-gray-300 mb-2">
               No non-YM factory Inline records found.
             </div>
@@ -322,32 +302,27 @@ const SubConEdit = () => {
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredData.map((record, index) => (
-                  <tr
-                    key={record._id || index}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-700"
-                  >
+                  <tr key={record._id || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                      {record.date
-                        ? new Date(record.date).toLocaleDateString()
-                        : "N/A"}
+                      {record.date ? new Date(record.date).toLocaleDateString() : 'N/A'}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
-                      {record.factoryName || "N/A"}
+                      {record.factoryName || 'N/A'}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                       {(record.washType || "N/A").replace(" Wash", "")}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
-                      {record.reportType || "N/A"}
+                      {record.reportType || 'N/A'}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
-                      {record.orderNo || "N/A"}
+                      {record.orderNo || 'N/A'}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                      {record.color || "N/A"}
+                      {record.color || 'N/A'}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                      {record.userId || "N/A"}
+                      {record.userId || 'N/A'}
                     </td>
                     {/* Original Wash Qty - Always shows the original value */}
                     <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
@@ -381,22 +356,20 @@ const SubConEdit = () => {
                       )}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                      {record.checkedQty || "N/A"}
+                      {record.checkedQty || 'N/A'}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                       {(record.before_after_wash || "N/A").replace(" Wash", "")}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          record.overallFinalResult === "Pass"
-                            ? "bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200"
-                            : record.overallFinalResult === "Fail"
-                            ? "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-200"
-                            : "bg-gray-100 text-gray-800 dark:bg-yellow-600 dark:text-gray-200"
-                        }`}
-                      >
-                        {record.overallFinalResult || "N/A"}
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        record.overallFinalResult === 'Pass' 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200' 
+                          : record.overallFinalResult === 'Fail'
+                          ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-200'
+                          : 'bg-gray-100 text-gray-800 dark:bg-yellow-600 dark:text-gray-200'
+                      }`}>
+                        {record.overallFinalResult || 'N/A'}
                       </span>
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">

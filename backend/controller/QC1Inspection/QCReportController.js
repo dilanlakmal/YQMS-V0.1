@@ -2,7 +2,6 @@ import {
   QC1Sunrise,
   QC1SunriseSummary
 } from "../MongoDB/dbConnectionController.js";
-import mongoose from "mongoose";
 
 // Helper function to merge defect arrays
 const mergeDefects = (defects) => {

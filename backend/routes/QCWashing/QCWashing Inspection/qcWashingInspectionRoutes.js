@@ -95,11 +95,7 @@ router.post(
 ------------------------------ */
 
 router.post("/api/qc-washing/find-saved-measurement", savedMeasurementDataSpec);
-router.get(
-  "/api/qc-washing/order-sizes/:orderNo/:color(*)",
-  cleanupColor,
-  getqcwashingOrderSizes
-);
+router.get("/api/qc-washing/order-sizes/:orderNo", getqcwashingOrderSizes);
 router.get("/api/qc-washing/measurement-specs/:orderNo", getmeasurmentSpec);
 
 /* ------------------------------

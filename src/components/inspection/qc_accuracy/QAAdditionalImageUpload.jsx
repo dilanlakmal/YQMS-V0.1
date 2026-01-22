@@ -133,7 +133,8 @@ const QAAdditionalImageUpload = ({ sections, setSections, uploadMetadata }) => {
             {section.imageUrls.map((url, urlIndex) => (
               <div key={url} className="relative group w-full h-24">
                 <img
-                  src={url}
+                  //src={url}
+                  src={`${API_BASE_URL}${url}`}
                   alt={`Additional ${urlIndex}`}
                   className="w-full h-full object-cover rounded-md"
                 />

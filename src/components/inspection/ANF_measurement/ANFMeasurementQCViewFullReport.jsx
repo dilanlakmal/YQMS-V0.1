@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../config";
 import { format } from "date-fns";
@@ -190,10 +190,16 @@ const GarmentDataTable = ({ sizeDetail }) => {
 // --- MAIN PAGE COMPONENT ---
 const ANFMeasurementQCViewFullReport = () => {
   const { pageId } = useParams();
+  const [searchParams] = useSearchParams();
+  const stageValue = searchParams.get("stage") || "M1";
+
   const [report, setReport] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  /* ------------------------------------------------------------------
+     FIX 3: Dynamic API Prefix & Fetch Logic
+  ------------------------------------------------------------------ */
   useEffect(() => {
     const fetchReport = async () => {
       if (!pageId) {
@@ -201,9 +207,17 @@ const ANFMeasurementQCViewFullReport = () => {
         setIsLoading(false);
         return;
       }
+
+      // Determine the correct endpoint base
+      const apiPrefix =
+        stageValue === "M2"
+          ? `${API_BASE_URL}/api/anf-measurement-packing`
+          : `${API_BASE_URL}/api/anf-measurement`;
+
       try {
+        // Use the dynamic prefix
         const res = await axios.get(
-          `${API_BASE_URL}/api/anf-measurement/qc-daily-report/detail/${pageId}`
+          `${apiPrefix}/qc-daily-report/detail/${pageId}`
         );
         setReport(res.data);
       } catch (err) {
@@ -213,7 +227,7 @@ const ANFMeasurementQCViewFullReport = () => {
       }
     };
     fetchReport();
-  }, [pageId]);
+  }, [pageId, stageValue]);
 
   if (isLoading)
     return (

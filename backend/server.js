@@ -5,11 +5,16 @@
 import { app, server, PORT } from "./Config/appConfig.js";
 
 /* -----------------------------
-User Imports
+  User Imports
 ------------------------------ */
 import auth from "./routes/User/authRoutes.js";
 import roleManagement from "./routes/User/roleManagementRoutes.js";
 import user from "./routes/User/userRoutes.js";
+
+/* -----------------------------
+  Notifications
+------------------------------ */
+import normalNotification from "./routes/Notification/normalNotificationRoutes.js";
 
 /* ------------------------------
    SQL Query Import
@@ -60,6 +65,7 @@ Common File Imports
 import aql from "./routes/Common/AQLRoutes.js";
 /*-------------Buyer Spec Imports --------------*/
 import buyerSpec from "./routes/Common/DTOrdersBuyerSpecRoutes.js";
+import buyerSpecPacking from "./routes/Common/DTOrdersBuyerSpecPackingRoutes.js";
 /*-------------DT-Orders Imports --------------*/
 import dtOrders from "./routes/Common/DTOrdersRoutes.js";
 
@@ -162,6 +168,9 @@ import qc_real_wash_qty from "./routes/QC_Real_Wash_Qty/QcRealWashQtyRoute.js";
 import ANF from "./routes/ANF/ANFReportRoutes.js";
 import ANFInspection from "./routes/ANF/ANFInspectionRoutes.js";
 import ANFResult from "./routes/ANF/ANFResultRoutes.js";
+import ANFInspectionPacking from "./routes/ANF/ANFInspectionPackingRoutes.js";
+import ANFReportPacking from "./routes/ANF/ANFReportPackingRoutes.js";
+import ANFResultPacking from "./routes/ANF/ANFResultPackingRoutes.js";
 
 /* ------------------------------
   PivotY - QA Sections
@@ -171,9 +180,43 @@ import QASections_ProductType from "./routes/PivotY/QASections/QASections_Produc
 import QASections_Home from "./routes/PivotY/QASections/QASections_Home_Route.js";
 import QASections_Photos from "./routes/PivotY/QASections/QASections_Photos_Route.js";
 import QASections_Packing from "./routes/PivotY/QASections/QASections_Packing_Route.js";
+import QASections_Buyer from "./routes/PivotY/QASections/QASections_Buyer_Route.js";
 import QASections_DefectList from "./routes/PivotY/QASections/QASections_DefectList_Route.js";
 import QASections_DefectCategory from "./routes/PivotY/QASections/QASections_DefectCategory_Route.js";
 import QASections_ProductLocation from "./routes/PivotY/QASections/QASections_ProductLocation_Route.js";
+import QASections_AQL_Sample_Letters from "./routes/PivotY/QASections/QASections_AQL_Sample_Letter_Route.js";
+import QASections_AQL_Values from "./routes/PivotY/QASections/QASections_AQL_Values_Route.js";
+import QASections_AQL_Config from "./routes/PivotY/QASections/QASections_AQL_Config_Routes.js";
+import QASections_Line from "./routes/PivotY/QASections/QASections_Line_Route.js";
+import QASections_Table from "./routes/PivotY/QASections/QASections_Table_Route.js";
+import QASections_Shipping_Stage from "./routes/PivotY/QASections/QASections_Shipping_Stage_Route.js";
+
+/* ------------------------------
+  PivotY - QA Measurement Specs
+------------------------------ */
+
+import QASections_Measurement_Specs from "./routes/PivotY/QASections/QASections_Measurement_Specs_Route.js";
+
+/* ------------------------------
+  PivotY - QA Templates
+------------------------------ */
+import QASections_Templates from "./routes/PivotY/QATemplates/QATemplatesReport_Route.js";
+
+/* ------------------------------
+PivotY - Fincheck Inspection
+------------------------------ */
+import FincheckInspection from "./routes/PivotY/FincheckInspection/FincheckInspection_Route.js";
+import FincheckInspection_Report from "./routes/PivotY/FincheckInspection/FincheckInspection_Report_Route.js";
+import FincheckInspection_Approval from "./routes/PivotY/FincheckInspection/FincheckInspection_Approval_Route.js";
+import FincheckNotificationGroup from "./routes/PivotY/FincheckInspection/FincheckNotificationGroup_Routes.js";
+
+/* ------------------------------
+ P88 Data Upoad Routes
+------------------------------ */
+import p88Upload from "./routes/PivotY/P88Data/uploadP88DataRoutes.js";
+import p88Summarydata from "./routes/PivotY/P88Data/summaryP88DataRoutes.js";
+import downloadP88Report from "./routes/PivotY/P88Data/downloadP88ReportRoutes.js";
+import p88failedReports from "./routes/PivotY/P88Data/p88failedReportsRoutes.js";
 
 /* -----------------------------
 QA Random Inspection Imports
@@ -207,6 +250,11 @@ import qcWashingReport from "./routes/QCWashing/QCWashing Report/qcWashingReport
 import qcWashingOldQty from "./routes/QCWashing/oldQtyRoutes.js";
 
 /* -----------------------------
+  After Ironing Import
+------------------------------ */
+import afterIroning from "./routes/AfterIroning/AfterIroningInspection/afterIroningInspectionRoutes.js";
+
+/* -----------------------------
 Audit Imports
 ------------------------------ */
 import auditAdmin from "./routes/Audit/AuditAdminRoutes.js";
@@ -224,6 +272,12 @@ import digitalMeasurement from "./routes/DigitalMeasurement/DigitalMeasurmentRou
 import supplierIssuesAdmin from "./routes/SupplierIssue/supplierIssuesAdminRoutes.js";
 import supplierIssueReport from "./routes/SupplierIssue/supplierIssueReportRoutes.js";
 import supplierIssueInspection from "./routes/SupplierIssue/supplierIssueInspectionRoutes.js";
+
+/* ------------------------------
+  Humidity Inspection Report
+------------------------------ */
+
+import FiberNameRoute from "./routes/YorksysOrders/FIberNameRoute.js";
 
 /* ------------------------------
   Yorksys Orders
@@ -258,11 +312,35 @@ app.use("/api/ai/production/instruction", translationRoutes);
 
 
 /* -----------------------------
+  YDT Imports
+------------------------------ */
+/* -----------Cover Page-----------------*/
+import CoverPage from "./routes/YDT/CoverPage/CoverPageRoutes.js";
+/* -----------Sketch Technical-----------------*/
+import sketchTechnical from "./routes/YDT/CoverPage/sketchTechnicalRoutes.js";
+
+/* -----------------------------
+  CE System
+------------------------------ */
+import ceMasterRoutes from "./modules/CESystem/Routes/CEMasterRoutes.js";
+import ceTargetMasterRoutes from "./modules/CESystem/Routes/CETargetMasterRoutes.js";
+
+/* -----------------------------
+ Humidity
+------------------------------ */
+import huminityRoutes from "./routes/huminity/huminityRoutes.js";
+
+/* -----------------------------
   User Routes
 ------------------------------ */
 app.use(auth);
 app.use(roleManagement);
 app.use(user);
+
+/* -----------------------------
+  Notifications Routes
+------------------------------ */
+app.use(normalNotification);
 
 /* ------------------------------
   SQL Query routes start
@@ -276,6 +354,7 @@ Commin file  Routes
 app.use(aql);
 /* -----------Buyer Specs -----------------*/
 app.use(buyerSpec);
+app.use(buyerSpecPacking);
 /* ----------- DT_Orders -----------------*/
 app.use(dtOrders);
 
@@ -416,6 +495,9 @@ app.use(qc_real_wash_qty);
 app.use(ANF);
 app.use(ANFInspection);
 app.use(ANFResult);
+app.use(ANFInspectionPacking);
+app.use(ANFReportPacking);
+app.use(ANFResultPacking);
 
 /* ------------------------------
   PivotY - QA Sections routes
@@ -425,9 +507,42 @@ app.use(QASections_ProductType);
 app.use(QASections_Home);
 app.use(QASections_Photos);
 app.use(QASections_Packing);
+app.use(QASections_Buyer);
 app.use(QASections_DefectList);
 app.use(QASections_DefectCategory);
 app.use(QASections_ProductLocation);
+app.use(QASections_AQL_Sample_Letters);
+app.use(QASections_AQL_Values);
+app.use(QASections_AQL_Config);
+app.use(QASections_Line);
+app.use(QASections_Table);
+app.use(QASections_Shipping_Stage);
+
+/* ------------------------------
+  PivotY - QA Measurements routes
+------------------------------ */
+app.use(QASections_Measurement_Specs);
+
+/* ------------------------------
+  PivotY - QA Templates routes
+------------------------------ */
+app.use(QASections_Templates);
+
+/* ------------------------------
+PivotY - Fincheck Inspection routes
+------------------------------ */
+app.use(FincheckInspection);
+app.use(FincheckInspection_Report);
+app.use(FincheckInspection_Approval);
+app.use(FincheckNotificationGroup);
+
+/* ------------------------------
+ P88 Data Upoad Routes
+------------------------------ */
+app.use(p88Upload);
+app.use(p88Summarydata);
+app.use(downloadP88Report);
+app.use(p88failedReports);
 
 /* -----------------------------
   QA Random Inspection Routes
@@ -461,6 +576,11 @@ app.use(qcWashingReport);
 app.use(qcWashingOldQty);
 
 /* -----------------------------
+After Ironing Routes
+------------------------------ */
+app.use(afterIroning);
+
+/* -----------------------------
 Audit Routes
 ------------------------------ */
 app.use(auditAdmin);
@@ -480,6 +600,11 @@ app.use(supplierIssueInspection);
 app.use(supplierIssueReport);
 
 /* ------------------------------
+  Humidity Inspection Report Routes
+------------------------------ */
+app.use(FiberNameRoute);
+
+/* ------------------------------
   Yorksys Orders routes
 ------------------------------ */
 
@@ -495,11 +620,33 @@ app.use(PackingList);
 ------------------------------ */
 app.use(QCOutputRoute);
 
+
 /* -----------------------------
   Chatbot Output Routes
 ------------------------------ */
 app.use("/api/ai/conversation", conversationRoutes);
 app.use("/api/ai/chat", chatRoutes);
+
+/* ------------------------------
+  CE System Routes
+------------------------------ */
+app.use(ceMasterRoutes);
+app.use(ceTargetMasterRoutes);
+
+/* -----------------------------
+  YDT Imports
+------------------------------ */
+/* -----------Cover Page-----------------*/
+app.use(CoverPage);
+/* -----------Sketch Technical-----------------*/
+app.use(sketchTechnical);
+
+/* -----------------------------
+ Humidity Imports
+------------------------------ */
+app.use(huminityRoutes);
+
+
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");

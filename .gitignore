@@ -1,4 +1,5 @@
 # Environment variables
+.env
 
 # Logs
 logs
@@ -34,6 +35,10 @@ dist-ssr
 /backend/chrome/
 /backend/uploads/
 /downloads/
+
+# Fincheck image upload folders in frontend
+/backend/storage/PivotY/Fincheck
+
 # --- USER UPLOADED CONTENT ---
 # Ignore all content within the public storage directory.
 # handles all image upload folders in frontend

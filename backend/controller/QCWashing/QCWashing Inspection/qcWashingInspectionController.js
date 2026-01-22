@@ -307,6 +307,7 @@ export const saveQCWashingInspectionData = async (req, res) => {
     );
     const timeCoolEnabled = JSON.parse(req.body.timeCoolEnabled || "false");
     const timeHotEnabled = JSON.parse(req.body.timeHotEnabled || "false");
+    const referenceSampleApproveDate = req.body.referenceSampleApproveDate;
 
     if (!recordId) {
       return res
@@ -450,7 +451,18 @@ export const saveQCWashingInspectionData = async (req, res) => {
       })),
       // Add machine settings
       timeCoolEnabled,
-      timeHotEnabled
+      timeHotEnabled,
+      referenceSampleApproveDate: referenceSampleApproveDate
+        ? (() => {
+            const date = new Date(referenceSampleApproveDate);
+            date.setHours(0, 0, 0, 0); // Set time to 00:00:00.000
+            return date;
+          })()
+        : (() => {
+            const now = new Date();
+            now.setHours(0, 0, 0, 0); // Set time to 00:00:00.000
+            return now;
+          })()
     };
 
     record.savedAt = new Date();
@@ -522,6 +534,7 @@ export const updateQCWashingInspectionData = async (req, res) => {
     );
     const timeCoolEnabled = JSON.parse(req.body.timeCoolEnabled || "false");
     const timeHotEnabled = JSON.parse(req.body.timeHotEnabled || "false");
+    const referenceSampleApproveDate = req.body.referenceSampleApproveDate;
 
     if (!recordId) {
       return res
@@ -651,7 +664,18 @@ export const updateQCWashingInspectionData = async (req, res) => {
       })),
       // Update machine settings
       timeCoolEnabled,
-      timeHotEnabled
+      timeHotEnabled,
+      referenceSampleApproveDate: referenceSampleApproveDate
+        ? (() => {
+            const date = new Date(referenceSampleApproveDate);
+            date.setHours(0, 0, 0, 0); // Set time to 00:00:00.000
+            return date;
+          })()
+        : (() => {
+            const now = new Date();
+            now.setHours(0, 0, 0, 0); // Set time to 00:00:00.000
+            return now;
+          })()
     };
 
     record.savedAt = new Date();
@@ -986,66 +1010,88 @@ export const savedMeasurementDataSpec = async (req, res) => {
   }
 };
 
-// Get sizes for a specific order and color
+// Get sizes for a specific order
 export const getqcwashingOrderSizes = async (req, res) => {
-  const { orderNo, color } = req.params;
-
-  // Sanitizer function for color - handles special characters for Ubuntu compatibility
-  const sanitizeColor = (colorInput) => {
-    if (!colorInput || typeof colorInput !== "string") {
-      return "";
-    }
-
-    // For Ubuntu servers, we need to preserve special characters but normalize them
-    return colorInput
-      .trim() // Remove leading/trailing whitespace
-      .replace(/\s+/g, " ") // Replace multiple spaces with single space
-      .replace(/\/+/g, "/") // Replace multiple slashes with single slash
-      .replace(/\\+/g, "\\"); // Replace multiple backslashes with single backslash
-  };
-
-  // Apply sanitizer to color
-  const sanitizedColor = sanitizeColor(color);
-
-  // Validate sanitized color
-  if (!sanitizedColor) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Invalid color parameter provided." });
-  }
-
+  const { orderNo } = req.params;
   const collection = ymProdConnection.db.collection("dt_orders");
 
   try {
     const orders = await collection.find({ Order_No: orderNo }).toArray();
 
     if (!orders || orders.length === 0) {
-      return res
-        .status(404)
-        .json({ success: false, message: `Order '${orderNo}' not found.` });
+      // Try alternative search patterns
+      const alternativeOrders = await collection
+        .find({
+          $or: [
+            { Order_No: orderNo },
+            { Style: orderNo },
+            { order_no: orderNo },
+            { orderNo: orderNo }
+          ]
+        })
+        .toArray();
+
+      if (alternativeOrders.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: `Order '${orderNo}' not found.`,
+          debug: { searchedFor: orderNo }
+        });
+      }
+
+      // Use alternative results
+      orders.push(...alternativeOrders);
     }
 
     const sizes = new Set();
 
     orders.forEach((order) => {
-      if (order.OrderColors && Array.isArray(order.OrderColors)) {
-        const matchingColor = order.OrderColors.find((c) => {
-          const orderColor = sanitizeColor(c.Color);
-          // Case-insensitive comparison for better matching
-          return orderColor.toLowerCase() === sanitizedColor.toLowerCase();
+      // Try multiple possible structures
+
+      // Structure 1: Direct OrderQty array
+      if (order.OrderQty && Array.isArray(order.OrderQty)) {
+        order.OrderQty.forEach((entry) => {
+          const sizeName = Object.keys(entry)[0];
+          const quantity = entry[sizeName];
+
+          if (quantity > 0) {
+            const cleanSize = sizeName.split(";")[0].trim();
+            sizes.add(cleanSize);
+          }
         });
+      }
 
-        if (matchingColor && matchingColor.OrderQty) {
-          matchingColor.OrderQty.forEach((entry) => {
-            const sizeName = Object.keys(entry)[0];
-            const quantity = entry[sizeName];
+      // Structure 2: OrderColors with nested OrderQty
+      if (order.OrderColors && Array.isArray(order.OrderColors)) {
+        order.OrderColors.forEach((colorEntry) => {
+          if (colorEntry.OrderQty && Array.isArray(colorEntry.OrderQty)) {
+            colorEntry.OrderQty.forEach((entry) => {
+              const sizeName = Object.keys(entry)[0];
+              const quantity = entry[sizeName];
 
-            if (quantity > 0) {
-              const cleanSize = sizeName.split(";")[0].trim();
-              sizes.add(cleanSize);
-            }
-          });
-        }
+              if (quantity > 0) {
+                const cleanSize = sizeName.split(";")[0].trim();
+                sizes.add(cleanSize);
+              }
+            });
+          }
+        });
+      }
+
+      // Structure 3: Other possible size fields
+      if (order.Sizes && Array.isArray(order.Sizes)) {
+        order.Sizes.forEach((size) => {
+          sizes.add(size);
+        });
+      }
+
+      // Structure 4: SizeQty object
+      if (order.SizeQty && typeof order.SizeQty === "object") {
+        Object.keys(order.SizeQty).forEach((size) => {
+          if (order.SizeQty[size] > 0) {
+            sizes.add(size);
+          }
+        });
       }
     });
 
@@ -1053,14 +1099,24 @@ export const getqcwashingOrderSizes = async (req, res) => {
     return res.status(200).json({
       success: true,
       orderNo,
-      color: sanitizedColor,
-      sizes: Array.from(sizes)
+      sizes: Array.from(sizes),
+      debug: {
+        ordersFound: orders.length,
+        sizesFound: sizes.size,
+        orderStructures: orders.map((o) => ({
+          Order_No: o.Order_No,
+          hasOrderQty: !!o.OrderQty,
+          hasOrderColors: !!o.OrderColors,
+          hasSizes: !!o.Sizes,
+          hasSizeQty: !!o.SizeQty
+        }))
+      }
     });
   } catch (error) {
-    console.error("Error fetching order sizes:", error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error while fetching order sizes."
+      message: "Internal server error while fetching order sizes.",
+      error: error.message
     });
   }
 };
@@ -1340,23 +1396,18 @@ export const saveqwashingSummary = async (req, res) => {
         (totalDefectCount === 0 ? "Pass" : "Fail");
     }
 
-    // 6. Calculate FRESH overall result
+    // 6. Calculate FRESH overall result using SIMPLIFIED LOGIC
+    // SIMPLIFIED LOGIC: Only consider defectDetails.result and pass rate >= 95%
     let newOverallFinalResult;
-    const isSOP = qcRecord.reportType === "SOP";
 
-    // For SOP, both measurement and defects must pass.
-    const isMeasurementPass = passRate >= 95;
-    const isDefectPass = totalDefectCount === 0;
+    // Get defect result from defectDetails.result (not calculated)
+    const savedDefectResult = qcRecord.defectDetails?.result || "Pass";
 
-    if (isSOP) {
-      newOverallFinalResult =
-        isMeasurementPass && isDefectPass ? "Pass" : "Fail";
+    // Overall result: Pass only if defect result is Pass AND pass rate >= 95%
+    if (savedDefectResult === "Pass" && passRate >= 95.0) {
+      newOverallFinalResult = "Pass";
     } else {
-      // For other report types, use the individual results
-      newOverallFinalResult =
-        measurementResult === "Pass" && defectResult === "Pass"
-          ? "Pass"
-          : "Fail";
+      newOverallFinalResult = "Fail";
     }
 
     // 7. Update ALL calculated fields with fresh values
@@ -1412,10 +1463,10 @@ export const saveqwashingSummary = async (req, res) => {
           } = ${defectResult}`
         },
         overallCalculation: {
-          measurementResult: measurementResult,
-          defectResult: defectResult,
+          savedDefectResult: savedDefectResult,
+          passRate: passRate,
           overallResult: newOverallFinalResult,
-          logic: `(${measurementResult} AND ${defectResult}) = ${newOverallFinalResult}`
+          logic: `Simplified Logic: (defectDetails.result='${savedDefectResult}' AND passRate=${passRate}% >= 95%) = ${newOverallFinalResult}`
         }
       },
       calculatedValues: {
@@ -1426,8 +1477,7 @@ export const saveqwashingSummary = async (req, res) => {
         totalMeasurementPass,
         totalMeasurementFail,
         passRate,
-        measurementResult,
-        defectResult,
+        savedDefectResult,
         overallFinalResult: newOverallFinalResult
       }
     });
@@ -1523,14 +1573,12 @@ export const getqcwashingOverAllSummary = async (req, res) => {
         ? Math.round((totalMeasurementPass / totalMeasurementPoints) * 100)
         : 100;
 
-    // Use 95% threshold for measurement result
-    const measurementResult =
-      totalMeasurementPoints === 0 ? "Pass" : passRate >= 95 ? "Pass" : "Fail";
+    // SIMPLIFIED LOGIC: Only consider defectDetails.result and pass rate >= 95%
+    const savedDefectResult = qcRecord.defectDetails?.result || "Pass";
 
-    const defectResult = qcRecord.defectDetails?.result || "Pass";
-
+    // Overall result: Pass only if defect result is Pass AND pass rate >= 95%
     const calculatedOverallResult =
-      measurementResult === "Pass" && defectResult === "Pass" ? "Pass" : "Fail";
+      savedDefectResult === "Pass" && passRate >= 95.0 ? "Pass" : "Fail";
 
     res.json({
       success: true,
@@ -1554,11 +1602,11 @@ export const getqcwashingOverAllSummary = async (req, res) => {
           totalPoints: totalMeasurementPoints,
           totalPass: totalMeasurementPass,
           totalFail: totalMeasurementFail,
-          measurementResult: measurementResult,
+          passRate: passRate,
           passRateThreshold: 95
         },
         defectStats: {
-          defectResult: defectResult
+          savedDefectResult: savedDefectResult
         },
 
         // Include the measurement details for frontend calculation

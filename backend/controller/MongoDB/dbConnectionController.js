@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 
 //Schemas
+import createDTOrdersSchema from "../../models/dt_orders.js";
+
 import creatQCRealWashQty from "../../models/QCRealWashingQty.js";
 import createIroningModel from "../../models/Ironing.js";
 import createRoleManagmentModel from "../../models/RoleManagment.js";
@@ -62,8 +64,11 @@ import createQAStandardDefectsModel from "../../models/QAStandardDefectsModel.js
 import createAuditCheckPointModel from "../../models/AuditCheckPoint.js";
 
 import createBuyerSpecTemplateModel from "../../models/BuyerSpecTemplate.js";
+import createBuyerSpecTemplateM2Model from "../../models/BuyerSpecTemplateM2.js";
 import createANFMeasurementReportModel from "../../models/ANFMeasurementReport.js";
 import createSizeCompletionStatusModel from "../../models/SizeCompletionStatus.model.js";
+import createANFMeasurementReportPackingModel from "../../models/ANFMeasurementReportPacking.js";
+import createSizeCompletionStatusPackingModel from "../../models/SizeCompletionStatusPacking.js";
 
 import createQCWashingDefectsModel from "../../models/QCWashingDefectsModel.js";
 import createQCWashingCheckpointsModel from "../../models/QCWashingCheckpointsModel.js";
@@ -82,7 +87,8 @@ import createQCWashingMachineStandard from "../../models/qcWashingStanderd.js";
 import createQC2OlderDefectModel from "../../models/QC2_Older_Defects.js";
 import createQCWashingQtyOldSchema from "../../models/QCWashingQtyOld.js";
 import createQCWorkersModel from "../../models/QCWorkers.js";
-import createDTOrdersSchema from "../../models/dt_orders.js";
+import createAfterIroningModel from "../../models/AfterIroning/AfterIroning.js";
+
 import CuttingInlineOrdersModel from "../../models/CuttingInlineOrders.js";
 import createPlanPackingListModel from "../../models/PlanPackingList.js";
 
@@ -92,42 +98,73 @@ import createQASectionsProductType from "../../models/QA/QASectionsProductType.j
 import createQASectionsHomeModel from "../../models/QA/QASectionsHome.js";
 import createQASectionsPhotosModel from "../../models/QA/QASectionsPhotos.js";
 import createQASectionsPackingModel from "../../models/QA/QASectionsPacking.js";
+import createQASectionsBuyerModel from "../../models/QA/QASectionsBuyer.js";
 import createQASectionsDefectListModel from "../../models/QA/QASectionsDefectList.js";
 import createQASectionsDefectCategoryModel from "../../models/QA/QASectionsDefectCategory.js";
 import createQASectionsProductLocationModel from "../../models/QA/QASectionsProductLocation.js";
+import createQASectionsAqlSampleLettersModel from "../../models/QA/QASectionsAqlSampleLetters.js";
+import createQASectionsAqlValuesModel from "../../models/QA/QASectionsAqlValues.js";
+import createQASectionsAqlBuyerConfigModel from "../../models/QA/QASectionsAqlBuyerConfig.js";
+import createQASectionsLineModel from "../../models/QA/QASectionsLine.js";
+import createQASectionsTableModel from "../../models/QA/QASectionsTable.js";
+import createQASectionsShippingStageModel from "../../models/QA/QASectionsShippingStage.js";
+
+import createQASectionsMeasurementSpecsModel from "../../models/QA/QASectionsMeasurementSpecs.js";
+
+import createQASectionsTemplatesModel from "../../models/QA/QASectionsTemplates.js";
+
+import createFincheckUserPreferencesModel from "../../models/QA/FincheckUserPreferences.js";
+import createFincheckInspectionReportsModel from "../../models/QA/FincheckInspectionReports.js";
+import createFincheckApprovalAssigneeModel from "../../models/QA/FincheckApprovalAssignee.js";
+import createFincheckNotificationGroupModel from "../../models/QA/FincheckNotificationGroupSchema.js";
+import createFincheckInspectionDecisionModel from "../../models/QA/fincheck_inspection_decision.js";
+import createFincheckPushSubscriptionModel from "../../models/QA/FincheckPushSubscription.js";
+
+//P88Data
+import createP88DataSchema from "../../models/P88/p88LegacyData.js";
+import p88failedReportsModel from "../../models/P88/p88failedReports.js";
+
+import normalNotificationSchema from "../../models/NormalNotification.js";
+
+import createHumidityFiberNameModel from "../../models/HumidityFiberName.js";
+
+//YDT Models
+/*------------- Cover page ----------------*/
+import createCoverPageSchema from "../../models/YDT/coverPage.js";
+
+//Humidity Models
+import createHumidityModel from "../../models/huminity/HumidityReport.js";
 
 import createConversationModel from "../../models/chatbot/conversation.model.js";
 import createPTExtractionModel from "../../models/production/instruction/extraction/page.extractions.model.js";
 import createProductionModel from "../../models/production/production.model.js";
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
-  // "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
-  process.env.MONGO_URI_PRODUCTION ?? "mongodb://yaidev:Yai%40Dev2025@192.167.4.7:28425/ym_prod?authSource=admin&retryWrites=true&w=majority"
-  //"mongodb://localhost:27017/ym_prod"
+  process.env.MongoDB_URI_ym_prod
 );
 
 export const ymEcoConnection = mongoose.createConnection(
-  // "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin"
-  process.env.MONGO_URI_ECO ?? "mongodb://yaidev:Yai%40Dev2025@192.167.4.7:28425/ym_prod?authSource=admin&retryWrites=true&w=majority"
-  //"mongodb://localhost:27017/ym_prod"
+  process.env.MongoDB_URI_ym_eco_board
 );
 
 //Connection status
 ymProdConnection.on("connected", () =>
-  console.log("✅ Connected to ym_prod database in 192.167.1.10:29000...")
+  console.log("✅ Connected to ym_prod database...")
 );
 ymProdConnection.on("error", (err) =>
   console.error("❌ unexpected error:", err)
 );
 
 ymEcoConnection.on("connected", () =>
-  console.log("✅ Connected to ym_eco_board database in 192.167.1.10:29000...")
+  console.log("✅ Connected to ym_eco_board database...")
 );
 ymEcoConnection.on("error", (err) =>
   console.error("❌ unexpected error:", err)
 );
 
 //Collections
+export const DtOrder = createDTOrdersSchema(ymProdConnection);
+
 export const QCRealWashQty = creatQCRealWashQty(ymProdConnection);
 export const UserMain = createUserModel(ymEcoConnection);
 export const UserProd = createUserModel(ymProdConnection);
@@ -181,27 +218,40 @@ export const ElasticReport = createElasticReportModel(ymProdConnection);
 export const EMBDefect = createEMBDefectModel(ymProdConnection);
 export const PrintingDefect = createPrintingDefectModel(ymProdConnection);
 export const EMBReport = createEMBReportModel(ymProdConnection);
+
 export const QADefectsModel = createQADefectsModel(ymProdConnection);
 export const QCAccuracyReportModel =
   createQCAccuracyReportModel(ymProdConnection);
 export const QAStandardDefectsModel =
   createQAStandardDefectsModel(ymProdConnection);
+
 export const SCCHTOperator = createSCCHTOperatorModel(ymProdConnection);
 export const SCCFUOperator = createSCCFUOperatorModel(ymProdConnection);
 export const SCCElasticOperator =
   createSCCElasticOperatorModel(ymProdConnection);
+
 export const AuditCheckPoint = createAuditCheckPointModel(ymProdConnection);
+
 export const BuyerSpecTemplate = createBuyerSpecTemplateModel(ymProdConnection);
+export const BuyerSpecTemplateM2 =
+  createBuyerSpecTemplateM2Model(ymProdConnection);
 export const ANFMeasurementReport =
   createANFMeasurementReportModel(ymProdConnection);
 export const SizeCompletionStatus =
   createSizeCompletionStatusModel(ymProdConnection);
+export const ANFMeasurementReportPacking =
+  createANFMeasurementReportPackingModel(ymProdConnection);
+export const SizeCompletionStatusPacking =
+  createSizeCompletionStatusPackingModel(ymProdConnection);
+
 export const QCWashingDefects = createQCWashingDefectsModel(ymProdConnection);
 export const QCWashingCheckList =
   createQCWashingCheckpointsModel(ymProdConnection);
 export const QCWashingFirstOutput =
   createQCWashingFirstOutputModel(ymProdConnection);
 export const QCWashing = createQCWashingModel(ymProdConnection);
+export const AfterIroning = createAfterIroningModel(ymProdConnection);
+
 export const SupplierIssuesDefect =
   createSupplierIssuesDefectModel(ymProdConnection);
 export const SupplierIssueReport =
@@ -213,12 +263,13 @@ export const QCWashingMachineStandard =
 export const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
 export const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
 export const QCWorkers = createQCWorkersModel(ymProdConnection);
-export const DtOrder = createDTOrdersSchema(ymProdConnection);
+
 export const SubConDefect = createSubConDefectsModel(ymProdConnection);
 export const SubconSewingFactory =
   createSubconSewingFactoryModel(ymProdConnection);
 export const SubconSewingQc1Report =
   createSubconSewingQc1ReportModel(ymProdConnection);
+
 export const CuttingInlineOrders = CuttingInlineOrdersModel(ymProdConnection);
 export const PlanPackingList = createPlanPackingListModel(ymProdConnection);
 export const YorksysOrders = createYorksysOrdersModel(ymProdConnection);
@@ -228,12 +279,57 @@ export const QASectionsProductType =
 export const QASectionsHome = createQASectionsHomeModel(ymProdConnection);
 export const QASectionsPhotos = createQASectionsPhotosModel(ymProdConnection);
 export const QASectionsPacking = createQASectionsPackingModel(ymProdConnection);
+export const QASectionsBuyer = createQASectionsBuyerModel(ymProdConnection);
 export const QASectionsDefectCategory =
   createQASectionsDefectCategoryModel(ymProdConnection);
 export const QASectionsDefectList =
   createQASectionsDefectListModel(ymProdConnection);
 export const QASectionsProductLocation =
   createQASectionsProductLocationModel(ymProdConnection);
+export const QASectionsAqlSampleLetters =
+  createQASectionsAqlSampleLettersModel(ymProdConnection);
+export const QASectionsAqlValues =
+  createQASectionsAqlValuesModel(ymProdConnection);
+export const QASectionsAqlBuyerConfig =
+  createQASectionsAqlBuyerConfigModel(ymProdConnection);
+export const QASectionsLine = createQASectionsLineModel(ymProdConnection);
+export const QASectionsTable = createQASectionsTableModel(ymProdConnection);
+export const QASectionsShippingStage =
+  createQASectionsShippingStageModel(ymProdConnection);
+
+export const QASectionsMeasurementSpecs =
+  createQASectionsMeasurementSpecsModel(ymProdConnection);
+
+export const QASectionsTemplates =
+  createQASectionsTemplatesModel(ymProdConnection);
+
+export const FincheckUserPreferences =
+  createFincheckUserPreferencesModel(ymProdConnection);
+export const FincheckInspectionReports =
+  createFincheckInspectionReportsModel(ymProdConnection);
+export const FincheckApprovalAssignees =
+  createFincheckApprovalAssigneeModel(ymProdConnection);
+export const FincheckNotificationGroup =
+  createFincheckNotificationGroupModel(ymProdConnection);
+
+export const FincheckInspectionDecision =
+  createFincheckInspectionDecisionModel(ymProdConnection);
+export const FincheckPushSubscription =
+  createFincheckPushSubscriptionModel(ymProdConnection);
+
+export const p88LegacyData = createP88DataSchema(ymProdConnection);
+export const p88FailedReport = p88failedReportsModel(ymProdConnection);
+
+export const NormalNotification = normalNotificationSchema(ymProdConnection);
+
+export const HumidityFiberName = createHumidityFiberNameModel(ymProdConnection);
+
+//YDT Exported Models
+/*------------- Cover page ----------------*/
+export const CoverPage = createCoverPageSchema(ymProdConnection);
+
+//Humidity Exported Models
+export const HumidityReport = createHumidityModel(ymProdConnection);
 
 
 export const Conversation = createConversationModel(ymEcoConnection);

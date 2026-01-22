@@ -22,6 +22,13 @@ const YPivotQASectionsPhotos = () => {
     { no: 1, itemName: "", maxCount: 10 }
   ]);
 
+  // Add new item to existing section states
+  const [addingItemToSectionId, setAddingItemToSectionId] = useState(null);
+  const [newItemForSection, setNewItemForSection] = useState({
+    itemName: "",
+    maxCount: 10
+  });
+
   // Fetch all sections on mount
   useEffect(() => {
     fetchSections();
@@ -311,6 +318,51 @@ const YPivotQASectionsPhotos = () => {
     }
   };
 
+  // === ADD ITEM TO EXISTING SECTION ===
+  const handleShowAddItemToSection = (sectionId) => {
+    setAddingItemToSectionId(sectionId);
+    setNewItemForSection({ itemName: "", maxCount: 10 });
+  };
+
+  const handleCancelAddItemToSection = () => {
+    setAddingItemToSectionId(null);
+    setNewItemForSection({ itemName: "", maxCount: 10 });
+  };
+
+  const handleSaveItemToSection = async (sectionId) => {
+    if (!newItemForSection.itemName.trim()) {
+      Swal.fire("Validation Error", "Item name cannot be empty", "warning");
+      return;
+    }
+
+    if (newItemForSection.maxCount < 1) {
+      Swal.fire("Validation Error", "Max count must be at least 1", "warning");
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/qa-sections-photos/${sectionId}/items`,
+        newItemForSection
+      );
+
+      if (response.data.success) {
+        Swal.fire({
+          icon: "success",
+          title: "Added!",
+          text: "Item added successfully",
+          timer: 1500,
+          showConfirmButton: false
+        });
+        fetchSections();
+        handleCancelAddItemToSection();
+      }
+    } catch (error) {
+      console.error("Error adding item:", error);
+      Swal.fire("Error", "Failed to add item", "error");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
@@ -432,7 +484,7 @@ const YPivotQASectionsPhotos = () => {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 dark:from-indigo-700 dark:to-blue-700">
           <h2 className="text-xl font-bold text-white">
-            Manage Photos Section and Item List
+            Manage Photo Sections and Item List
           </h2>
         </div>
 
@@ -452,9 +504,6 @@ const YPivotQASectionsPhotos = () => {
                 <th className="px-6 py-4 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-32">
                   Item Actions
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-32">
-                  Section Actions
-                </th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -468,7 +517,10 @@ const YPivotQASectionsPhotos = () => {
                       {/* Section Name - only show on first row */}
                       {index === 0 && (
                         <td
-                          rowSpan={section.itemList.length}
+                          rowSpan={
+                            section.itemList.length +
+                            (addingItemToSectionId === section._id ? 1 : 0)
+                          }
                           className="px-6 py-4 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50"
                         >
                           {editingSectionId === section._id ? (
@@ -499,17 +551,43 @@ const YPivotQASectionsPhotos = () => {
                               </div>
                             </div>
                           ) : (
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                               <p className="font-bold text-gray-900 dark:text-gray-100">
                                 {section.sectionName}
                               </p>
-                              <button
-                                onClick={() => handleEditSectionName(section)}
-                                className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                              >
-                                <Edit2 size={12} />
-                                Edit
-                              </button>
+                              <div className="flex flex-col gap-2">
+                                <button
+                                  onClick={() => handleEditSectionName(section)}
+                                  className="flex items-center justify-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded"
+                                >
+                                  <Edit2 size={12} />
+                                  Edit Name
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleShowAddItemToSection(section._id)
+                                  }
+                                  disabled={
+                                    addingItemToSectionId === section._id
+                                  }
+                                  className="flex items-center justify-center gap-1 text-xs text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded disabled:opacity-50"
+                                >
+                                  <Plus size={12} />
+                                  Add Item
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleDeleteSection(
+                                      section._id,
+                                      section.sectionName
+                                    )
+                                  }
+                                  className="flex items-center justify-center gap-1 text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded"
+                                >
+                                  <Trash2 size={12} />
+                                  Delete Section
+                                </button>
+                              </div>
                             </div>
                           )}
                         </td>
@@ -608,29 +686,60 @@ const YPivotQASectionsPhotos = () => {
                           )}
                         </div>
                       </td>
-
-                      {/* Section Actions - only show on first row */}
-                      {index === 0 && (
-                        <td
-                          rowSpan={section.itemList.length}
-                          className="px-6 py-4 text-center border-l border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50"
-                        >
-                          <button
-                            onClick={() =>
-                              handleDeleteSection(
-                                section._id,
-                                section.sectionName
-                              )
-                            }
-                            className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-md transition-all"
-                            title="Delete entire section"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </td>
-                      )}
                     </tr>
                   ))}
+
+                  {/* Add Item Row - shows when adding item to this section */}
+                  {addingItemToSectionId === section._id && (
+                    <tr className="bg-green-50 dark:bg-green-900/20">
+                      <td className="px-6 py-4">
+                        <input
+                          type="text"
+                          value={newItemForSection.itemName}
+                          onChange={(e) =>
+                            setNewItemForSection({
+                              ...newItemForSection,
+                              itemName: e.target.value
+                            })
+                          }
+                          placeholder="New item name..."
+                          className="w-full p-2 border-2 border-green-300 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 text-sm focus:ring-2 focus:ring-green-500"
+                        />
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <input
+                          type="number"
+                          value={newItemForSection.maxCount}
+                          onChange={(e) =>
+                            setNewItemForSection({
+                              ...newItemForSection,
+                              maxCount: parseInt(e.target.value) || 1
+                            })
+                          }
+                          min="1"
+                          className="w-20 p-2 border-2 border-green-300 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 text-sm text-center focus:ring-2 focus:ring-green-500"
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleSaveItemToSection(section._id)}
+                            className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-md transition-all"
+                            title="Save new item"
+                          >
+                            <Save size={16} />
+                          </button>
+                          <button
+                            onClick={handleCancelAddItemToSection}
+                            className="p-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 shadow-md transition-all"
+                            title="Cancel"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </React.Fragment>
               ))}
             </tbody>

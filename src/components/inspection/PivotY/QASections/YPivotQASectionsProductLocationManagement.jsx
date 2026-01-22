@@ -5,12 +5,14 @@ import {
   X,
   Plus,
   Trash2,
-  Eye,
   MapPin,
   Image as ImageIcon,
   AlertCircle,
   Loader2,
-  ArrowLeft
+  Edit,
+  Check,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import axios from "axios";
 import Swal from "sweetalert2";
@@ -30,11 +32,15 @@ const YPivotQASectionsProductLocationManagement = () => {
   const [isMarkingBack, setIsMarkingBack] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savedConfigurations, setSavedConfigurations] = useState([]);
-  const [viewMode, setViewMode] = useState("create"); // 'create' or 'list'
-  const [selectedConfig, setSelectedConfig] = useState(null);
   const [hoveredLocation, setHoveredLocation] = useState(null);
+  const [editingConfigId, setEditingConfigId] = useState(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [expandedCardId, setExpandedCardId] = useState(null);
 
-  const [loadingProductTypes, setLoadingProductTypes] = useState(true);
+  // State for advanced editing
+  const [editingLocationId, setEditingLocationId] = useState(null);
+  const [editingLocationName, setEditingLocationName] = useState("");
+  const [draggingLocation, setDraggingLocation] = useState(null);
 
   const frontImageRef = useRef(null);
   const backImageRef = useRef(null);
@@ -81,7 +87,6 @@ const YPivotQASectionsProductLocationManagement = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       Swal.fire({
         icon: "error",
@@ -91,7 +96,6 @@ const YPivotQASectionsProductLocationManagement = () => {
       return;
     }
 
-    // Validate file size (10MB max)
     if (file.size > 10 * 1024 * 1024) {
       Swal.fire({
         icon: "error",
@@ -121,7 +125,10 @@ const YPivotQASectionsProductLocationManagement = () => {
     const isMarking = view === "front" ? isMarkingFront : isMarkingBack;
     if (!isMarking) return;
 
+    // Use currentTarget (the image itself) for accurate coordinates
     const rect = e.currentTarget.getBoundingClientRect();
+
+    // Calculate percentage based on the IMAGE dimensions, not the container
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
 
@@ -145,7 +152,8 @@ const YPivotQASectionsProductLocationManagement = () => {
           LocationNo: locations.length + 1,
           LocationName: result.value,
           x: x,
-          y: y
+          y: y,
+          tempId: Date.now()
         };
 
         if (view === "front") {
@@ -165,26 +173,25 @@ const YPivotQASectionsProductLocationManagement = () => {
     });
   };
 
-  // Remove location
-  const removeLocation = (locationNo, view) => {
+  const removeLocation = (location, view) => {
     Swal.fire({
       title: "Remove Location?",
-      text: "Are you sure you want to remove this location?",
+      text: `Are you sure you want to remove "${location.LocationName}"?`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#ef4444",
-      cancelButtonColor: "#6b7280",
       confirmButtonText: "Yes, remove it"
     }).then((result) => {
       if (result.isConfirmed) {
+        const idToRemove = location._id || location.tempId;
         if (view === "front") {
           const updated = frontLocations
-            .filter((loc) => loc.LocationNo !== locationNo)
+            .filter((loc) => (loc._id || loc.tempId) !== idToRemove)
             .map((loc, index) => ({ ...loc, LocationNo: index + 1 }));
           setFrontLocations(updated);
         } else {
           const updated = backLocations
-            .filter((loc) => loc.LocationNo !== locationNo)
+            .filter((loc) => (loc._id || loc.tempId) !== idToRemove)
             .map((loc, index) => ({ ...loc, LocationNo: index + 1 }));
           setBackLocations(updated);
         }
@@ -192,9 +199,67 @@ const YPivotQASectionsProductLocationManagement = () => {
     });
   };
 
+  const handleEditLocationName = (location) => {
+    setEditingLocationId(location._id || location.tempId);
+    setEditingLocationName(location.LocationName);
+  };
+
+  const handleSaveLocationName = (location, view) => {
+    const idToUpdate = location._id || location.tempId;
+    const updateFn = (locations) =>
+      locations.map((loc) =>
+        (loc._id || loc.tempId) === idToUpdate
+          ? { ...loc, LocationName: editingLocationName }
+          : loc
+      );
+
+    if (view === "front") {
+      setFrontLocations(updateFn);
+    } else {
+      setBackLocations(updateFn);
+    }
+    setEditingLocationId(null);
+    setEditingLocationName("");
+  };
+
+  const handleDragStart = (e, location, view) => {
+    e.preventDefault();
+    setDraggingLocation({ ...location, view });
+  };
+
+  const handleDragMove = (e, view) => {
+    if (!draggingLocation || draggingLocation.view !== view) return;
+
+    const imageRef = view === "front" ? frontImageRef : backImageRef;
+    if (!imageRef.current) return;
+
+    // Calculate relative to the image element reference
+    const rect = imageRef.current.getBoundingClientRect();
+    let x = ((e.clientX - rect.left) / rect.width) * 100;
+    let y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    x = Math.max(0, Math.min(100, x));
+    y = Math.max(0, Math.min(100, y));
+
+    const idToUpdate = draggingLocation._id || draggingLocation.tempId;
+    const updateFn = (locations) =>
+      locations.map((loc) =>
+        (loc._id || loc.tempId) === idToUpdate ? { ...loc, x, y } : loc
+      );
+
+    if (view === "front") {
+      setFrontLocations(updateFn);
+    } else {
+      setBackLocations(updateFn);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggingLocation(null);
+  };
+
   // Save configuration
   const handleSave = async () => {
-    // Validation
     if (!selectedProductType) {
       Swal.fire({
         icon: "error",
@@ -204,7 +269,7 @@ const YPivotQASectionsProductLocationManagement = () => {
       return;
     }
 
-    if (!frontImage || !backImage) {
+    if (!editingConfigId && (!frontImage || !backImage)) {
       Swal.fire({
         icon: "error",
         title: "Validation Error",
@@ -224,21 +289,22 @@ const YPivotQASectionsProductLocationManagement = () => {
         confirmButtonColor: "#6366f1",
         cancelButtonColor: "#6b7280"
       });
-
       if (!result.isConfirmed) return;
     }
 
-    submitData();
+    if (editingConfigId) {
+      submitUpdateData();
+    } else {
+      submitCreateData();
+    }
   };
 
-  const submitData = async () => {
+  const submitCreateData = async () => {
     setLoading(true);
-
     try {
       const productTypeObj = productTypes.find(
         (pt) => pt._id === selectedProductType
       );
-
       const formData = new FormData();
       formData.append("productTypeId", selectedProductType);
       formData.append(
@@ -254,9 +320,7 @@ const YPivotQASectionsProductLocationManagement = () => {
         `${API_BASE_URL}/api/qa-sections-product-location`,
         formData,
         {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          }
+          headers: { "Content-Type": "multipart/form-data" }
         }
       );
 
@@ -264,20 +328,56 @@ const YPivotQASectionsProductLocationManagement = () => {
         await Swal.fire({
           icon: "success",
           title: "Success!",
-          text: "Product location configuration saved successfully",
-          confirmButtonColor: "#6366f1"
+          text: "Configuration saved successfully"
         });
-
         resetForm();
         fetchSavedConfigurations();
-        setViewMode("list");
+        setShowCreateForm(false);
       }
     } catch (error) {
-      console.error("Error saving configuration:", error);
       Swal.fire({
         icon: "error",
         title: "Error",
         text: error.response?.data?.message || "Failed to save configuration"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitUpdateData = async () => {
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      if (frontImage) formData.append("frontView", frontImage);
+      if (backImage) formData.append("backView", backImage);
+
+      formData.append("frontLocations", JSON.stringify(frontLocations));
+      formData.append("backLocations", JSON.stringify(backLocations));
+
+      const response = await axios.put(
+        `${API_BASE_URL}/api/qa-sections-product-location/${editingConfigId}`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" }
+        }
+      );
+
+      if (response.data.success) {
+        await Swal.fire({
+          icon: "success",
+          title: "Updated!",
+          text: "Configuration updated successfully"
+        });
+        resetForm();
+        fetchSavedConfigurations();
+        setShowCreateForm(false);
+      }
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.response?.data?.message || "Failed to update configuration"
       });
     } finally {
       setLoading(false);
@@ -294,15 +394,9 @@ const YPivotQASectionsProductLocationManagement = () => {
     setBackLocations([]);
     setIsMarkingFront(false);
     setIsMarkingBack(false);
+    setEditingConfigId(null);
   };
 
-  // View saved configuration
-  const viewConfiguration = (config) => {
-    setSelectedConfig(config);
-    setViewMode("preview");
-  };
-
-  // Delete configuration
   const deleteConfiguration = async (id) => {
     const result = await Swal.fire({
       title: "Are you sure?",
@@ -341,120 +435,382 @@ const YPivotQASectionsProductLocationManagement = () => {
     }
   };
 
-  // Render location markers
-  const renderLocationMarkers = (locations, color = "red") => {
-    return locations.map((location) => (
-      <div
-        key={location.LocationNo || location._id}
-        className="absolute transform -translate-x-1/2 -translate-y-1/2 group"
-        style={{
-          left: `${location.x}%`,
-          top: `${location.y}%`
-        }}
-        onMouseEnter={() => setHoveredLocation(location)}
-        onMouseLeave={() => setHoveredLocation(null)}
-      >
-        <div className="relative">
-          <div
-            className={`w-8 h-8 bg-${color}-500 text-white rounded-full flex items-center justify-center font-bold text-sm border-2 border-white shadow-lg hover:scale-110 transition-transform cursor-pointer`}
-            style={{ backgroundColor: color === "red" ? "#ef4444" : "#3b82f6" }}
-          >
-            {location.LocationNo}
-          </div>
-          {hoveredLocation?.LocationNo === location.LocationNo && (
-            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded whitespace-nowrap z-10 shadow-lg">
-              <div className="font-semibold">
-                Location {location.LocationNo}
-              </div>
-              <div>{location.LocationName}</div>
+  const handleEditConfiguration = (config) => {
+    setEditingConfigId(config._id);
+    setSelectedProductType(config.productTypeId._id);
+    setFrontLocations(config.frontView.locations);
+    setBackLocations(config.backView.locations);
+
+    setFrontImagePreview(
+      `${API_BASE_URL}/api/qa-sections-product-location/image/${config.frontView.imagePath
+        .split("/")
+        .pop()}`
+    );
+    setBackImagePreview(
+      `${API_BASE_URL}/api/qa-sections-product-location/image/${config.backView.imagePath
+        .split("/")
+        .pop()}`
+    );
+
+    setFrontImage(null);
+    setBackImage(null);
+    setShowCreateForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const renderLocationMarkers = (locations, color = "red", view) => {
+    return locations.map((location) => {
+      const isEditingThisLocation =
+        editingLocationId === (location._id || location.tempId);
+
+      return (
+        <div
+          key={location.LocationNo || location._id || location.tempId}
+          className="absolute transform -translate-x-1/2 -translate-y-1/2 group"
+          style={{
+            left: `${location.x}%`,
+            top: `${location.y}%`
+          }}
+          onMouseEnter={() => setHoveredLocation(location)}
+          onMouseLeave={() => setHoveredLocation(null)}
+          onMouseDown={(e) => handleDragStart(e, location, view)}
+        >
+          <div className="relative">
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border-2 border-white shadow-lg transition-transform ${
+                draggingLocation
+                  ? "cursor-grabbing"
+                  : "cursor-grab hover:scale-110"
+              } ${
+                isEditingThisLocation
+                  ? "ring-4 ring-offset-2 ring-yellow-400 animate-pulse"
+                  : ""
+              }`}
+              style={{
+                backgroundColor: color === "red" ? "#ef4444" : "#3b82f6"
+              }}
+            >
+              {location.LocationNo}
             </div>
-          )}
+            {hoveredLocation?.LocationNo === location.LocationNo && (
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded whitespace-nowrap z-10 shadow-lg">
+                <div className="font-semibold">
+                  Location {location.LocationNo}
+                </div>
+                <div>{location.LocationName}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    });
+  };
+
+  // Configuration Card Component
+  const ConfigurationCard = ({ config }) => {
+    const isExpanded = expandedCardId === config._id;
+    const totalLocations =
+      config.frontView.locations.length + config.backView.locations.length;
+
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden transform hover:scale-105 transition-all duration-300">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                <MapPin size={18} className="text-white" />
+              </div>
+              <span className="text-white font-semibold text-sm">
+                Configuration
+              </span>
+            </div>
+            <span className="bg-white/20 text-white px-3 py-1 rounded-full text-xs font-bold">
+              {totalLocations} Locations
+            </span>
+          </div>
+        </div>
+
+        {/* Product Name */}
+        <div className="px-5 py-4 bg-gray-50 dark:bg-gray-750">
+          <h4
+            className="font-bold text-lg text-gray-900 dark:text-gray-700 truncate"
+            title={config.productTypeName}
+          >
+            {config.productTypeName}
+          </h4>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Created: {new Date(config.createdAt).toLocaleDateString()}
+          </p>
+        </div>
+
+        {/* Images Grid */}
+        <div className="px-5 py-4 space-y-4">
+          {/* Front View */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                Front View ({config.frontView.locations.length})
+              </span>
+            </div>
+
+            {/* FIXED: Using Flex center + relative inline-block wrapper to ensure perfect positioning */}
+            <div className="h-80 border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-900 flex items-center justify-center overflow-hidden">
+              <div className="relative inline-block">
+                <img
+                  src={`${API_BASE_URL}/api/qa-sections-product-location/image/${config.frontView.imagePath
+                    .split("/")
+                    .pop()}`}
+                  alt="Front View"
+                  className="max-h-80 w-auto max-w-full object-contain block"
+                  onError={(e) => {
+                    e.target.src =
+                      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23ddd' width='400' height='300'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EImage not found%3C/text%3E%3C/svg%3E";
+                  }}
+                />
+                {renderLocationMarkers(config.frontView.locations, "red")}
+              </div>
+            </div>
+          </div>
+
+          {/* Back View */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                Back View ({config.backView.locations.length})
+              </span>
+            </div>
+
+            {/* FIXED: Using Flex center + relative inline-block wrapper */}
+            <div className="h-80 border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-900 flex items-center justify-center overflow-hidden">
+              <div className="relative inline-block">
+                <img
+                  src={`${API_BASE_URL}/api/qa-sections-product-location/image/${config.backView.imagePath
+                    .split("/")
+                    .pop()}`}
+                  alt="Back View"
+                  className="max-h-80 w-auto max-w-full object-contain block"
+                  onError={(e) => {
+                    e.target.src =
+                      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23ddd' width='400' height='300'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EImage not found%3C/text%3E%3C/svg%3E";
+                  }}
+                />
+                {renderLocationMarkers(config.backView.locations, "blue")}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Expandable Location List */}
+        {isExpanded && (
+          <div className="px-5 pb-4 space-y-3">
+            {/* Front Locations */}
+            {config.frontView.locations.length > 0 && (
+              <div className="bg-red-50 dark:bg-red-900/10 rounded-lg p-3 border border-red-200 dark:border-red-800">
+                <h5 className="font-semibold text-xs text-red-700 dark:text-red-300 mb-2">
+                  Front Locations:
+                </h5>
+                <div className="space-y-1.5">
+                  {config.frontView.locations.map((loc) => (
+                    <div
+                      key={loc._id}
+                      className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300"
+                    >
+                      <span className="w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                        {loc.LocationNo}
+                      </span>
+                      <span className="flex-1">{loc.LocationName}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Back Locations */}
+            {config.backView.locations.length > 0 && (
+              <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+                <h5 className="font-semibold text-xs text-blue-700 dark:text-blue-300 mb-2">
+                  Back Locations:
+                </h5>
+                <div className="space-y-1.5">
+                  {config.backView.locations.map((loc) => (
+                    <div
+                      key={loc._id}
+                      className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300"
+                    >
+                      <span className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                        {loc.LocationNo}
+                      </span>
+                      <span className="flex-1">{loc.LocationName}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="px-5 pb-5 space-y-2">
+          <button
+            onClick={() => setExpandedCardId(isExpanded ? null : config._id)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all text-sm font-medium"
+          >
+            {isExpanded ? (
+              <>
+                <ChevronUp size={16} />
+                Hide Details
+              </>
+            ) : (
+              <>
+                <ChevronDown size={16} />
+                Show Details
+              </>
+            )}
+          </button>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleEditConfiguration(config)}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 dark:bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-600 dark:hover:bg-blue-700 shadow-md transition-all"
+            >
+              <Edit size={16} />
+              Edit
+            </button>
+            <button
+              onClick={() => deleteConfiguration(config._id)}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 dark:bg-red-600 text-white font-semibold rounded-lg hover:bg-red-600 dark:hover:bg-red-700 shadow-md transition-all"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         </div>
       </div>
-    ));
+    );
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
-              <MapPin className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 p-2.5 rounded-lg backdrop-blur-sm">
+                <MapPin size={22} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">
+                  Product Location Management
+                </h2>
+                <p className="text-indigo-100 text-xs mt-0.5">
+                  <span className="font-semibold text-white">
+                    {savedConfigurations.length}
+                  </span>{" "}
+                  Total Configurations
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-                Product Location Management
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Upload product images and mark inspection locations
-              </p>
-            </div>
-          </div>
 
-          <div className="flex gap-2">
-            {viewMode !== "create" && (
+            {!showCreateForm && (
               <button
                 onClick={() => {
-                  setViewMode("create");
-                  setSelectedConfig(null);
+                  setShowCreateForm(true);
                   resetForm();
                 }}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+                className="flex items-center gap-2 px-5 py-2.5 bg-white text-indigo-600 font-semibold rounded-lg hover:bg-indigo-50 shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200"
               >
-                <Plus className="w-4 h-4 inline mr-2" />
+                <Plus size={18} />
                 Create New
-              </button>
-            )}
-            {viewMode === "create" && savedConfigurations.length > 0 && (
-              <button
-                onClick={() => setViewMode("list")}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
-              >
-                <Eye className="w-4 h-4 inline mr-2" />
-                View Saved
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* Create Mode */}
-      {viewMode === "create" && (
-        <div className="space-y-6">
+      {/* Create/Edit Form */}
+      {showCreateForm && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border-2 border-indigo-500 dark:border-indigo-400 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+              {editingConfigId ? (
+                <>
+                  <Edit size={20} className="text-indigo-600" />
+                  Edit Configuration
+                </>
+              ) : (
+                <>
+                  <Plus size={20} className="text-indigo-600" />
+                  Create New Configuration
+                </>
+              )}
+            </h3>
+            <button
+              onClick={() => {
+                setShowCreateForm(false);
+                resetForm();
+              }}
+              className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
           {/* Product Type Selection */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
               Select Product Type <span className="text-red-500">*</span>
             </label>
             <select
               value={selectedProductType}
               onChange={(e) => setSelectedProductType(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white transition-colors"
+              disabled={!!editingConfigId}
+              className={`w-full px-4 py-3 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 transition-all outline-none ${
+                editingConfigId
+                  ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
+                  : ""
+              }`}
             >
               <option value="">-- Select a Product Type --</option>
-              {productTypes.map((type) => (
-                <option key={type._id} value={type._id}>
-                  {type.EnglishProductName}
-                  {type.KhmerProductName && ` (${type.KhmerProductName})`}
-                </option>
-              ))}
+              {productTypes.map((type) => {
+                const configuredTypeIds = savedConfigurations.map(
+                  (c) => c.productTypeId._id
+                );
+                const isConfigured = configuredTypeIds.includes(type._id);
+                const isCurrentlyEditing =
+                  editingConfigId && type._id === selectedProductType;
+                const isDisabled = isConfigured && !isCurrentlyEditing;
+
+                return (
+                  <option key={type._id} value={type._id} disabled={isDisabled}>
+                    {type.EnglishProductName}
+                    {type.KhmerProductName && ` (${type.KhmerProductName})`}
+                    {isDisabled && " (Already Configured)"}
+                  </option>
+                );
+              })}
             </select>
+            {editingConfigId && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+                Product Type cannot be changed when editing a configuration.
+              </p>
+            )}
           </div>
 
           {/* Image Upload Section */}
           {selectedProductType && (
             <>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* Front View */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white flex items-center gap-2">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-gray-800 dark:text-white flex items-center gap-2">
                       <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                       Front View
-                    </h3>
-                    <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                    </h4>
+                    <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">
                       {frontLocations.length} location
                       {frontLocations.length !== 1 ? "s" : ""}
                     </span>
@@ -463,10 +819,9 @@ const YPivotQASectionsProductLocationManagement = () => {
                   {!frontImagePreview ? (
                     <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-700/30 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <Upload className="w-12 h-12 text-gray-400 mb-3" />
-                        <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">
-                          <span className="font-semibold">Click to upload</span>{" "}
-                          or drag and drop
+                        <Upload className="w-10 h-10 text-gray-400 mb-2" />
+                        <p className="mb-1 text-sm text-gray-600 dark:text-gray-400">
+                          <span className="font-semibold">Click to upload</span>
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-500">
                           PNG, JPG, GIF up to 10MB
@@ -480,35 +835,46 @@ const YPivotQASectionsProductLocationManagement = () => {
                       />
                     </label>
                   ) : (
-                    <div className="space-y-4">
-                      <div className="relative border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900">
-                        <img
-                          ref={frontImageRef}
-                          src={frontImagePreview}
-                          alt="Front View"
-                          className={`w-full h-auto ${
-                            isMarkingFront
-                              ? "cursor-crosshair"
-                              : "cursor-default"
-                          }`}
-                          onClick={(e) => handleImageClick(e, "front")}
-                        />
-                        {renderLocationMarkers(frontLocations, "red")}
+                    <div className="space-y-3">
+                      {/* FIXED: Edit Window - Front View */}
+                      {/* Use Flex Center + Relative Inline-Block wrapper */}
+                      <div
+                        className="h-96 border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900 flex items-center justify-center"
+                        onMouseMove={(e) => handleDragMove(e, "front")}
+                        onMouseUp={handleDragEnd}
+                        onMouseLeave={handleDragEnd}
+                      >
+                        <div className="relative inline-block">
+                          <img
+                            ref={frontImageRef}
+                            src={frontImagePreview}
+                            alt="Front View"
+                            className={`max-h-96 w-auto max-w-full object-contain block ${
+                              isMarkingFront
+                                ? "cursor-crosshair"
+                                : "cursor-default"
+                            }`}
+                            onClick={(e) => handleImageClick(e, "front")}
+                          />
+                          {renderLocationMarkers(
+                            frontLocations,
+                            "red",
+                            "front"
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex gap-2">
                         <button
                           onClick={() => setIsMarkingFront(!isMarkingFront)}
-                          className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all ${
+                          className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all ${
                             isMarkingFront
-                              ? "bg-indigo-600 text-white shadow-lg"
+                              ? "bg-indigo-600 text-white shadow-md"
                               : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                           }`}
                         >
-                          <MapPin className="w-4 h-4 inline mr-2" />
-                          {isMarkingFront
-                            ? "Marking ON (Click Image)"
-                            : "Mark Locations"}
+                          <MapPin className="w-4 h-4 inline mr-1.5" />
+                          {isMarkingFront ? "Marking ON" : "Mark Locations"}
                         </button>
                         <button
                           onClick={() => {
@@ -517,7 +883,7 @@ const YPivotQASectionsProductLocationManagement = () => {
                             setFrontLocations([]);
                             setIsMarkingFront(false);
                           }}
-                          className="px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                          className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                           title="Remove image"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -525,33 +891,83 @@ const YPivotQASectionsProductLocationManagement = () => {
                       </div>
 
                       {frontLocations.length > 0 && (
-                        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                          <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-3">
+                        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                          <h5 className="font-semibold text-xs text-gray-700 dark:text-gray-300 mb-2">
                             Marked Locations:
-                          </h4>
-                          <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {frontLocations.map((loc) => (
-                              <div
-                                key={loc.LocationNo}
-                                className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600"
-                              >
-                                <span className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                                  <span className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
-                                    {loc.LocationNo}
-                                  </span>
-                                  {loc.LocationName}
-                                </span>
-                                <button
-                                  onClick={() =>
-                                    removeLocation(loc.LocationNo, "front")
-                                  }
-                                  className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                                  title="Remove location"
+                          </h5>
+                          <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                            {frontLocations.map((loc) => {
+                              const isEditing =
+                                editingLocationId === (loc._id || loc.tempId);
+                              return (
+                                <div
+                                  key={loc._id || loc.tempId}
+                                  className="flex items-center justify-between bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-600"
                                 >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ))}
+                                  <div className="flex items-center gap-2 flex-grow">
+                                    <span className="w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                                      {loc.LocationNo}
+                                    </span>
+                                    {isEditing ? (
+                                      <input
+                                        type="text"
+                                        value={editingLocationName}
+                                        onChange={(e) =>
+                                          setEditingLocationName(e.target.value)
+                                        }
+                                        className="text-xs p-1 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span className="text-xs text-gray-700 dark:text-gray-300">
+                                        {loc.LocationName}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    {isEditing ? (
+                                      <>
+                                        <button
+                                          onClick={() =>
+                                            handleSaveLocationName(loc, "front")
+                                          }
+                                          title="Save Name"
+                                        >
+                                          <Check className="w-3.5 h-3.5 text-green-500" />
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            setEditingLocationId(null)
+                                          }
+                                          title="Cancel"
+                                        >
+                                          <X className="w-3.5 h-3.5 text-gray-500" />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button
+                                          onClick={() =>
+                                            handleEditLocationName(loc)
+                                          }
+                                          title="Edit name"
+                                        >
+                                          <Edit className="w-3.5 h-3.5 text-blue-500" />
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            removeLocation(loc, "front")
+                                          }
+                                          title="Remove location"
+                                        >
+                                          <X className="w-3.5 h-3.5 text-red-500" />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -560,13 +976,13 @@ const YPivotQASectionsProductLocationManagement = () => {
                 </div>
 
                 {/* Back View */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white flex items-center gap-2">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-gray-800 dark:text-white flex items-center gap-2">
                       <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
                       Back View
-                    </h3>
-                    <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                    </h4>
+                    <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">
                       {backLocations.length} location
                       {backLocations.length !== 1 ? "s" : ""}
                     </span>
@@ -575,10 +991,9 @@ const YPivotQASectionsProductLocationManagement = () => {
                   {!backImagePreview ? (
                     <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-700/30 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <Upload className="w-12 h-12 text-gray-400 mb-3" />
-                        <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">
-                          <span className="font-semibold">Click to upload</span>{" "}
-                          or drag and drop
+                        <Upload className="w-10 h-10 text-gray-400 mb-2" />
+                        <p className="mb-1 text-sm text-gray-600 dark:text-gray-400">
+                          <span className="font-semibold">Click to upload</span>
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-500">
                           PNG, JPG, GIF up to 10MB
@@ -592,35 +1007,42 @@ const YPivotQASectionsProductLocationManagement = () => {
                       />
                     </label>
                   ) : (
-                    <div className="space-y-4">
-                      <div className="relative border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900">
-                        <img
-                          ref={backImageRef}
-                          src={backImagePreview}
-                          alt="Back View"
-                          className={`w-full h-auto ${
-                            isMarkingBack
-                              ? "cursor-crosshair"
-                              : "cursor-default"
-                          }`}
-                          onClick={(e) => handleImageClick(e, "back")}
-                        />
-                        {renderLocationMarkers(backLocations, "blue")}
+                    <div className="space-y-3">
+                      {/* FIXED: Edit Window - Back View */}
+                      {/* Use Flex Center + Relative Inline-Block wrapper */}
+                      <div
+                        className="h-96 border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900 flex items-center justify-center"
+                        onMouseMove={(e) => handleDragMove(e, "back")}
+                        onMouseUp={handleDragEnd}
+                        onMouseLeave={handleDragEnd}
+                      >
+                        <div className="relative inline-block">
+                          <img
+                            ref={backImageRef}
+                            src={backImagePreview}
+                            alt="Back View"
+                            className={`max-h-96 w-auto max-w-full object-contain block ${
+                              isMarkingBack
+                                ? "cursor-crosshair"
+                                : "cursor-default"
+                            }`}
+                            onClick={(e) => handleImageClick(e, "back")}
+                          />
+                          {renderLocationMarkers(backLocations, "blue", "back")}
+                        </div>
                       </div>
 
                       <div className="flex gap-2">
                         <button
                           onClick={() => setIsMarkingBack(!isMarkingBack)}
-                          className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all ${
+                          className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all ${
                             isMarkingBack
-                              ? "bg-indigo-600 text-white shadow-lg"
+                              ? "bg-indigo-600 text-white shadow-md"
                               : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                           }`}
                         >
-                          <MapPin className="w-4 h-4 inline mr-2" />
-                          {isMarkingBack
-                            ? "Marking ON (Click Image)"
-                            : "Mark Locations"}
+                          <MapPin className="w-4 h-4 inline mr-1.5" />
+                          {isMarkingBack ? "Marking ON" : "Mark Locations"}
                         </button>
                         <button
                           onClick={() => {
@@ -629,7 +1051,7 @@ const YPivotQASectionsProductLocationManagement = () => {
                             setBackLocations([]);
                             setIsMarkingBack(false);
                           }}
-                          className="px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                          className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                           title="Remove image"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -637,33 +1059,83 @@ const YPivotQASectionsProductLocationManagement = () => {
                       </div>
 
                       {backLocations.length > 0 && (
-                        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                          <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-3">
+                        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                          <h5 className="font-semibold text-xs text-gray-700 dark:text-gray-300 mb-2">
                             Marked Locations:
-                          </h4>
-                          <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {backLocations.map((loc) => (
-                              <div
-                                key={loc.LocationNo}
-                                className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600"
-                              >
-                                <span className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                                  <span className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
-                                    {loc.LocationNo}
-                                  </span>
-                                  {loc.LocationName}
-                                </span>
-                                <button
-                                  onClick={() =>
-                                    removeLocation(loc.LocationNo, "back")
-                                  }
-                                  className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                                  title="Remove location"
+                          </h5>
+                          <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                            {backLocations.map((loc) => {
+                              const isEditing =
+                                editingLocationId === (loc._id || loc.tempId);
+                              return (
+                                <div
+                                  key={loc._id || loc.tempId}
+                                  className="flex items-center justify-between bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-600"
                                 >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ))}
+                                  <div className="flex items-center gap-2 flex-grow">
+                                    <span className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                                      {loc.LocationNo}
+                                    </span>
+                                    {isEditing ? (
+                                      <input
+                                        type="text"
+                                        value={editingLocationName}
+                                        onChange={(e) =>
+                                          setEditingLocationName(e.target.value)
+                                        }
+                                        className="text-xs p-1 border rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span className="text-xs text-gray-700 dark:text-gray-300">
+                                        {loc.LocationName}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    {isEditing ? (
+                                      <>
+                                        <button
+                                          onClick={() =>
+                                            handleSaveLocationName(loc, "back")
+                                          }
+                                          title="Save Name"
+                                        >
+                                          <Check className="w-3.5 h-3.5 text-green-500" />
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            setEditingLocationId(null)
+                                          }
+                                          title="Cancel"
+                                        >
+                                          <X className="w-3.5 h-3.5 text-gray-500" />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button
+                                          onClick={() =>
+                                            handleEditLocationName(loc)
+                                          }
+                                          title="Edit name"
+                                        >
+                                          <Edit className="w-3.5 h-3.5 text-blue-500" />
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            removeLocation(loc, "back")
+                                          }
+                                          title="Remove location"
+                                        >
+                                          <X className="w-3.5 h-3.5 text-red-500" />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -673,25 +1145,25 @@ const YPivotQASectionsProductLocationManagement = () => {
               </div>
 
               {/* Info Alert */}
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-blue-800 dark:text-blue-300">
-                    <p className="font-semibold mb-2">How to mark locations:</p>
-                    <ol className="list-decimal list-inside space-y-1.5 ml-2">
+                  <div className="text-xs text-blue-800 dark:text-blue-300">
+                    <p className="font-semibold mb-1.5">
+                      How to mark locations:
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1 ml-2 text-[11px]">
                       <li>Upload both front and back view images</li>
-                      <li>
-                        Click the "Mark Locations" button to enable marking mode
-                      </li>
+                      <li>Click "Mark Locations" to enable marking mode</li>
                       <li>
                         Click on the image where you want to mark an inspection
                         point
                       </li>
                       <li>
                         Enter a descriptive name for the location (e.g., "Left
-                        Pocket", "Collar")
+                        Pocket")
                       </li>
-                      <li>Repeat for all inspection points on both views</li>
+                      <li>Drag markers to adjust their position</li>
                       <li>Click "Save Configuration" when finished</li>
                     </ol>
                   </div>
@@ -700,9 +1172,9 @@ const YPivotQASectionsProductLocationManagement = () => {
 
               {/* Save/Cancel Buttons */}
               {frontImagePreview && backImagePreview && (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
                   <div className="flex items-center justify-between">
-                    <div className="space-y-1">
+                    <div className="space-y-0.5">
                       <p className="text-sm text-gray-600 dark:text-gray-400">
                         Product:{" "}
                         <span className="font-semibold text-gray-800 dark:text-white">
@@ -713,30 +1185,33 @@ const YPivotQASectionsProductLocationManagement = () => {
                           }
                         </span>
                       </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
                         Total Locations:{" "}
                         <span className="font-semibold text-gray-800 dark:text-white">
                           {frontLocations.length + backLocations.length}
                         </span>
-                        <span className="text-xs ml-2">
+                        <span className="text-[11px] ml-2">
                           (Front: {frontLocations.length}, Back:{" "}
                           {backLocations.length})
                         </span>
                       </p>
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex gap-2">
                       <button
-                        onClick={resetForm}
-                        className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors font-medium"
+                        onClick={() => {
+                          setShowCreateForm(false);
+                          resetForm();
+                        }}
+                        className="px-5 py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors font-medium text-sm"
                         disabled={loading}
                       >
-                        <X className="w-4 h-4 inline mr-2" />
+                        <X className="w-4 h-4 inline mr-1.5" />
                         Cancel
                       </button>
                       <button
                         onClick={handleSave}
                         disabled={loading}
-                        className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         {loading ? (
                           <>
@@ -746,7 +1221,7 @@ const YPivotQASectionsProductLocationManagement = () => {
                         ) : (
                           <>
                             <Save className="w-4 h-4" />
-                            Save Configuration
+                            {editingConfigId ? "Update" : "Save"} Configuration
                           </>
                         )}
                       </button>
@@ -759,206 +1234,42 @@ const YPivotQASectionsProductLocationManagement = () => {
         </div>
       )}
 
-      {/* List Mode */}
-      {viewMode === "list" && !selectedConfig && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
+      {/* Saved Configurations Grid */}
+      {savedConfigurations.length > 0 && (
+        <div>
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-            Saved Configurations ({savedConfigurations.length})
+            Saved Configurations
           </h3>
-
-          {savedConfigurations.length === 0 ? (
-            <div className="text-center py-16">
-              <ImageIcon className="w-20 h-20 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 dark:text-gray-400 text-lg mb-2">
-                No configurations saved yet
-              </p>
-              <p className="text-gray-500 dark:text-gray-500 text-sm mb-6">
-                Create your first product location configuration
-              </p>
-              <button
-                onClick={() => setViewMode("create")}
-                className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
-              >
-                <Plus className="w-4 h-4 inline mr-2" />
-                Create Configuration
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {savedConfigurations.map((config) => (
-                <div
-                  key={config._id}
-                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-lg transition-all hover:border-indigo-300 dark:hover:border-indigo-600"
-                >
-                  <h4
-                    className="font-semibold text-gray-800 dark:text-white mb-3 truncate"
-                    title={config.productTypeName}
-                  >
-                    {config.productTypeName}
-                  </h4>
-                  <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2 mb-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                      <span>
-                        Front: {config.frontView.locations.length} locations
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                      <span>
-                        Back: {config.backView.locations.length} locations
-                      </span>
-                    </div>
-                    <p className="text-xs pt-2 border-t border-gray-200 dark:border-gray-700">
-                      Created: {new Date(config.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => viewConfiguration(config)}
-                      className="flex-1 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium transition-colors"
-                    >
-                      <Eye className="w-4 h-4 inline mr-1" />
-                      View
-                    </button>
-                    <button
-                      onClick={() => deleteConfiguration(config._id)}
-                      className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm transition-colors"
-                      title="Delete configuration"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {savedConfigurations.map((config) => (
+              <ConfigurationCard key={config._id} config={config} />
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Preview Mode */}
-      {viewMode === "preview" && selectedConfig && (
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-xl font-bold text-gray-800 dark:text-white">
-                  {selectedConfig.productTypeName}
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Created: {new Date(selectedConfig.createdAt).toLocaleString()}
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setSelectedConfig(null);
-                  setViewMode("list");
-                }}
-                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to List
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Front View Preview */}
-              <div>
-                <h4 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
-                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                  Front View ({selectedConfig.frontView.locations.length}{" "}
-                  locations)
-                </h4>
-                <div className="relative border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900 mb-4">
-                  <img
-                    src={`${API_BASE_URL}/api/qa-sections-product-location/image/${selectedConfig.frontView.imagePath
-                      .split("/")
-                      .pop()}`}
-                    alt="Front View"
-                    className="w-full h-auto"
-                    onError={(e) => {
-                      console.error("Error loading front image");
-                      e.target.src =
-                        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23ddd' width='400' height='300'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EImage not found%3C/text%3E%3C/svg%3E";
-                    }}
-                  />
-                  {renderLocationMarkers(
-                    selectedConfig.frontView.locations,
-                    "red"
-                  )}
-                </div>
-
-                {selectedConfig.frontView.locations.length > 0 && (
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                    <h5 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-3">
-                      Location List:
-                    </h5>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {selectedConfig.frontView.locations.map((loc) => (
-                        <div
-                          key={loc._id}
-                          className="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600"
-                        >
-                          <span className="w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
-                            {loc.LocationNo}
-                          </span>
-                          <span className="flex-1">{loc.LocationName}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Back View Preview */}
-              <div>
-                <h4 className="font-semibold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  Back View ({selectedConfig.backView.locations.length}{" "}
-                  locations)
-                </h4>
-                <div className="relative border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900 mb-4">
-                  <img
-                    src={`/api/qa-sections-product-location/image/${selectedConfig.backView.imagePath
-                      .split("/")
-                      .pop()}`}
-                    alt="Back View"
-                    className="w-full h-auto"
-                    onError={(e) => {
-                      console.error("Error loading back image");
-                      e.target.src =
-                        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23ddd' width='400' height='300'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EImage not found%3C/text%3E%3C/svg%3E";
-                    }}
-                  />
-                  {renderLocationMarkers(
-                    selectedConfig.backView.locations,
-                    "blue"
-                  )}
-                </div>
-
-                {selectedConfig.backView.locations.length > 0 && (
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                    <h5 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-3">
-                      Location List:
-                    </h5>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {selectedConfig.backView.locations.map((loc) => (
-                        <div
-                          key={loc._id}
-                          className="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600"
-                        >
-                          <span className="w-7 h-7 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
-                            {loc.LocationNo}
-                          </span>
-                          <span className="flex-1">{loc.LocationName}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+      {/* Empty State */}
+      {savedConfigurations.length === 0 && !showCreateForm && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-16 text-center">
+          <div className="bg-gray-100 dark:bg-gray-700 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <ImageIcon className="w-10 h-10 text-gray-400 dark:text-gray-500" />
           </div>
+          <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">
+            No configurations saved yet
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            Create your first product location configuration
+          </p>
+          <button
+            onClick={() => {
+              setShowCreateForm(true);
+              resetForm();
+            }}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium shadow-md hover:shadow-lg"
+          >
+            <Plus className="w-4 h-4 inline mr-2" />
+            Create Configuration
+          </button>
         </div>
       )}
     </div>

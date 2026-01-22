@@ -15,7 +15,8 @@ import {
   Hash,
   AlertTriangle,
   ClipboardCheck,
-  Calculator
+  Calculator,
+  CalendarDays
 } from "lucide-react";
 import { getToleranceAsFraction } from "./fractionConverter";
 import { API_BASE_URL } from "../../../../../config";
@@ -730,6 +731,70 @@ const QCWashingViewDetailsModal = ({
                     </div>
                   </div>
                 </div>
+                <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 shadow-sm">
+                  <div className="flex items-center">
+                    <CalendarDays className="w-8 h-8 text-violet-600 dark:text-violet-400" />
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                        Inspection Date
+                      </p>
+                      <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        {(() => {
+                          // Try multiple possible date fields
+                          const inspectionDate = itemData.date;
+
+                          if (!inspectionDate) return "N/A";
+
+                          try {
+                            let dateObj;
+                            let dateString = inspectionDate;
+
+                            // Handle MongoDB's extended JSON format for dates
+                            if (
+                              typeof inspectionDate === "object" &&
+                              inspectionDate !== null &&
+                              inspectionDate.$date
+                            ) {
+                              dateString = inspectionDate.$date;
+                            }
+
+                            // Create a date object
+                            dateObj = new Date(dateString);
+
+                            if (isNaN(dateObj.getTime())) {
+                              console.warn(
+                                "Invalid inspection date:",
+                                inspectionDate
+                              );
+                              return "Invalid Date";
+                            }
+
+                            // Format the date
+                            const formattedDate = dateObj.toLocaleDateString(
+                              "en-US",
+                              {
+                                year: "numeric",
+                                month: "2-digit",
+                                day: "2-digit",
+                                timeZone: "UTC"
+                              }
+                            );
+
+                            return formattedDate;
+                          } catch (error) {
+                            console.error(
+                              "Date parsing error:",
+                              error,
+                              "for value:",
+                              inspectionDate
+                            );
+                            return "Error parsing date";
+                          }
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1201,6 +1266,71 @@ const QCWashingViewDetailsModal = ({
                         </div>
                       </div>
                     )}
+                  <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 shadow-sm">
+                    <div className="flex items-center">
+                      <ClipboardCheck className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                          Sample Approve Date
+                        </p>
+                        <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                          {(() => {
+                            const approveDate =
+                              itemData.inspectionDetails
+                                ?.referenceSampleApproveDate;
+
+                            if (!approveDate) return "N/A";
+
+                            try {
+                              let dateObj;
+                              let dateString = approveDate;
+
+                              // Handle MongoDB's extended JSON format for dates
+                              if (
+                                typeof approveDate === "object" &&
+                                approveDate !== null &&
+                                approveDate.$date
+                              ) {
+                                dateString = approveDate.$date;
+                              }
+
+                              // Create a date object. The string is assumed to be in UTC format.
+                              dateObj = new Date(dateString);
+
+                              if (isNaN(dateObj.getTime())) {
+                                console.warn(
+                                  "Invalid approve date:",
+                                  approveDate
+                                );
+                                return "Invalid Date";
+                              }
+
+                              // Format the date using UTC parts to avoid timezone shifts.
+                              const formattedDate = dateObj.toLocaleDateString(
+                                "en-US",
+                                {
+                                  year: "numeric",
+                                  month: "2-digit",
+                                  day: "2-digit",
+                                  timeZone: "UTC" // Important: interpret the date in UTC
+                                }
+                              );
+
+                              return formattedDate;
+                            } catch (error) {
+                              console.error(
+                                "Date parsing error:",
+                                error,
+                                "for value:",
+                                approveDate
+                              );
+                              return "Error parsing date";
+                            }
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

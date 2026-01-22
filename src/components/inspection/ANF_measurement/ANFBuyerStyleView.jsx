@@ -15,8 +15,11 @@ import Select from "react-select";
 import { API_BASE_URL } from "../../../../config";
 
 // Reusable Action Menu for Style View
-const ActionMenu = ({ item, isLastRow }) => {
-  const reportUrl = `/anf-washing/buyer-style-full-report/${item.moNo}`;
+const ActionMenu = ({ item, isLastRow, stage }) => {
+  const reportUrl = `/anf-washing/buyer-style-full-report/${item.moNo}?stage=${
+    stage?.value || "M1"
+  }`;
+
   const handleAction = (action) => {
     alert(`${action} clicked for MO: ${item.moNo}`);
   };
@@ -89,6 +92,18 @@ const ANFBuyerStyleView = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const [stage, setStage] = useState({ value: "M1", label: "M1 - 5 Points" });
+  const stageOptions = [
+    { value: "M1", label: "M1 - 5 Points" },
+    { value: "M2", label: "M2 - 2 Points" }
+  ];
+
+  const getApiPrefix = () => {
+    return stage.value === "M2"
+      ? `${API_BASE_URL}/api/anf-measurement-packing`
+      : `${API_BASE_URL}/api/anf-measurement`;
+  };
+
   const [filters, setFilters] = useState({
     startDate: subDays(new Date(), 30),
     endDate: new Date(),
@@ -104,14 +119,20 @@ const ANFBuyerStyleView = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
+  /* ------------------------------------------------------------------
+     Update Data Fetching to use Dynamic Prefix & Depend on Stage
+  ------------------------------------------------------------------ */
   useEffect(() => {
     const fetchData = async () => {
       if (!filters.startDate || !filters.endDate) return;
       setIsLoading(true);
       setError(null);
+
+      const prefix = getApiPrefix(); // <--- Dynamic prefix
+
       try {
         const dataRes = await axios.get(
-          `${API_BASE_URL}/api/anf-measurement/style-view-summary`,
+          `${prefix}/style-view-summary`, // Use prefix
           {
             params: {
               startDate: filters.startDate.toISOString().split("T")[0],
@@ -141,7 +162,7 @@ const ANFBuyerStyleView = () => {
       }
     };
     fetchData();
-  }, [filters.startDate, filters.endDate]);
+  }, [filters.startDate, filters.endDate, stage]);
 
   const filteredData = useMemo(() => {
     return allData.filter((item) => {
@@ -202,7 +223,7 @@ const ANFBuyerStyleView = () => {
 
         {/* --- FILTERS SECTION --- */}
         <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md mb-3">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">
                 Start Date
@@ -223,6 +244,16 @@ const ANFBuyerStyleView = () => {
                   setFilters((f) => ({ ...f, endDate: date }))
                 }
                 className="w-full p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Stage</label>
+              <Select
+                options={stageOptions}
+                value={stage}
+                onChange={setStage}
+                styles={selectStyles}
+                isSearchable={false}
               />
             </div>
             <div>
@@ -391,7 +422,6 @@ const ANFBuyerStyleView = () => {
                         ? ((newPassPoints / newTotalPoints) * 100).toFixed(2) +
                           "%"
                         : "N/A";
-                    // --- END: MODIFIED CALCULATIONS FOR BUYER VIEW ---
 
                     const isLastRow = index === paginatedData.length - 1;
 
@@ -441,7 +471,11 @@ const ANFBuyerStyleView = () => {
                           {passRatePoints}
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <ActionMenu item={item} isLastRow={isLastRow} />
+                          <ActionMenu
+                            item={item}
+                            isLastRow={isLastRow}
+                            stage={stage}
+                          />
                         </td>
                       </tr>
                     );

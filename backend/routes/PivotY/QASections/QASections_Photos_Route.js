@@ -6,6 +6,7 @@ import {
   GetSpecificPhotoSection,
   UpdatePhotoSection,
   DeletePhotoSection,
+  AddPhotoSectionItem,
   DeletePhotoSectionItem
 } from "../../../controller/PivotY/QASections/QASections_Photos_Controller.js";
 const router = express.Router();
@@ -39,6 +40,12 @@ router.put("/api/qa-sections-photos/:id", UpdatePhotoSection);
  * Route: Deletes a specific photo section
  */
 router.delete("/api/qa-sections-photos/:id", DeletePhotoSection);
+
+/**
+ * POST
+ * Route: Adds a new item to an existing photo section
+ */
+router.post("/api/qa-sections-photos/:id/items", AddPhotoSectionItem);
 
 /**
  * DELETE
