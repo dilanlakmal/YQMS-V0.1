@@ -179,7 +179,7 @@ const InstructionTranslation = () => {
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col relative overflow-hidden bg-slate-50/50">
                 {/* Top Header / Progress for Mobile or just general info */}
-                <header className="h-16 border-b border-slate-200/60 bg-white/80 backdrop-blur-sm flex items-center justify-between px-8 z-10 sticky top-0 relative">
+                <header className="h-16 border-b border-slate-200/60 bg-white/80 backdrop-blur-sm flex items-center justify-between px-8 z-10 sticky top-0">
                     <div className="flex items-center gap-2 text-sm text-slate-500 flex-1">
                         <span className="font-medium text-slate-900">Step {currentStep}</span>
                         <span>/</span>
