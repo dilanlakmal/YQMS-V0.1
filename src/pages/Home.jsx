@@ -1926,7 +1926,7 @@ function Home() {
         />
 
         {/* Mobile Header */}
-        <header className="flex-shrink-0 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm z-40">
+        <header className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm">
           <div className="flex items-center justify-between px-4 h-12">
             <div className="flex items-center gap-2">
               {currentSection && (
@@ -1960,7 +1960,7 @@ function Home() {
         )}
 
         {/* Mobile Content */}
-        <main className="flex-1 overflow-auto p-2 pb-20">
+        <main className="p-2 pb-24">
           {currentSectionItems.length > 0 ? (
             <div className="grid grid-cols-4 gap-2">
               {currentSectionItems.map((item, index) => (
