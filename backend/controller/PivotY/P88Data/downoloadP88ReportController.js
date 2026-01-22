@@ -215,7 +215,7 @@ const runDownloadTaskUbuntu = async (jobId, params,  userId) => {
                 await printBtn.click();
                 
                 const newFiles = await waitForNewFile(jobDir, filesBefore);
-                const baseName = getFilename(record);
+                const baseName = getFilename(record, inspNo);
                 
                 newFiles.forEach((file, index) => {
                     const oldPath = path.join(jobDir, file);
@@ -499,11 +499,11 @@ const updateDownloadStatus = async (recordId, status) => {
     } catch (e) { console.error("DB Error:", e.message); }
 };
 
-const getFilename = (record) => {
+const getFilename = (record, inspNo) => {
     const reportType = (record.reportType || 'Report').replace(/[/\\?%*:|"<>]/g, '-');
     const po = (record.poNumbers?.length > 0 ? record.poNumbers[0] : 'NO-PO');
     const group = record.groupNumber || 'NO-GROUP';
-    return `${reportType}-${po}-${group}`;
+    return `${reportType}-${po}-${group}-${inspNo}`;
 };
 
 // Get inspection records from your MongoDB collection (updated to include download status)
@@ -763,7 +763,7 @@ const runDownloadTask = async (jobId, recordParams, userId) => {
                 });
 
                 const newFiles = await waitForNewFile(jobDir, filesBefore, 90000);
-                const baseName = getFilename(record);
+                const baseName = getFilename(record, inspNo);
                 
                 newFiles.forEach((file, index) => {
                     const oldPath = path.join(jobDir, file);
@@ -1132,7 +1132,7 @@ export const downloadBulkReports = async (req, res) => {
                 const newFiles = await waitForNewFile(jobDir, filesBefore, 120000);
 
                 // Rename
-                const baseName = getFilename(record);
+                const baseName = getFilename(record, inspNo);
                 newFiles.forEach((file, index) => {
                     const oldPath = path.join(jobDir, file);
                     const newName = `${baseName}-${language}${newFiles.length > 1 ? `_${index + 1}` : ''}.pdf`;
