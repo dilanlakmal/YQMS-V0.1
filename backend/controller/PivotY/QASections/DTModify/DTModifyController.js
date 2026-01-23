@@ -72,9 +72,22 @@ export const getDtOrderByOrderNo = async (req, res) => {
 // Update DT Order by ID
 export const updateDtOrder = async (req, res) => {
   try {
-    
     const { id } = req.params;
-    let updateData = { ...req.body }; // Create a copy
+    let updateData = { ...req.body };
+
+    // Extract user info from JWT token
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    let userInfo = null;
+    
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        userInfo = decoded;
+        console.log('🔐 Authenticated user:', userInfo);
+      } catch (jwtError) {
+        console.log('JWT verification failed:', jwtError.message);
+      }
+    }
 
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -84,32 +97,48 @@ export const updateDtOrder = async (req, res) => {
       });
     }
 
-    // Validate required fields if they exist
-    if (updateData.SizeSpec && !Array.isArray(updateData.SizeSpec)) {
-      return res.status(400).json({
-        success: false,
-        message: 'SizeSpec must be an array'
+    // ❌ REMOVE THIS SECTION - No need to convert again
+    // Frontend already sends converted values
+    /*
+    if (updateData.SizeSpec && Array.isArray(updateData.SizeSpec)) {
+      updateData.SizeSpec = updateData.SizeSpec.map(spec => {
+        // ... conversion logic removed
       });
     }
+    */
 
-    if (updateData.OrderColors && !Array.isArray(updateData.OrderColors)) {
-      return res.status(400).json({
-        success: false,
-        message: 'OrderColors must be an array'
-      });
-    }
-
-    // EXPLICITLY set modification fields
+    // Set modification fields with actual user data
     updateData.isModify = true;
     updateData.modifiedAt = new Date();
     updateData.updatedAt = new Date();
+    
+    updateData.modifiedBy = userInfo ? 
+      (userInfo.eng_name || userInfo.emp_id || userInfo.email || 'Authenticated User') : 
+      (updateData.modifiedBy || 'Unknown User');
 
-    // Update the order with explicit options
+    // Add to modification history
+    if (!updateData.modificationHistory) {
+      updateData.modificationHistory = [];
+    }
+    
+    updateData.modificationHistory.push({
+      modifiedAt: new Date(),
+      modifiedBy: updateData.modifiedBy,
+      changes: updateData.changes || 'Order specifications and tolerances modified',
+      userDetails: userInfo ? {
+        userId: userInfo.emp_id,
+        empId: userInfo.emp_id,
+        engName: userInfo.eng_name,
+        email: userInfo.email
+      } : null
+    });
+
+    console.log('💾 Updating order with user:', updateData.modifiedBy);
+
+    // Update the order - frontend data already has correct decimal values
     const updatedOrder = await DtOrder.findByIdAndUpdate(
       id,
-      {
-        $set: updateData 
-      },
+      { $set: updateData },
       { 
         new: true, 
         runValidators: false, 
@@ -118,13 +147,15 @@ export const updateDtOrder = async (req, res) => {
       }
     );
 
-    if (!updatedOrder) {;
+    if (!updatedOrder) {
       return res.status(404).json({
         success: false,
         message: 'Order not found'
       });
     }
-    
+
+    console.log('✅ Order updated successfully by:', updateData.modifiedBy);
+
     res.status(200).json({
       success: true,
       message: 'Order updated successfully',
@@ -132,6 +163,7 @@ export const updateDtOrder = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('❌ Error updating DT order:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',

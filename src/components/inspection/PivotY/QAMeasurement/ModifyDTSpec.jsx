@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../../authentication/AuthContext';
+import Swal from "sweetalert2";
 
 const ModifyDTspec = () => {
   const { user } = useAuth();
@@ -24,9 +25,24 @@ const ModifyDTspec = () => {
   const [editingTable, setEditingTable] = useState('');
   const editInputRef = useRef(null);
 
+  const [editingToleranceIndex, setEditingToleranceIndex] = useState(-1);
+  const [editingToleranceType, setEditingToleranceType] = useState(''); // 'minus' or 'plus'
+  const [editingToleranceValue, setEditingToleranceValue] = useState('');
+  const toleranceInputRef = useRef(null);
+
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
   const inputRef = useRef(null);
   const suggestionsRef = useRef(null);
+
+  const Toast = Swal.mixin({
+    customClass: {
+      confirmButton: 'px-6 py-2.5 bg-blue-600 text-white font-medium text-xs leading-tight uppercase rounded shadow-md hover:bg-blue-700 mx-2',
+      cancelButton: 'px-6 py-2.5 bg-gray-500 text-white font-medium text-xs leading-tight uppercase rounded shadow-md hover:bg-gray-600 mx-2',
+      denyButton: 'px-6 py-2.5 bg-red-600 text-white font-medium text-xs leading-tight uppercase rounded shadow-md hover:bg-red-700 mx-2',
+    },
+    buttonsStyling: false,
+  });
+
 
   const useDebounce = (value, delay) => {
     const [debouncedValue, setDebouncedValue] = useState(value);
@@ -360,7 +376,121 @@ const cancelEditingSizeName = () => {
   setEditingTable('');
 };
 
+const startEditingTolerance = (specIndex, toleranceType, currentValue) => {
+  setEditingToleranceIndex(specIndex);
+  setEditingToleranceType(toleranceType);
+  setEditingToleranceValue(currentValue || '');
+  setTimeout(() => {
+    if (toleranceInputRef.current) {
+      toleranceInputRef.current.focus();
+      toleranceInputRef.current.select();
+    }
+  }, 50);
+};
 
+const cancelEditingTolerance = () => {
+  setEditingToleranceIndex(-1);
+  setEditingToleranceType('');
+  setEditingToleranceValue('');
+};
+
+const handleToleranceEdit = (specIndex, toleranceType, newValue) => {
+  const trimmedValue = newValue.trim();
+  
+  console.log('🔧 Editing tolerance:', { specIndex, toleranceType, newValue: trimmedValue });
+  
+  const fieldKey = createFieldKey('tolerance', specIndex, toleranceType);
+  
+  // Get original value for comparison
+  const originalValue = toleranceType === 'minus' 
+    ? originalData?.SizeSpec?.[specIndex]?.ToleranceMinus?.fraction || ''
+    : originalData?.SizeSpec?.[specIndex]?.TolerancePlus?.fraction || '';
+  
+  setModifiedData(prevData => {
+    const updatedData = { ...prevData };
+    
+    // Convert the new value to decimal using the same function as measurements
+    const decimalValue = convertFractionToDecimal(trimmedValue);
+    
+    console.log(`✅ Converted tolerance "${trimmedValue}" to decimal: ${decimalValue}`);
+    
+    if (toleranceType === 'minus') {
+      updatedData.SizeSpec[specIndex].ToleranceMinus = {
+        fraction: trimmedValue,
+        decimal: decimalValue
+      };
+    } else {
+      updatedData.SizeSpec[specIndex].TolerancePlus = {
+        fraction: trimmedValue,
+        decimal: decimalValue
+      };
+    }
+    
+    return updatedData;
+  });
+  
+  // Track if field is modified
+  if (trimmedValue !== originalValue) {
+    markFieldAsModified(fieldKey);
+  } else {
+    setModifiedFields(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(fieldKey);
+      return newSet;
+    });
+  }
+  
+  setIsModified(true);
+  
+  // Exit edit mode
+  cancelEditingTolerance();
+  
+  console.log('✅ Tolerance updated successfully');
+};
+
+const handleToleranceChange = (specIndex, toleranceType, value) => {
+  console.log('🔧 handleToleranceChange called:', { specIndex, toleranceType, value });
+  
+  const fieldKey = createFieldKey('tolerance', specIndex, toleranceType);
+  
+  // Check if value is different from original
+  const originalValue = toleranceType === 'minus'
+    ? originalData?.SizeSpec?.[specIndex]?.ToleranceMinus?.fraction || ''
+    : originalData?.SizeSpec?.[specIndex]?.TolerancePlus?.fraction || '';
+  
+  const updatedData = { ...modifiedData };
+  
+  // Convert fraction to decimal using the same logic as measurements
+  const decimalValue = convertFractionToDecimal(value);
+  console.log(`✅ Converted tolerance "${value}" to decimal: ${decimalValue}`);
+  
+  if (toleranceType === 'minus') {
+    updatedData.SizeSpec[specIndex].ToleranceMinus = {
+      fraction: value,
+      decimal: decimalValue
+    };
+  } else {
+    updatedData.SizeSpec[specIndex].TolerancePlus = {
+      fraction: value,
+      decimal: decimalValue
+    };
+  }
+  
+  // Track if field is modified
+  if (value !== originalValue) {
+    markFieldAsModified(fieldKey);
+  } else {
+    // Remove from modified fields if value matches original
+    setModifiedFields(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(fieldKey);
+      return newSet;
+    });
+  }
+  
+  setModifiedData(updatedData);
+  setIsModified(true);
+};
 
   const createFieldKey = (type, ...identifiers) => {
     return `${type}_${identifiers.join('_')}`;
@@ -583,62 +713,7 @@ const handleDragOver = (e, index) => {
     setIsModified(true);
   };
 
-const convertFractionToDecimal = (fractionStr) => {
-  if (!fractionStr || typeof fractionStr !== 'string') {
-    return 0;
-  }
-
-  const trimmed = fractionStr.trim();
-  
-  // Handle empty string
-  if (trimmed === '') {
-    return 0;
-  }
-
-  // Handle pure decimal numbers (like "1.5", "0.75")
-  if (!trimmed.includes('/') && !trimmed.includes(' ')) {
-    const decimal = parseFloat(trimmed);
-    return isNaN(decimal) ? 0 : decimal;
-  }
-
-  // Handle mixed numbers (like "1 1/2", "2 3/4")
-  if (trimmed.includes(' ') && trimmed.includes('/')) {
-    const parts = trimmed.split(' ');
-    if (parts.length === 2) {
-      const wholePart = parseInt(parts[0]) || 0;
-      const fractionPart = parts[1];
-      
-      if (fractionPart.includes('/')) {
-        const [numerator, denominator] = fractionPart.split('/');
-        const num = parseInt(numerator) || 0;
-        const den = parseInt(denominator) || 1;
-        
-        if (den !== 0) {
-          const decimal = wholePart + (num / den);
-          return Math.round(decimal * 10000) / 10000; // Round to 4 decimal places
-        }
-      }
-    }
-  }
-
-  // Handle pure fractions (like "1/2", "3/4", "5/8")
-  if (trimmed.includes('/')) {
-    const [numerator, denominator] = trimmed.split('/');
-    const num = parseInt(numerator) || 0;
-    const den = parseInt(denominator) || 1;
-    
-    if (den !== 0) {
-      const decimal = num / den;
-      return Math.round(decimal * 10000) / 10000; // Round to 4 decimal places
-    }
-  }
-
-  // If all else fails, try to parse as a regular number
-  const fallback = parseFloat(trimmed);
-  return isNaN(fallback) ? 0 : fallback;
-};
-
-// Convert decimal number to fraction string
+  // Convert decimal number to fraction string
 const convertDecimalToFraction = (decimal) => {
   if (typeof decimal !== 'number' || isNaN(decimal)) {
     return "0";
@@ -659,8 +734,6 @@ const convertDecimalToFraction = (decimal) => {
 
   // Convert fractional part to fraction
   const tolerance = 1e-6;
-  let numerator = 1;
-  let denominator = 1;
   let bestNumerator = 1;
   let bestDenominator = 1;
   let bestError = Math.abs(fractionalPart - (bestNumerator / bestDenominator));
@@ -707,6 +780,91 @@ const convertDecimalToFraction = (decimal) => {
 };
 
 
+const convertFractionToDecimal = (fractionStr) => {
+  if (!fractionStr || typeof fractionStr !== 'string') {
+    return 0;
+  }
+  
+  const trimmed = fractionStr.trim();
+  
+  // Handle empty string
+  if (trimmed === '') {
+    return 0;
+  }
+
+  // Handle negative values
+  let isNegative = false;
+  let workingStr = trimmed;
+  
+  // Check for negative signs (including Unicode minus)
+  if (trimmed.startsWith('-') || trimmed.startsWith('−')) {
+    isNegative = true;
+    workingStr = trimmed.substring(1).trim();
+  }
+
+  let decimal = 0;
+
+  try {
+    // Handle pure decimal numbers (like "1.5", "0.75")
+    if (!workingStr.includes('/') && !workingStr.includes('⁄') && !workingStr.includes(' ')) {
+      decimal = parseFloat(workingStr);
+      if (isNaN(decimal)) decimal = 0;
+    }
+    // Handle mixed numbers (like "1 1/2", "2 3⁄4") - FIXED: Now handles both / and ⁄
+    else if (workingStr.includes(' ') && (workingStr.includes('/') || workingStr.includes('⁄'))) {
+      const parts = workingStr.split(' ');
+      if (parts.length === 2) {
+        const wholePart = parseInt(parts[0]) || 0;
+        const fractionPart = parts[1];
+        
+        // Handle both regular slash and Unicode fraction slash in mixed numbers
+        const fractionParts = fractionPart.includes('⁄') 
+          ? fractionPart.split('⁄') 
+          : fractionPart.split('/');
+          
+        if (fractionParts.length === 2) {
+          const num = parseInt(fractionParts[0]) || 0;
+          const den = parseInt(fractionParts[1]) || 1;
+          
+          if (den !== 0) {
+            decimal = wholePart + (num / den);
+          }
+        }
+      }
+    }
+    // Handle pure fractions (like "1/2", "3⁄4", "5⁄8")
+    else if (workingStr.includes('/') || workingStr.includes('⁄')) {
+      // Handle both regular slash and Unicode fraction slash
+      const parts = workingStr.includes('⁄') 
+        ? workingStr.split('⁄') 
+        : workingStr.split('/');
+        
+      if (parts.length === 2) {
+        const num = parseInt(parts[0]) || 0;
+        const den = parseInt(parts[1]) || 1;
+        
+        if (den !== 0) {
+          decimal = num / den;
+        }
+      }
+    }
+    else {
+      const fallback = parseFloat(workingStr);
+      decimal = isNaN(fallback) ? 0 : fallback;
+    }
+  } catch (error) {
+    console.error('Error converting fraction to decimal:', error);
+    decimal = 0;
+  }
+
+  // Apply negative sign if needed
+  if (isNegative) {
+    decimal = -decimal;
+  }
+
+  // Round to 6 decimal places to avoid floating point precision issues
+  return Math.round(decimal * 1000000) / 1000000;
+};
 
   // Add new size to specifications
   const handleAddSize = (newSize) => {
@@ -856,7 +1014,8 @@ const convertDecimalToFraction = (decimal) => {
   const handleSave = async () => {
     if (!isModified) return;
     if (!user) {
-      alert('You must be logged in to save changes');
+      // Switched to SweetAlert
+      Toast.fire({ icon: 'error', title: 'Unauthorized', text: 'You must be logged in to save changes' });
       return;
     }
     setLoading(true);
@@ -895,15 +1054,14 @@ const convertDecimalToFraction = (decimal) => {
       const result = await response.json();
       
       if (result.success && result.data) {
-        setOrderData(result.data);
-        setModifiedData(JSON.parse(JSON.stringify(result.data)));
-        setOriginalData(JSON.parse(JSON.stringify(result.data))); // Update original data
-        setIsModified(false);
-        setModifiedFields(new Set()); // Clear all modified field tracking
-        setNewlyAddedSizes(new Set()); // Clear newly added sizes after save
-        alert('Changes saved successfully!');
+        setOrderData(result.data); setModifiedData(JSON.parse(JSON.stringify(result.data))); setOriginalData(JSON.parse(JSON.stringify(result.data)));
+        setIsModified(false); 
+        setModifiedFields(new Set()); 
+        setNewlyAddedSizes(new Set());
+        // Switched to SweetAlert
+        Toast.fire({ icon: 'success', title: 'Success', text: 'Changes saved successfully!' });
       } else {
-        throw new Error(result.message || 'Failed to save changes');
+          throw new Error(result.message || 'Failed to save changes'); 
       }
     } catch (err) {
       console.error('❌ Save error:', err);
@@ -917,75 +1075,45 @@ const convertDecimalToFraction = (decimal) => {
   const handleDeleteSize = async (sizeToDelete) => {
     if (!orderData || !sizeToDelete) return;
     
-    // Confirm deletion
-    const confirmDelete = window.confirm(
-      `Are you sure you want to delete size "${sizeToDelete}"? This will remove it from all specifications and quantity tables.`
-    );
-    
-    if (!confirmDelete) return;
-    console.log('🗑️ Deleting size:', sizeToDelete);
-    
-    // Remove from newly added sizes if it exists
-    setNewlyAddedSizes(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(sizeToDelete);
-      return newSet;
+    Toast.fire({
+      title: 'Are you sure?',
+      text: `Do you want to delete size "${sizeToDelete}"? This will remove it from all specifications and quantity tables.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, delete it!',
+      cancelButtonText: 'No, cancel!',
+      reverseButtons: true
+    }).then((result) => {
+      if (result.isConfirmed) {
+        setNewlyAddedSizes(prev => { const newSet = new Set(prev); newSet.delete(sizeToDelete); return newSet; });
+        setModifiedData(prevData => {
+          if (!prevData) return prevData;
+          const updatedData = { ...prevData };
+          updatedData.SizeList = prevData.SizeList.filter(size => size !== sizeToDelete);
+          updatedData.NoOfSize = updatedData.SizeList.length;
+          updatedData.SizeSpec = prevData.SizeSpec.map(spec => ({ ...spec, Specs: spec.Specs.filter(specItem => !specItem.hasOwnProperty(sizeToDelete)) }));
+          updatedData.OrderColors = prevData.OrderColors.map(color => {
+            const updatedColor = { ...color };
+            updatedColor.OrderQty = color.OrderQty.filter(qtyItem => !qtyItem.hasOwnProperty(sizeToDelete));
+            const { [sizeToDelete]: deletedSize, ...remainingCutQty } = color.CutQty;
+            updatedColor.CutQty = remainingCutQty;
+            return updatedColor;
+          });
+          updatedData.OrderColorShip = prevData.OrderColorShip.map(colorShip => ({ ...colorShip, ShipSeqNo: colorShip.ShipSeqNo.map(shipSeq => ({ ...shipSeq, sizes: shipSeq.sizes.filter(sizeItem => !sizeItem.hasOwnProperty(sizeToDelete)) })) }));
+          return updatedData;
+        });
+        setIsModified(true);
+        Toast.fire('Deleted!', 'The size has been removed from the UI. Remember to save changes.', 'success');
+      }
     });
-    
-    // Update UI immediately (optimistic update)
-    setModifiedData(prevData => {
-      if (!prevData) return prevData;
-      
-      const updatedData = { ...prevData };
-      
-      // Remove from SizeList
-      updatedData.SizeList = prevData.SizeList.filter(size => size !== sizeToDelete);
-      updatedData.NoOfSize = updatedData.SizeList.length;
-      
-      // Remove from SizeSpec
-      updatedData.SizeSpec = prevData.SizeSpec.map(spec => ({
-        ...spec,
-        Specs: spec.Specs.filter(specItem => !specItem.hasOwnProperty(sizeToDelete))
-      }));
-      
-      // Remove from OrderColors
-      updatedData.OrderColors = prevData.OrderColors.map(color => {
-        const updatedColor = { ...color };
-        
-        // Remove from OrderQty
-        updatedColor.OrderQty = color.OrderQty.filter(qtyItem =>  
-          !qtyItem.hasOwnProperty(sizeToDelete)
-        );
-        
-        // Remove from CutQty
-        const { [sizeToDelete]: deletedSize, ...remainingCutQty } = color.CutQty;
-        updatedColor.CutQty = remainingCutQty;
-        
-        return updatedColor;
-      });
-      
-      // Remove from OrderColorShip
-      updatedData.OrderColorShip = prevData.OrderColorShip.map(colorShip => ({
-        ...colorShip,
-        ShipSeqNo: colorShip.ShipSeqNo.map(shipSeq => ({
-          ...shipSeq,
-          sizes: shipSeq.sizes.filter(sizeItem => !sizeItem.hasOwnProperty(sizeToDelete))
-        }))
-      }));
-      
-      return updatedData;
-    });
-    
-    setIsModified(true);
-    console.log('✅ Size deleted from UI, remember to save changes');
   };
 
   // Close edit mode when clicking outside - Add this useEffect
 // Close edit mode when clicking outside - Updated
 useEffect(() => {
   const handleClickOutsideEdit = (event) => {
+    // Handle size name editing
     if (editingSizeIndex !== -1 && editingTable) {
-      // Check if click is outside the editing area
       const editingElements = document.querySelectorAll('input[type="text"]');
       let clickedOutside = true;
       
@@ -995,18 +1123,41 @@ useEffect(() => {
         }
       });
       
-      // Also check if clicked on save/cancel buttons
       if (event.target.closest('button[title="Save"]') || 
           event.target.closest('button[title="Cancel"]')) {
         clickedOutside = false;
       }
       
       if (clickedOutside) {
-        // Save the current edit when clicking outside
         if (editingSizeName.trim() && editingSizeName !== modifiedData.SizeList[editingSizeIndex]) {
           handleSizeNameEdit(editingSizeIndex, editingSizeName);
         } else {
           cancelEditingSizeName();
+        }
+      }
+    }
+    
+    // Handle tolerance editing
+    if (editingToleranceIndex !== -1 && editingToleranceType) {
+      const editingElements = document.querySelectorAll('input[type="text"]');
+      let clickedOutside = true;
+      
+      editingElements.forEach(element => {
+        if (element.contains(event.target) || element === event.target) {
+          clickedOutside = false;
+        }
+      });
+      
+      if (event.target.closest('button[title="Save"]') || 
+          event.target.closest('button[title="Cancel"]')) {
+        clickedOutside = false;
+      }
+      
+      if (clickedOutside) {
+        if (editingToleranceValue.trim()) {
+          handleToleranceEdit(editingToleranceIndex, editingToleranceType, editingToleranceValue);
+        } else {
+          cancelEditingTolerance();
         }
       }
     }
@@ -1016,7 +1167,7 @@ useEffect(() => {
   return () => {
     document.removeEventListener('mousedown', handleClickOutsideEdit);
   };
-}, [editingSizeIndex, editingSizeName, editingTable, modifiedData]);
+}, [editingSizeIndex, editingSizeName, editingTable, editingToleranceIndex, editingToleranceType, editingToleranceValue, modifiedData]);
 
 useEffect(() => {
   if (editingSizeIndex !== -1 && editingTable === 'specs' && editInputRef.current) {
@@ -1059,13 +1210,15 @@ useEffect(() => {
                 </svg>
               </div>
               <div className="text-sm text-blue-800">
-                <p className="font-semibold mb-2">💡 How to manage sizes:</p>
+                <p className="font-semibold mb-2">💡 How to manage sizes and tolerances:</p>
                 <ul className="space-y-1 ml-4">
                   <li>• <span className="font-medium">Click on size name</span> to edit it</li>
+                  <li>• <span className="font-medium">Click on tolerance values</span> to edit them</li>
                   <li>• Drag and drop the size column headers to reorder</li>
                   <li>• Use the ↑↓ arrow buttons in each size header</li>
                   <li>• <span className="bg-yellow-200 px-2 py-1 rounded-md font-medium">Yellow highlight</span> shows modified fields</li>
                   <li>• <span className="bg-green-200 px-2 py-1 rounded-md font-medium">Green highlight</span> shows new sizes</li>
+                  <li>• Tolerance values support fractions (1/2), decimals (0.5), and mixed numbers (1 1/2)</li>
                 </ul>
               </div>
             </div>
@@ -1310,12 +1463,143 @@ useEffect(() => {
                         {spec.SizeSpecMeasUnit}
                       </span>
                     </td> */}
-                    <td className="border-r border-gray-200 px-4 py-3 text-center text-sm text-gray-600">
-                      {spec.ToleranceMinus?.fraction}
-                    </td>
-                    <td className="border-r border-gray-200 px-4 py-3 text-center text-sm text-gray-600">
-                      {spec.TolerancePlus?.fraction}
-                    </td>
+                   <td className="border-r border-gray-200 px-4 py-3 text-center text-sm">
+                    {editingToleranceIndex === specIndex && editingToleranceType === 'minus' ? (
+                      <div className="flex items-center justify-center gap-1">
+                        <input
+                          ref={toleranceInputRef}
+                          type="text"
+                          value={editingToleranceValue}
+                          onChange={(e) => setEditingToleranceValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleToleranceEdit(specIndex, 'minus', editingToleranceValue);
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              cancelEditingTolerance();
+                            }
+                          }}
+                          className="w-20 px-2 py-1 text-xs text-center border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          onFocus={(e) => e.target.select()}
+                          placeholder="e.g., 1/8, 0.125"
+                        />
+                        <div className="flex flex-col gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToleranceEdit(specIndex, 'minus', editingToleranceValue);
+                            }}
+                            className="w-3 h-3 bg-green-500 hover:bg-green-600 text-white rounded-sm flex items-center justify-center"
+                            title="Save"
+                          >
+                            <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              cancelEditingTolerance();
+                            }}
+                            className="w-3 h-3 bg-red-500 hover:bg-red-600 text-white rounded-sm flex items-center justify-center"
+                            title="Cancel"
+                          >
+                            <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={spec.ToleranceMinus?.fraction || ''}
+                          onChange={(e) => handleToleranceChange(specIndex, 'minus', e.target.value)}
+                          className={`w-20 px-3 py-2 border rounded-lg text-center text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                            isFieldModified(createFieldKey('tolerance', specIndex, 'minus'))
+                              ? 'bg-yellow-50 border-yellow-400 text-yellow-800 shadow-sm' 
+                              : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                          }`}
+                          placeholder="0"
+                          title={`Decimal: ${spec.ToleranceMinus?.decimal || 0}`}
+                        />
+                        {isFieldModified(createFieldKey('tolerance', specIndex, 'minus')) && (
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white"></div>
+                        )}
+                      </div>
+                    )}
+                  </td>
+
+                  <td className="border-r border-gray-200 px-4 py-3 text-center text-sm">
+                    {editingToleranceIndex === specIndex && editingToleranceType === 'plus' ? (
+                      <div className="flex items-center justify-center gap-1">
+                        <input
+                          ref={toleranceInputRef}
+                          type="text"
+                          value={editingToleranceValue}
+                          onChange={(e) => setEditingToleranceValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleToleranceEdit(specIndex, 'plus', editingToleranceValue);
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              cancelEditingTolerance();
+                            }
+                          }}
+                          className="w-20 px-2 py-1 text-xs text-center border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          onFocus={(e) => e.target.select()}
+                          placeholder="e.g., 1/8, 0.125"
+                        />
+                        <div className="flex flex-col gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToleranceEdit(specIndex, 'plus', editingToleranceValue);
+                            }}
+                            className="w-3 h-3 bg-green-500 hover:bg-green-600 text-white rounded-sm flex items-center justify-center"
+                            title="Save"
+                          >
+                            <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              cancelEditingTolerance();
+                            }}
+                            className="w-3 h-3 bg-red-500 hover:bg-red-600 text-white rounded-sm flex items-center justify-center"
+                            title="Cancel"
+                          >
+                            <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={spec.TolerancePlus?.fraction || ''}
+                          onChange={(e) => handleToleranceChange(specIndex, 'plus', e.target.value)}
+                          className={`w-20 px-3 py-2 border rounded-lg text-center text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                            isFieldModified(createFieldKey('tolerance', specIndex, 'plus'))
+                              ? 'bg-yellow-50 border-yellow-400 text-yellow-800 shadow-sm' 
+                              : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                          }`}
+                          placeholder="0"
+                          title={`Decimal: ${spec.TolerancePlus?.decimal || 0}`}
+                        />
+                        {isFieldModified(createFieldKey('tolerance', specIndex, 'plus')) && (
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white"></div>
+                        )}
+                      </div>
+                    )}
+                  </td>
                     {modifiedData.SizeList.map(size => {
                       const sizeSpec = spec.Specs.find(s => s[size]);
                       const value = sizeSpec?.[size];
