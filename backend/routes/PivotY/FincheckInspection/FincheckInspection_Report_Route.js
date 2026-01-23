@@ -11,6 +11,7 @@ import {
   getFilterOptions,
   autocompleteOrderNo,
   autocompleteCustStyle,
+  autocompletePOLine,
   saveUserPreference,
   getUserPreferences,
   deleteUserFilter,
@@ -41,6 +42,7 @@ router.get(
   "/api/fincheck-reports/autocomplete/cust-style",
   autocompleteCustStyle
 );
+router.get("/api/fincheck-reports/autocomplete/po-line", autocompletePOLine);
 
 // Route for Defect Images
 router.get(

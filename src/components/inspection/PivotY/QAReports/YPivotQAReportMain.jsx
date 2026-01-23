@@ -342,6 +342,124 @@ const AutocompleteInput = ({ value, onChange, placeholder, apiEndpoint }) => {
 };
 
 // =============================================================================
+// Sub-Component: Multi-Select Autocomplete (For PO Line)
+// =============================================================================
+const MultiSelectAutocomplete = ({
+  selectedItems,
+  onChange,
+  placeholder,
+  apiEndpoint
+}) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [results, setResults] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const containerRef = useRef(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target)
+      ) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (searchTerm.length >= 2) {
+        setLoading(true);
+        try {
+          const res = await axios.get(
+            `${API_BASE_URL}${apiEndpoint}?term=${searchTerm}`
+          );
+          if (res.data.success) {
+            // Filter out already selected items
+            const filtered = (res.data.data || []).filter(
+              (item) => !selectedItems.includes(item)
+            );
+            setResults(filtered);
+            setShowDropdown(true);
+          }
+        } catch (error) {
+          console.error("Autocomplete error", error);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setResults([]);
+        setShowDropdown(false);
+      }
+    }, 300);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm, apiEndpoint, selectedItems]);
+
+  const handleSelect = (item) => {
+    onChange([...selectedItems, item]);
+    setSearchTerm("");
+    setShowDropdown(false);
+  };
+
+  const handleRemove = (itemToRemove) => {
+    onChange(selectedItems.filter((i) => i !== itemToRemove));
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full max-w-[250px]">
+      <div className="flex flex-wrap items-center gap-1 p-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl min-h-[38px] focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
+        {selectedItems.map((item) => (
+          <span
+            key={item}
+            className="flex items-center gap-1 px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold rounded-lg border border-indigo-200 dark:border-indigo-800"
+          >
+            <span className="truncate max-w-[80px]">{item}</span>
+            <button
+              onClick={() => handleRemove(item)}
+              className="hover:text-red-500 rounded-full focus:outline-none"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        ))}
+        <input
+          type="text"
+          placeholder={selectedItems.length === 0 ? placeholder : ""}
+          className="flex-1 min-w-[60px] bg-transparent text-sm outline-none px-1 text-gray-700 dark:text-gray-200"
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setShowDropdown(true);
+          }}
+          onFocus={() => setShowDropdown(true)}
+        />
+        {loading && (
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500 mr-2" />
+        )}
+      </div>
+
+      {showDropdown && results.length > 0 && (
+        <div className="absolute z-[100] mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+          {results.map((item, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleSelect(item)}
+              className="w-full text-left px-3 py-2 hover:bg-indigo-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0 text-xs font-medium text-gray-700 dark:text-gray-200 transition-colors"
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// =============================================================================
 // Helper: Inspector Detail Modal (Auto-Close)
 // =============================================================================
 const InspectorAutoCloseModal = ({ data, onClose }) => {
@@ -1156,8 +1274,17 @@ const YPivotQAReportMain = () => {
     try {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
-        if (value && value !== "All") params.append(key, value);
+        if (key === "poLines") {
+          if (value && value.length > 0) {
+            params.append("poLine", value.join(",")); // Send as comma-separated string
+          }
+        } else if (value && value !== "All") {
+          params.append(key, value);
+        }
       });
+      // Object.entries(filters).forEach(([key, value]) => {
+      //   if (value && value !== "All") params.append(key, value);
+      // });
       params.append("page", page);
       params.append("limit", pageSize);
 
@@ -1241,7 +1368,8 @@ const YPivotQAReportMain = () => {
       subConFactory: "All",
       custStyle: "",
       buyer: "All",
-      supplier: "All"
+      supplier: "All",
+      poLines: []
     });
   };
 
@@ -1782,7 +1910,18 @@ const YPivotQAReportMain = () => {
               </span>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-1 justify-end min-w-0">
+              {/* --- NEW PO LINE FILTER --- */}
+              <div className="w-full max-w-[140px] sm:max-w-[250px]">
+                <MultiSelectAutocomplete
+                  selectedItems={filters.poLines || []}
+                  onChange={(newItems) =>
+                    handleFilterChange("poLines", newItems)
+                  }
+                  placeholder="Filter PO Line..."
+                  apiEndpoint="/api/fincheck-reports/autocomplete/po-line"
+                />
+              </div>
               {/* Customize View Button */}
               <button
                 onClick={() => setShowColumnModal(true)}

@@ -48,6 +48,41 @@ export const getInspectionReports = async (req, res) => {
       status: { $ne: "cancelled" }
     };
 
+    // --- PO Line Filter Logic ---
+    if (poLine) {
+      // Split by comma and trim
+      const poList = poLine
+        .split(",")
+        .map((p) => p.trim())
+        .filter((p) => p);
+
+      if (poList.length > 0) {
+        //  Find Order Numbers (moNo) from YorksysOrders that match ANY of these PO Lines
+        // Using $in with regex for partial match or exact match depending on requirement.
+        // Assuming strict filtering based on selection, we use $in.
+
+        // We create a regex array to allow case-insensitive exact matching
+        const regexList = poList.map((p) => new RegExp(`^${p}$`, "i"));
+
+        const matchingOrders = await YorksysOrders.find({
+          "SKUData.POLine": { $in: regexList }
+        })
+          .select("moNo")
+          .lean();
+
+        const matchingOrderNos = matchingOrders.map((o) => o.moNo);
+
+        // Report must contain at least one of these order numbers
+        // We use $in on the orderNos array field in the report
+        if (query.orderNos) {
+          // If orderNos query already exists (e.g. from Order No filter), we need to use $and or intersect
+          query.orderNos = { $in: matchingOrderNos };
+        } else {
+          query.orderNos = { $in: matchingOrderNos };
+        }
+      }
+    }
+
     // 1. Date Range Filter
     if (startDate && endDate) {
       const start = new Date(startDate);
@@ -350,6 +385,50 @@ export const autocompleteCustStyle = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in style autocomplete:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// Autocomplete for PO Line (NEW)
+// ============================================================
+export const autocompletePOLine = async (req, res) => {
+  try {
+    const { term } = req.query;
+
+    if (!term || term.length < 2) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    // Search inside SKUData array for POLine field
+    const results = await YorksysOrders.find({
+      "SKUData.POLine": { $regex: term, $options: "i" }
+    })
+      .select("SKUData.POLine")
+      .limit(50) // Limit documents to scan
+      .lean();
+
+    const poSet = new Set();
+
+    results.forEach((order) => {
+      if (order.SKUData && Array.isArray(order.SKUData)) {
+        order.SKUData.forEach((sku) => {
+          if (
+            sku.POLine &&
+            sku.POLine.toLowerCase().includes(term.toLowerCase())
+          ) {
+            poSet.add(sku.POLine);
+          }
+        });
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: Array.from(poSet).slice(0, 15) // Return top 15 matches
+    });
+  } catch (error) {
+    console.error("Error in PO Line autocomplete:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };
