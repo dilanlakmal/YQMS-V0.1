@@ -1268,58 +1268,96 @@ export const submitLeaderDecision = async (req, res) => {
     const orderStr =
       report.orderNosString ||
       (report.orderNos ? report.orderNos.join(", ") : "N/A");
+    const reportName = report.reportType || "Inspection";
     const targetUrl = `/fincheck-reports/view/${reportId}`;
 
     // --- SCENARIO A: Critical Rework PO Notification ---
-    // Target: FincheckNotificationGroup (Excluding QA)
+    // Target: ALL members in FincheckNotificationGroup
     if (reworkPO === "Yes") {
       try {
         const groupMembers = await FincheckNotificationGroup.find({});
 
-        // Prepare Message
-        const poCommentText = reworkPOComment
-          ? `\nReason: ${reworkPOComment}`
-          : "";
-        const criticalBody = `Order: ${orderStr} | QA: ${qaEmpId}\nLeader: ${leaderName}${poCommentText}`;
+        if (groupMembers && groupMembers.length > 0) {
+          // Build the notification body
+          const line1 = `#${parsedReportId} [${reportName}]`;
+          const line2 = `[${dateStr} - ${orderStr} - ${qaEmpId}] marked for Rework PO due to quality issue by ${leaderId} - ${leaderName}`;
+          const line3 = reworkPOComment ? `Reason: ${reworkPOComment}` : "";
 
-        const criticalPayload = {
-          title: `🚨 CRITICAL: Rework PO Required #${reportId}`,
-          body: criticalBody,
-          icon: "/assets/Home/Fincheck_Critical.png", // Optional: Different icon for critical
-          url: targetUrl,
-          tag: `rework-po-${reportId}`,
-          isCritical: true // Flag for SW to vibrate longer
-        };
+          const criticalBody = line3
+            ? `${line1}\n${line2}\n${line3}`
+            : `${line1}\n${line2}`;
 
-        // Loop and Send
-        for (const member of groupMembers) {
-          // DO NOT send to the QA (as per requirement)
-          if (member.empId === qaEmpId) continue;
+          const criticalPayload = {
+            title: `🚨 CRITICAL: REWORK PO OPEN CARTON REQUIRED !!!`,
+            body: criticalBody,
+            icon: "/assets/Home/Fincheck_Critical.png",
+            url: targetUrl,
+            tag: `rework-po-${parsedReportId}`,
+            isCritical: true
+          };
 
-          // Send (Fire and Forget)
-          sendPushToUser(member.empId, criticalPayload);
+          // Send to ALL group members (including QA if they are in the group)
+          for (const member of groupMembers) {
+            try {
+              await sendPushToUser(member.empId, criticalPayload);
+            } catch (pushErr) {
+              console.error(`Failed to send to ${member.empId}:`, pushErr);
+            }
+          }
+        } else {
+          console.log("No members found in FincheckNotificationGroup");
         }
       } catch (err) {
-        console.error("Error sending notification group push:", err);
+        console.error("Error sending Rework PO notification:", err);
       }
     }
 
-    // --- SCENARIO B: QA Feedback Notification ---
-    // Target: QA User Only (If Action Required)
+    // --- SCENARIO B: QA Feedback Notification (Rework or Rejected) ---
+    // Target: QA User Only
     if (status === "Rework" || status === "Rejected") {
-      const qaBodyText = `Report #${reportId} [${
-        report.reportType
-      }] marked for ${status.toUpperCase()} by ${leaderName}.`;
+      try {
+        // Build the notification body
+        const line1 = `Report #${parsedReportId} [${reportName}]`;
+        const line2 = `[${dateStr} - ${orderStr} - ${qaEmpId}] marked for ${status.toUpperCase()} by ${leaderId} - ${leaderName}`;
+        const leaderComment = additionalComment || "";
+        const line3 = leaderComment ? `Leader Comment: ${leaderComment}` : "";
 
-      const qaPayload = {
-        title: `Fincheck: Report ${status}`,
-        body: qaBodyText,
-        icon: "/assets/Home/Fincheck_Inspection.png",
-        url: targetUrl,
-        tag: `fincheck-${reportId}`
-      };
+        const qaBody = line3
+          ? `${line1}\n${line2}\n${line3}`
+          : `${line1}\n${line2}`;
 
-      sendPushToUser(qaEmpId, qaPayload);
+        const qaPayload = {
+          title: `Fincheck: Report ${status}`,
+          body: qaBody,
+          icon: "/assets/Home/Fincheck_Inspection.png",
+          url: targetUrl,
+          tag: `fincheck-${parsedReportId}`
+        };
+
+        await sendPushToUser(qaEmpId, qaPayload);
+      } catch (pushErr) {
+        console.error(`Failed to send ${status} notification to QA:`, pushErr);
+      }
+    }
+
+    // --- SCENARIO C: Approved Notification (Optional - Inform QA) ---
+    if (status === "Approved") {
+      try {
+        const line1 = `Report #${parsedReportId} [${reportName}]`;
+        const line2 = `[${dateStr} - ${orderStr}] has been APPROVED by ${leaderId} - ${leaderName}`;
+
+        const approvedPayload = {
+          title: `✅ Fincheck: Report Approved`,
+          body: `${line1}\n${line2}`,
+          icon: "/assets/Home/Fincheck_Inspection.png",
+          url: targetUrl,
+          tag: `fincheck-approved-${parsedReportId}`
+        };
+
+        await sendPushToUser(qaEmpId, approvedPayload);
+      } catch (pushErr) {
+        console.error("Failed to send Approved notification:", pushErr);
+      }
     }
 
     return res.status(200).json({

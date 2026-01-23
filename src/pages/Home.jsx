@@ -1958,6 +1958,27 @@ function Home() {
     return () => clearInterval(interval);
   }, [user?.emp_id]);
 
+  // Register Service Worker on Mount (Required for Push Notifications)
+  useEffect(() => {
+    if (!user?.emp_id) return;
+
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      console.log("Push Messaging not supported");
+      return;
+    }
+
+    const registerServiceWorker = async () => {
+      try {
+        const registration = await navigator.serviceWorker.register("/sw.js");
+        console.log("Service Worker registered:", registration.scope);
+      } catch (error) {
+        console.error("Service Worker registration failed:", error);
+      }
+    };
+
+    registerServiceWorker();
+  }, [user?.emp_id]);
+
   if (loading || pageLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-slate-900 gap-3">
