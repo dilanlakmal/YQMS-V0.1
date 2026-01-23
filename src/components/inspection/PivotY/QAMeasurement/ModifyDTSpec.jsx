@@ -817,111 +817,190 @@ const handleDeleteSize = async (sizeToDelete) => {
     if (!modifiedData?.SizeSpec) return null;
 
     return (
-      <div className="p-6 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Size Specifications</h3>
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
-            <strong>💡 Tip:</strong> You can reorder sizes by:
-            <br />• Dragging and dropping the size column headers
-            <br />• Using the ↑↓ arrow buttons in each size header
-            <br />• <span className="bg-yellow-200 px-1 rounded">Yellow background</span> indicates modified fields
-          </p>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-gray-800">Size Specifications</h3>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse border border-gray-300 min-w-[800px]">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="border border-gray-300 px-3 py-2 text-center font-bold sticky top-0 bg-gray-50 z-10">Seq</th>
-                <th className="border border-gray-300 px-3 py-2 text-center font-bold sticky top-0 bg-gray-50 z-10">Description</th>
-                <th className="border border-gray-300 px-3 py-2 text-center font-bold sticky top-0 bg-gray-50 z-10">Unit</th>
-                <th className="border border-gray-300 px-3 py-2 text-center font-bold sticky top-0 bg-gray-50 z-10">Tolerance -</th>
-                <th className="border border-gray-300 px-3 py-2 text-center font-bold sticky top-0 bg-gray-50 z-10">Tolerance +</th>
-                {modifiedData.SizeList.map((size, sizeIndex) => (
-                  <th 
-                    key={size} 
-                    className={`border border-gray-300 px-3 py-2 text-center font-bold sticky top-0 bg-gray-50 z-10 cursor-move ${
-                      dragOverIndex === sizeIndex ? 'bg-blue-200' : ''
-                    }`}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, sizeIndex)}
-                    onDragEnd={handleDragEnd}
-                    onDragOver={(e) => handleDragOver(e, sizeIndex)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, sizeIndex)}
-                  >
+
+        <div className="p-6">
+          <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="text-sm text-blue-800">
+                <p className="font-semibold mb-2">💡 How to reorder sizes:</p>
+                <ul className="space-y-1 ml-4">
+                  <li>• Drag and drop the size column headers</li>
+                  <li>• Use the ↑↓ arrow buttons in each size header</li>
+                  <li>• <span className="bg-yellow-200 px-2 py-1 rounded-md font-medium">Yellow highlight</span> shows modified fields</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="w-full border-collapse min-w-[800px]">
+              <thead>
+                <tr className="bg-gradient-to-r from-gray-50 to-gray-100">
+                  <th className="border-r border-gray-200 px-4 py-3 text-center font-bold text-gray-700 sticky top-0 bg-gray-50 z-10">
                     <div className="flex flex-col items-center gap-1">
-                      <div className="flex items-center gap-1 mb-1">
-                        <button
-                          onClick={() => moveSizeUp(sizeIndex)}
-                          disabled={sizeIndex === 0}
-                          className="text-xs px-1 py-0.5 bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed rounded"
-                          title="Move size left"
-                        >
-                          ↑
-                        </button>
-                        <button
-                          onClick={() => moveSizeDown(sizeIndex)}
-                          disabled={sizeIndex === modifiedData.SizeList.length - 1}
-                          className="text-xs px-1 py-0.5 bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed rounded"
-                          title="Move size right"
-                        >
-                          ↓
-                        </button>
-                      </div>
-                      
-                      <span className="font-semibold">{size}</span>
-                      <div className="text-xs text-gray-500">#{sizeIndex + 1}</div>
-                      
-                      <button
-                        onClick={() => handleDeleteSize(size)}
-                        className="text-red-600 hover:text-red-800 text-xs px-1 py-0.5 rounded hover:bg-red-100 transition-colors mt-1"
-                        title={`Delete size ${size}`}
-                      >
-                        🗑️
-                      </button>
+                      <span>Seq</span>
+                      <div className="w-8 h-0.5 bg-gray-300 rounded"></div>
                     </div>
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {modifiedData.SizeSpec.map((spec, specIndex) => (
-                <tr key={spec.Seq} className="hover:bg-gray-50">
-                  <td className="border border-gray-300 px-3 py-2 text-center">{spec.Seq}</td>
-                  <td className="border border-gray-300 px-3 py-2">
-                    <div className="text-left min-w-[200px]">
-                      <div className="text-sm">{spec.EnglishRemark}</div>
-                      <div className="text-xs text-gray-600 mt-1">{spec.ChineseRemark}</div>
+                  <th className="border-r border-gray-200 px-4 py-3 text-center font-bold text-gray-700 sticky top-0 bg-gray-50 z-10 min-w-[200px]">
+                    <div className="flex flex-col items-center gap-1">
+                      <span>Description</span>
+                      <div className="w-16 h-0.5 bg-gray-300 rounded"></div>
                     </div>
-                  </td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{spec.SizeSpecMeasUnit}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{spec.ToleranceMinus?.fraction}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">{spec.TolerancePlus?.fraction}</td>
-                  {modifiedData.SizeList.map(size => {
-                    const sizeSpec = spec.Specs.find(s => s[size]);
-                    const value = sizeSpec?.[size];
-                    const fieldKey = createFieldKey('spec', specIndex, size, 'fraction');
-                    const isModified = isFieldModified(fieldKey);
-                    
-                    return (
-                      <td key={size} className="border border-gray-300 px-2 py-2 text-center">
-                        <input
-                          type="text"
-                          value={value?.fraction || ''}
-                          onChange={(e) => handleSpecChange(specIndex, size, 'fraction', e.target.value)}
-                          className={`w-20 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                            isModified 
-                              ? 'bg-yellow-100 border-yellow-400' 
-                              : 'bg-white'
-                          }`}
-                        />
-                      </td>
-                    );
-                  })}
+                  </th>
+                  <th className="border-r border-gray-200 px-4 py-3 text-center font-bold text-gray-700 sticky top-0 bg-gray-50 z-10">
+                    <div className="flex flex-col items-center gap-1">
+                      <span>Unit</span>
+                      <div className="w-8 h-0.5 bg-gray-300 rounded"></div>
+                    </div>
+                  </th>
+                  <th className="border-r border-gray-200 px-4 py-3 text-center font-bold text-gray-700 sticky top-0 bg-gray-50 z-10">
+                    <div className="flex flex-col items-center gap-1">
+                      <span>Tol -</span>
+                      <div className="w-8 h-0.5 bg-gray-300 rounded"></div>
+                    </div>
+                  </th>
+                  <th className="border-r border-gray-200 px-4 py-3 text-center font-bold text-gray-700 sticky top-0 bg-gray-50 z-10">
+                    <div className="flex flex-col items-center gap-1">
+                      <span>Tol +</span>
+                      <div className="w-8 h-0.5 bg-gray-300 rounded"></div>
+                    </div>
+                  </th>
+                  {modifiedData.SizeList.map((size, sizeIndex) => (
+                    <th 
+                      key={size} 
+                      className={`border-r border-gray-200 px-3 py-3 text-center font-bold sticky top-0 z-10 cursor-move transition-all duration-200 ${
+                        dragOverIndex === sizeIndex 
+                          ? 'bg-blue-200 shadow-lg transform scale-105' 
+                          : 'bg-gray-50 hover:bg-gray-100'
+                      }`}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, sizeIndex)}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={(e) => handleDragOver(e, sizeIndex)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, sizeIndex)}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        {/* Size controls */}
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => moveSizeUp(sizeIndex)}
+                            disabled={sizeIndex === 0}
+                            className="w-6 h-6 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md flex items-center justify-center transition-colors"
+                            title="Move size left"
+                          >
+                            <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => moveSizeDown(sizeIndex)}
+                            disabled={sizeIndex === modifiedData.SizeList.length - 1}
+                            className="w-6 h-6 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md flex items-center justify-center transition-colors"
+                            title="Move size right"
+                          >
+                            <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                        </div>
+                        
+                        {/* Size info */}
+                        <div className="text-center">
+                          <span className="font-bold text-gray-800">{size}</span>
+                          <div className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full mt-1">
+                            #{sizeIndex + 1}
+                          </div>
+                        </div>
+                        
+                        {/* Delete button */}
+                        <button
+                          onClick={() => handleDeleteSize(size)}
+                          className="w-6 h-6 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 rounded-md flex items-center justify-center transition-colors"
+                          title={`Delete size ${size}`}
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {modifiedData.SizeSpec.map((spec, specIndex) => (
+                  <tr key={spec.Seq} className="hover:bg-gray-50 transition-colors">
+                    <td className="border-r border-gray-200 px-4 py-3 text-center font-medium text-gray-700 bg-gray-50">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+                        <span className="text-sm font-bold text-blue-700">{spec.Seq}</span>
+                      </div>
+                    </td>
+                    <td className="border-r border-gray-200 px-4 py-3">
+                      <div className="text-left space-y-1">
+                        <div className="font-medium text-gray-800">{spec.EnglishRemark}</div>
+                        <div className="text-sm text-gray-500">{spec.ChineseRemark}</div>
+                      </div>
+                    </td>
+                    <td className="border-r border-gray-200 px-4 py-3 text-center">
+                      <span className="inline-block bg-gray-100 px-2 py-1 rounded-md text-sm font-medium text-gray-700">
+                        {spec.SizeSpecMeasUnit}
+                      </span>
+                    </td>
+                    <td className="border-r border-gray-200 px-4 py-3 text-center text-sm text-gray-600">
+                      {spec.ToleranceMinus?.fraction}
+                    </td>
+                    <td className="border-r border-gray-200 px-4 py-3 text-center text-sm text-gray-600">
+                      {spec.TolerancePlus?.fraction}
+                    </td>
+                    {modifiedData.SizeList.map(size => {
+                      const sizeSpec = spec.Specs.find(s => s[size]);
+                      const value = sizeSpec?.[size];
+                      const fieldKey = createFieldKey('spec', specIndex, size, 'fraction');
+                      const isModified = isFieldModified(fieldKey);
+                      
+                      return (
+                        <td key={size} className="border-r border-gray-200 px-3 py-3 text-center">
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={value?.fraction || ''}
+                              onChange={(e) => handleSpecChange(specIndex, size, 'fraction', e.target.value)}
+                              className={`w-20 px-3 py-2 border rounded-lg text-center text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                isModified 
+                                  ? 'bg-yellow-50 border-yellow-400 text-yellow-800 shadow-sm' 
+                                  : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                              }`}
+                            />
+                            {isModified && (
+                              <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white"></div>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     );
@@ -933,107 +1012,180 @@ const handleDeleteSize = async (sizeToDelete) => {
     if (!modifiedData?.OrderColors) return null;
 
     return (
-      <div className="p-6 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Order Quantities & Cut Quantities</h3>
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-sm text-green-800">
-            <strong>✅ Note:</strong> Size order in quantity tables automatically matches the specification table order above.
-            <br />• <span className="bg-yellow-200 px-1 rounded">Yellow background</span> indicates modified fields
-          </p>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-gray-800">Order Quantities & Cut Quantities</h3>
+          </div>
         </div>
-        {modifiedData.OrderColors.map((color, colorIndex) => (
-          <div key={color.ColorCode} className="mb-8">
-            <h4 className="text-base font-medium text-gray-700 mb-4 p-3 bg-gray-100 rounded">
-              {color.ColorCode} - {color.Color}
-            </h4>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-300 min-w-[600px]">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="border border-gray-300 px-3 py-2 text-center font-bold sticky top-0 bg-gray-50 z-10">Type</th>
-                    {modifiedData.SizeList.map((size, index) => (
-                      <th key={size} className="border border-gray-300 px-3 py-2 text-center font-bold sticky top-0 bg-gray-50 z-10">
-                        <div className="flex flex-col items-center">
-                          <span>{size}</span>
-                          <span className="text-xs text-gray-500">#{index + 1}</span>
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="hover:bg-gray-50">
-                    <td className="border border-gray-300 px-3 py-2 font-semibold">Order Qty</td>
-                    {modifiedData.SizeList.map(size => {
-                      const orderQtyItem = color.OrderQty?.find(q => q[size] !== undefined);
-                      const fieldKey = createFieldKey('qty', colorIndex, size, 'order');
-                      const isModified = isFieldModified(fieldKey);
-                      
-                      return (
-                        <td key={size} className="border border-gray-300 px-2 py-2 text-center">
-                          <input
-                            type="number"
-                            value={orderQtyItem?.[size] || 0}
-                            onChange={(e) => handleQtyChange(colorIndex, size, 'order', e.target.value)}
-                            className={`w-20 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                              isModified 
-                                ? 'bg-yellow-100 border-yellow-400' 
-                                : 'bg-white'
-                            }`}
-                          />
-                        </td>
-                      );
-                    })}
-                  </tr>
-                  <tr className="hover:bg-gray-50">
-                    <td className="border border-gray-300 px-3 py-2 font-semibold">Plan Cut Qty</td>
-                    {modifiedData.SizeList.map(size => {
-                      const fieldKey = createFieldKey('qty', colorIndex, size, 'planCut');
-                      const isModified = isFieldModified(fieldKey);
-                      
-                      return (
-                        <td key={size} className="border border-gray-300 px-2 py-2 text-center">
-                          <input
-                            type="number"
-                            value={color.CutQty?.[size]?.PlanCutQty || 0}
-                            onChange={(e) => handleQtyChange(colorIndex, size, 'planCut', e.target.value)}
-                            className={`w-20 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                              isModified 
-                                ? 'bg-yellow-100 border-yellow-400' 
-                                : 'bg-white'
-                            }`}
-                          />
-                        </td>
-                      );
-                    })}
-                  </tr>
-                  <tr className="hover:bg-gray-50">
-                    <td className="border border-gray-300 px-3 py-2 font-semibold">Actual Cut Qty</td>
-                    {modifiedData.SizeList.map(size => {
-                      const fieldKey = createFieldKey('qty', colorIndex, size, 'actualCut');
-                      const isModified = isFieldModified(fieldKey);
-                      
-                      return (
-                        <td key={size} className="border border-gray-300 px-2 py-2 text-center">
-                          <input
-                            type="number"
-                            value={color.CutQty?.[size]?.ActualCutQty || 0}
-                            onChange={(e) => handleQtyChange(colorIndex, size, 'actualCut', e.target.value)}
-                            className={`w-20 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                              isModified 
-                                ? 'bg-yellow-100 border-yellow-400' 
-                                : 'bg-white'
-                            }`}
-                          />
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </tbody>
-              </table>
+
+        <div className="p-6">
+          <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-teal-50 border border-green-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div className="text-sm text-green-800">
+                <p className="font-semibold mb-1">✅ Size order automatically matches specification table</p>
+                <p>• <span className="bg-yellow-200 px-2 py-1 rounded-md font-medium">Yellow highlight</span> shows modified fields</p>
+              </div>
             </div>
           </div>
-        ))}
+
+          <div className="space-y-8">
+            {modifiedData.OrderColors.map((color, colorIndex) => (
+              <div key={color.ColorCode} className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-bold text-gray-800">{color.ColorCode}</h4>
+                    <p className="text-gray-600">{color.Color}</p>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+                  <table className="w-full border-collapse min-w-[600px]">
+                    <thead>
+                      <tr className="bg-gradient-to-r from-gray-50 to-gray-100">
+                        <th className="border-r border-gray-200 px-4 py-3 text-center font-bold text-gray-700 sticky top-0 bg-gray-50 z-10">
+                          <div className="flex flex-col items-center gap-1">
+                            <span>Type</span>
+                            <div className="w-8 h-0.5 bg-gray-300 rounded"></div>
+                          </div>
+                        </th>
+                        {modifiedData.SizeList.map((size, index) => (
+                          <th key={size} className="border-r border-gray-200 px-4 py-3 text-center font-bold text-gray-700 sticky top-0 bg-gray-50 z-10">
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="font-bold">{size}</span>
+                              <div className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+                                #{index + 1}
+                              </div>
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Order Qty Row */}
+                      <tr className="hover:bg-gray-50 transition-colors">
+                        <td className="border-r border-gray-200 px-4 py-3 bg-blue-50">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                            <span className="font-semibold text-gray-800">Order Qty</span>
+                          </div>
+                        </td>
+                        {modifiedData.SizeList.map(size => {
+                          const orderQtyItem = color.OrderQty?.find(q => q[size] !== undefined);
+                          const fieldKey = createFieldKey('qty', colorIndex, size, 'order');
+                          const isModified = isFieldModified(fieldKey);
+                          
+                          return (
+                            <td key={size} className="border-r border-gray-200 px-3 py-3 text-center">
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  value={orderQtyItem?.[size] || 0}
+                                  onChange={(e) => handleQtyChange(colorIndex, size, 'order', e.target.value)}
+                                  className={`w-20 px-3 py-2 border rounded-lg text-center text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                    isModified 
+                                      ? 'bg-yellow-50 border-yellow-400 text-yellow-800 shadow-sm' 
+                                      : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                                  }`}
+                                />
+                                {isModified && (
+                                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white"></div>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+
+                      {/* Plan Cut Qty Row */}
+                      <tr className="hover:bg-gray-50 transition-colors">
+                        <td className="border-r border-gray-200 px-4 py-3 bg-green-50">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                            <span className="font-semibold text-gray-800">Plan Cut Qty</span>
+                          </div>
+                        </td>
+                        {modifiedData.SizeList.map(size => {
+                          const fieldKey = createFieldKey('qty', colorIndex, size, 'planCut');
+                          const isModified = isFieldModified(fieldKey);
+                          
+                          return (
+                            <td key={size} className="border-r border-gray-200 px-3 py-3 text-center">
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  value={color.CutQty?.[size]?.PlanCutQty || 0}
+                                  onChange={(e) => handleQtyChange(colorIndex, size, 'planCut', e.target.value)}
+                                  className={`w-20 px-3 py-2 border rounded-lg text-center text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                    isModified 
+                                      ? 'bg-yellow-50 border-yellow-400 text-yellow-800 shadow-sm' 
+                                      : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                                  }`}
+                                />
+                                {isModified && (
+                                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white"></div>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+
+                      {/* Actual Cut Qty Row */}
+                      <tr className="hover:bg-gray-50 transition-colors">
+                        <td className="border-r border-gray-200 px-4 py-3 bg-orange-50">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                            <span className="font-semibold text-gray-800">Actual Cut Qty</span>
+                          </div>
+                        </td>
+                        {modifiedData.SizeList.map(size => {
+                          const fieldKey = createFieldKey('qty', colorIndex, size, 'actualCut');
+                          const isModified = isFieldModified(fieldKey);
+                          
+                          return (
+                            <td key={size} className="border-r border-gray-200 px-3 py-3 text-center">
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  value={color.CutQty?.[size]?.ActualCutQty || 0}
+                                  onChange={(e) => handleQtyChange(colorIndex, size, 'actualCut', e.target.value)}
+                                  className={`w-20 px-3 py-2 border rounded-lg text-center text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                    isModified 
+                                      ? 'bg-yellow-50 border-yellow-400 text-yellow-800 shadow-sm' 
+                                      : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                                  }`}
+                                />
+                                {isModified && (
+                                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white"></div>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   };
@@ -1049,143 +1201,256 @@ const handleDeleteSize = async (sizeToDelete) => {
       }
     };
 
-    return (
-      <div className="p-6 border-b border-gray-200">
-        <h4 className="text-base font-semibold text-gray-800 mb-3">Add New Size</h4>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <input
-            type="text"
-            value={newSize}
-            onChange={(e) => setNewSize(e.target.value)}
-            placeholder="Enter new size (e.g., XXXL)"
-            className="flex-1 sm:w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <button 
-            onClick={handleAddNewSize} 
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
-          >
-            Add Size
-          </button>
+     return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </div>
+            <h4 className="text-lg font-bold text-gray-800">Add New Size</h4>
+          </div>
+        </div>
+        
+        <div className="p-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <input
+                type="text"
+                value={newSize}
+                onChange={(e) => setNewSize(e.target.value)}
+                placeholder="Enter new size (e.g., XXXL, 2XL, etc.)"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"
+                onKeyPress={(e) => e.key === 'Enter' && handleAddNewSize()}
+              />
+            </div>
+            <button 
+              onClick={handleAddNewSize} 
+              disabled={!newSize.trim()}
+              className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-200 font-semibold shadow-sm"
+            >
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add Size
+              </div>
+    </button>
+          </div>
         </div>
       </div>
     );
   };
 
-    return (
-    <div className="max-w-7xl mx-auto p-5">
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-5">Modify DT Specifications</h2>
-        
-        {/* Search Section with Autocomplete */}
-        <div className="bg-gray-50 p-5 rounded-lg mb-5">
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <div className="flex-1 relative">
-              <input
-                ref={inputRef}
-                type="text"
-                value={orderNo}
-                onChange={handleOrderNoChange}
-                onKeyDown={handleKeyDown}
-                placeholder="Enter Order Number (e.g., PTAF, GPRT, etc.)"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                autoComplete="off"
-              />
-              
-              {/* Loading indicator for suggestions */}
-              {loadingSuggestions && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="max-w-8xl mx-auto p-6">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+              DT Specifications Manager
+            </h1>
+            <p className="text-gray-600 text-lg">Modify and manage your design specifications with ease</p>
+          </div>
+
+          {/* Search Section */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </div>
-              )}
-              
-              {/* Suggestions dropdown */}
-              {showSuggestions && suggestions.length > 0 && (
-                <div 
-                  ref={suggestionsRef}
-                  className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
-                >
-                  {suggestions.map((suggestion, index) => (
-                    <div
-                      key={suggestion._id}
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      className={`px-4 py-3 cursor-pointer border-b border-gray-100 hover:bg-blue-50 ${
-                        index === selectedSuggestionIndex ? 'bg-blue-100' : ''
-                      }`}
+                <h2 className="text-xl font-bold text-gray-800">Search Order</h2>
+              </div>
+            </div>
+
+            <div className="p-6 overflow-visible"> {/* Add overflow-visible */}
+              <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center">
+                <div className="flex-1 relative overflow-visible"> {/* Add overflow-visible */}
+                  <div className="relative">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={orderNo}
+                      onChange={handleOrderNoChange}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Enter Order Number (e.g., PTAF, GPRT, etc.)"
+                      className="w-full pl-12 pr-12 py-4 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400 shadow-sm"
+                      autoComplete="off"
+                    />
+
+                    <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+
+                    {/* Loading indicator */}
+                    {loadingSuggestions && (
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent"></div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Improved Suggestions dropdown */}
+                  {showSuggestions && suggestions.length > 0 && (
+                    <div 
+                      ref={suggestionsRef}
+                      className="absolute z-[9999] w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-80 overflow-y-auto"
+                      style={{ 
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
+                      }}
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="font-semibold text-gray-900">
-                            {suggestion.Order_No}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            {suggestion.Style} - {suggestion.ShortName}
-                          </div>
-                          {suggestion.CustStyle && (
-                            <div className="text-xs text-gray-500">
-                              Customer Style: {suggestion.CustStyle}
+                      {suggestions.map((suggestion, index) => (
+                        <div
+                          key={suggestion._id}
+                          onClick={() => handleSuggestionClick(suggestion)}
+                          className={`px-6 py-4 cursor-pointer transition-all duration-150 ${
+                            index === selectedSuggestionIndex 
+                              ? 'bg-blue-50 border-l-4 border-blue-500' 
+                              : 'hover:bg-gray-50'
+                          } ${index === suggestions.length - 1 ? '' : 'border-b border-gray-100'}`}
+                        >
+                          <div className="flex justify-between items-start gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-bold text-gray-900 text-base mb-1 truncate">
+                                {suggestion.Order_No}
+                              </div>
+                              <div className="text-sm text-gray-600 mb-1">
+                                <span className="font-medium">{suggestion.Style}</span> - {suggestion.ShortName}
+                              </div>
+                              {suggestion.CustStyle && (
+                                <div className="text-xs text-gray-500 truncate">
+                                  Customer Style: <span className="font-medium">{suggestion.CustStyle}</span>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                        <div className="text-right ml-4">
-                          <div className="text-sm font-medium text-gray-700">
-                            Qty: {suggestion.TotalQty}
+                            <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                              <div className="text-sm font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-full whitespace-nowrap">
+                                Qty: {suggestion.TotalQty}
+                              </div>
+                              {suggestion.isModify && (
+                                <span className="inline-block bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm">
+                                  Modified
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          {suggestion.isModify && (
-                            <span className="inline-block bg-yellow-400 text-yellow-900 px-2 py-1 rounded-full text-xs font-bold mt-1">
-                              Modified
-                            </span>
-                          )}
                         </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* No suggestions found */}
+                  {showSuggestions && suggestions.length === 0 && !loadingSuggestions && debouncedOrderNo.length >= 2 && (
+                    <div className="absolute z-[9999] w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl">
+                      <div className="px-6 py-4 text-gray-500 text-center">
+                        <svg className="w-12 h-12 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.29-1.009-5.824-2.562M15 6.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <p className="font-medium">No orders found</p>
+                        <p className="text-sm">Try searching with a different order number</p>
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
-              
-              {/* No suggestions found */}
-              {showSuggestions && suggestions.length === 0 && !loadingSuggestions && debouncedOrderNo.length >= 2 && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
-                  <div className="px-4 py-3 text-gray-500 text-sm">
-                    No orders found matching {debouncedOrderNo}
+
+                <button 
+                  onClick={() => handleSearch()}
+                  disabled={loading}
+                  className="px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 font-semibold shadow-lg"
+                >
+                  <div className="flex items-center gap-2">
+                    {loading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                        Searching...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        Search
+                      </>
+                    )}
+                  </div>
+                </button>
+              </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="mt-4 p-4 bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <p className="text-red-700 font-medium">{error}</p>
                   </div>
                 </div>
               )}
             </div>
-            
-            <button 
-              onClick={() => handleSearch()}
-              disabled={loading}
-              className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors text-sm"
-            >
-              {loading ? 'Searching...' : 'Search'}
-            </button>
-          </div>
-          
-          {error && (
-            <div className="mt-3 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md">
-              {error}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* Order Information */}
-      {orderData && (
-        <div className="bg-white rounded-lg shadow-md">
-          <div className="p-5 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">Order Information</h3>
-            <div className="flex flex-wrap gap-5 text-sm">
-              <span><strong>Order No:</strong> {orderData.Order_No}</span>
-              <span><strong>Style:</strong> {orderData.Style}</span>
-              <span><strong>Customer:</strong> {orderData.ShortName}</span>
-              <span><strong>Total Qty:</strong> {orderData.TotalQty}</span>
-              {orderData.isModify && (
-                <span className="bg-yellow-400 text-yellow-900 px-2 py-1 rounded-full text-xs font-bold">
-                  Modified
-                </span>
-              )}
+
+        {/* Order Information */}
+        {orderData && (
+          <div className="space-y-8">
+            {/* Order Info Card */}
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.29-1.009-5.824-2.562M15 6.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-800">Order Information</h3>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <div className="text-sm text-blue-600 font-medium mb-1">Order No</div>
+                    <div className="text-lg font-bold text-blue-800">{orderData.Order_No}</div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                    <div className="text-sm text-green-600 font-medium mb-1">Style</div>
+                    <div className="text-lg font-bold text-green-800">{orderData.Style}</div>
+                  </div>
+                  <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                    <div className="text-sm text-purple-600 font-medium mb-1">Customer</div>
+                    <div className="text-lg font-bold text-purple-800">{orderData.ShortName}</div>
+                  </div>
+                  <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+                    <div className="text-sm text-orange-600 font-medium mb-1">Total Qty</div>
+                    <div className="text-lg font-bold text-orange-800">{orderData.TotalQty}</div>
+                  </div>
+                </div>
+                
+                {orderData.isModify && (
+                  <div className="mt-4 inline-flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-4 py-2 rounded-full text-sm font-bold shadow-sm">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Previously Modified
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
 
           {/* Add Size Section */}
           <AddSizeComponent />
@@ -1197,22 +1462,75 @@ const handleDeleteSize = async (sizeToDelete) => {
           {renderQuantitiesTable()}
 
           {/* Save Section */}
-          {isModified && (
-            <div className="p-5 bg-gray-50 flex items-center gap-4">
-              <button 
-                onClick={handleSave} 
-                disabled={loading}
-                className="px-6 py-3 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors font-semibold"
-              >
-                {loading ? 'Saving...' : 'Save Changes'}
-              </button>
-               <span className="text-red-600 font-semibold text-sm">
-            * {modifiedFields.size} field{modifiedFields.size !== 1 ? 's' : ''} modified
-          </span>
+         {isModified && (
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-red-50 to-pink-50 px-6 py-4 border-b border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800">Save Changes</h3>
+                  </div>
+                </div>
+                
+                <div className="p-6">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <button 
+                      onClick={handleSave} 
+                      disabled={loading}
+                      className="px-8 py-4 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all duration-200 font-bold shadow-lg"
+                    >
+                      <div className="flex items-center gap-2">
+                        {loading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                            Saving Changes...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            Save All Changes
+                          </>
+                        )}
+                      </div>
+                    </button>
+                    
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 bg-yellow-100 px-4 py-2 rounded-lg border border-yellow-300">
+                        <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
+                        <span className="text-yellow-800 font-semibold text-sm">
+                          {modifiedFields.size} field{modifiedFields.size !== 1 ? 's' : ''} modified
+                        </span>
+                      </div>
+                      
+                      <div className="text-sm text-gray-600 bg-gray-100 px-3 py-2 rounded-lg">
+                        <span className="font-medium">💡 Tip:</span> Changes are highlighted in yellow
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!orderData && !loading && (
+          <div className="text-center py-16">
+            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
             </div>
-          )}
-        </div>
-      )}
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">Search for an Order</h3>
+            <p className="text-gray-500">Enter an order number above to start modifying specifications</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
