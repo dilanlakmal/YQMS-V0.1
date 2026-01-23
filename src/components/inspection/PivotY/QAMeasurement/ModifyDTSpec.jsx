@@ -16,6 +16,7 @@ const ModifyDTspec = () => {
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [modifiedFields, setModifiedFields] = useState(new Set());
   const [originalData, setOriginalData] = useState(null);
+  const [newlyAddedSizes, setNewlyAddedSizes] = useState(new Set());
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
   const inputRef = useRef(null);
@@ -546,75 +547,77 @@ const convertDecimalToFraction = (decimal) => {
 
   // Add new size to specifications
   const handleAddSize = (newSize) => {
-  console.log('🔧 handleAddSize called with:', newSize);
-  console.log('🔧 Current modifiedData:', modifiedData);
-  
-  if (!modifiedData) {
-    console.log('❌ modifiedData is null - order not loaded yet');
-    alert('Please search and load an order first');
-    return;
-  }
-  
-  if (!newSize.trim()) {
-    console.log('❌ New size is empty');
-    return;
-  }
-  
-  if (modifiedData.SizeList.includes(newSize)) {
-    console.log('❌ Size already exists:', newSize);
-    alert(`Size "${newSize}" already exists!`);
-    return;
-  }
-
-  console.log('✅ Adding new size:', newSize);
-  
-  setModifiedData(prevData => {
-    const updatedData = { ...prevData };
+    console.log('🔧 handleAddSize called with:', newSize);
+    console.log('🔧 Current modifiedData:', modifiedData);
     
-    // Add to SizeList
-    updatedData.SizeList = [...prevData.SizeList, newSize];
-    updatedData.NoOfSize = updatedData.SizeList.length;
-
-    // Add to each specification with proper initialization
-    updatedData.SizeSpec = prevData.SizeSpec.map(spec => ({
-      ...spec,
-      Specs: [...spec.Specs, {
-        [newSize]: {
-          fraction: "0",
-          decimal: 0
+    if (!modifiedData) {
+      console.log('❌ modifiedData is null - order not loaded yet');
+      alert('Please search and load an order first');
+      return;
+    }
+    
+    if (!newSize.trim()) {
+      console.log('❌ New size is empty');
+      return;
+    }
+    
+    if (modifiedData.SizeList.includes(newSize)) {
+      console.log('❌ Size already exists:', newSize);
+      alert(`Size "${newSize}" already exists!`);
+      return;
+    }
+    
+    console.log('✅ Adding new size:', newSize);
+    
+    // Track newly added size
+    setNewlyAddedSizes(prev => new Set([...prev, newSize]));
+    
+    setModifiedData(prevData => {
+      const updatedData = { ...prevData };
+      
+      // Add to SizeList
+      updatedData.SizeList = [...prevData.SizeList, newSize];
+      updatedData.NoOfSize = updatedData.SizeList.length;
+      
+      // Add to each specification with proper initialization
+      updatedData.SizeSpec = prevData.SizeSpec.map(spec => ({
+        ...spec,
+        Specs: [...spec.Specs, {
+          [newSize]: {
+            fraction: "0",
+            decimal: 0
+          }
+        }]
+      }));
+      
+      // Add to OrderQty and CutQty for each color
+      updatedData.OrderColors = prevData.OrderColors.map(color => ({
+        ...color,
+        OrderQty: [...(color.OrderQty || []), { [newSize]: 0 }],
+        CutQty: {
+          ...(color.CutQty || {}),
+          [newSize]: {
+            ActualCutQty: 0,
+            PlanCutQty: 0
+          }
         }
-      }]
-    }));
-
-    // Add to OrderQty and CutQty for each color
-    updatedData.OrderColors = prevData.OrderColors.map(color => ({
-      ...color,
-      OrderQty: [...(color.OrderQty || []), { [newSize]: 0 }],
-      CutQty: {
-        ...(color.CutQty || {}),
-        [newSize]: {
-          ActualCutQty: 0,
-          PlanCutQty: 0
-        }
-      }
-    }));
-
-    // Add to OrderColorShip
-    updatedData.OrderColorShip = prevData.OrderColorShip.map(colorShip => ({
-      ...colorShip,
-      ShipSeqNo: colorShip.ShipSeqNo.map(shipSeq => ({
-        ...shipSeq,
-        sizes: [...(shipSeq.sizes || []), { [newSize]: 0 }]
-      }))
-    }));
-
-    return updatedData;
-  });
-  
-  setIsModified(true);
-  console.log('✅ handleAddSize completed');
-};
-
+      }));
+      
+      // Add to OrderColorShip
+      updatedData.OrderColorShip = prevData.OrderColorShip.map(colorShip => ({
+        ...colorShip,
+        ShipSeqNo: colorShip.ShipSeqNo.map(shipSeq => ({
+          ...shipSeq,
+          sizes: [...(shipSeq.sizes || []), { [newSize]: 0 }]
+        }))
+      }));
+      
+      return updatedData;
+    });
+    
+    setIsModified(true);
+    console.log('✅ handleAddSize completed');
+  };
 
   // Handle quantity changes
    const handleQtyChange = (colorIndex, sizeKey, qtyType, value) => {
@@ -687,9 +690,8 @@ const convertDecimalToFraction = (decimal) => {
   };
 
   // Save changes
-const handleSave = async () => {
+  const handleSave = async () => {
     if (!isModified) return;
-
     setLoading(true);
     try {
       const dataToSave = {
@@ -698,7 +700,7 @@ const handleSave = async () => {
         modifiedAt: new Date(),
         modifiedBy: 'Current User'
       };
-
+      
       console.log('💾 Saving order:', orderData._id);
       console.log('💾 isModify being sent:', dataToSave.isModify);
       
@@ -712,9 +714,9 @@ const handleSave = async () => {
         },
         body: JSON.stringify(dataToSave),
       });
-
+      
       console.log('📡 Save response status:', response.status);
-
+      
       if (!response.ok) {
         let errorMessage = 'Failed to save changes';
         try {
@@ -727,22 +729,22 @@ const handleSave = async () => {
         }
         throw new Error(errorMessage);
       }
-
+      
       const result = await response.json();
       console.log('✅ Save API Response:', result);
       console.log('✅ Saved isModify status:', result.data?.isModify);
-
+      
       if (result.success && result.data) {
         setOrderData(result.data);
         setModifiedData(JSON.parse(JSON.stringify(result.data)));
         setOriginalData(JSON.parse(JSON.stringify(result.data))); // Update original data
         setIsModified(false);
         setModifiedFields(new Set()); // Clear all modified field tracking
+        setNewlyAddedSizes(new Set()); // Clear newly added sizes after save
         alert('Changes saved successfully!');
       } else {
         throw new Error(result.message || 'Failed to save changes');
       }
-
     } catch (err) {
       console.error('❌ Save error:', err);
       setError(err.message);
@@ -752,65 +754,71 @@ const handleSave = async () => {
   };
 
   // Delete size from specifications
-const handleDeleteSize = async (sizeToDelete) => {
-  if (!orderData || !sizeToDelete) return;
-  
-  // Confirm deletion
-  const confirmDelete = window.confirm(
-    `Are you sure you want to delete size "${sizeToDelete}"? This will remove it from all specifications and quantity tables.`
-  );
-  
-  if (!confirmDelete) return;
-
-  console.log('🗑️ Deleting size:', sizeToDelete);
-  
-  // Update UI immediately (optimistic update)
-  setModifiedData(prevData => {
-    if (!prevData) return prevData;
+  const handleDeleteSize = async (sizeToDelete) => {
+    if (!orderData || !sizeToDelete) return;
     
-    const updatedData = { ...prevData };
+    // Confirm deletion
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete size "${sizeToDelete}"? This will remove it from all specifications and quantity tables.`
+    );
     
-    // Remove from SizeList
-    updatedData.SizeList = prevData.SizeList.filter(size => size !== sizeToDelete);
-    updatedData.NoOfSize = updatedData.SizeList.length;
-
-    // Remove from SizeSpec
-    updatedData.SizeSpec = prevData.SizeSpec.map(spec => ({
-      ...spec,
-      Specs: spec.Specs.filter(specItem => !specItem.hasOwnProperty(sizeToDelete))
-    }));
-
-    // Remove from OrderColors
-    updatedData.OrderColors = prevData.OrderColors.map(color => {
-      const updatedColor = { ...color };
-      
-      // Remove from OrderQty
-      updatedColor.OrderQty = color.OrderQty.filter(qtyItem =>  
-        !qtyItem.hasOwnProperty(sizeToDelete)
-      );
-      
-      // Remove from CutQty
-      const { [sizeToDelete]: deletedSize, ...remainingCutQty } = color.CutQty;
-      updatedColor.CutQty = remainingCutQty;
-      
-      return updatedColor;
+    if (!confirmDelete) return;
+    console.log('🗑️ Deleting size:', sizeToDelete);
+    
+    // Remove from newly added sizes if it exists
+    setNewlyAddedSizes(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(sizeToDelete);
+      return newSet;
     });
-
-    // Remove from OrderColorShip
-    updatedData.OrderColorShip = prevData.OrderColorShip.map(colorShip => ({
-      ...colorShip,
-      ShipSeqNo: colorShip.ShipSeqNo.map(shipSeq => ({
-        ...shipSeq,
-        sizes: shipSeq.sizes.filter(sizeItem => !sizeItem.hasOwnProperty(sizeToDelete))
-      }))
-    }));
-
-    return updatedData;
-  });
-  
-  setIsModified(true);
-  console.log('✅ Size deleted from UI, remember to save changes');
-};
+    
+    // Update UI immediately (optimistic update)
+    setModifiedData(prevData => {
+      if (!prevData) return prevData;
+      
+      const updatedData = { ...prevData };
+      
+      // Remove from SizeList
+      updatedData.SizeList = prevData.SizeList.filter(size => size !== sizeToDelete);
+      updatedData.NoOfSize = updatedData.SizeList.length;
+      
+      // Remove from SizeSpec
+      updatedData.SizeSpec = prevData.SizeSpec.map(spec => ({
+        ...spec,
+        Specs: spec.Specs.filter(specItem => !specItem.hasOwnProperty(sizeToDelete))
+      }));
+      
+      // Remove from OrderColors
+      updatedData.OrderColors = prevData.OrderColors.map(color => {
+        const updatedColor = { ...color };
+        
+        // Remove from OrderQty
+        updatedColor.OrderQty = color.OrderQty.filter(qtyItem =>  
+          !qtyItem.hasOwnProperty(sizeToDelete)
+        );
+        
+        // Remove from CutQty
+        const { [sizeToDelete]: deletedSize, ...remainingCutQty } = color.CutQty;
+        updatedColor.CutQty = remainingCutQty;
+        
+        return updatedColor;
+      });
+      
+      // Remove from OrderColorShip
+      updatedData.OrderColorShip = prevData.OrderColorShip.map(colorShip => ({
+        ...colorShip,
+        ShipSeqNo: colorShip.ShipSeqNo.map(shipSeq => ({
+          ...shipSeq,
+          sizes: shipSeq.sizes.filter(sizeItem => !sizeItem.hasOwnProperty(sizeToDelete))
+        }))
+      }));
+      
+      return updatedData;
+    });
+    
+    setIsModified(true);
+    console.log('✅ Size deleted from UI, remember to save changes');
+  };
 
   // Render specifications table
    const renderSpecsTable = () => {
@@ -860,16 +868,16 @@ const handleDeleteSize = async (sizeToDelete) => {
                   </th>
                   <th className="border-r border-gray-200 px-4 py-3 text-center font-bold text-gray-700 sticky top-0 bg-gray-50 z-10 min-w-[200px]">
                     <div className="flex flex-col items-center gap-1">
-                      <span>Description</span>
+                      <span>Measurement Point</span>
                       <div className="w-16 h-0.5 bg-gray-300 rounded"></div>
                     </div>
                   </th>
-                  <th className="border-r border-gray-200 px-4 py-3 text-center font-bold text-gray-700 sticky top-0 bg-gray-50 z-10">
+                  {/* <th className="border-r border-gray-200 px-4 py-3 text-center font-bold text-gray-700 sticky top-0 bg-gray-50 z-10">
                     <div className="flex flex-col items-center gap-1">
                       <span>Unit</span>
                       <div className="w-8 h-0.5 bg-gray-300 rounded"></div>
                     </div>
-                  </th>
+                  </th> */}
                   <th className="border-r border-gray-200 px-4 py-3 text-center font-bold text-gray-700 sticky top-0 bg-gray-50 z-10">
                     <div className="flex flex-col items-center gap-1">
                       <span>Tol -</span>
@@ -882,67 +890,94 @@ const handleDeleteSize = async (sizeToDelete) => {
                       <div className="w-8 h-0.5 bg-gray-300 rounded"></div>
                     </div>
                   </th>
-                  {modifiedData.SizeList.map((size, sizeIndex) => (
-                    <th 
-                      key={size} 
-                      className={`border-r border-gray-200 px-3 py-3 text-center font-bold sticky top-0 z-10 cursor-move transition-all duration-200 ${
-                        dragOverIndex === sizeIndex 
-                          ? 'bg-blue-200 shadow-lg transform scale-105' 
-                          : 'bg-gray-50 hover:bg-gray-100'
-                      }`}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, sizeIndex)}
-                      onDragEnd={handleDragEnd}
-                      onDragOver={(e) => handleDragOver(e, sizeIndex)}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, sizeIndex)}
-                    >
-                      <div className="flex flex-col items-center gap-2">
-                        {/* Size controls */}
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => moveSizeUp(sizeIndex)}
-                            disabled={sizeIndex === 0}
-                            className="w-6 h-6 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md flex items-center justify-center transition-colors"
-                            title="Move size left"
-                          >
-                            <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => moveSizeDown(sizeIndex)}
-                            disabled={sizeIndex === modifiedData.SizeList.length - 1}
-                            className="w-6 h-6 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md flex items-center justify-center transition-colors"
-                            title="Move size right"
-                          >
-                            <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </button>
-                        </div>
-                        
-                        {/* Size info */}
-                        <div className="text-center">
-                          <span className="font-bold text-gray-800">{size}</span>
-                          <div className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full mt-1">
-                            #{sizeIndex + 1}
+                  {modifiedData.SizeList.map((size, sizeIndex) => {
+                    const isNewSize = newlyAddedSizes.has(size);
+                    
+                    return (
+                      <th 
+                        key={size} 
+                        className={`border-r border-gray-200 px-3 py-3 text-center font-bold sticky top-0 z-10 cursor-move transition-all duration-200 ${
+                          dragOverIndex === sizeIndex 
+                            ? 'bg-blue-200 shadow-lg transform scale-105' 
+                            : isNewSize
+                              ? 'bg-gradient-to-br from-green-100 to-emerald-100 hover:from-green-200 hover:to-emerald-200'
+                              : 'bg-gray-50 hover:bg-gray-100'
+                        }`}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, sizeIndex)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={(e) => handleDragOver(e, sizeIndex)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, sizeIndex)}
+                      >
+                        <div className="flex flex-col items-center gap-2">
+                          {/* New size indicator */}
+                          {isNewSize && (
+                            <div className="flex items-center gap-1 mb-1">
+                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                              <span className="text-xs font-bold text-green-700 bg-green-200 px-2 py-0.5 rounded-full">
+                                NEW
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Size controls */}
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => moveSizeUp(sizeIndex)}
+                              disabled={sizeIndex === 0}
+                              className="w-6 h-6 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md flex items-center justify-center transition-colors"
+                              title="Move size left"
+                            >
+                              <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => moveSizeDown(sizeIndex)}
+                              disabled={sizeIndex === modifiedData.SizeList.length - 1}
+                              className="w-6 h-6 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md flex items-center justify-center transition-colors"
+                              title="Move size right"
+                            >
+                              <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
                           </div>
+                          
+                          {/* Size info */}
+                          <div className="text-center">
+                            <span className={`font-bold ${isNewSize ? 'text-green-800' : 'text-gray-800'}`}>
+                              {size}
+                            </span>
+                            <div className={`text-xs px-2 py-0.5 rounded-full mt-1 ${
+                              isNewSize 
+                                ? 'text-green-700 bg-green-200' 
+                                : 'text-gray-500 bg-gray-200'
+                            }`}>
+                              #{sizeIndex + 1}
+                            </div>
+                          </div>
+                          
+                          {/* Delete button */}
+                          <button
+                            onClick={() => handleDeleteSize(size)}
+                            className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${
+                              isNewSize
+                                ? 'bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700'
+                                : 'bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700'
+                            }`}
+                            title={`Delete size ${size}`}
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
                         </div>
-                        
-                        {/* Delete button */}
-                        <button
-                          onClick={() => handleDeleteSize(size)}
-                          className="w-6 h-6 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 rounded-md flex items-center justify-center transition-colors"
-                          title={`Delete size ${size}`}
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    </th>
-                  ))}
+                      </th>
+                    );
+                  })}
+
                 </tr>
               </thead>
               <tbody>
@@ -959,11 +994,11 @@ const handleDeleteSize = async (sizeToDelete) => {
                         <div className="text-sm text-gray-500">{spec.ChineseRemark}</div>
                       </div>
                     </td>
-                    <td className="border-r border-gray-200 px-4 py-3 text-center">
+                    {/* <td className="border-r border-gray-200 px-4 py-3 text-center">
                       <span className="inline-block bg-gray-100 px-2 py-1 rounded-md text-sm font-medium text-gray-700">
                         {spec.SizeSpecMeasUnit}
                       </span>
-                    </td>
+                    </td> */}
                     <td className="border-r border-gray-200 px-4 py-3 text-center text-sm text-gray-600">
                       {spec.ToleranceMinus?.fraction}
                     </td>
@@ -975,9 +1010,12 @@ const handleDeleteSize = async (sizeToDelete) => {
                       const value = sizeSpec?.[size];
                       const fieldKey = createFieldKey('spec', specIndex, size, 'fraction');
                       const isModified = isFieldModified(fieldKey);
+                      const isNewSize = newlyAddedSizes.has(size);
                       
                       return (
-                        <td key={size} className="border-r border-gray-200 px-3 py-3 text-center">
+                        <td key={size} className={`border-r border-gray-200 px-3 py-3 text-center ${
+                          isNewSize ? 'bg-green-25' : ''
+                        }`}>
                           <div className="relative">
                             <input
                               type="text"
@@ -986,16 +1024,22 @@ const handleDeleteSize = async (sizeToDelete) => {
                               className={`w-20 px-3 py-2 border rounded-lg text-center text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                                 isModified 
                                   ? 'bg-yellow-50 border-yellow-400 text-yellow-800 shadow-sm' 
-                                  : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                                  : isNewSize
+                                    ? 'bg-green-50 border-green-300 text-green-800 hover:border-green-400'
+                                    : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
                               }`}
                             />
                             {isModified && (
                               <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white"></div>
                             )}
+                            {isNewSize && !isModified && (
+                              <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
+                            )}
                           </div>
                         </td>
                       );
                     })}
+
                   </tr>
                 ))}
               </tbody>
@@ -1064,16 +1108,35 @@ const handleDeleteSize = async (sizeToDelete) => {
                             <div className="w-8 h-0.5 bg-gray-300 rounded"></div>
                           </div>
                         </th>
-                        {modifiedData.SizeList.map((size, index) => (
-                          <th key={size} className="border-r border-gray-200 px-4 py-3 text-center font-bold text-gray-700 sticky top-0 bg-gray-50 z-10">
-                            <div className="flex flex-col items-center gap-1">
-                              <span className="font-bold">{size}</span>
-                              <div className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
-                                #{index + 1}
+                        {modifiedData.SizeList.map((size, index) => {
+                          const isNewSize = newlyAddedSizes.has(size);
+                          
+                          return (
+                            <th key={size} className={`border-r border-gray-200 px-4 py-3 text-center font-bold sticky top-0 z-10 ${
+                              isNewSize ? 'bg-gradient-to-br from-green-100 to-emerald-100' : 'bg-gray-50'
+                            }`}>
+                              <div className="flex flex-col items-center gap-1">
+                                {isNewSize && (
+                                  <div className="flex items-center gap-1 mb-1">
+                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                                    <span className="text-xs font-bold text-green-700">NEW</span>
+                                  </div>
+                                )}
+                                <span className={`font-bold ${isNewSize ? 'text-green-800' : 'text-gray-700'}`}>
+                                  {size}
+                                </span>
+                                <div className={`text-xs px-2 py-0.5 rounded-full ${
+                                  isNewSize 
+                                    ? 'text-green-700 bg-green-200' 
+                                    : 'text-gray-500 bg-gray-200'
+                                }`}>
+                                  #{index + 1}
+                                </div>
                               </div>
-                            </div>
-                          </th>
-                        ))}
+                            </th>
+                          );
+                        })}
+
                       </tr>
                     </thead>
                     <tbody>
@@ -1089,9 +1152,12 @@ const handleDeleteSize = async (sizeToDelete) => {
                           const orderQtyItem = color.OrderQty?.find(q => q[size] !== undefined);
                           const fieldKey = createFieldKey('qty', colorIndex, size, 'order');
                           const isModified = isFieldModified(fieldKey);
+                          const isNewSize = newlyAddedSizes.has(size);
                           
                           return (
-                            <td key={size} className="border-r border-gray-200 px-3 py-3 text-center">
+                            <td key={size} className={`border-r border-gray-200 px-3 py-3 text-center ${
+                              isNewSize ? 'bg-green-25' : ''
+                            }`}>
                               <div className="relative">
                                 <input
                                   type="number"
@@ -1100,16 +1166,22 @@ const handleDeleteSize = async (sizeToDelete) => {
                                   className={`w-20 px-3 py-2 border rounded-lg text-center text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                                     isModified 
                                       ? 'bg-yellow-50 border-yellow-400 text-yellow-800 shadow-sm' 
-                                      : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                                      : isNewSize
+                                        ? 'bg-green-50 border-green-300 text-green-800 hover:border-green-400'
+                                        : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
                                   }`}
                                 />
                                 {isModified && (
                                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-white"></div>
                                 )}
+                                {isNewSize && !isModified && (
+                                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
+                                )}
                               </div>
                             </td>
                           );
                         })}
+
                       </tr>
 
                       {/* Plan Cut Qty Row */}
