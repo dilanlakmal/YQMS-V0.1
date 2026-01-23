@@ -2329,7 +2329,7 @@ function extractSpecsDataAsArray(record, orderNo) {
     // 4. Save to MongoDB
     console.log("💾 Saving to MongoDB...");
     const finalDocs = Array.from(orderMap.values());
-    
+
     // Clean and validate data before saving
     const cleanedDocs = finalDocs.map(doc => {
       if (doc.SizeSpec) {
@@ -2339,10 +2339,37 @@ function extractSpecsDataAsArray(record, orderNo) {
                 !isNaN(spec.TolerancePlus.decimal);
         });
       }
-      return doc;
+      
+      // Remove isModify related fields from the document to avoid schema conflicts
+      const { isModify, modifiedAt, modifiedBy, modificationHistory, ...cleanDoc } = doc;
+      return cleanDoc;
     });
 
-    const bulkOps = cleanedDocs.map(doc => ({
+    // Remove duplicates based on Order_No (just in case)
+    const uniqueDocs = cleanedDocs.reduce((acc, doc) => {
+      const existingIndex = acc.findIndex(existing => existing.Order_No === doc.Order_No);
+      if (existingIndex === -1) {
+        acc.push(doc);
+      } else {
+        // If duplicate found, you might want to merge or keep the latest one
+      }
+      return acc;
+    }, []);
+
+    // FIXED: Get list of orders with isModify: true first
+    const modifiedOrders = await DtOrder.find({ isModify: true }).select('Order_No');
+    const modifiedOrderNos = new Set(modifiedOrders.map(order => order.Order_No));
+
+    console.log(`📋 Found ${modifiedOrderNos.size} orders with isModify: true`);
+
+    // Filter out the modified orders from our update list
+    const ordersToUpdate = uniqueDocs.filter(doc => !modifiedOrderNos.has(doc.Order_No));
+
+    console.log(`📊 Orders to update: ${ordersToUpdate.length} out of ${uniqueDocs.length}`);
+    console.log(`📊 Orders to skip (manually modified): ${modifiedOrderNos.size}`);
+
+    // Create simple bulk operations without complex $or filters
+    const bulkOps = ordersToUpdate.map(doc => ({
       updateOne: {
         filter: { Order_No: doc.Order_No },
         update: { $set: doc },
@@ -2352,16 +2379,17 @@ function extractSpecsDataAsArray(record, orderNo) {
 
     if (bulkOps.length > 0) {
       try {
-        const result = await DtOrder.bulkWrite(bulkOps);
-        
-        console.log("✅ DT Orders data migration completed successfully!");
+        // Use ordered: false to continue processing even if some operations fail
+        const result = await DtOrder.bulkWrite(bulkOps, { ordered: false });
         
         return {
           success: true,
-          totalOrders: finalDocs.length,
-          // matched: result.matchedCount,
-          // upserted: result.upsertedCount,
+          totalOrders: uniqueDocs.length,
+          processed: ordersToUpdate.length,
+          matched: result.matchedCount,
           modified: result.modifiedCount,
+          upserted: result.upsertedCount,
+          skipped: modifiedOrderNos.size,
           cutQtyRecords: cutQtyResult.recordset.length,
           cutQtyMatchCount: cutQtyMatchCount,
           colorsWithCutQty: colorsWithCutQty
@@ -2369,17 +2397,49 @@ function extractSpecsDataAsArray(record, orderNo) {
         
       } catch (bulkError) {
         console.error("❌ Bulk operation failed:", bulkError);
+        
+        // If there are still errors, let's handle them more gracefully
+        if (bulkError.writeErrors) {
+          bulkError.writeErrors.forEach((error, index) => {
+            console.log(`   Error ${index + 1}: ${error.errmsg}`);
+          });
+        }
+        
+        // Return partial success if some operations succeeded
+        if (bulkError.result) {
+          
+          return {
+            success: false,
+            partialSuccess: true,
+            totalOrders: uniqueDocs.length,
+            processed: ordersToUpdate.length,
+            matched: bulkError.result.matchedCount,
+            modified: bulkError.result.modifiedCount,
+            upserted: bulkError.result.upsertedCount,
+            skipped: modifiedOrderNos.size,
+            errors: bulkError.writeErrors?.length || 0,
+            cutQtyRecords: cutQtyResult.recordset.length,
+            cutQtyMatchCount: cutQtyMatchCount,
+            colorsWithCutQty: colorsWithCutQty
+          };
+        }
+        
         throw bulkError;
       }
     } else {
-      console.log("⚠️ No data to sync");
-      return { success: true, message: "No data to sync" };
+      return { 
+        success: true, 
+        message: "No records to update - all are manually modified",
+        totalOrders: uniqueDocs.length,
+        skipped: modifiedOrderNos.size
+      };
     }
-  } catch (error) {
-    console.error("❌ DT Orders sync failed:", error);
-    throw error;
-  }
-}
+
+    } catch (error) {
+      console.error("❌ DT Orders sync failed:", error);
+      throw error;
+    }
+  } 
 
 // Add API endpoint for manual sync
 //api/sync-dt-orders
