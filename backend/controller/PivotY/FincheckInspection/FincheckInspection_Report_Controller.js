@@ -2,6 +2,7 @@ import {
   FincheckInspectionReports,
   QASectionsMeasurementSpecs,
   DtOrder,
+  YorksysOrders,
   RoleManagment,
   UserMain,
   QASectionsProductLocation,
@@ -37,11 +38,12 @@ export const getInspectionReports = async (req, res) => {
       custStyle,
       buyer,
       supplier,
+      poLine,
       page = 1,
       limit = 20
     } = req.query;
 
-    // --- 1. Build Query ---
+    // --- Build Query ---
     let query = {
       status: { $ne: "cancelled" }
     };
@@ -149,14 +151,59 @@ export const getInspectionReports = async (req, res) => {
       };
     });
 
+    // --- Fetch PO Lines from YorksysOrders ---
+
+    // A. Collect all unique Order Numbers from the fetched reports
+    const allOrderNos = reports.reduce((acc, report) => {
+      if (report.orderNos && Array.isArray(report.orderNos)) {
+        acc.push(...report.orderNos);
+      }
+      return acc;
+    }, []);
+
+    // B. Fetch only the PO Lines for these orders
+    const yorksysOrders = await YorksysOrders.find({
+      moNo: { $in: allOrderNos }
+    })
+      .select("moNo SKUData.POLine")
+      .lean();
+
+    // C. Create a Map: OrderNo -> Array of PO Lines
+    const orderPOMap = {};
+    yorksysOrders.forEach((yOrder) => {
+      const poSet = new Set();
+      if (yOrder.SKUData && Array.isArray(yOrder.SKUData)) {
+        yOrder.SKUData.forEach((sku) => {
+          if (sku.POLine) {
+            poSet.add(sku.POLine.trim());
+          }
+        });
+      }
+      orderPOMap[yOrder.moNo] = Array.from(poSet);
+    });
+
     // --- 4. Merge Data ---
     const mergedReports = reports.map((report) => {
       const decisionInfo = decisionMap[report.reportId];
+
+      // Calculate Unique PO Lines for this specific report
+      const reportPOs = new Set();
+      if (report.orderNos) {
+        report.orderNos.forEach((orderNo) => {
+          if (orderPOMap[orderNo]) {
+            orderPOMap[orderNo].forEach((po) => reportPOs.add(po));
+          }
+        });
+      }
+      // Convert to comma-separated string
+      const poLineString = Array.from(reportPOs).sort().join(", ");
+
       return {
         ...report,
         // Add the decision fields to the report object
         decisionStatus: decisionInfo ? decisionInfo.status : null,
-        decisionUpdatedAt: decisionInfo ? decisionInfo.updatedAt : null
+        decisionUpdatedAt: decisionInfo ? decisionInfo.updatedAt : null,
+        poLines: poLineString
       };
     });
 

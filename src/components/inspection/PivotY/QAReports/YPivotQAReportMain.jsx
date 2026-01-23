@@ -845,6 +845,7 @@ const PaginationControls = ({
 const ALL_COLUMNS = [
   { id: "date", label: "Date", required: true },
   { id: "reportId", label: "Report ID", requiresPermission: true },
+  { id: "poLines", label: "PO Line" },
   { id: "orderNo", label: "Order No", required: true },
   { id: "custStyle", label: "Cust. Style" },
   { id: "customer", label: "Customer" },
@@ -859,6 +860,7 @@ const ALL_COLUMNS = [
   { id: "factory", label: "Factory" },
   { id: "finishedQty", label: "Finished #" },
   { id: "sampleSize", label: "Sample Size" },
+  { id: "defectQty", label: "Defect Qty" },
   { id: "createdDate", label: "Created Date" },
   { id: "updatedDate", label: "Updated Date" },
   { id: "status", label: "QA Status" },
@@ -897,6 +899,7 @@ const YPivotQAReportMain = () => {
   const [visibleColumns, setVisibleColumns] = useState([
     "date",
     "reportId",
+    "poLines",
     "orderNo",
     "custStyle",
     "customer",
@@ -906,6 +909,7 @@ const YPivotQAReportMain = () => {
     "factory",
     "finishedQty",
     "sampleSize",
+    "defectQty",
     "createdDate",
     "updatedDate",
     "status",
@@ -927,7 +931,8 @@ const YPivotQAReportMain = () => {
     subConFactory: "All",
     custStyle: "",
     buyer: "All",
-    supplier: "All"
+    supplier: "All",
+    poLines: []
   });
 
   // Dynamic Options (for Dropdowns)
@@ -1822,6 +1827,11 @@ const YPivotQAReportMain = () => {
                     Report ID
                   </th>
                 )}
+                {isColumnVisible("poLines") && (
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    PO Line
+                  </th>
+                )}
                 {isColumnVisible("orderNo") && (
                   <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
                     Order No
@@ -1890,6 +1900,11 @@ const YPivotQAReportMain = () => {
                 {isColumnVisible("sampleSize") && (
                   <th className="px-3 sm:px-5 py-3 sm:py-4 text-right whitespace-nowrap">
                     Sample Size
+                  </th>
+                )}
+                {isColumnVisible("defectQty") && (
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 text-right whitespace-nowrap text-red-300">
+                    Defect Qty
                   </th>
                 )}
                 {isColumnVisible("createdDate") && (
@@ -1970,6 +1985,11 @@ const YPivotQAReportMain = () => {
                     sampleSizeDisplay = config.sampleSize || 0;
                   }
 
+                  const totalDefectQty = (report.defectData || []).reduce(
+                    (sum, d) => sum + (d.qty || 0),
+                    0
+                  );
+
                   const productImage = report.productTypeId?.imageURL;
 
                   return (
@@ -2009,6 +2029,29 @@ const YPivotQAReportMain = () => {
                               <Info className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                             </button>
                           </div>
+                        </td>
+                      )}
+
+                      {/* --- PO LINE COLUMN --- */}
+                      {isColumnVisible("poLines") && (
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 max-w-[100px] sm:max-w-[150px] align-top">
+                          {report.poLines ? (
+                            <div className="flex flex-col gap-1">
+                              {report.poLines.split(", ").map((line, idx) => (
+                                <p
+                                  key={idx}
+                                  className="text-[11px] sm:text-[12px] leading-tight text-gray-600 dark:text-gray-400 font-medium truncate border-b border-dashed border-gray-200 dark:border-gray-700 last:border-0 pb-0.5 last:pb-0"
+                                  title={line}
+                                >
+                                  {line}
+                                </p>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-[11px] sm:text-[12px]">
+                              -
+                            </span>
+                          )}
                         </td>
                       )}
 
@@ -2217,6 +2260,21 @@ const YPivotQAReportMain = () => {
                           ) : (
                             <span className="text-gray-300">-</span>
                           )}
+                        </td>
+                      )}
+
+                      {/* --- DEFECT QTY COLUMN --- */}
+                      {isColumnVisible("defectQty") && (
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 text-right">
+                          <span
+                            className={`font-mono text-[10px] sm:text-xs font-bold ${
+                              totalDefectQty > 0
+                                ? "text-red-600 dark:text-red-400"
+                                : "text-gray-400"
+                            }`}
+                          >
+                            {totalDefectQty}
+                          </span>
                         </td>
                       )}
 
