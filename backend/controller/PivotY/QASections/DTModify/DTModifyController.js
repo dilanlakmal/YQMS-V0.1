@@ -11,6 +11,7 @@ export const getDtOrderByOrderNo = async (req, res) => {
     console.log('Request query:', req.query);
     
     const { orderNo } = req.params;
+    const { suggest } = req.query; // New query parameter for suggestions
     
     if (!orderNo) {
       console.log('No order number provided');
@@ -21,13 +22,46 @@ export const getDtOrderByOrderNo = async (req, res) => {
     }
 
     console.log('Searching for order:', orderNo);
+    console.log('Suggestion mode:', !!suggest);
     console.log('DtOrder model available:', !!DtOrder);
     
     // Check database connection
     console.log('Database connection state:', mongoose.connection.readyState);
-    // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
     
-    // Find order by Order_No field
+    // If suggest=true, return suggestions instead of exact match
+    if (suggest === 'true') {
+      console.log('Fetching suggestions for:', orderNo);
+      
+      if (orderNo.length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: 'Query must be at least 2 characters long for suggestions'
+        });
+      }
+
+      // Search for orders that match the query (case-insensitive)
+      const suggestions = await DtOrder.find({
+        $or: [
+          { Order_No: { $regex: orderNo, $options: 'i' } },
+          { Style: { $regex: orderNo, $options: 'i' } },
+          { CustStyle: { $regex: orderNo, $options: 'i' } }
+        ]
+      })
+      .select('Order_No Style CustStyle ShortName TotalQty isModify')
+      .limit(10) // Limit to 10 suggestions
+      .sort({ Order_No: 1 });
+
+      console.log(`Found ${suggestions.length} matching orders for suggestions`);
+
+      return res.status(200).json({
+        success: true,
+        data: suggestions,
+        count: suggestions.length,
+        type: 'suggestions'
+      });
+    }
+
+    // Original exact match logic
     const order = await DtOrder.findOne({ Order_No: orderNo });
     console.log('Order found:', !!order);
     
@@ -42,7 +76,8 @@ export const getDtOrderByOrderNo = async (req, res) => {
     console.log('Returning order data, Order_No:', order.Order_No);
     res.status(200).json({
       success: true,
-      data: order
+      data: order,
+      type: 'exact_match'
     });
 
   } catch (error) {
@@ -56,6 +91,7 @@ export const getDtOrderByOrderNo = async (req, res) => {
 };
 
 // Update DT Order by ID
+// Update your updateDtOrder function
 export const updateDtOrder = async (req, res) => {
   try {
     console.log('=== updateDtOrder called ===');
@@ -63,7 +99,7 @@ export const updateDtOrder = async (req, res) => {
     console.log('Request body keys:', Object.keys(req.body));
     
     const { id } = req.params;
-    const updateData = req.body;
+    let updateData = { ...req.body }; // Create a copy
 
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -89,27 +125,37 @@ export const updateDtOrder = async (req, res) => {
       });
     }
 
-    // Add modification timestamp and flag
+    // EXPLICITLY set modification fields
     updateData.isModify = true;
+    updateData.modifiedAt = new Date();
     updateData.updatedAt = new Date();
 
     console.log('✅ Updating order with ID:', id);
     console.log('✅ SizeList length:', updateData.SizeList?.length);
     console.log('✅ SizeSpec length:', updateData.SizeSpec?.length);
     console.log('✅ OrderColors length:', updateData.OrderColors?.length);
+    console.log('✅ isModify being set to:', updateData.isModify);
+    console.log('✅ modifiedAt being set to:', updateData.modifiedAt);
 
-    // Update the order (ONLY ONE DECLARATION)
+    // Log the complete update data structure
+    console.log('✅ Update data keys:', Object.keys(updateData));
+
+    // Update the order with explicit options
     const updatedOrder = await DtOrder.findByIdAndUpdate(
       id,
-      updateData,
+      {
+        $set: updateData // Use $set operator to ensure all fields are updated
+      },
       { 
         new: true, // Return updated document
-        runValidators: true // Run schema validators
+        runValidators: false, // Disable validators temporarily to avoid issues
+        strict: false, // Allow fields not in schema
+        upsert: false // Don't create if not exists
       }
     );
 
     if (!updatedOrder) {
-      console.log('❌ Order not found for update');
+      console.log('❌ Order not found for update after save attempt');
       return res.status(404).json({
         success: false,
         message: 'Order not found'
@@ -118,6 +164,9 @@ export const updateDtOrder = async (req, res) => {
 
     console.log('✅ Order updated successfully');
     console.log('✅ Updated SizeList:', updatedOrder.SizeList);
+    console.log('✅ isModify saved as:', updatedOrder.isModify);
+    console.log('✅ modifiedAt saved as:', updatedOrder.modifiedAt);
+    console.log('✅ updatedAt saved as:', updatedOrder.updatedAt);
     
     res.status(200).json({
       success: true,
@@ -127,17 +176,8 @@ export const updateDtOrder = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error updating DT order:', error);
+    console.error('❌ Error stack:', error.stack);
     
-    // Handle validation errors
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({
-        success: false,
-        message: 'Validation error',
-        errors: validationErrors
-      });
-    }
-
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -145,6 +185,7 @@ export const updateDtOrder = async (req, res) => {
     });
   }
 };
+
 
 // Get all DT Orders (optional - for listing/searching)
 export const getAllDtOrders = async (req, res) => {

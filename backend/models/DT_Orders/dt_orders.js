@@ -266,6 +266,37 @@ const DtOrderSchema = new mongoose.Schema({
       required: false,
       default: []
     },
+
+     isModify: {
+    type: Boolean,
+    required: false,
+    default: false
+  },
+  modifiedAt: {
+    type: Date,
+    required: false,
+    default: null
+  },
+  modifiedBy: {
+    type: String,
+    required: false,
+    default: null
+  },
+  modificationHistory: [{
+    modifiedAt: {
+      type: Date,
+      default: Date.now
+    },
+    modifiedBy: {
+      type: String,
+      required: false
+    },
+    changes: {
+      type: String,
+      required: false
+    }
+  }],
+  
   
   // Nested Arrays
   SizeSpec: [SizeSpecSchema],
@@ -281,5 +312,6 @@ DtOrderSchema.index({ Factory: 1 });
 DtOrderSchema.index({ Cust_Code: 1 });
 DtOrderSchema.index({ Style: 1 }); // Added index for Style since we're using it for mapping
 DtOrderSchema.index({ createdAt: -1 });
+DtOrderSchema.index({ isModify: 1 });
 
 export default (connection) => connection.model("DtOrder", DtOrderSchema);
