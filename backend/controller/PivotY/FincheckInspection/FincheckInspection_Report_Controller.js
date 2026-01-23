@@ -1272,40 +1272,54 @@ export const submitLeaderDecision = async (req, res) => {
     const targetUrl = `/fincheck-reports/view/${reportId}`;
 
     // --- SCENARIO A: Critical Rework PO Notification ---
-    // Target: ALL members in FincheckNotificationGroup
+    // Target: Members in FincheckNotificationGroup who have the report's buyer in their notifiedCustomers
     if (reworkPO === "Yes") {
       try {
-        const groupMembers = await FincheckNotificationGroup.find({});
+        // Get the buyer/customer from the report
+        const reportBuyer = report.buyer;
 
-        if (groupMembers && groupMembers.length > 0) {
-          // Build the notification body
-          const line1 = `#${parsedReportId} [${reportName}]`;
-          const line2 = `[${dateStr} - ${orderStr} - ${qaEmpId}] marked for Rework PO due to quality issue by ${leaderId} - ${leaderName}`;
-          const line3 = reworkPOComment ? `Reason: ${reworkPOComment}` : "";
-
-          const criticalBody = line3
-            ? `${line1}\n${line2}\n${line3}`
-            : `${line1}\n${line2}`;
-
-          const criticalPayload = {
-            title: `🚨 CRITICAL: REWORK PO OPEN CARTON REQUIRED !!!`,
-            body: criticalBody,
-            icon: "/assets/Home/Fincheck_Critical.png",
-            url: targetUrl,
-            tag: `rework-po-${parsedReportId}`,
-            isCritical: true
-          };
-
-          // Send to ALL group members (including QA if they are in the group)
-          for (const member of groupMembers) {
-            try {
-              await sendPushToUser(member.empId, criticalPayload);
-            } catch (pushErr) {
-              console.error(`Failed to send to ${member.empId}:`, pushErr);
-            }
-          }
+        if (!reportBuyer) {
+          console.log(
+            "No buyer found in report, skipping Rework PO notifications"
+          );
         } else {
-          console.log("No members found in FincheckNotificationGroup");
+          // Find only group members who have this buyer in their notifiedCustomers array
+          const groupMembers = await FincheckNotificationGroup.find({
+            notifiedCustomers: { $in: [reportBuyer] }
+          });
+
+          if (groupMembers && groupMembers.length > 0) {
+            // Build the notification body
+            const line1 = `#${parsedReportId} [${reportName}]`;
+            const line2 = `[${dateStr} - ${orderStr} - ${qaEmpId}] marked for Rework PO due to quality issue by ${leaderId} - ${leaderName}`;
+            const line3 = reworkPOComment ? `Reason: ${reworkPOComment}` : "";
+
+            const criticalBody = line3
+              ? `${line1}\n${line2}\n${line3}`
+              : `${line1}\n${line2}`;
+
+            const criticalPayload = {
+              title: `🚨 CRITICAL: REWORK PO OPEN CARTON REQUIRED !!!`,
+              body: criticalBody,
+              icon: "/assets/Home/Fincheck_Critical.png",
+              url: targetUrl,
+              tag: `rework-po-${parsedReportId}`,
+              isCritical: true
+            };
+
+            // Send only to members who are subscribed to this buyer
+            for (const member of groupMembers) {
+              try {
+                await sendPushToUser(member.empId, criticalPayload);
+              } catch (pushErr) {
+                console.error(`Failed to send to ${member.empId}:`, pushErr);
+              }
+            }
+          } else {
+            console.log(
+              `No notification group members found for buyer: ${reportBuyer}`
+            );
+          }
         }
       } catch (err) {
         console.error("Error sending Rework PO notification:", err);
