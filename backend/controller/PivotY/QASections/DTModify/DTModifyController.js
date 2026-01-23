@@ -4,33 +4,18 @@ import mongoose from 'mongoose';
 // Get DT Order by Order Number
 export const getDtOrderByOrderNo = async (req, res) => {
   try {
-    console.log('=== getDtOrderByOrderNo called ===');
-    console.log('Request URL:', req.originalUrl);
-    console.log('Request method:', req.method);
-    console.log('Request params:', req.params);
-    console.log('Request query:', req.query);
-    
     const { orderNo } = req.params;
     const { suggest } = req.query; // New query parameter for suggestions
     
     if (!orderNo) {
-      console.log('No order number provided');
       return res.status(400).json({
         success: false,
         message: 'Order number is required'
       });
     }
-
-    console.log('Searching for order:', orderNo);
-    console.log('Suggestion mode:', !!suggest);
-    console.log('DtOrder model available:', !!DtOrder);
-    
-    // Check database connection
-    console.log('Database connection state:', mongoose.connection.readyState);
     
     // If suggest=true, return suggestions instead of exact match
     if (suggest === 'true') {
-      console.log('Fetching suggestions for:', orderNo);
       
       if (orderNo.length < 2) {
         return res.status(400).json({
@@ -48,10 +33,8 @@ export const getDtOrderByOrderNo = async (req, res) => {
         ]
       })
       .select('Order_No Style CustStyle ShortName TotalQty isModify')
-      .limit(10) // Limit to 10 suggestions
+      .limit(10) 
       .sort({ Order_No: 1 });
-
-      console.log(`Found ${suggestions.length} matching orders for suggestions`);
 
       return res.status(200).json({
         success: true,
@@ -63,17 +46,13 @@ export const getDtOrderByOrderNo = async (req, res) => {
 
     // Original exact match logic
     const order = await DtOrder.findOne({ Order_No: orderNo });
-    console.log('Order found:', !!order);
     
     if (!order) {
-      console.log('Order not found in database');
       return res.status(404).json({
         success: false,
         message: 'Order not found'
       });
     }
-
-    console.log('Returning order data, Order_No:', order.Order_No);
     res.status(200).json({
       success: true,
       data: order,
@@ -91,19 +70,14 @@ export const getDtOrderByOrderNo = async (req, res) => {
 };
 
 // Update DT Order by ID
-// Update your updateDtOrder function
 export const updateDtOrder = async (req, res) => {
   try {
-    console.log('=== updateDtOrder called ===');
-    console.log('Request params:', req.params);
-    console.log('Request body keys:', Object.keys(req.body));
     
     const { id } = req.params;
     let updateData = { ...req.body }; // Create a copy
 
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      console.log('❌ Invalid ObjectId:', id);
       return res.status(400).json({
         success: false,
         message: 'Invalid order ID format'
@@ -130,43 +104,26 @@ export const updateDtOrder = async (req, res) => {
     updateData.modifiedAt = new Date();
     updateData.updatedAt = new Date();
 
-    console.log('✅ Updating order with ID:', id);
-    console.log('✅ SizeList length:', updateData.SizeList?.length);
-    console.log('✅ SizeSpec length:', updateData.SizeSpec?.length);
-    console.log('✅ OrderColors length:', updateData.OrderColors?.length);
-    console.log('✅ isModify being set to:', updateData.isModify);
-    console.log('✅ modifiedAt being set to:', updateData.modifiedAt);
-
-    // Log the complete update data structure
-    console.log('✅ Update data keys:', Object.keys(updateData));
-
     // Update the order with explicit options
     const updatedOrder = await DtOrder.findByIdAndUpdate(
       id,
       {
-        $set: updateData // Use $set operator to ensure all fields are updated
+        $set: updateData 
       },
       { 
-        new: true, // Return updated document
-        runValidators: false, // Disable validators temporarily to avoid issues
-        strict: false, // Allow fields not in schema
-        upsert: false // Don't create if not exists
+        new: true, 
+        runValidators: false, 
+        strict: false, 
+        upsert: false 
       }
     );
 
-    if (!updatedOrder) {
-      console.log('❌ Order not found for update after save attempt');
+    if (!updatedOrder) {;
       return res.status(404).json({
         success: false,
         message: 'Order not found'
       });
     }
-
-    console.log('✅ Order updated successfully');
-    console.log('✅ Updated SizeList:', updatedOrder.SizeList);
-    console.log('✅ isModify saved as:', updatedOrder.isModify);
-    console.log('✅ modifiedAt saved as:', updatedOrder.modifiedAt);
-    console.log('✅ updatedAt saved as:', updatedOrder.updatedAt);
     
     res.status(200).json({
       success: true,
@@ -175,9 +132,6 @@ export const updateDtOrder = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error updating DT order:', error);
-    console.error('❌ Error stack:', error.stack);
-    
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -350,16 +304,12 @@ export const backupOrder = async (req, res) => {
 
 export const deleteSizeFromOrder = async (req, res) => {
   try {
-    console.log('=== deleteSizeFromOrder called ===');
-    console.log('Request params:', req.params);
-    console.log('Request body:', req.body);
     
     const { id } = req.params;
     const { sizeToDelete } = req.body;
 
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      console.log('❌ Invalid ObjectId:', id);
       return res.status(400).json({
         success: false,
         message: 'Invalid order ID format'
@@ -373,8 +323,6 @@ export const deleteSizeFromOrder = async (req, res) => {
         message: 'Size to delete is required and must be a string'
       });
     }
-
-    console.log('✅ Deleting size:', sizeToDelete, 'from order:', id);
 
     // Find the order first
     const order = await DtOrder.findById(id);
@@ -393,15 +341,12 @@ export const deleteSizeFromOrder = async (req, res) => {
       });
     }
 
-    console.log('✅ Size found in order, proceeding with deletion');
-
     // Create updated data by removing the size from all relevant places
     const updatedData = { ...order.toObject() };
 
     // 1. Remove from SizeList
     updatedData.SizeList = order.SizeList.filter(size => size !== sizeToDelete);
     updatedData.NoOfSize = updatedData.SizeList.length;
-    console.log('✅ Removed from SizeList. New count:', updatedData.NoOfSize);
 
     // 2. Remove from SizeSpec
     if (updatedData.SizeSpec && Array.isArray(updatedData.SizeSpec)) {
@@ -409,7 +354,6 @@ export const deleteSizeFromOrder = async (req, res) => {
         ...spec,
         Specs: spec.Specs.filter(specItem => !Object.prototype.hasOwnProperty.call(specItem, sizeToDelete))
       }));
-      console.log('✅ Removed from SizeSpec');
     }
 
     // 3. Remove from OrderColors (OrderQty and CutQty)
@@ -432,7 +376,6 @@ export const deleteSizeFromOrder = async (req, res) => {
         
         return updatedColor;
       });
-      console.log('✅ Removed from OrderColors (OrderQty and CutQty)');
     }
 
     // 4. Remove from OrderColorShip
@@ -444,7 +387,6 @@ export const deleteSizeFromOrder = async (req, res) => {
           sizes: shipSeq.sizes.filter(sizeItem => !Object.prototype.hasOwnProperty.call(sizeItem, sizeToDelete))
         }))
       }));
-      console.log('✅ Removed from OrderColorShip');
     }
 
     // Add modification flags
@@ -467,9 +409,6 @@ export const deleteSizeFromOrder = async (req, res) => {
         message: 'Failed to update order after size deletion'
       });
     }
-
-    console.log('✅ Size deleted successfully from order');
-    console.log('✅ Updated SizeList:', updatedOrder.SizeList);
     
     res.status(200).json({
       success: true,

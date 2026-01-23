@@ -310,7 +310,7 @@ const DtOrderSchema = new mongoose.Schema({
 // Indexes for better performance
 DtOrderSchema.index({ Factory: 1 });
 DtOrderSchema.index({ Cust_Code: 1 });
-DtOrderSchema.index({ Style: 1 }); // Added index for Style since we're using it for mapping
+DtOrderSchema.index({ Style: 1 }); 
 DtOrderSchema.index({ createdAt: -1 });
 DtOrderSchema.index({ isModify: 1 });
 

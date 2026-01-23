@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
+import { useAuth } from '../../../authentication/AuthContext';
 
 const ModifyDTspec = () => {
+  const { user } = useAuth();
   const [orderNo, setOrderNo] = useState('');
   const [orderData, setOrderData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -17,6 +19,10 @@ const ModifyDTspec = () => {
   const [modifiedFields, setModifiedFields] = useState(new Set());
   const [originalData, setOriginalData] = useState(null);
   const [newlyAddedSizes, setNewlyAddedSizes] = useState(new Set());
+  const [editingSizeIndex, setEditingSizeIndex] = useState(-1);
+  const [editingSizeName, setEditingSizeName] = useState('');
+  const [editingTable, setEditingTable] = useState('');
+  const editInputRef = useRef(null);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
   const inputRef = useRef(null);
@@ -155,60 +161,206 @@ const ModifyDTspec = () => {
 
   // Search for order by order number
     const handleSearch = async (searchOrderNo = null) => {
-    const orderToSearch = searchOrderNo || orderNo;
+  const orderToSearch = searchOrderNo || orderNo;
+  
+  if (!orderToSearch.trim()) {
+    setError('Please enter an order number');
+    return;
+  }
+  setLoading(true);
+  setError('');
+  setShowSuggestions(false);
+  
+  // Reset editing states when loading new order
+  setEditingSizeIndex(-1);
+  setEditingSizeName('');
+  setNewlyAddedSizes(new Set()); // Reset newly added sizes for new order
+  
+  try {
+    console.log('🔍 Fetching order:', orderToSearch);
     
-    if (!orderToSearch.trim()) {
-      setError('Please enter an order number');
-      return;
+    const url = `${apiBaseUrl}/api/dt-modify/${orderToSearch}`;
+    console.log('📡 Full URL:', url);
+    
+    const response = await fetch(url);
+    console.log('📡 Response status:', response.status);
+    
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorMessage;
+      } catch (jsonError) {
+        const errorText = await response.text();
+        console.log('❌ Error response text:', errorText);
+      }
+      throw new Error(errorMessage);
     }
+    
+    const result = await response.json();
+    console.log('✅ API Response:', result);
+    
+    if (result.success && result.data && result.type === 'exact_match') {
+      setOrderData(result.data);
+      setModifiedData(JSON.parse(JSON.stringify(result.data)));
+      setOriginalData(JSON.parse(JSON.stringify(result.data))); // Store original data
+      setIsModified(false);
+      setModifiedFields(new Set()); // Clear modified fields tracking
+      console.log('✅ Order data loaded successfully');
+    } else {
+      throw new Error(result.message || 'Failed to fetch order');
+    }
+    
+  } catch (err) {
+    console.error('❌ Search error:', err);
+    setError(err.message);
+    setOrderData(null);
+  } finally {
+    setLoading(false);
+  }
+};
 
-    setLoading(true);
-    setError('');
-    setShowSuggestions(false);
+  // Handle size name editing
+const handleSizeNameEdit = (sizeIndex, newSizeName) => {
+  const trimmedName = newSizeName.trim();
+  
+  if (!trimmedName) {
+    alert('Size name cannot be empty');
+    // Reset to original name and stay in edit mode
+    setEditingSizeName(modifiedData.SizeList[sizeIndex]);
+    return;
+  }
+
+  const oldSizeName = modifiedData.SizeList[sizeIndex];
+  
+  // If name hasn't changed, just exit edit mode
+  if (trimmedName === oldSizeName) {
+    setEditingSizeIndex(-1);
+    setEditingSizeName('');
+    setEditingTable('');
+    return;
+  }
+  
+  // Check if new name already exists (excluding current size)
+  if (modifiedData.SizeList.some((size, index) => 
+    index !== sizeIndex && size.toLowerCase() === trimmedName.toLowerCase()
+  )) {
+    alert(`Size "${trimmedName}" already exists!`);
+    // Reset to original name and stay in edit mode
+    setEditingSizeName(oldSizeName);
+    return;
+  }
+
+  console.log('🔧 Renaming size from:', oldSizeName, 'to:', trimmedName);
+
+  // Force a re-render by updating the key
+  const timestamp = Date.now();
+
+  setModifiedData(prevData => {
+    const updatedData = { ...prevData };
     
-    try {
-      console.log('🔍 Fetching order:', orderToSearch);
-      
-      const url = `${apiBaseUrl}/api/dt-modify/${orderToSearch}`;
-      console.log('📡 Full URL:', url);
-      
-      const response = await fetch(url);
-      console.log('📡 Response status:', response.status);
-      
-      if (!response.ok) {
-        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (jsonError) {
-          const errorText = await response.text();
-          console.log('❌ Error response text:', errorText);
+    // Update SizeList
+    updatedData.SizeList = [...prevData.SizeList];
+    updatedData.SizeList[sizeIndex] = trimmedName;
+    
+    // Update SizeSpec - rename size keys in Specs
+    updatedData.SizeSpec = prevData.SizeSpec.map(spec => ({
+      ...spec,
+      Specs: spec.Specs.map(specItem => {
+        if (specItem[oldSizeName]) {
+          const { [oldSizeName]: value, ...rest } = specItem;
+          return { ...rest, [trimmedName]: value };
         }
-        throw new Error(errorMessage);
+        return specItem;
+      })
+    }));
+    
+    // Update OrderColors - rename size keys in OrderQty and CutQty
+    updatedData.OrderColors = prevData.OrderColors.map(color => {
+      const updatedColor = { ...color };
+      
+      // Update OrderQty
+      updatedColor.OrderQty = color.OrderQty.map(qtyItem => {
+        if (qtyItem[oldSizeName] !== undefined) {
+          const { [oldSizeName]: value, ...rest } = qtyItem;
+          return { ...rest, [trimmedName]: value };
+        }
+        return qtyItem;
+      });
+      
+      // Update CutQty
+      if (color.CutQty && color.CutQty[oldSizeName]) {
+        const { [oldSizeName]: value, ...rest } = color.CutQty;
+        updatedColor.CutQty = { ...rest, [trimmedName]: value };
       }
       
-      const result = await response.json();
-      console.log('✅ API Response:', result);
-      
-      if (result.success && result.data && result.type === 'exact_match') {
-        setOrderData(result.data);
-        setModifiedData(JSON.parse(JSON.stringify(result.data)));
-        setOriginalData(JSON.parse(JSON.stringify(result.data))); // Store original data
-        setIsModified(false);
-        setModifiedFields(new Set()); // Clear modified fields tracking
-        console.log('✅ Order data loaded successfully');
-      } else {
-        throw new Error(result.message || 'Failed to fetch order');
-      }
-      
-    } catch (err) {
-      console.error('❌ Search error:', err);
-      setError(err.message);
-      setOrderData(null);
-    } finally {
-      setLoading(false);
+      return updatedColor;
+    });
+    
+    // Update OrderColorShip - rename size keys in sizes arrays
+    updatedData.OrderColorShip = prevData.OrderColorShip.map(colorShip => ({
+      ...colorShip,
+      ShipSeqNo: colorShip.ShipSeqNo.map(shipSeq => ({
+        ...shipSeq,
+        sizes: shipSeq.sizes.map(sizeItem => {
+          if (sizeItem[oldSizeName] !== undefined) {
+            const { [oldSizeName]: value, ...rest } = sizeItem;
+            return { ...rest, [trimmedName]: value };
+          }
+          return sizeItem;
+        })
+      }))
+    }));
+    
+    // Add a timestamp to force re-render
+    updatedData._lastModified = timestamp;
+    
+    return updatedData;
+  });
+
+  // Update newly added sizes set if the renamed size was newly added
+  setNewlyAddedSizes(prev => {
+    if (prev.has(oldSizeName)) {
+      const newSet = new Set(prev);
+      newSet.delete(oldSizeName);
+      newSet.add(trimmedName);
+      return newSet;
     }
-  };
+    return prev;
+  });
+
+  setIsModified(true);
+  
+  // Exit edit mode
+  setEditingSizeIndex(-1);
+  setEditingSizeName('');
+  setEditingTable('');
+  
+  console.log('✅ Size renamed successfully from', oldSizeName, 'to', trimmedName);
+};
+
+// Start editing size name - Updated
+const startEditingSizeName = (sizeIndex, currentName, tableType = 'specs') => {
+  setEditingSizeIndex(sizeIndex);
+  setEditingSizeName(currentName);
+  setEditingTable(tableType);
+
+  setTimeout(() => {
+    if (editInputRef.current) {
+      editInputRef.current.focus({ preventScroll: true });
+      editInputRef.current.select();
+    }
+  }, 50);
+};
+
+// Cancel editing size name - Updated
+const cancelEditingSizeName = () => {
+  setEditingSizeIndex(-1);
+  setEditingSizeName('');
+  setEditingTable('');
+};
+
+
 
   const createFieldKey = (type, ...identifiers) => {
     return `${type}_${identifiers.join('_')}`;
@@ -330,23 +482,34 @@ const ModifyDTspec = () => {
 
   // Drag and drop handlers
   const handleDragStart = (e, index) => {
+    // Don't allow dragging when in edit mode
+    if (editingSizeIndex !== -1 && editingTable === 'specs') {
+      e.preventDefault();
+      return;
+    }
+    
     setDraggedSizeIndex(index);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/html', e.target.outerHTML);
     e.target.style.opacity = '0.5';
   };
 
-  const handleDragEnd = (e) => {
-    e.target.style.opacity = '1';
-    setDraggedSizeIndex(null);
-    setDragOverIndex(null);
-  };
+const handleDragEnd = (e) => {
+  e.target.style.opacity = '1';
+  setDraggedSizeIndex(null);
+  setDragOverIndex(null);
+};
 
-  const handleDragOver = (e, index) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverIndex(index);
-  };
+const handleDragOver = (e, index) => {
+  // Don't allow drag over when in edit mode
+  if (editingSizeIndex !== -1 && editingTable === 'specs') {
+    return;
+  }
+  
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  setDragOverIndex(index);
+};
 
   const handleDragLeave = () => {
     setDragOverIndex(null);
@@ -692,30 +855,29 @@ const convertDecimalToFraction = (decimal) => {
   // Save changes
   const handleSave = async () => {
     if (!isModified) return;
+    if (!user) {
+      alert('You must be logged in to save changes');
+      return;
+    }
     setLoading(true);
     try {
       const dataToSave = {
         ...modifiedData,
         isModify: true,
         modifiedAt: new Date(),
-        modifiedBy: 'Current User'
+        modifiedBy: user.emp_id || user.eng_name ||  user.email || 'Unknown User',
       };
-      
-      console.log('💾 Saving order:', orderData._id);
-      console.log('💾 isModify being sent:', dataToSave.isModify);
-      
       const url = `${apiBaseUrl}/api/dt-modify/${orderData._id}`;
-      console.log('📡 Save URL:', url);
       
       const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
         body: JSON.stringify(dataToSave),
       });
       
-      console.log('📡 Save response status:', response.status);
       
       if (!response.ok) {
         let errorMessage = 'Failed to save changes';
@@ -731,8 +893,6 @@ const convertDecimalToFraction = (decimal) => {
       }
       
       const result = await response.json();
-      console.log('✅ Save API Response:', result);
-      console.log('✅ Saved isModify status:', result.data?.isModify);
       
       if (result.success && result.data) {
         setOrderData(result.data);
@@ -820,6 +980,59 @@ const convertDecimalToFraction = (decimal) => {
     console.log('✅ Size deleted from UI, remember to save changes');
   };
 
+  // Close edit mode when clicking outside - Add this useEffect
+// Close edit mode when clicking outside - Updated
+useEffect(() => {
+  const handleClickOutsideEdit = (event) => {
+    if (editingSizeIndex !== -1 && editingTable) {
+      // Check if click is outside the editing area
+      const editingElements = document.querySelectorAll('input[type="text"]');
+      let clickedOutside = true;
+      
+      editingElements.forEach(element => {
+        if (element.contains(event.target) || element === event.target) {
+          clickedOutside = false;
+        }
+      });
+      
+      // Also check if clicked on save/cancel buttons
+      if (event.target.closest('button[title="Save"]') || 
+          event.target.closest('button[title="Cancel"]')) {
+        clickedOutside = false;
+      }
+      
+      if (clickedOutside) {
+        // Save the current edit when clicking outside
+        if (editingSizeName.trim() && editingSizeName !== modifiedData.SizeList[editingSizeIndex]) {
+          handleSizeNameEdit(editingSizeIndex, editingSizeName);
+        } else {
+          cancelEditingSizeName();
+        }
+      }
+    }
+  };
+
+  document.addEventListener('mousedown', handleClickOutsideEdit);
+  return () => {
+    document.removeEventListener('mousedown', handleClickOutsideEdit);
+  };
+}, [editingSizeIndex, editingSizeName, editingTable, modifiedData]);
+
+useEffect(() => {
+  if (editingSizeIndex !== -1 && editingTable === 'specs' && editInputRef.current) {
+    // Small delay to ensure the input is rendered
+    const timer = setTimeout(() => {
+      if (editInputRef.current) {
+        editInputRef.current.focus({ preventScroll: true });
+        editInputRef.current.select();
+      }
+    }, 10);
+    
+    return () => clearTimeout(timer);
+  }
+}, [editingSizeIndex, editingTable]);
+
+
   // Render specifications table
    const renderSpecsTable = () => {
     if (!modifiedData?.SizeSpec) return null;
@@ -846,11 +1059,13 @@ const convertDecimalToFraction = (decimal) => {
                 </svg>
               </div>
               <div className="text-sm text-blue-800">
-                <p className="font-semibold mb-2">💡 How to reorder sizes:</p>
+                <p className="font-semibold mb-2">💡 How to manage sizes:</p>
                 <ul className="space-y-1 ml-4">
-                  <li>• Drag and drop the size column headers</li>
+                  <li>• <span className="font-medium">Click on size name</span> to edit it</li>
+                  <li>• Drag and drop the size column headers to reorder</li>
                   <li>• Use the ↑↓ arrow buttons in each size header</li>
                   <li>• <span className="bg-yellow-200 px-2 py-1 rounded-md font-medium">Yellow highlight</span> shows modified fields</li>
+                  <li>• <span className="bg-green-200 px-2 py-1 rounded-md font-medium">Green highlight</span> shows new sizes</li>
                 </ul>
               </div>
             </div>
@@ -896,14 +1111,14 @@ const convertDecimalToFraction = (decimal) => {
                     return (
                       <th 
                         key={size} 
-                        className={`border-r border-gray-200 px-3 py-3 text-center font-bold sticky top-0 z-10 cursor-move transition-all duration-200 ${
+                        className={`border-r border-gray-200 px-3 py-3 text-center font-bold sticky top-0 z-10 transition-all duration-200 ${
                           dragOverIndex === sizeIndex 
                             ? 'bg-blue-200 shadow-lg transform scale-105' 
                             : isNewSize
                               ? 'bg-gradient-to-br from-green-100 to-emerald-100 hover:from-green-200 hover:to-emerald-200'
                               : 'bg-gray-50 hover:bg-gray-100'
-                        }`}
-                        draggable
+                        } ${editingSizeIndex === -1 ? 'cursor-move' : 'cursor-default'}`}
+                        draggable={editingSizeIndex === -1} // Only draggable when not editing
                         onDragStart={(e) => handleDragStart(e, sizeIndex)}
                         onDragEnd={handleDragEnd}
                         onDragOver={(e) => handleDragOver(e, sizeIndex)}
@@ -921,60 +1136,156 @@ const convertDecimalToFraction = (decimal) => {
                             </div>
                           )}
                           
-                          {/* Size controls */}
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => moveSizeUp(sizeIndex)}
-                              disabled={sizeIndex === 0}
-                              className="w-6 h-6 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md flex items-center justify-center transition-colors"
-                              title="Move size left"
-                            >
-                              <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => moveSizeDown(sizeIndex)}
-                              disabled={sizeIndex === modifiedData.SizeList.length - 1}
-                              className="w-6 h-6 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md flex items-center justify-center transition-colors"
-                              title="Move size right"
-                            >
-                              <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
-                            </button>
-                          </div>
-                          
-                          {/* Size info */}
-                          <div className="text-center">
-                            <span className={`font-bold ${isNewSize ? 'text-green-800' : 'text-gray-800'}`}>
-                              {size}
-                            </span>
-                            <div className={`text-xs px-2 py-0.5 rounded-full mt-1 ${
-                              isNewSize 
-                                ? 'text-green-700 bg-green-200' 
-                                : 'text-gray-500 bg-gray-200'
-                            }`}>
-                              #{sizeIndex + 1}
+                          {/* Size controls - Only show when not editing */}
+                          {editingSizeIndex !== sizeIndex && (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  moveSizeUp(sizeIndex);
+                                }}
+                                disabled={sizeIndex === 0}
+                                className="w-6 h-6 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md flex items-center justify-center transition-colors"
+                                title="Move size left"
+                              >
+                                <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  moveSizeDown(sizeIndex);
+                                }}
+                                disabled={sizeIndex === modifiedData.SizeList.length - 1}
+                                className="w-6 h-6 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md flex items-center justify-center transition-colors"
+                                title="Move size right"
+                              >
+                                <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </button>
                             </div>
-                          </div>
+                          )}
                           
-                          {/* Delete button */}
-                          <button
-                            onClick={() => handleDeleteSize(size)}
-                            className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${
-                              isNewSize
-                                ? 'bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700'
-                                : 'bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700'
-                            }`}
-                            title={`Delete size ${size}`}
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                          {/* Size info - Updated with edit functionality */}
+                          <div className="text-center">
+                            {editingSizeIndex === sizeIndex && editingTable === 'specs' ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <input
+                                  ref={editInputRef} // Use the ref here
+                                  type="text"
+                                  value={editingSizeName}
+                                  onChange={(e) => setEditingSizeName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleSizeNameEdit(sizeIndex, editingSizeName);
+                                    } else if (e.key === 'Escape') {
+                                      e.preventDefault();
+                                      cancelEditingSizeName();
+                                    }
+                                  }}
+                                  className="w-16 px-2 py-1 text-xs font-bold text-center border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  onFocus={(e) => e.target.select()} // Select all text on focus
+                                />
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSizeNameEdit(sizeIndex, editingSizeName);
+                                    }}
+                                    className="w-4 h-4 bg-green-500 hover:bg-green-600 text-white rounded-sm flex items-center justify-center"
+                                    title="Save"
+                                  >
+                                    <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      cancelEditingSizeName();
+                                    }}
+                                    className="w-4 h-4 bg-red-500 hover:bg-red-600 text-white rounded-sm flex items-center justify-center"
+                                    title="Cancel"
+                                  >
+                                    <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-center">
+                                <div 
+                                  className={`font-bold cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition-colors ${
+                                    isNewSize ? 'text-green-800' : 'text-gray-800'
+                                  }`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    startEditingSizeName(sizeIndex, size, 'specs');
+                                  }}
+                                  title="Click to edit size name"
+                                >
+                                  {size}
+                                </div>
+                                <div className={`text-xs px-2 py-0.5 rounded-full mt-1 ${
+                                  isNewSize 
+                                    ? 'text-green-700 bg-green-200' 
+                                    : 'text-gray-500 bg-gray-200'
+                                }`}>
+                                  #{sizeIndex + 1}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Action buttons - Only show when not editing */}
+                          {!(editingSizeIndex === sizeIndex && editingTable === 'specs') && (
+                            <div className="flex gap-1">
+                              {/* Edit button */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  startEditingSizeName(sizeIndex, size, 'specs');
+                                }}
+                                className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${
+                                  isNewSize
+                                    ? 'bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700'
+                                    : 'bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-700'
+                                }`}
+                                title={`Edit size name: ${size}`}
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                              
+                              {/* Delete button */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  handleDeleteSize(size);
+                                }}
+                                className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${
+                                  isNewSize
+                                    ? 'bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700'
+                                    : 'bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700'
+                                }`}
+                                title={`Delete size ${size}`}
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </th>
+
                     );
                   })}
 
@@ -1109,33 +1420,44 @@ const convertDecimalToFraction = (decimal) => {
                           </div>
                         </th>
                         {modifiedData.SizeList.map((size, index) => {
-                          const isNewSize = newlyAddedSizes.has(size);
-                          
-                          return (
-                            <th key={size} className={`border-r border-gray-200 px-4 py-3 text-center font-bold sticky top-0 z-10 ${
-                              isNewSize ? 'bg-gradient-to-br from-green-100 to-emerald-100' : 'bg-gray-50'
-                            }`}>
-                              <div className="flex flex-col items-center gap-1">
-                                {isNewSize && (
-                                  <div className="flex items-center gap-1 mb-1">
-                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                                    <span className="text-xs font-bold text-green-700">NEW</span>
+                            const isNewSize = newlyAddedSizes.has(size);
+                            
+                            return (
+                              <th key={size} className={`border-r border-gray-200 px-4 py-3 text-center font-bold sticky top-0 z-10 ${
+                                isNewSize ? 'bg-gradient-to-br from-green-100 to-emerald-100' : 'bg-gray-50'
+                              }`}>
+                                <div className="flex flex-col items-center gap-1">
+                                  {isNewSize && (
+                                    <div className="flex items-center gap-1 mb-1">
+                                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                                      <span className="text-xs font-bold text-green-700">NEW</span>
+                                    </div>
+                                  )}
+                                  
+                                  {/* NON-EDITABLE size name display */}
+                                  <span 
+                                    className={`font-bold px-2 py-1 rounded ${
+                                      isNewSize ? 'text-green-800' : 'text-gray-700'
+                                    }`}
+                                    title="Edit size names in the Size Specifications table above"
+                                  >
+                                    {size}
+                                  </span>
+                                  
+                                  <div className={`text-xs px-2 py-0.5 rounded-full ${
+                                    isNewSize 
+                                      ? 'text-green-700 bg-green-200' 
+                                      : 'text-gray-500 bg-gray-200'
+                                  }`}>
+                                    #{index + 1}
                                   </div>
-                                )}
-                                <span className={`font-bold ${isNewSize ? 'text-green-800' : 'text-gray-700'}`}>
-                                  {size}
-                                </span>
-                                <div className={`text-xs px-2 py-0.5 rounded-full ${
-                                  isNewSize 
-                                    ? 'text-green-700 bg-green-200' 
-                                    : 'text-gray-500 bg-gray-200'
-                                }`}>
-                                  #{index + 1}
                                 </div>
-                              </div>
-                            </th>
-                          );
-                        })}
+                              </th>
+                            );
+                          })}
+
+
+
 
                       </tr>
                     </thead>
