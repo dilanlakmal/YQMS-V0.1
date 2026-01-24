@@ -5,7 +5,7 @@ import {
   CutPanelOrders,
   QCWorkers,
   DtOrder,
-  QC1Sunrise
+  QC1Sunrise,
 } from "../MongoDB/dbConnectionController.js";
 
 /* ------------------------------
@@ -21,14 +21,14 @@ const sqlConfig = {
   database: "YMDataStore",
   options: {
     encrypt: false, // Use true if SSL is required
-    trustServerCertificate: true // For self-signed certificates
+    trustServerCertificate: true, // For self-signed certificates
   },
   requestTimeout: 3000000, // Set timeout to 5 minutes (300,000 ms)
   pool: {
     max: 10,
     min: 0,
-    idleTimeoutMillis: 30000
-  }
+    idleTimeoutMillis: 30000,
+  },
 };
 
 /* ------------------------------
@@ -44,15 +44,15 @@ const sqlConfigYMCE = {
   database: "YMCE_SYSTEM",
   options: {
     encrypt: false,
-    trustServerCertificate: true
+    trustServerCertificate: true,
   },
   requestTimeout: 300000,
   connectionTimeout: 300000, // Increase connection timeout to 300 seconds
   pool: {
     max: 10,
     min: 0,
-    idleTimeoutMillis: 30000
-  }
+    idleTimeoutMillis: 30000,
+  },
 };
 
 /* ------------------------------
@@ -66,12 +66,12 @@ const sqlConfigFCSystem = {
   // Database will be specified in the query
   options: {
     encrypt: false,
-    trustServerCertificate: true
+    trustServerCertificate: true,
   },
   // Use the longer of the two timeouts to be safe
   requestTimeout: 21000000,
   connectionTimeout: 21000000,
-  pool: { max: 10, min: 2, idleTimeoutMillis: 60000 }
+  pool: { max: 10, min: 2, idleTimeoutMillis: 60000 },
 };
 
 // Create connection pools
@@ -83,7 +83,7 @@ const poolFCSystem = new sql.ConnectionPool(sqlConfigFCSystem); //YMWHSYS2
 const sqlConnectionStatus = {
   YMDataStore: false,
   YMCE_SYSTEM: false,
-  FCSystem: false
+  FCSystem: false,
 };
 
 // Function to connect to a pool, now it updates the status tracker
@@ -96,14 +96,14 @@ async function connectPool(pool, poolName) {
       } catch (closeErr) {
         console.warn(
           `Warning closing existing ${poolName} connection:`,
-          closeErr.message
+          closeErr.message,
         );
       }
     }
 
     await pool.connect();
     console.log(
-      `✅ Successfully connected to ${poolName} pool at ${pool.config.server}`
+      `✅ Successfully connected to ${poolName} pool at ${pool.config.server}`,
     );
     sqlConnectionStatus[poolName] = true; // Set status to true on success
 
@@ -130,7 +130,7 @@ async function ensurePoolConnected(pool, poolName, maxRetries = 3) {
       }
 
       console.log(
-        `Attempt ${attempt}/${maxRetries}: Reconnecting to ${poolName}...`
+        `Attempt ${attempt}/${maxRetries}: Reconnecting to ${poolName}...`,
       );
 
       // Close existing connection if in bad state
@@ -140,7 +140,7 @@ async function ensurePoolConnected(pool, poolName, maxRetries = 3) {
         } catch (closeErr) {
           console.warn(
             `Warning during close for ${poolName}:`,
-            closeErr.message
+            closeErr.message,
           );
         }
       }
@@ -155,13 +155,13 @@ async function ensurePoolConnected(pool, poolName, maxRetries = 3) {
     } catch (reconnectErr) {
       console.error(
         `Attempt ${attempt}/${maxRetries} failed for ${poolName}:`,
-        reconnectErr.message
+        reconnectErr.message,
       );
 
       if (attempt === maxRetries) {
         sqlConnectionStatus[poolName] = false;
         throw new Error(
-          `Failed to reconnect to ${poolName} after ${maxRetries} attempts: ${reconnectErr.message}`
+          `Failed to reconnect to ${poolName} after ${maxRetries} attempts: ${reconnectErr.message}`,
         );
       }
     }
@@ -199,7 +199,7 @@ async function initializeServer() {
   const connectionPromises = [
     connectPool(poolYMDataStore, "YMDataStore"),
     connectPool(poolYMCE, "YMCE_SYSTEM"),
-    connectPool(poolFCSystem, "FCSystem")
+    connectPool(poolFCSystem, "FCSystem"),
   ];
 
   // Promise.allSettled will not short-circuit. It waits for all promises.
@@ -209,14 +209,14 @@ async function initializeServer() {
     if (result.status === "rejected") {
       // The error is already logged in connectPool, but we can add a summary here.
       console.warn(
-        `Initialization Warning: ${result.reason.message}. Dependent services will be unavailable.`
+        `Initialization Warning: ${result.reason.message}. Dependent services will be unavailable.`,
       );
     }
   });
 
   console.log("Current SQL Connection Status:", sqlConnectionStatus);
   console.log(
-    "SQL pool initialization complete. Server will continue regardless of failures."
+    "SQL pool initialization complete. Server will continue regardless of failures.",
   );
 
   // 3. Run initial data syncs. These functions will now check the connection status internally.
@@ -249,7 +249,7 @@ export const getSunriseRS18Data = async (req, res) => {
     return res.status(503).json({
       message:
         "Service Unavailable: The YMDataStore database is not connected.",
-      error: "Database connection failed"
+      error: "Database connection failed",
     });
   }
   try {
@@ -399,7 +399,7 @@ export const getSunriseOutputData = async (req, res) => {
     return res.status(503).json({
       message:
         "Service Unavailable: The YMDataStore database is not connected.",
-      error: "Database connection failed"
+      error: "Database connection failed",
     });
   }
   try {
@@ -442,7 +442,7 @@ export const getSunriseOutputData = async (req, res) => {
     console.error("Error fetching Sunrise Output data:", err);
     res.status(500).json({
       message: "Failed to fetch Sunrise Output data",
-      error: err.message
+      error: err.message,
     });
   }
 };
@@ -457,7 +457,7 @@ const fetchRS18Data = async (res) => {
     return res.status(503).json({
       message:
         "Service Unavailable: The YMDataStore database is not connected.",
-      error: "Database connection failed"
+      error: "Database connection failed",
     });
   }
   try {
@@ -587,7 +587,7 @@ const fetchRS18Data = async (res) => {
     `;
     const result = await request.query(query);
     console.log(
-      `Fetched ${result.recordset.length} RS18 records from the last 7 days`
+      `Fetched ${result.recordset.length} RS18 records from the last 7 days`,
     );
     return result.recordset;
   } catch (err) {
@@ -602,7 +602,7 @@ const fetchOutputData = async (res) => {
     return res.status(503).json({
       message:
         "Service Unavailable: The YMDataStore database is not connected.",
-      error: "Database connection failed"
+      error: "Database connection failed",
     });
   }
   try {
@@ -641,7 +641,7 @@ const fetchOutputData = async (res) => {
     `;
     const result = await request.query(query);
     console.log(
-      `Fetched ${result.recordset.length} Output records from the last 7 days`
+      `Fetched ${result.recordset.length} Output records from the last 7 days`,
     );
     return result.recordset;
   } catch (err) {
@@ -669,12 +669,12 @@ const syncQC1SunriseData = async () => {
     // Fetch data from both sources (last 7 days only)
     const [rs18Data, outputData] = await Promise.all([
       fetchRS18Data(),
-      fetchOutputData()
+      fetchOutputData(),
     ]);
 
     if (outputData.length === 0) {
       console.log(
-        "No output data fetched from SQL Server for the last 7 days. Sync aborted."
+        "No output data fetched from SQL Server for the last 7 days. Sync aborted.",
       );
       return;
     }
@@ -689,7 +689,7 @@ const syncQC1SunriseData = async () => {
       defectMap.get(key).push({
         defectCode: defect.ReworkCode,
         defectName: defect.ReworkName,
-        defectQty: defect.DefectsQty
+        defectQty: defect.DefectsQty,
       });
     });
     console.log(`Defect Map contains ${defectMap.size} entries with defects`);
@@ -702,11 +702,11 @@ const syncQC1SunriseData = async () => {
 
       const totalDefectsQty = defectArray.reduce(
         (sum, defect) => sum + defect.defectQty,
-        0
+        0,
       );
       const checkedQty = Math.max(
         output.TotalQtyT38 || 0,
-        output.TotalQtyT39 || 0
+        output.TotalQtyT39 || 0,
       );
 
       const doc = {
@@ -721,7 +721,7 @@ const syncQC1SunriseData = async () => {
         CheckedQtyT39: output.TotalQtyT39 || 0,
         CheckedQty: checkedQty,
         DefectArray: defectArray, // Will be empty if no defects
-        totalDefectsQty: totalDefectsQty
+        totalDefectsQty: totalDefectsQty,
       };
       documents.push(doc);
     });
@@ -732,8 +732,8 @@ const syncQC1SunriseData = async () => {
       inspectionDate: {
         $gte: new Date(new Date().setDate(new Date().getDate() - 7))
           .toISOString()
-          .split("T")[0]
-      }
+          .split("T")[0],
+      },
     }).lean();
     const existingDocsMap = new Map();
     existingDocs.forEach((doc) => {
@@ -741,7 +741,7 @@ const syncQC1SunriseData = async () => {
       existingDocsMap.set(key, doc);
     });
     console.log(
-      `Fetched ${existingDocsMap.size} existing documents from qc1_sunrise for comparison`
+      `Fetched ${existingDocsMap.size} existing documents from qc1_sunrise for comparison`,
     );
 
     // Filter documents to only include those that are new or have changed
@@ -769,7 +769,7 @@ const syncQC1SunriseData = async () => {
       }
     }
     console.log(
-      `Filtered down to ${documentsToUpdate.length} documents that are new or modified`
+      `Filtered down to ${documentsToUpdate.length} documents that are new or modified`,
     );
 
     // Bulk upsert into MongoDB
@@ -780,20 +780,20 @@ const syncQC1SunriseData = async () => {
           lineNo: doc.lineNo,
           MONo: doc.MONo,
           Size: doc.Size,
-          ColorNo: doc.ColorNo
+          ColorNo: doc.ColorNo,
         },
         update: { $set: doc },
-        upsert: true
-      }
+        upsert: true,
+      },
     }));
 
     if (bulkOps.length > 0) {
       const result = await QC1Sunrise.bulkWrite(bulkOps);
       console.log(
-        `Bulk write result: Matched: ${result.matchedCount}, Modified: ${result.modifiedCount}, Upserted: ${result.upsertedCount}`
+        `Bulk write result: Matched: ${result.matchedCount}, Modified: ${result.modifiedCount}, Upserted: ${result.upsertedCount}`,
       );
       console.log(
-        `Successfully synced ${bulkOps.length} documents to qc1_sunrise.`
+        `Successfully synced ${bulkOps.length} documents to qc1_sunrise.`,
       );
     } else {
       console.log("No new or modified documents to upsert");
@@ -803,11 +803,11 @@ const syncQC1SunriseData = async () => {
     // Verify collection contents
     const collectionCount = await QC1Sunrise.countDocuments();
     console.log(
-      `Total documents in qc1_sunrise collection: ${collectionCount}`
+      `Total documents in qc1_sunrise collection: ${collectionCount}`,
     );
 
     console.log(
-      `Successfully completed QC1 Sunrise sync with ${documentsToUpdate.length} new or modified records`
+      `Successfully completed QC1 Sunrise sync with ${documentsToUpdate.length} new or modified records`,
     );
   } catch (err) {
     console.error("Error syncing QC1 Sunrise data:", err);
@@ -847,7 +847,7 @@ async function syncInlineOrders() {
   //MODIFICATION: Add connection status check
   if (!sqlConnectionStatus.YMCE_SYSTEM) {
     console.warn(
-      "Skipping syncInlineOrders: YMCE_SYSTEM database is not connected."
+      "Skipping syncInlineOrders: YMCE_SYSTEM database is not connected.",
     );
     return;
   }
@@ -861,7 +861,7 @@ async function syncInlineOrders() {
       "Using connection to:",
       poolYMCE.config.server,
       "database:",
-      poolYMCE.config.database
+      poolYMCE.config.database,
     );
 
     const query = `
@@ -896,7 +896,7 @@ async function syncInlineOrders() {
           St_No: row.St_No,
           By_Style: row.By_Style,
           Dept_Type: row.Dept_Type,
-          orderData: []
+          orderData: [],
         };
       }
       acc[key].orderData.push({
@@ -906,7 +906,7 @@ async function syncInlineOrders() {
         ch_name: row.ch_name,
         kh_name: row.kh_name,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
       return acc;
     }, {});
@@ -919,7 +919,7 @@ async function syncInlineOrders() {
         filter: {
           St_No: doc.St_No,
           By_Style: doc.By_Style,
-          Dept_Type: doc.Dept_Type
+          Dept_Type: doc.Dept_Type,
         },
         update: {
           $set: {
@@ -927,24 +927,24 @@ async function syncInlineOrders() {
             By_Style: doc.By_Style,
             Dept_Type: doc.Dept_Type,
             orderData: doc.orderData,
-            updatedAt: new Date()
+            updatedAt: new Date(),
           },
           $setOnInsert: {
-            createdAt: new Date()
-          }
+            createdAt: new Date(),
+          },
         },
-        upsert: true
-      }
+        upsert: true,
+      },
     }));
 
     await InlineOrders.bulkWrite(bulkOps);
     console.log(
-      `Successfully synced ${documents.length} documents to inline_orders.`
+      `Successfully synced ${documents.length} documents to inline_orders.`,
     );
 
     // Optional: Remove documents that no longer exist in the source data
     const existingKeys = documents.map(
-      (doc) => `${doc.St_No}_${doc.By_Style}_${doc.Dept_Type}`
+      (doc) => `${doc.St_No}_${doc.By_Style}_${doc.Dept_Type}`,
     );
     await InlineOrders.deleteMany({
       $and: [
@@ -956,12 +956,12 @@ async function syncInlineOrders() {
             $not: {
               $in: [
                 { $concat: ["$St_No", "_", "$By_Style", "_", "$Dept_Type"] },
-                existingKeys
-              ]
-            }
-          }
-        }
-      ]
+                existingKeys,
+              ],
+            },
+          },
+        },
+      ],
     });
     console.log("Removed outdated documents from inline_orders.");
   } catch (err) {
@@ -982,7 +982,7 @@ export const getInlineOrdersSync = async (req, res) => {
     console.error("Error in /api/sync-inline-orders endpoint:", err);
     res.status(500).json({
       message: "Failed to sync inline orders",
-      error: err.message
+      error: err.message,
     });
   }
 };
@@ -1001,7 +1001,7 @@ export const getYMCESystemData = async (req, res) => {
     return res.status(503).json({
       message:
         "Service Unavailable: The YMCE_SYSTEM database is not connected.",
-      error: "Database connection failed"
+      error: "Database connection failed",
     });
   }
 
@@ -1043,7 +1043,7 @@ export const getYMCESystemData = async (req, res) => {
     console.error("Error fetching YMCE_SYSTEM data:", err);
     res.status(500).json({
       message: "Failed to fetch YMCE_SYSTEM data",
-      error: err.message
+      error: err.message,
     });
   }
 };
@@ -1059,7 +1059,7 @@ async function syncCutPanelOrders() {
   // *** 2. THE GATEKEEPER CHECK ***
   if (isCutPanelSyncRunning) {
     console.log(
-      "[CutPanelOrders] Sync is already in progress. Skipping this run."
+      "[CutPanelOrders] Sync is already in progress. Skipping this run.",
     );
     return;
   }
@@ -1070,7 +1070,7 @@ async function syncCutPanelOrders() {
 
     if (!sqlConnectionStatus.FCSystem) {
       console.warn(
-        "[CutPanelOrders] Skipping sync: FCSystem database is not connected."
+        "[CutPanelOrders] Skipping sync: FCSystem database is not connected.",
       );
       return;
     }
@@ -1132,8 +1132,8 @@ async function syncCutPanelOrders() {
           const delay = Math.random() * 1000 + 1500; // Random delay 1.5-2.5 seconds
           console.warn(
             `[CutPanelOrders] Deadlock detected. Retrying in ${delay.toFixed(
-              0
-            )}ms (attempt ${attempt}/${maxRetries})`
+              0,
+            )}ms (attempt ${attempt}/${maxRetries})`,
           );
           await new Promise((resolve) => setTimeout(resolve, delay));
         } else {
@@ -1144,7 +1144,7 @@ async function syncCutPanelOrders() {
 
     if (records.length > 0) {
       console.log(
-        `[CutPanelOrders] Fetched ${records.length} records from SQL Server.`
+        `[CutPanelOrders] Fetched ${records.length} records from SQL Server.`,
       );
       const bulkOps = records.map((row) => ({
         updateOne: {
@@ -1190,20 +1190,20 @@ async function syncCutPanelOrders() {
                 no: k + 1,
                 size: row[`Size${k + 1}`],
                 cuttingRatio: row[`CuttingRatio${k + 1}`],
-                orderQty: row[`OrderQty${k + 1}`]
-              }))
-            }
+                orderQty: row[`OrderQty${k + 1}`],
+              })),
+            },
           },
-          upsert: true
-        }
+          upsert: true,
+        },
       }));
       await CutPanelOrders.bulkWrite(bulkOps);
       console.log(
-        `[CutPanelOrders] Successfully synced ${bulkOps.length} documents.`
+        `[CutPanelOrders] Successfully synced ${bulkOps.length} documents.`,
       );
     } else {
       console.log(
-        "[CutPanelOrders] No new documents to sync in the last 3 days."
+        "[CutPanelOrders] No new documents to sync in the last 3 days.",
       );
     }
   } catch (err) {
@@ -1226,7 +1226,7 @@ export const cutpanelOrdersSync = async (req, res) => {
   syncCutPanelOrders();
   res.status(202).json({
     message:
-      "Cut panel orders sync initiated successfully. Check logs for progress."
+      "Cut panel orders sync initiated successfully. Check logs for progress.",
   });
 };
 
@@ -1247,7 +1247,7 @@ const formatDateSQL = (date) => {
 
 async function syncQC1WorkerData(
   startDate = "2025-07-01",
-  endDate = new Date()
+  endDate = new Date(),
 ) {
   console.log("🔄 Starting QC1 Worker Data sync...");
 
@@ -1262,7 +1262,7 @@ async function syncQC1WorkerData(
   // 3. Verify connection is actually working
   if (!poolYMDataStore.connected) {
     throw new Error(
-      "YMDataStore pool is not connected after reconnection attempt"
+      "YMDataStore pool is not connected after reconnection attempt",
     );
   }
   const request = poolYMDataStore.request();
@@ -1314,13 +1314,13 @@ async function syncQC1WorkerData(
   const outputRows = outputResult.recordset.map((row) => ({
     ...row,
     Inspection_date: row.BillDate,
-    QC_ID: row.EmpID
+    QC_ID: row.EmpID,
   }));
 
   const defectRows = defectResult.recordset.map((row) => ({
     ...row,
     Inspection_date: row.dDate,
-    QC_ID: row.EmpID_QC
+    QC_ID: row.EmpID_QC,
   }));
 
   // Use a unified key for both output and defect data
@@ -1371,7 +1371,7 @@ async function syncQC1WorkerData(
       MONo: rows[0].MONo,
       Color: rows[0].ColorName,
       Size: rows[0].SizeName,
-      Qty: rows.reduce((sum, r) => sum + Number(r.Qty), 0)
+      Qty: rows.reduce((sum, r) => sum + Number(r.Qty), 0),
     }));
     // Group Output_data by (Line_no, MONo)
     const outputSummaryMap = new Map();
@@ -1402,7 +1402,7 @@ async function syncQC1WorkerData(
           defectDetailsMap.set(ddKey, {
             Defect_code: Number(d.ReworkCode),
             Defect_name: d.ReworkName,
-            Qty: 0
+            Qty: 0,
           });
         }
         defectDetailsMap.get(ddKey).Qty += Number(d.Defect_Qty);
@@ -1415,7 +1415,7 @@ async function syncQC1WorkerData(
         Color,
         Size,
         Defect_qty: TotalDefect,
-        DefectDetails: Array.from(defectDetailsMap.values())
+        DefectDetails: Array.from(defectDetailsMap.values()),
       };
     });
     // Group Defect_data by (Line_no, MONo)
@@ -1427,7 +1427,7 @@ async function syncQC1WorkerData(
           Line_no: d.Line_no,
           MONo: d.MONo,
           Defect_Qty: 0,
-          Defect_Details: []
+          Defect_Details: [],
         });
       }
       // Sum defect qty
@@ -1439,8 +1439,8 @@ async function syncQC1WorkerData(
           .get(key)
           .Defect_Details.map((dd) => [
             `${dd.Defect_code}|${dd.Defect_name}`,
-            { ...dd }
-          ])
+            { ...dd },
+          ]),
       );
       for (const dd of d.DefectDetails) {
         const ddKey = `${dd.Defect_code}|${dd.Defect_name}`;
@@ -1451,14 +1451,14 @@ async function syncQC1WorkerData(
         }
       }
       defectSummaryMap.get(key).Defect_Details = Array.from(
-        detailsMap.values()
+        detailsMap.values(),
       );
     }
     const Defect_data_summary = Array.from(defectSummaryMap.values());
 
     const TotalDefect = Defect_data_summary.reduce(
       (sum, d) => sum + d.Defect_Qty,
-      0
+      0,
     );
 
     // 3. Add report_type
@@ -1473,7 +1473,7 @@ async function syncQC1WorkerData(
       Output_data,
       Output_data_summary,
       Defect_data,
-      Defect_data_summary
+      Defect_data_summary,
     });
   }
 
@@ -1483,16 +1483,16 @@ async function syncQC1WorkerData(
     updateOne: {
       filter: {
         Inspection_date: doc.Inspection_date,
-        QC_ID: doc.QC_ID
+        QC_ID: doc.QC_ID,
       },
       update: { $set: doc },
-      upsert: true
-    }
+      upsert: true,
+    },
   }));
   if (bulkOps.length) {
     const result = await QCWorkers.bulkWrite(bulkOps);
     console.log(
-      `QC1_Worker sync: Matched ${result.matchedCount}, Upserted ${result.upsertedCount}, Modified ${result.modifiedCount}`
+      `QC1_Worker sync: Matched ${result.matchedCount}, Upserted ${result.upsertedCount}, Modified ${result.modifiedCount}`,
     );
   }
 }
@@ -1516,13 +1516,13 @@ cron.schedule("0 23 * * *", async () => {
   await syncQC1WorkerData(startDate, endDate)
     .then(() => {
       console.log(
-        "✅ QC1 Worker Data Sync completed (last 3 days, scheduled 11pm)."
+        "✅ QC1 Worker Data Sync completed (last 3 days, scheduled 11pm).",
       );
     })
     .catch((err) => {
       console.error(
         "❌ QC1 Worker Data Sync failed (last 3 days, scheduled 11pm):",
-        err
+        err,
       );
     });
 });
@@ -1538,7 +1538,7 @@ async function syncDTOrdersData() {
     } catch (connErr) {
       console.error(
         "❌ Failed to establish required connections:",
-        connErr.message
+        connErr.message,
       );
       throw connErr;
     }
@@ -1791,7 +1791,7 @@ async function syncDTOrdersData() {
         "370",
         "380",
         "390",
-        "400"
+        "400",
       ];
       sizeColumns.forEach((seq) => {
         const sizeNameColumn = `Size_${seq}_Name`;
@@ -1825,7 +1825,7 @@ async function syncDTOrdersData() {
       // Set the aggregated quantities for this size
       colorCutData[size] = {
         PlanCutQty: planQty,
-        ActualCutQty: cutQty
+        ActualCutQty: cutQty,
       };
     });
 
@@ -1875,7 +1875,7 @@ async function syncDTOrdersData() {
         "370",
         "380",
         "390",
-        "400"
+        "400",
       ];
       allSizeColumns.forEach((seq) => {
         const columnName = `${prefix}${seq}`;
@@ -1964,7 +1964,7 @@ async function syncDTOrdersData() {
         "370",
         "380",
         "390",
-        "400"
+        "400",
       ];
 
       sizeSeqs.forEach((seq) => {
@@ -2067,7 +2067,7 @@ async function syncDTOrdersData() {
       } catch (error) {
         console.error(
           `Error parsing tolerance value "${toleranceStr}":`,
-          error
+          error,
         );
         // Fallback: try to extract any numbers and make a reasonable guess
         const numbers = str.match(/\d+(?:\.\d+)?/g);
@@ -2085,7 +2085,7 @@ async function syncDTOrdersData() {
 
       return {
         fraction: toleranceStr.toString(),
-        decimal: Math.round(decimal * 10000) / 10000 // Round to 4 decimal places
+        decimal: Math.round(decimal * 10000) / 10000, // Round to 4 decimal places
       };
     }
 
@@ -2164,7 +2164,7 @@ async function syncDTOrdersData() {
           const specObject = {};
           specObject[sizeName] = {
             fraction: value,
-            decimal: Math.round(decimal * 10000) / 10000 // Round to 4 decimal places
+            decimal: Math.round(decimal * 10000) / 10000, // Round to 4 decimal places
           };
           specsArray.push(specObject);
         }
@@ -2224,7 +2224,7 @@ async function syncDTOrdersData() {
           SizeList: orderedSizeList,
           OrderColors: [],
           OrderColorShip: [],
-          SizeSpec: []
+          SizeSpec: [],
         });
       }
     });
@@ -2255,7 +2255,7 @@ async function syncDTOrdersData() {
             Color: record.Color,
             ChnColor: record.ChnColor,
             ColorKey: Number(record.Color_Seq) || 0,
-            sizeTotals: {}
+            sizeTotals: {},
           });
         }
 
@@ -2278,13 +2278,13 @@ async function syncDTOrdersData() {
             Color: record.Color,
             ChnColor: record.ChnColor,
             ColorKey: Number(record.Color_Seq) || 0,
-            ShipSeqNo: []
+            ShipSeqNo: [],
           });
         }
 
         const shipRecord = shipMap.get(shipKey);
         const existingSeq = shipRecord.ShipSeqNo.find(
-          (seq) => seq.seqNo === shipSeqNo
+          (seq) => seq.seqNo === shipSeqNo,
         );
         if (!existingSeq && shipSeqNo) {
           // Convert sizes object to array format like OrderQty
@@ -2293,7 +2293,7 @@ async function syncDTOrdersData() {
           shipRecord.ShipSeqNo.push({
             seqNo: Number(shipSeqNo),
             Ship_ID: convertEmptyToNull(shipId), // Added Ship_ID here
-            sizes: sizesArray // Now this will be in format [{"XS": 44}, {"S": 130}, ...]
+            sizes: sizesArray, // Now this will be in format [{"XS": 44}, {"S": 130}, ...]
           });
         }
       }
@@ -2305,7 +2305,7 @@ async function syncDTOrdersData() {
       const orderNo = colorKey.split("_")[0]; // Extract order number from colorKey
       const orderQtyArray = convertSizeObjectToArray(
         colorSummary.sizeTotals,
-        orderNo
+        orderNo,
       ); // Pass orderNo
 
       colorMap.set(colorKey, {
@@ -2314,7 +2314,7 @@ async function syncDTOrdersData() {
         ChnColor: colorSummary.ChnColor,
         ColorKey: colorSummary.ColorKey,
         OrderQty: orderQtyArray,
-        CutQty: {} // Will be populated with cut quantity data
+        CutQty: {}, // Will be populated with cut quantity data
       });
     }
 
@@ -2342,7 +2342,7 @@ async function syncDTOrdersData() {
             Object.entries(cutData).forEach(([size, quantities]) => {
               colorData.CutQty[size] = {
                 ActualCutQty: quantities.ActualCutQty,
-                PlanCutQty: quantities.PlanCutQty
+                PlanCutQty: quantities.PlanCutQty,
               };
             });
 
@@ -2426,22 +2426,22 @@ async function syncDTOrdersData() {
             IsMiddleCalc: spec.IsMiddleCalc || null,
             ToleranceMinus: {
               fraction: toleranceMinus.fraction || "",
-              decimal: toleranceMinus.decimal
+              decimal: toleranceMinus.decimal,
             },
             TolerancePlus: {
               fraction: tolerancePlus.fraction || "",
-              decimal: tolerancePlus.decimal
+              decimal: tolerancePlus.decimal,
             },
             SpecMemo: convertEmptyToNull(spec.SpecMemo),
             SizeSpecMeasUnit: convertEmptyToNull(spec.SizeSpecMeasUnit),
-            Specs: specs || []
+            Specs: specs || [],
           };
 
           order.SizeSpec.push(sizeSpecData);
         } catch (error) {
           console.error(
             `Error processing spec for job ${jobNo}, seq ${spec.Seq}:`,
-            error.message
+            error.message,
           );
         }
       }
@@ -2463,40 +2463,116 @@ async function syncDTOrdersData() {
           );
         });
       }
-      return doc;
+
+      // Remove isModify related fields from the document to avoid schema conflicts
+      const {
+        isModify,
+        modifiedAt,
+        modifiedBy,
+        modificationHistory,
+        ...cleanDoc
+      } = doc;
+      return cleanDoc;
     });
 
-    const bulkOps = cleanedDocs.map((doc) => ({
+    // Remove duplicates based on Order_No (just in case)
+    const uniqueDocs = cleanedDocs.reduce((acc, doc) => {
+      const existingIndex = acc.findIndex(
+        (existing) => existing.Order_No === doc.Order_No,
+      );
+      if (existingIndex === -1) {
+        acc.push(doc);
+      } else {
+        // If duplicate found, you might want to merge or keep the latest one
+      }
+      return acc;
+    }, []);
+
+    // FIXED: Get list of orders with isModify: true first
+    const modifiedOrders = await DtOrder.find({ isModify: true }).select(
+      "Order_No",
+    );
+    const modifiedOrderNos = new Set(
+      modifiedOrders.map((order) => order.Order_No),
+    );
+
+    console.log(`📋 Found ${modifiedOrderNos.size} orders with isModify: true`);
+
+    // Filter out the modified orders from our update list
+    const ordersToUpdate = uniqueDocs.filter(
+      (doc) => !modifiedOrderNos.has(doc.Order_No),
+    );
+
+    console.log(
+      `📊 Orders to update: ${ordersToUpdate.length} out of ${uniqueDocs.length}`,
+    );
+    console.log(
+      `📊 Orders to skip (manually modified): ${modifiedOrderNos.size}`,
+    );
+
+    // Create simple bulk operations without complex $or filters
+    const bulkOps = ordersToUpdate.map((doc) => ({
       updateOne: {
         filter: { Order_No: doc.Order_No },
         update: { $set: doc },
-        upsert: true
-      }
+        upsert: true,
+      },
     }));
 
     if (bulkOps.length > 0) {
       try {
-        const result = await DtOrder.bulkWrite(bulkOps);
-
-        console.log("✅ DT Orders data migration completed successfully!");
+        // Use ordered: false to continue processing even if some operations fail
+        const result = await DtOrder.bulkWrite(bulkOps, { ordered: false });
 
         return {
           success: true,
-          totalOrders: finalDocs.length,
-          // matched: result.matchedCount,
-          // upserted: result.upsertedCount,
+          totalOrders: uniqueDocs.length,
+          processed: ordersToUpdate.length,
+          matched: result.matchedCount,
           modified: result.modifiedCount,
+          upserted: result.upsertedCount,
+          skipped: modifiedOrderNos.size,
           cutQtyRecords: cutQtyResult.recordset.length,
           cutQtyMatchCount: cutQtyMatchCount,
-          colorsWithCutQty: colorsWithCutQty
+          colorsWithCutQty: colorsWithCutQty,
         };
       } catch (bulkError) {
         console.error("❌ Bulk operation failed:", bulkError);
+
+        // If there are still errors, let's handle them more gracefully
+        if (bulkError.writeErrors) {
+          bulkError.writeErrors.forEach((error, index) => {
+            console.log(`   Error ${index + 1}: ${error.errmsg}`);
+          });
+        }
+
+        // Return partial success if some operations succeeded
+        if (bulkError.result) {
+          return {
+            success: false,
+            partialSuccess: true,
+            totalOrders: uniqueDocs.length,
+            processed: ordersToUpdate.length,
+            matched: bulkError.result.matchedCount,
+            modified: bulkError.result.modifiedCount,
+            upserted: bulkError.result.upsertedCount,
+            skipped: modifiedOrderNos.size,
+            errors: bulkError.writeErrors?.length || 0,
+            cutQtyRecords: cutQtyResult.recordset.length,
+            cutQtyMatchCount: cutQtyMatchCount,
+            colorsWithCutQty: colorsWithCutQty,
+          };
+        }
+
         throw bulkError;
       }
     } else {
-      console.log("⚠️ No data to sync");
-      return { success: true, message: "No data to sync" };
+      return {
+        success: true,
+        message: "No records to update - all are manually modified",
+        totalOrders: uniqueDocs.length,
+        skipped: modifiedOrderNos.size,
+      };
     }
   } catch (error) {
     console.error("❌ DT Orders sync failed:", error);
@@ -2512,14 +2588,14 @@ export const syncDtOrders = async (req, res) => {
     res.json({
       success: true,
       message: "DT Orders data sync completed successfully",
-      data: result
+      data: result,
     });
   } catch (error) {
     console.error("DT Orders sync API error:", error);
     res.status(500).json({
       success: false,
       message: "DT Orders data sync failed",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -2549,7 +2625,7 @@ export async function closeSQLPools() {
     await Promise.all([
       poolYMDataStore.close(),
       poolYMCE.close(),
-      poolFCSystem.close()
+      poolFCSystem.close(),
     ]);
     console.log("SQL connection pools closed.");
   } catch (err) {
