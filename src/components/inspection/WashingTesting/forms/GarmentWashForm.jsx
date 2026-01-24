@@ -95,6 +95,7 @@ const GarmentWashForm = ({
     const careLabelFileInputRef = useRef(null);
     const careLabelCameraInputRef = useRef(null);
     const prevAvailableColorsRef = useRef([]);
+    const prevSizeRef = useRef(formData.sampleSize);
     const [keypadOpen, setKeypadOpen] = useState(false);
     const [showSizeDropdown, setShowSizeDropdown] = useState(false);
     const [keypadTarget, setKeypadTarget] = useState({ field: '', index: null, key: '' });
@@ -106,11 +107,11 @@ const GarmentWashForm = ({
     const [isExporting, setIsExporting] = useState(false);
 
     // Measurement specs state (same as MeasurementDetailsSection)
-    const [measurementSpecs, setMeasurementSpecs] = useState({ 
-        beforeWash: [], 
-        afterWash: [], 
-        beforeWashGrouped: {}, 
-        afterWashGrouped: {} 
+    const [measurementSpecs, setMeasurementSpecs] = useState({
+        beforeWash: [],
+        afterWash: [],
+        beforeWashGrouped: {},
+        afterWashGrouped: {}
     });
     const [isLoadingMeasurementSpecs, setIsLoadingMeasurementSpecs] = useState(false);
 
@@ -212,7 +213,7 @@ const GarmentWashForm = ({
 
         if (!formData.shrinkageRows || formData.shrinkageRows.length === 0) {
             handleInputChange('shrinkageRows', [
-                { location: '', original: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' }
+                { location: '', beforeWashSpec: '', afterWashSpec: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' }
             ]);
         }
 
@@ -244,11 +245,11 @@ const GarmentWashForm = ({
         try {
             const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}`);
             const data = await response.json();
-            
+
             if (response.ok && data.success) {
                 const beforeWashGrouped = data.beforeWashGrouped || {};
                 const afterWashGrouped = data.afterWashGrouped || {};
-                
+
                 setMeasurementSpecs({
                     beforeWash: data.beforeWashSpecs || [],
                     afterWash: data.afterWashSpecs || [],
@@ -275,13 +276,56 @@ const GarmentWashForm = ({
         return spec.Specs?.fraction || spec.Specs || '';
     };
 
+    // Helper function to get filtered available sizes based on actual measurement specs
+    const getFilteredAvailableSizes = () => {
+        const washType = formData.washType || 'Before Wash';
+        const isBeforeWash = washType === 'Before Wash';
+        const specsSource = isBeforeWash ? measurementSpecs.beforeWash : measurementSpecs.afterWash;
+        const groupedSpecs = isBeforeWash ? measurementSpecs.beforeWashGrouped : measurementSpecs.afterWashGrouped;
+
+        // Get the first available K-value or use flat array
+        let specsToUse = [];
+        if (Object.keys(groupedSpecs).length > 0) {
+            const firstKValue = Object.keys(groupedSpecs)[0];
+            specsToUse = groupedSpecs[firstKValue] || [];
+        } else if (Array.isArray(specsSource) && specsSource.length > 0) {
+            specsToUse = specsSource;
+        }
+
+        // Extract all available sizes from specs
+        const sizesFromSpecs = new Set();
+        specsToUse.forEach(spec => {
+            if (Array.isArray(spec.Specs)) {
+                spec.Specs.forEach(s => {
+                    if (s.size) sizesFromSpecs.add(s.size);
+                });
+            }
+        });
+
+        // If we have sizes from specs, use only those. Otherwise fall back to availableSizes prop
+        const sizesToUse = sizesFromSpecs.size > 0
+            ? Array.from(sizesFromSpecs)
+            : (availableSizes || []);
+
+        // Sort sizes in a logical order
+        const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '4XL', '5XL'];
+        return sizesToUse.sort((a, b) => {
+            const indexA = sizeOrder.indexOf(a);
+            const indexB = sizeOrder.indexOf(b);
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+            if (indexA !== -1) return -1;
+            if (indexB !== -1) return 1;
+            return a.localeCompare(b);
+        });
+    };
+
     // Helper function to get all sizes with their specs for comparison
     const getAllSizeSpecs = () => {
         const washType = formData.washType || 'Before Wash';
         const isBeforeWash = washType === 'Before Wash';
         const specsSource = isBeforeWash ? measurementSpecs.beforeWash : measurementSpecs.afterWash;
         const groupedSpecs = isBeforeWash ? measurementSpecs.beforeWashGrouped : measurementSpecs.afterWashGrouped;
-        
+
         // Get the first available K-value or use flat array
         let specsToUse = [];
         if (Object.keys(groupedSpecs).length > 0) {
@@ -318,11 +362,11 @@ const GarmentWashForm = ({
                 measurementPoint: spec.MeasurementPointEngName || spec.measurementPoint || 'UNKNOWN',
                 sizes: {}
             };
-            
+
             sortedSizes.forEach(size => {
                 row.sizes[size] = getSizeSpecValue(spec, size);
             });
-            
+
             return row;
         });
 
@@ -333,20 +377,46 @@ const GarmentWashForm = ({
     const lastFetchedOrderNoRef = useRef('');
     useEffect(() => {
         const orderNo = (formData.style || '').trim().toUpperCase();
-        
+
         if (orderNo && orderNo.length >= 3 && orderNo !== lastFetchedOrderNoRef.current) {
             lastFetchedOrderNoRef.current = orderNo;
             fetchMeasurementSpecs(orderNo);
+            // Reset sampleSize to default when style changes
+            // Note: washType will be auto-selected by the smart selection logic below
+            handleInputChange('sampleSize', '');
         } else if (!orderNo || orderNo.length < 3) {
             setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
         }
     }, [formData.style]);
 
+    // 1.5. Auto-select wash type based on available specs
+    useEffect(() => {
+        if (isLoadingMeasurementSpecs) return;
+
+        const hasBeforeWashSpecs = measurementSpecs.beforeWash && measurementSpecs.beforeWash.length > 0;
+        const hasAfterWashSpecs = measurementSpecs.afterWash && measurementSpecs.afterWash.length > 0;
+
+        // Smart wash type selection logic
+        if (hasBeforeWashSpecs && hasAfterWashSpecs) {
+            // Both specs available → Default to "BEFORE"
+            handleInputChange('washType', 'Before Wash');
+        } else if (hasBeforeWashSpecs && !hasAfterWashSpecs) {
+            // Only SPEC (BEFORE) available → Set to "BEFORE"
+            handleInputChange('washType', 'Before Wash');
+        } else if (!hasBeforeWashSpecs && hasAfterWashSpecs) {
+            // Only SPEC (AFTER) available → Set to "AFTER"
+            handleInputChange('washType', 'After Wash');
+        } else {
+            // No specs available → Default to "BEFORE"
+            handleInputChange('washType', 'Before Wash');
+        }
+    }, [measurementSpecs, isLoadingMeasurementSpecs]);
+
     // 2. Update shrinkageRows when measurement specs, size, or wash type change
     useEffect(() => {
         const size = formData.sampleSize;
         const washType = formData.washType || 'Before Wash';
-        
+
         if (!size || isLoadingMeasurementSpecs) {
             return;
         }
@@ -355,7 +425,7 @@ const GarmentWashForm = ({
         const isBeforeWash = washType === 'Before Wash';
         const specsSource = isBeforeWash ? measurementSpecs.beforeWash : measurementSpecs.afterWash;
         const groupedSpecs = isBeforeWash ? measurementSpecs.beforeWashGrouped : measurementSpecs.afterWashGrouped;
-        
+
         // Get the first available K-value or use flat array
         let specsToUse = [];
         if (Object.keys(groupedSpecs).length > 0) {
@@ -367,29 +437,80 @@ const GarmentWashForm = ({
         }
 
         if (specsToUse.length > 0) {
+            // Check if size changed to determine if we should preserve data
+            const sizeChanged = prevSizeRef.current !== size;
+            const currentRows = formData.shrinkageRows || [];
+
+            // Get both before and after wash specs
+            const beforeWashSpecs = measurementSpecs.beforeWash || [];
+            const afterWashSpecs = measurementSpecs.afterWash || [];
+
+            // Create maps for easy lookup
+            const beforeWashSpecsMap = {};
+            beforeWashSpecs.forEach(spec => {
+                const pointName = spec.MeasurementPointEngName || spec.measurementPoint || '';
+                if (pointName) {
+                    beforeWashSpecsMap[pointName] = spec;
+                }
+            });
+
+            const afterWashSpecsMap = {};
+            afterWashSpecs.forEach(spec => {
+                const pointName = spec.MeasurementPointEngName || spec.measurementPoint || '';
+                if (pointName) {
+                    afterWashSpecsMap[pointName] = spec;
+                }
+            });
+
             // Transform specs to shrinkageRows format, filtering by size
             const dynamicRows = specsToUse.map((spec, idx) => {
-                const specValue = getSizeSpecValue(spec, size);
-                
+                const locationName = spec.MeasurementPointEngName || spec.measurementPoint || 'UNKNOWN';
+
+                // Determine which spec values to use based on wash type
+                let beforeWashSpecValue = '';
+                let afterWashSpecValue = '';
+
+                if (isBeforeWash) {
+                    // In Before Wash mode: use beforeWashSpecs as source
+                    beforeWashSpecValue = getSizeSpecValue(spec, size);
+                    // Look up corresponding after wash spec
+                    const afterWashSpec = afterWashSpecsMap[locationName];
+                    afterWashSpecValue = afterWashSpec ? getSizeSpecValue(afterWashSpec, size) : '';
+                } else {
+                    // In After Wash mode: use afterWashSpecs as source
+                    afterWashSpecValue = getSizeSpecValue(spec, size);
+                    // Look up corresponding before wash spec
+                    const beforeWashSpec = beforeWashSpecsMap[locationName];
+                    beforeWashSpecValue = beforeWashSpec ? getSizeSpecValue(beforeWashSpec, size) : '';
+                }
+
+                // Only preserve existing data if size hasn't changed
+                const existingRow = !sizeChanged ? currentRows.find(r => r.location === locationName) : null;
+
                 return {
                     no: idx + 1,
-                    location: spec.MeasurementPointEngName || spec.measurementPoint || 'UNKNOWN',
-                    original: specValue || '',
-                    beforeWash: '',
-                    afterWash: '',
-                    shrinkage: '',
+                    location: locationName,
+                    beforeWashSpec: beforeWashSpecValue || '',
+                    afterWashSpec: afterWashSpecValue || '',
+                    beforeWash: existingRow ? existingRow.beforeWash : '',
+                    afterWash: existingRow ? existingRow.afterWash : '',
+                    shrinkage: existingRow ? existingRow.shrinkage : '',
                     requirement: '±5%', // Default shrinkage requirement
-                    passFail: 'PASS',
+                    passFail: existingRow ? existingRow.passFail : 'PASS',
                     isFromSpec: true,
-                    id: Math.random().toString(36).substr(2, 9)
+                    id: existingRow ? existingRow.id : Math.random().toString(36).substr(2, 9)
                 };
             });
-            
+
             handleInputChange('shrinkageRows', dynamicRows);
         } else if (!isLoadingMeasurementSpecs && size) {
             // If fetch finished but no specs found, clear rows
             handleInputChange('shrinkageRows', []);
         }
+
+        // Update ref
+        prevSizeRef.current = size;
+
     }, [measurementSpecs, formData.sampleSize, formData.washType, isLoadingMeasurementSpecs]);
 
     // Synchronization effects for derived metadata
@@ -510,18 +631,24 @@ const GarmentWashForm = ({
             const row = rows[index];
             const beforeVal = key === 'beforeWash' ? value : row.beforeWash;
             const afterVal = key === 'afterWash' ? value : row.afterWash;
+            const beforeSpecVal = row.beforeWashSpec || '';
+            const afterSpecVal = row.afterWashSpec || '';
 
             const before = parseFraction(beforeVal);
             const after = parseFraction(afterVal);
+            const beforeSpec = parseFraction(beforeSpecVal);
+            const afterSpec = parseFraction(afterSpecVal);
 
-            // 1. In this version, we no longer validate measurement against TOL- and TOL+
-            let isMeasurementOk = true;
-
-            // 2. Determine Shrinkage Pass/Fail
+            // Determine Shrinkage Pass/Fail
             let isShrinkageOk = true;
-            if (before !== 0 && beforeVal !== '' && afterVal !== '') {
-                const shrinkage = ((after - before) / before) * 100;
-                rows[index].shrinkage = (shrinkage >= 0 ? '+' : '') + shrinkage.toFixed(2) + '%';
+
+            // Calculate shrinkage based on available specs and measurements
+            // Priority 1: Use SPEC (BEFORE) if available with measurements
+            if (beforeSpec !== 0 && beforeSpecVal !== '' && before !== 0 && after !== 0 && beforeVal !== '' && afterVal !== '') {
+                // Formula: ((G2 - G1) / Spec_Before) × 100
+                const actualChange = after - before;
+                const shrinkagePercent = (actualChange / beforeSpec) * 100;
+                rows[index].shrinkage = (shrinkagePercent >= 0 ? '+' : '') + shrinkagePercent.toFixed(2) + '%';
 
                 // Get requirement threshold (default 5% if not specified)
                 let req = 5;
@@ -529,14 +656,55 @@ const GarmentWashForm = ({
                 const match = reqStr.match(/(\d+)/);
                 if (match) req = parseInt(match[1]);
 
-                isShrinkageOk = Math.abs(shrinkage) <= req;
+                isShrinkageOk = Math.abs(shrinkagePercent) <= req;
+            }
+            // Priority 2: Use SPEC (AFTER) if SPEC (BEFORE) not available but measurements exist
+            else if (afterSpec !== 0 && afterSpecVal !== '' && before !== 0 && after !== 0 && beforeVal !== '' && afterVal !== '') {
+                // Formula: ((G2 - G1) / Spec_After) × 100
+                const actualChange = after - before;
+                const shrinkagePercent = (actualChange / afterSpec) * 100;
+                rows[index].shrinkage = (shrinkagePercent >= 0 ? '+' : '') + shrinkagePercent.toFixed(2) + '%';
+
+                // Get requirement threshold (default 5% if not specified)
+                let req = 5;
+                const reqStr = row.requirement || '';
+                const match = reqStr.match(/(\d+)/);
+                if (match) req = parseInt(match[1]);
+
+                isShrinkageOk = Math.abs(shrinkagePercent) <= req;
+            }
+            // Priority 3: If we have both specs but no actual measurements, calculate expected shrinkage
+            else if (beforeSpec !== 0 && afterSpec !== 0 && beforeSpecVal !== '' && afterSpecVal !== '') {
+                const expectedShrinkage = ((afterSpec - beforeSpec) / beforeSpec) * 100;
+                rows[index].shrinkage = (expectedShrinkage >= 0 ? '+' : '') + expectedShrinkage.toFixed(2) + '%';
+
+                // Get requirement threshold (default 5% if not specified)
+                let req = 5;
+                const reqStr = row.requirement || '';
+                const match = reqStr.match(/(\d+)/);
+                if (match) req = parseInt(match[1]);
+
+                isShrinkageOk = Math.abs(expectedShrinkage) <= req;
+            }
+            // Priority 4: Fallback - If only actual measurements available (no specs)
+            else if (before !== 0 && beforeVal !== '' && afterVal !== '') {
+                const actualShrinkage = ((after - before) / before) * 100;
+                rows[index].shrinkage = (actualShrinkage >= 0 ? '+' : '') + actualShrinkage.toFixed(2) + '%';
+
+                // Get requirement threshold (default 5% if not specified)
+                let req = 5;
+                const reqStr = row.requirement || '';
+                const match = reqStr.match(/(\d+)/);
+                if (match) req = parseInt(match[1]);
+
+                isShrinkageOk = Math.abs(actualShrinkage) <= req;
             } else if (key === 'beforeWash' || key === 'afterWash') {
                 rows[index].shrinkage = '';
             }
 
-            // 3. Final Pass/Fail Status
-            if (beforeVal !== '' || afterVal !== '') {
-                rows[index].passFail = (isMeasurementOk && isShrinkageOk) ? 'PASS' : 'FAIL';
+            // Final Pass/Fail Status
+            if (beforeVal !== '' || afterVal !== '' || beforeSpecVal !== '' || afterSpecVal !== '') {
+                rows[index].passFail = isShrinkageOk ? 'PASS' : 'FAIL';
             } else {
                 rows[index].passFail = 'PASS';
             }
@@ -557,7 +725,7 @@ const GarmentWashForm = ({
         } else if (field === 'colorStainingRows') {
             newRow = { fabricType: '', color: headerColor, colorStaining: '5', ratingAfterWash: '', requirement: '4-5', passFail: 'PASS' };
         } else if (field === 'shrinkageRows') {
-            newRow = { location: '', original: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' };
+            newRow = { location: '', beforeWashSpec: '', afterWashSpec: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' };
         }
 
         handleInputChange(field, [...rows, newRow]);
@@ -669,9 +837,19 @@ const GarmentWashForm = ({
                                 key={f}
                                 onClick={() => {
                                     if (f === '-1') {
-                                        setIntegerPart(prev => prev - 1);
+                                        const newVal = integerPart - 1;
+                                        setIntegerPart(newVal);
+                                        // Auto confirm with new integer part
+                                        const sign = isNegative ? '-' : '';
+                                        const intStr = newVal === 0 ? '' : `${newVal} `;
+                                        const fracStr = fractionPart || '';
+                                        onConfirm(`${sign}${intStr}${fracStr}`.trim() || '0');
                                     } else {
                                         setFractionPart(f);
+                                        // Auto confirm with selected fraction
+                                        const sign = isNegative ? '-' : '';
+                                        const intStr = integerPart === 0 ? '' : `${integerPart} `;
+                                        onConfirm(`${sign}${intStr}${f}`.trim());
                                     }
                                 }}
                                 className="h-14 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm font-medium transition-all flex flex-col items-center justify-center dark:text-white shadow-sm active:scale-95"
@@ -726,7 +904,7 @@ const GarmentWashForm = ({
     };
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+        <div className="space-y-8">
             <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4 border-b pb-2">
                 GARMENT WASH TEST REPORT
             </h2>
@@ -1141,7 +1319,7 @@ const GarmentWashForm = ({
                     </div>
                 </div>
 
-           
+
 
                 {/* 4. Color Staining Table */}
                 <div>
@@ -1293,7 +1471,7 @@ const GarmentWashForm = ({
                             <div className="relative group">
                                 <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-xl blur-sm group-hover:blur-md transition-all duration-300 opacity-50"></div>
                                 <div className="relative flex items-center gap-3 px-4 py-2 bg-white dark:bg-gray-800 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm transition-all hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md">
-                                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.1em]">Test Size</span>
+                                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.1em]">Size</span>
                                     <div className="h-4 w-[1px] bg-gray-100 dark:bg-gray-700"></div>
                                     <div className="relative" ref={sizeDropdownRef}>
                                         <button
@@ -1308,36 +1486,59 @@ const GarmentWashForm = ({
                                         </button>
 
                                         {/* Dropdown Menu */}
-                                        {showSizeDropdown && (
-                                            <div className="absolute top-full right-0 mt-3 min-w-[140px] bg-white dark:bg-gray-800 border border-blue-100 dark:border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ring-4 ring-blue-50/50 dark:ring-blue-900/20">
-                                                <div className="max-h-64 overflow-y-auto p-1.5 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600">
-                                                    {(availableSizes || []).length === 0 ? (
-                                                        <div className="px-4 py-3 text-xs text-gray-400 text-center font-medium italic">No sizes available</div>
-                                                    ) : (
-                                                        (availableSizes || []).map((s) => (
-                                                            <button
-                                                                key={s}
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    handleInputChange('sampleSize', s);
-                                                                    setShowSizeDropdown(false);
-                                                                }}
-                                                                className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold transition-all mb-0.5 last:mb-0 flex items-center justify-between group
-                                                                    ${formData.sampleSize === s
-                                                                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400'
-                                                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-300'
-                                                                    }`}
-                                                            >
-                                                                {s}
-                                                                {formData.sampleSize === s && (
-                                                                    <Check size={14} strokeWidth={3} className="opacity-100 transition-opacity" />
-                                                                )}
-                                                            </button>
-                                                        ))
-                                                    )}
+                                        {showSizeDropdown && (() => {
+                                            const filteredSizes = getFilteredAvailableSizes();
+                                            return (
+                                                <div className="absolute top-full right-0 mt-3 min-w-[140px] bg-white dark:bg-gray-800 border border-blue-100 dark:border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ring-4 ring-blue-50/50 dark:ring-blue-900/20">
+                                                    <div className="max-h-64 overflow-y-auto p-1.5 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600">
+                                                        {filteredSizes.length === 0 ? (
+                                                            <div className="px-4 py-3 text-xs text-gray-400 text-center font-medium italic">No sizes available</div>
+                                                        ) : (
+                                                            filteredSizes.map((s) => {
+                                                                // Count how many specs are available for this size
+                                                                const washType = formData.washType || 'Before Wash';
+                                                                const isBeforeWash = washType === 'Before Wash';
+                                                                const specsSource = isBeforeWash ? measurementSpecs.beforeWash : measurementSpecs.afterWash;
+
+                                                                let specCount = 0;
+                                                                if (Array.isArray(specsSource)) {
+                                                                    specCount = specsSource.filter(spec => {
+                                                                        const specValue = getSizeSpecValue(spec, s);
+                                                                        return specValue && specValue !== '';
+                                                                    }).length;
+                                                                }
+
+                                                                return (
+                                                                    <button
+                                                                        key={s}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            handleInputChange('sampleSize', s);
+                                                                            setShowSizeDropdown(false);
+                                                                        }}
+                                                                        className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold transition-all mb-0.5 last:mb-0 flex items-center justify-between group
+                                                                        ${formData.sampleSize === s
+                                                                                ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400'
+                                                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-300'
+                                                                            }`}
+                                                                    >
+                                                                        <span className="flex items-center gap-2">
+                                                                            {s}
+                                                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-black tabular-nums ${specCount > 0}`}>
+                                                                                ( {specCount} )
+                                                                            </span>
+                                                                        </span>
+                                                                        {formData.sampleSize === s && (
+                                                                            <Check size={14} strokeWidth={3} className="opacity-100 transition-opacity" />
+                                                                        )}
+                                                                    </button>
+                                                                );
+                                                            })
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </div>
@@ -1346,16 +1547,10 @@ const GarmentWashForm = ({
                             {formData.sampleSize && (formData.shrinkageRows || []).length > 0 && (
                                 <button
                                     type="button"
-                                    onClick={() => setShowSizeComparisonModal(true)}
-                                    className="relative group flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border border-blue-200 dark:border-blue-700 rounded-xl shadow-sm hover:shadow-md transition-all hover:from-blue-100 hover:to-indigo-100 dark:hover:from-blue-900/50 dark:hover:to-indigo-900/50"
-                                    title="View all sizes comparison"
-                                >
-                                    <Maximize2 size={16} className="text-blue-600 dark:text-blue-400" />
-                                    <span className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">View All Sizes</span>
+                                    onClick={() => setShowSizeComparisonModal(true)} title="View all sizes comparison">
+                                    <Maximize2 size={16} className="" />
                                 </button>
                             )}
-
-
                         </div>
                     </div>
 
@@ -1375,9 +1570,19 @@ const GarmentWashForm = ({
                                 <tr>
                                     <th className="p-4 border-b dark:border-gray-700 w-14 text-center first:rounded-tl-xl">NO</th>
                                     <th className="p-4 border-b dark:border-gray-700">MEASUREMENT POINT</th>
-                                    <th className="p-4 border-b dark:border-gray-700 w-28 text-center bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l border-r border-blue-100 dark:border-blue-800">
-                                        SPECIFICATION
+                                    <th className="p-4 border-b dark:border-gray-700 min-w-[7rem] text-center bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l border-r border-blue-100 dark:border-blue-800">
+                                        <div className="flex flex-col items-center gap-0.5">
+                                            <span className="font-extrabold">SPEC</span>
+                                            <span className="font-extrabold">(BEFORE)</span>
+                                        </div>
                                         <div className="h-0.5 w-8 bg-blue-200 dark:bg-blue-600 mx-auto mt-1 rounded-full"></div>
+                                    </th>
+                                    <th className="p-4 border-b dark:border-gray-700 min-w-[7rem] text-center bg-purple-50/50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border-l border-r border-purple-100 dark:border-purple-800">
+                                        <div className="flex flex-col items-center gap-0.5">
+                                            <span className="font-extrabold">SPEC</span>
+                                            <span className="font-extrabold">(AFTER)</span>
+                                        </div>
+                                        <div className="h-0.5 w-8 bg-purple-200 dark:bg-purple-600 mx-auto mt-1 rounded-full"></div>
                                     </th>
                                     <th className="p-4 border-b dark:border-gray-700 w-32 text-center text-gray-700 dark:text-gray-300">
                                         Before Wash (G1)
@@ -1437,23 +1642,49 @@ const GarmentWashForm = ({
                                                 {row.isFromSpec ? (
                                                     <div className="relative">
                                                         <span className="text-blue-600 dark:text-blue-400 font-black text-lg tracking-tight tabular-nums">
-                                                            {row.original}
+                                                            {row.beforeWashSpec}
                                                         </span>
                                                         <span className="absolute -top-1 -right-3 text-[9px] font-bold text-blue-300">IN</span>
                                                     </div>
                                                 ) : (
                                                     <input
                                                         type="text"
-                                                        value={row.original}
-                                                        onClick={() => openKeypad('shrinkageRows', index, 'original', row.original)}
+                                                        value={row.beforeWashSpec}
+                                                        onClick={() => openKeypad('shrinkageRows', index, 'beforeWashSpec', row.beforeWashSpec)}
                                                         readOnly
                                                         className="w-full bg-white/50 dark:bg-gray-800/50 border border-blue-100 dark:border-blue-800 rounded px-1 text-center cursor-pointer hover:bg-white dark:hover:bg-gray-800 text-blue-600 font-black text-lg"
                                                         placeholder="-"
                                                     />
                                                 )}
-                                                {row.original && (
+                                                {row.beforeWashSpec && (
                                                     <span className="text-[10px] text-gray-400 font-mono font-medium">
-                                                        {parseFraction(row.original).toFixed(3)}"
+                                                        {parseFraction(row.beforeWashSpec).toFixed(3)}"
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="p-3 bg-purple-50/30 dark:bg-purple-900/10 border-l border-r border-purple-50 dark:border-purple-900/30">
+                                            <div className="flex flex-col items-center justify-center gap-0.5">
+                                                {row.isFromSpec ? (
+                                                    <div className="relative">
+                                                        <span className="text-purple-600 dark:text-purple-400 font-black text-lg tracking-tight tabular-nums">
+                                                            {row.afterWashSpec}
+                                                        </span>
+                                                        <span className="absolute -top-1 -right-3 text-[9px] font-bold text-purple-300">IN</span>
+                                                    </div>
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        value={row.afterWashSpec}
+                                                        onClick={() => openKeypad('shrinkageRows', index, 'afterWashSpec', row.afterWashSpec)}
+                                                        readOnly
+                                                        className="w-full bg-white/50 dark:bg-gray-800/50 border border-purple-100 dark:border-purple-800 rounded px-1 text-center cursor-pointer hover:bg-white dark:hover:bg-gray-800 text-purple-600 font-black text-lg"
+                                                        placeholder="-"
+                                                    />
+                                                )}
+                                                {row.afterWashSpec && (
+                                                    <span className="text-[10px] text-gray-400 font-mono font-medium">
+                                                        {parseFraction(row.afterWashSpec).toFixed(3)}"
                                                     </span>
                                                 )}
                                             </div>
@@ -1466,7 +1697,7 @@ const GarmentWashForm = ({
                                             >
                                                 {row.beforeWash ? (
                                                     <>
-                                                        <span className="text-lg font-black text-gray-800 dark:text-white tabular-nums">{row.beforeWash}</span>
+                                                        <span className="text-lg font-black tabular-nums text-gray-800 dark:text-white">{row.beforeWash}</span>
                                                         <span className="text-[10px] text-gray-400 font-mono">{parseFraction(row.beforeWash).toFixed(3)}"</span>
                                                     </>
                                                 ) : (
@@ -1474,7 +1705,6 @@ const GarmentWashForm = ({
                                                         <Hash size={16} />
                                                     </span>
                                                 )}
-
                                             </div>
                                         </td>
                                         <td className="p-3">
@@ -1485,7 +1715,7 @@ const GarmentWashForm = ({
                                             >
                                                 {row.afterWash ? (
                                                     <>
-                                                        <span className="text-lg font-black text-gray-800 dark:text-white tabular-nums">{row.afterWash}</span>
+                                                        <span className="text-lg font-black tabular-nums text-gray-800 dark:text-white">{row.afterWash}</span>
                                                         <span className="text-[10px] text-gray-400 font-mono">{parseFraction(row.afterWash).toFixed(3)}"</span>
                                                     </>
                                                 ) : (
@@ -1497,20 +1727,75 @@ const GarmentWashForm = ({
                                         </td>
                                         <td className="p-3 text-center">
                                             {row.shrinkage ? (
-                                                <div className={`py-1.5 px-3 rounded-lg inline-flex items-center gap-1.5 border transition-all duration-500 shadow-sm
-                                                    ${row.passFail === 'FAIL'
-                                                        ? 'bg-red-50 border-red-100 text-red-600 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 animate-pulse-soft'
-                                                        : 'bg-green-50 border-green-100 text-green-600 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400'}`}>
-                                                    <span className="text-sm font-black tabular-nums">{row.shrinkage}</span>
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <div className={`py-1.5 px-3 rounded-lg inline-flex items-center gap-1.5 border transition-all duration-500 shadow-sm
+                                                        ${row.passFail === 'FAIL'
+                                                            ? 'bg-red-50 border-red-100 text-red-600 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 animate-pulse-soft'
+                                                            : 'bg-green-50 border-green-100 text-green-600 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400'}`}>
+                                                        <span className="text-sm font-black tabular-nums">{row.shrinkage}</span>
+                                                    </div>
+                                                    {(() => {
+                                                        const hasBeforeSpec = row.beforeWashSpec && row.beforeWashSpec !== '';
+                                                        const hasAfterSpec = row.afterWashSpec && row.afterWashSpec !== '';
+                                                        const hasG1 = row.beforeWash && row.beforeWash !== '';
+                                                        const hasG2 = row.afterWash && row.afterWash !== '';
+
+                                                        // Priority 1: SPEC (BEFORE) + Measurements
+                                                        if (hasBeforeSpec && hasG1 && hasG2) {
+                                                            return (
+                                                                <span className="text-[9px] font-mono text-gray-400 dark:text-gray-500 font-normal leading-tight">
+                                                                    (({parseFraction(row.afterWash).toFixed(3)} - {parseFraction(row.beforeWash).toFixed(3)}) / {parseFraction(row.beforeWashSpec).toFixed(3)}) × 100
+                                                                </span>
+                                                            );
+                                                        }
+                                                        // Priority 2: SPEC (AFTER) + Measurements (no SPEC BEFORE)
+                                                        else if (hasAfterSpec && hasG1 && hasG2 && !hasBeforeSpec) {
+                                                            return (
+                                                                <span className="text-[9px] font-mono text-gray-400 dark:text-gray-500 font-normal leading-tight">
+                                                                    (({parseFraction(row.afterWash).toFixed(3)} - {parseFraction(row.beforeWash).toFixed(3)}) / {parseFraction(row.afterWashSpec).toFixed(3)}) × 100
+                                                                </span>
+                                                            );
+                                                        }
+                                                        // Priority 3: Both Specs, No Measurements (Expected Shrinkage)
+                                                        else if (hasBeforeSpec && hasAfterSpec && !hasG1 && !hasG2) {
+                                                            return (
+                                                                <span className="text-[9px] font-mono text-gray-400 dark:text-gray-500 font-normal leading-tight">
+                                                                    (({parseFraction(row.afterWashSpec).toFixed(3)} - {parseFraction(row.beforeWashSpec).toFixed(3)}) / {parseFraction(row.beforeWashSpec).toFixed(3)}) × 100
+                                                                </span>
+                                                            );
+                                                        }
+                                                        // Priority 4: Measurements Only (no specs) - Fallback
+                                                        else if (hasG1 && hasG2 && !hasBeforeSpec && !hasAfterSpec) {
+                                                            return (
+                                                                <span className="text-[9px] font-mono text-gray-400 dark:text-gray-500 font-normal leading-tight">
+                                                                    (({parseFraction(row.afterWash).toFixed(3)} - {parseFraction(row.beforeWash).toFixed(3)}) / {parseFraction(row.beforeWash).toFixed(3)}) × 100
+                                                                </span>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()}
                                                 </div>
                                             ) : (
                                                 <span className="text-gray-300 font-bold text-xs uppercase tracking-wider">Pending</span>
                                             )}
                                         </td>
                                         <td className="p-3 text-center">
-                                            <span className="inline-block px-2 py-1 bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 font-bold rounded-md text-[11px] border border-gray-200 dark:border-gray-600">
-                                                {row.requirement}
-                                            </span>
+                                            <div className="flex flex-col items-center gap-1">
+                                                <span className="inline-block px-2 py-1 bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 font-bold rounded-md text-[11px] border border-gray-200 dark:border-gray-600">
+                                                    {row.requirement}
+                                                </span>
+                                                {row.shrinkage && row.requirement && (
+                                                    <span className="text-[9px] font-mono text-gray-400 dark:text-gray-500 font-normal leading-tight">
+                                                        {(() => {
+                                                            const reqMatch = row.requirement.match(/(\d+)/);
+                                                            const reqValue = reqMatch ? parseInt(reqMatch[1]) : 5;
+                                                            const shrinkageValue = parseFloat(row.shrinkage.replace('%', ''));
+                                                            const isPass = Math.abs(shrinkageValue) <= reqValue;
+                                                            return `${shrinkageValue.toFixed(2)}% ${isPass ? '≤' : '>'} ${reqValue}%`;
+                                                        })()}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="p-3 text-center">
                                             <button
@@ -1568,7 +1853,7 @@ const GarmentWashForm = ({
                 </div>
 
                 {/* 8. Footer / Approval */}
-                <div className="border-t pt-6 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-md">
+                <div className="border-t pt-8 mt-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
 
                         {/* Final Result */}
@@ -1617,8 +1902,8 @@ const GarmentWashForm = ({
                 </div>
 
                 {/* Images & Notes */}
-                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md border border-gray-200 dark:border-gray-700">
-                    <h3 className="font-medium mb-3">Images & Additional Notes</h3>
+                <div className="pt-8 mt-8 border-t">
+                    <h3 className="font-bold text-gray-800 dark:text-white mb-4 uppercase tracking-wider text-sm">Images & Additional Notes</h3>
 
                     {/* Image Upload UI(Similar to other forms) */}
                     <div className="mb-4">
@@ -1727,11 +2012,10 @@ const GarmentWashForm = ({
                                                     {comparisonData.sizes.map(size => (
                                                         <th
                                                             key={size}
-                                                            className={`p-4 text-center font-black border-b-2 border-gray-300 dark:border-gray-600 min-w-[120px] ${
-                                                                size === formData.sampleSize
-                                                                    ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
-                                                                    : 'text-gray-700 dark:text-gray-300'
-                                                            }`}
+                                                            className={`p-4 text-center font-black border-b-2 border-gray-300 dark:border-gray-600 min-w-[120px] ${size === formData.sampleSize
+                                                                ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
+                                                                : 'text-gray-700 dark:text-gray-300'
+                                                                }`}
                                                         >
                                                             <div className="flex items-center justify-center gap-2">
                                                                 <span className="w-2 h-2 rounded-full bg-blue-500"></span>
@@ -1756,11 +2040,10 @@ const GarmentWashForm = ({
                                                         {comparisonData.sizes.map(size => (
                                                             <td
                                                                 key={size}
-                                                                className={`p-4 text-center border-l border-gray-100 dark:border-gray-700 ${
-                                                                    size === formData.sampleSize
-                                                                        ? 'bg-blue-50/50 dark:bg-blue-900/20 font-black text-blue-700 dark:text-blue-300'
-                                                                        : 'text-gray-600 dark:text-gray-400'
-                                                                }`}
+                                                                className={`p-4 text-center border-l border-gray-100 dark:border-gray-700 ${size === formData.sampleSize
+                                                                    ? 'bg-blue-50/50 dark:bg-blue-900/20 font-black text-blue-700 dark:text-blue-300'
+                                                                    : 'text-gray-600 dark:text-gray-400'
+                                                                    }`}
                                                             >
                                                                 {row.sizes[size] || '-'}
                                                             </td>
@@ -1792,7 +2075,7 @@ const GarmentWashForm = ({
                     </div>
                 );
             })()}
-        </div >
+        </div>
     );
 };
 

@@ -44,7 +44,7 @@ export const getMoNoSearchWashing = async (req, res) => {
             ...yorksysResults.map((r) => r.moNo)
         ])].filter(Boolean);
 
-        console.log(`[DEBUG] Combined MONo search for "${term}": found ${dtResults.length} DT, ${yorksysResults.length} Yorksys results. Unique: ${uniqueMONos.length}`);
+        // console.log(`[DEBUG] Combined MONo search for "${term}": found ${dtResults.length} DT, ${yorksysResults.length} Yorksys results. Unique: ${uniqueMONos.length}`);
 
         res.json(uniqueMONos);
     } catch (error) {

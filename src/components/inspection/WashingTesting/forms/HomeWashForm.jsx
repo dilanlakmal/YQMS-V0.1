@@ -600,7 +600,7 @@ const HomeWashForm = ({
                                     return (
                                         <div
                                             key={index}
-                                            className="relative border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 p-3"
+                                            className="relative border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50/50 dark:bg-gray-800/50 p-3"
                                         >
                                             <div className="relative w-full flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-md overflow-hidden">
                                                 <img
@@ -628,7 +628,7 @@ const HomeWashForm = ({
                                 })}
                             </div>
                         ) : (
-                            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 p-8">
+                            <div className="border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50/30 dark:bg-gray-800/30 p-8">
                                 <div className="text-center text-gray-500 dark:text-gray-400">
                                     <Upload size={40} className="mx-auto mb-2" />
                                     <p>No image selected</p>

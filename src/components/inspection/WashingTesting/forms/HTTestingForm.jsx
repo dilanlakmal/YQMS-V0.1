@@ -28,7 +28,7 @@ const HTTestingForm = ({
     cameraInputRef,
 }) => {
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+        <div className="space-y-8">
             <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
                 Heat-Transfer Washing Test Report Form
             </h2>
@@ -692,7 +692,7 @@ const HTTestingForm = ({
                         </h3>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-blue-50/30 dark:bg-gray-700/30 p-5 rounded-2xl border border-blue-100/50 dark:border-gray-600">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-6">
                         {/* Final Results Selection */}
                         <div className="flex flex-col gap-3">
                             <label className="text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
@@ -790,7 +790,7 @@ const HTTestingForm = ({
                                         return (
                                             <div
                                                 key={index}
-                                                className="relative border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 p-3"
+                                                className="relative border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50/50 dark:bg-gray-800/50 p-3"
                                             >
                                                 <div className="relative w-full flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-md overflow-hidden">
                                                     <img

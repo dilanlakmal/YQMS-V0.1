@@ -383,6 +383,8 @@ const LaundryWashingMachineTest = () => {
         newData.color = [];
         newData.po = [];
         newData.exFtyDate = [];
+        newData.washType = 'Before Wash';
+        newData.sampleSize = '';
 
         // IMMEDIATELY clear metadata if style is cleared or too short
         if (!value || value.length < 2) {

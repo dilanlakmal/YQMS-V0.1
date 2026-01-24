@@ -94,6 +94,12 @@ export const handleOrderNoSelection = async (
             buyerStyle: '',
         };
 
+        // Reset Garment Wash specific fields if applicable
+        if (styleField === 'style') {
+            newData.washType = 'Before Wash';
+            newData.sampleSize = '';
+        }
+
         // Only clear metadata if it's truly a different core style
         // If we just added a trailing number or corrected casing, we keep the data
         if (selectedStyle !== currentStyle) {
