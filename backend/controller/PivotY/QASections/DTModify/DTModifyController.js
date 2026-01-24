@@ -69,6 +69,80 @@ export const getDtOrderByOrderNo = async (req, res) => {
   }
 };
 
+export const calculateTotalOrderQty = (orderData) => {
+  try {
+    let totalQty = 0;
+    
+    console.log('🔢 Calculating total order quantity...');
+    
+    // Check if OrderColors exists and is an array
+    if (!orderData.OrderColors || !Array.isArray(orderData.OrderColors)) {
+      console.log('⚠️ No OrderColors found or invalid format');
+      return 0;
+    }
+    
+    // Loop through each color
+    orderData.OrderColors.forEach((color, colorIndex) => {
+      console.log(`🎨 Processing color ${colorIndex + 1}: ${color.ColorCode || 'Unknown'}`);
+      
+      let colorTotal = 0;
+      
+      // Check if OrderQty exists and is an array
+      if (color.OrderQty && Array.isArray(color.OrderQty)) {
+        // Loop through each size quantity in this color
+        color.OrderQty.forEach((qtyItem, qtyIndex) => {
+          // Each qtyItem is an object like { "S": 100, "M": 150, "L": 200 }
+          Object.keys(qtyItem).forEach(size => {
+            const qty = parseInt(qtyItem[size]) || 0;
+            colorTotal += qty;
+            console.log(`  📏 Size ${size}: ${qty}`);
+          });
+        });
+      }
+      
+      console.log(`  🎨 Color ${color.ColorCode} total: ${colorTotal}`);
+      totalQty += colorTotal;
+    });
+    
+    console.log(`✅ Final total order quantity: ${totalQty}`);
+    return totalQty;
+    
+  } catch (error) {
+    console.error('❌ Error calculating total order quantity:', error);
+    return 0;
+  }
+};
+
+export const updateTotalOrderQty = async (orderId, newTotalQty) => {
+  try {
+    console.log(`🔄 Updating total quantity for order ${orderId} to ${newTotalQty}`);
+    
+    // Only update TotalQty and updatedAt - no user details
+    const updateData = {
+      TotalQty: newTotalQty,
+      updatedAt: new Date()
+    };
+    
+    const updatedOrder = await DtOrder.findByIdAndUpdate(
+      orderId,
+      { $set: updateData },
+      { new: true, runValidators: false }
+    );
+    
+    if (updatedOrder) {
+      console.log(`✅ Total quantity updated successfully: ${newTotalQty}`);
+      return updatedOrder;
+    } else {
+      console.log('❌ Failed to update total quantity - order not found');
+      return null;
+    }
+    
+  } catch (error) {
+    console.error('❌ Error updating total order quantity:', error);
+    throw error;
+  }
+};
+
 // Update DT Order by ID
 export const updateDtOrder = async (req, res) => {
   try {
@@ -83,7 +157,6 @@ export const updateDtOrder = async (req, res) => {
       try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         userInfo = decoded;
-        console.log('🔐 Authenticated user:', userInfo);
       } catch (jwtError) {
         console.log('JWT verification failed:', jwtError.message);
       }
@@ -97,17 +170,25 @@ export const updateDtOrder = async (req, res) => {
       });
     }
 
-    // ❌ REMOVE THIS SECTION - No need to convert again
-    // Frontend already sends converted values
-    /*
-    if (updateData.SizeSpec && Array.isArray(updateData.SizeSpec)) {
-      updateData.SizeSpec = updateData.SizeSpec.map(spec => {
-        // ... conversion logic removed
+    // Get the current order to compare old vs new total
+    const currentOrder = await DtOrder.findById(id);
+    if (!currentOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
       });
     }
-    */
 
-    // Set modification fields with actual user data
+    const oldTotalQty = currentOrder.TotalQty || 0;
+
+    // Calculate new total quantity
+    const newTotalQty = calculateTotalOrderQty(updateData);
+    console.log(`🔢 Old total: ${oldTotalQty}, Calculated new total: ${newTotalQty}`);
+    
+    // Update the TotalQty in updateData
+    updateData.TotalQty = newTotalQty;
+
+    // Set modification fields with user data (only once here)
     updateData.isModify = true;
     updateData.modifiedAt = new Date();
     updateData.updatedAt = new Date();
@@ -116,7 +197,7 @@ export const updateDtOrder = async (req, res) => {
       (userInfo.eng_name || userInfo.emp_id || userInfo.email || 'Authenticated User') : 
       (updateData.modifiedBy || 'Unknown User');
 
-    // Add to modification history
+    // Add to modification history (only once here)
     if (!updateData.modificationHistory) {
       updateData.modificationHistory = [];
     }
@@ -124,7 +205,13 @@ export const updateDtOrder = async (req, res) => {
     updateData.modificationHistory.push({
       modifiedAt: new Date(),
       modifiedBy: updateData.modifiedBy,
-      changes: updateData.changes || 'Order specifications and tolerances modified',
+      changes: updateData.changes || `Order specifications modified. Total quantity updated from ${oldTotalQty} to ${newTotalQty}`,
+      totalQtyChange: {
+        oldTotal: oldTotalQty,
+        newTotal: newTotalQty,
+        difference: newTotalQty - oldTotalQty,
+        updatedAt: new Date()
+      },
       userDetails: userInfo ? {
         userId: userInfo.emp_id,
         empId: userInfo.emp_id,
@@ -133,9 +220,7 @@ export const updateDtOrder = async (req, res) => {
       } : null
     });
 
-    console.log('💾 Updating order with user:', updateData.modifiedBy);
-
-    // Update the order - frontend data already has correct decimal values
+    // Update the order (includes TotalQty and all user details in one operation)
     const updatedOrder = await DtOrder.findByIdAndUpdate(
       id,
       { $set: updateData },
@@ -154,12 +239,18 @@ export const updateDtOrder = async (req, res) => {
       });
     }
 
-    console.log('✅ Order updated successfully by:', updateData.modifiedBy);
+    console.log(`✅ Order updated successfully. Total quantity: ${oldTotalQty} → ${newTotalQty}`);
 
     res.status(200).json({
       success: true,
-      message: 'Order updated successfully',
-      data: updatedOrder
+      message: `Order updated successfully. Total quantity updated from ${oldTotalQty} to ${newTotalQty}`,
+      data: updatedOrder,
+      totalQtyUpdated: true,
+      totalQtyChange: {
+        oldTotal: oldTotalQty,
+        newTotal: newTotalQty,
+        difference: newTotalQty - oldTotalQty
+      }
     });
 
   } catch (error) {
@@ -172,6 +263,62 @@ export const updateDtOrder = async (req, res) => {
   }
 };
 
+export const recalculateTotalQty = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid order ID format'
+      });
+    }
+    
+    const order = await DtOrder.findById(id);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+    
+    const newTotalQty = calculateTotalOrderQty(order.toObject());
+    const oldTotalQty = order.TotalQty || 0;
+    
+    console.log(`🔄 Recalculating total quantity for order ${order.Order_No}`);
+    console.log(`📊 Old total: ${oldTotalQty}, New total: ${newTotalQty}`);
+    
+    if (newTotalQty !== oldTotalQty) {
+      // Only update TotalQty, no user details for standalone recalculation
+      const updatedOrder = await updateTotalOrderQty(id, newTotalQty);
+      
+      res.status(200).json({
+        success: true,
+        message: `Total quantity recalculated and updated from ${oldTotalQty} to ${newTotalQty}`,
+        data: updatedOrder,
+        oldTotal: oldTotalQty,
+        newTotal: newTotalQty,
+        difference: newTotalQty - oldTotalQty
+      });
+    } else {
+      res.status(200).json({
+        success: true,
+        message: 'Total quantity is already correct',
+        data: order,
+        totalQty: newTotalQty,
+        noChangeNeeded: true
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Error recalculating total quantity:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
 
 // Get all DT Orders (optional - for listing/searching)
 export const getAllDtOrders = async (req, res) => {
@@ -336,11 +483,9 @@ export const backupOrder = async (req, res) => {
 
 export const deleteSizeFromOrder = async (req, res) => {
   try {
-    
     const { id } = req.params;
     const { sizeToDelete } = req.body;
 
-    // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
@@ -348,7 +493,6 @@ export const deleteSizeFromOrder = async (req, res) => {
       });
     }
 
-    // Validate size parameter
     if (!sizeToDelete || typeof sizeToDelete !== 'string') {
       return res.status(400).json({
         success: false,
@@ -356,7 +500,6 @@ export const deleteSizeFromOrder = async (req, res) => {
       });
     }
 
-    // Find the order first
     const order = await DtOrder.findById(id);
     if (!order) {
       return res.status(404).json({
@@ -365,7 +508,6 @@ export const deleteSizeFromOrder = async (req, res) => {
       });
     }
 
-    // Check if size exists in the order
     if (!order.SizeList || !order.SizeList.includes(sizeToDelete)) {
       return res.status(400).json({
         success: false,
@@ -373,14 +515,13 @@ export const deleteSizeFromOrder = async (req, res) => {
       });
     }
 
-    // Create updated data by removing the size from all relevant places
+    const oldTotalQty = order.TotalQty || 0;
     const updatedData = { ...order.toObject() };
 
-    // 1. Remove from SizeList
+    // Remove size from all relevant places
     updatedData.SizeList = order.SizeList.filter(size => size !== sizeToDelete);
     updatedData.NoOfSize = updatedData.SizeList.length;
 
-    // 2. Remove from SizeSpec
     if (updatedData.SizeSpec && Array.isArray(updatedData.SizeSpec)) {
       updatedData.SizeSpec = updatedData.SizeSpec.map(spec => ({
         ...spec,
@@ -388,19 +529,16 @@ export const deleteSizeFromOrder = async (req, res) => {
       }));
     }
 
-    // 3. Remove from OrderColors (OrderQty and CutQty)
     if (updatedData.OrderColors && Array.isArray(updatedData.OrderColors)) {
       updatedData.OrderColors = updatedData.OrderColors.map(color => {
         const updatedColor = { ...color };
         
-        // Remove from OrderQty
         if (updatedColor.OrderQty && Array.isArray(updatedColor.OrderQty)) {
           updatedColor.OrderQty = updatedColor.OrderQty.filter(qtyItem => 
             !Object.prototype.hasOwnProperty.call(qtyItem, sizeToDelete)
           );
         }
         
-        // Remove from CutQty
         if (updatedColor.CutQty && typeof updatedColor.CutQty === 'object') {
           const { [sizeToDelete]: deletedSize, ...remainingCutQty } = updatedColor.CutQty;
           updatedColor.CutQty = remainingCutQty;
@@ -410,7 +548,6 @@ export const deleteSizeFromOrder = async (req, res) => {
       });
     }
 
-    // 4. Remove from OrderColorShip
     if (updatedData.OrderColorShip && Array.isArray(updatedData.OrderColorShip)) {
       updatedData.OrderColorShip = updatedData.OrderColorShip.map(colorShip => ({
         ...colorShip,
@@ -421,17 +558,22 @@ export const deleteSizeFromOrder = async (req, res) => {
       }));
     }
 
-    // Add modification flags
+    // Recalculate total quantity after size deletion
+    const newTotalQty = calculateTotalOrderQty(updatedData);
+    updatedData.TotalQty = newTotalQty;
+
+    // Only set basic modification flags, no user details
     updatedData.isModify = true;
     updatedData.updatedAt = new Date();
 
-    // Update the order in database
+    console.log(`🗑️ Deleting size "${sizeToDelete}" - Total quantity: ${oldTotalQty} → ${newTotalQty}`);
+
     const updatedOrder = await DtOrder.findByIdAndUpdate(
       id,
       updatedData,
       { 
-        new: true, // Return updated document
-        runValidators: true // Run schema validators
+        new: true,
+        runValidators: true
       }
     );
 
@@ -444,10 +586,15 @@ export const deleteSizeFromOrder = async (req, res) => {
     
     res.status(200).json({
       success: true,
-      message: `Size "${sizeToDelete}" deleted successfully from order`,
+      message: `Size "${sizeToDelete}" deleted successfully. Total quantity updated from ${oldTotalQty} to ${newTotalQty}`,
       data: updatedOrder,
       deletedSize: sizeToDelete,
-      remainingSizes: updatedOrder.SizeList
+      remainingSizes: updatedOrder.SizeList,
+      totalQtyChange: {
+        oldTotal: oldTotalQty,
+        newTotal: newTotalQty,
+        difference: newTotalQty - oldTotalQty
+      }
     });
 
   } catch (error) {

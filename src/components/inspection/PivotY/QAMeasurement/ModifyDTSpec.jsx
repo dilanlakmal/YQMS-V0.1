@@ -193,13 +193,10 @@ const ModifyDTspec = () => {
   setNewlyAddedSizes(new Set()); // Reset newly added sizes for new order
   
   try {
-    console.log('🔍 Fetching order:', orderToSearch);
     
     const url = `${apiBaseUrl}/api/dt-modify/${orderToSearch}`;
-    console.log('📡 Full URL:', url);
     
     const response = await fetch(url);
-    console.log('📡 Response status:', response.status);
     
     if (!response.ok) {
       let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
@@ -214,15 +211,13 @@ const ModifyDTspec = () => {
     }
     
     const result = await response.json();
-    console.log('✅ API Response:', result);
     
     if (result.success && result.data && result.type === 'exact_match') {
       setOrderData(result.data);
       setModifiedData(JSON.parse(JSON.stringify(result.data)));
       setOriginalData(JSON.parse(JSON.stringify(result.data))); // Store original data
       setIsModified(false);
-      setModifiedFields(new Set()); // Clear modified fields tracking
-      console.log('✅ Order data loaded successfully');
+      setModifiedFields(new Set()); 
     } else {
       throw new Error(result.message || 'Failed to fetch order');
     }
@@ -266,8 +261,6 @@ const handleSizeNameEdit = (sizeIndex, newSizeName) => {
     setEditingSizeName(oldSizeName);
     return;
   }
-
-  console.log('🔧 Renaming size from:', oldSizeName, 'to:', trimmedName);
 
   // Force a re-render by updating the key
   const timestamp = Date.now();
@@ -352,7 +345,6 @@ const handleSizeNameEdit = (sizeIndex, newSizeName) => {
   setEditingSizeName('');
   setEditingTable('');
   
-  console.log('✅ Size renamed successfully from', oldSizeName, 'to', trimmedName);
 };
 
 // Start editing size name - Updated
@@ -397,7 +389,6 @@ const cancelEditingTolerance = () => {
 const handleToleranceEdit = (specIndex, toleranceType, newValue) => {
   const trimmedValue = newValue.trim();
   
-  console.log('🔧 Editing tolerance:', { specIndex, toleranceType, newValue: trimmedValue });
   
   const fieldKey = createFieldKey('tolerance', specIndex, toleranceType);
   
@@ -411,8 +402,7 @@ const handleToleranceEdit = (specIndex, toleranceType, newValue) => {
     
     // Convert the new value to decimal using the same function as measurements
     const decimalValue = convertFractionToDecimal(trimmedValue);
-    
-    console.log(`✅ Converted tolerance "${trimmedValue}" to decimal: ${decimalValue}`);
+  
     
     if (toleranceType === 'minus') {
       updatedData.SizeSpec[specIndex].ToleranceMinus = {
@@ -445,11 +435,10 @@ const handleToleranceEdit = (specIndex, toleranceType, newValue) => {
   // Exit edit mode
   cancelEditingTolerance();
   
-  console.log('✅ Tolerance updated successfully');
 };
 
 const handleToleranceChange = (specIndex, toleranceType, value) => {
-  console.log('🔧 handleToleranceChange called:', { specIndex, toleranceType, value });
+
   
   const fieldKey = createFieldKey('tolerance', specIndex, toleranceType);
   
@@ -462,7 +451,7 @@ const handleToleranceChange = (specIndex, toleranceType, value) => {
   
   // Convert fraction to decimal using the same logic as measurements
   const decimalValue = convertFractionToDecimal(value);
-  console.log(`✅ Converted tolerance "${value}" to decimal: ${decimalValue}`);
+
   
   if (toleranceType === 'minus') {
     updatedData.SizeSpec[specIndex].ToleranceMinus = {
@@ -509,8 +498,6 @@ const handleToleranceChange = (specIndex, toleranceType, value) => {
   const handleSizeReorder = (fromIndex, toIndex) => {
     if (fromIndex === toIndex) return;
 
-    console.log('🔄 Reordering size from index', fromIndex, 'to', toIndex);
-
     setModifiedData(prevData => {
       const updatedData = { ...prevData };
       
@@ -520,7 +507,6 @@ const handleToleranceChange = (specIndex, toleranceType, value) => {
       newSizeList.splice(toIndex, 0, movedSize);
       updatedData.SizeList = newSizeList;
 
-      console.log('✅ New size order:', newSizeList);
 
       // Update SizeSpec - reorder the Specs arrays to match new size order
       updatedData.SizeSpec = updatedData.SizeSpec.map(spec => {
@@ -607,7 +593,6 @@ const handleToleranceChange = (specIndex, toleranceType, value) => {
     });
 
     setIsModified(true);
-    console.log('✅ Size reordering completed');
   };
 
   // Drag and drop handlers
@@ -669,7 +654,7 @@ const handleDragOver = (e, index) => {
 
   // Handle specification changes
   const handleSpecChange = (specIndex, sizeKey, field, value) => {
-    console.log('🔧 handleSpecChange called:', { specIndex, sizeKey, field, value });
+
     
     const fieldKey = createFieldKey('spec', specIndex, sizeKey, field);
     
@@ -683,7 +668,7 @@ const handleDragOver = (e, index) => {
         if (spec[sizeKey]) {
           spec[sizeKey].fraction = value;
           spec[sizeKey].decimal = convertFractionToDecimal(value);
-          console.log(`✅ Converted "${value}" to decimal: ${spec[sizeKey].decimal}`);
+         
         }
       });
     } else if (field === 'decimal') {
@@ -692,7 +677,7 @@ const handleDragOver = (e, index) => {
           const decimalValue = parseFloat(value) || 0;
           spec[sizeKey].decimal = decimalValue;
           spec[sizeKey].fraction = convertDecimalToFraction(decimalValue);
-          console.log(`✅ Converted decimal ${decimalValue} to fraction: ${spec[sizeKey].fraction}`);
+         
         }
       });
     }
@@ -868,27 +853,21 @@ const convertFractionToDecimal = (fractionStr) => {
 
   // Add new size to specifications
   const handleAddSize = (newSize) => {
-    console.log('🔧 handleAddSize called with:', newSize);
-    console.log('🔧 Current modifiedData:', modifiedData);
     
     if (!modifiedData) {
-      console.log('❌ modifiedData is null - order not loaded yet');
       alert('Please search and load an order first');
       return;
     }
     
     if (!newSize.trim()) {
-      console.log('❌ New size is empty');
       return;
     }
     
     if (modifiedData.SizeList.includes(newSize)) {
-      console.log('❌ Size already exists:', newSize);
       alert(`Size "${newSize}" already exists!`);
       return;
     }
     
-    console.log('✅ Adding new size:', newSize);
     
     // Track newly added size
     setNewlyAddedSizes(prev => new Set([...prev, newSize]));
@@ -937,7 +916,6 @@ const convertFractionToDecimal = (fractionStr) => {
     });
     
     setIsModified(true);
-    console.log('✅ handleAddSize completed');
   };
 
   // Handle quantity changes
