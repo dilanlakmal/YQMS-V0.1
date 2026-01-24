@@ -13,10 +13,14 @@ import dotenv from "dotenv";
 export const app = express();
 export const PORT = 5001;
 
-dotenv.config();
+//dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 export const __dirname = path.dirname(__filename);
+
+// Load .env from root directory (one level up from backend)
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+
 // Define a base directory for the backend root
 export const __backendDir = path.resolve(__dirname, "..");
 
@@ -24,11 +28,11 @@ export const API_BASE_URL = process.env.API_BASE_URL;
 
 const options = {
   key: fs.readFileSync(
-    path.resolve(path.dirname(__filename), "192.167.6.207-key.pem")
+    path.resolve(path.dirname(__filename), "192.167.14.235-key.pem"),
   ),
   cert: fs.readFileSync(
-    path.resolve(path.dirname(__filename), "192.167.6.207.pem")
-  )
+    path.resolve(path.dirname(__filename), "192.167.14.235.pem"),
+  ),
 };
 
 export const server = https.createServer(options, app);
@@ -36,11 +40,11 @@ export const server = https.createServer(options, app);
 // Initialize Socket.io
 export const io = new SocketIO(server, {
   cors: {
-    origin: "https://192.167.6.207:3001",
+    origin: "https://192.167.14.235:3001",
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
-  }
+    credentials: true,
+  },
 });
 
 // Define allowed origins once
@@ -49,7 +53,7 @@ const allowedOrigins = [
   "http://localhost:3001",
   "https://localhost:3001",
   "https://yqms.yaikh.com",
-  "https://192.167.6.207:3001"
+  "https://192.167.14.235:3001",
 ];
 
 // CORS configuration
@@ -77,17 +81,17 @@ const corsOptions = {
     "If-Modified-Since",
     "If-None-Match",
     "ETag",
-    "Mode"
+    "Mode",
   ],
   exposedHeaders: [
     "Content-Length",
     "Content-Type",
     "Cache-Control",
     "Last-Modified",
-    "ETag"
+    "ETag",
   ],
   credentials: true, // Set to false for broader compatibility
-  optionsSuccessStatus: 204
+  optionsSuccessStatus: 204,
 };
 
 // Apply CORS globally
@@ -105,8 +109,8 @@ app.use(
     setHeaders: (res, path) => {
       res.header("Access-Control-Allow-Origin", "*");
       res.header("Cache-Control", "public, max-age=3600");
-    }
-  })
+    },
+  }),
 );
 
 app.use(
@@ -115,8 +119,8 @@ app.use(
     setHeaders: (res, path) => {
       res.header("Access-Control-Allow-Origin", "*");
       res.header("Cache-Control", "public, max-age=3600");
-    }
-  })
+    },
+  }),
 );
 
 app.use(
@@ -125,8 +129,8 @@ app.use(
     setHeaders: (res, path) => {
       res.header("Access-Control-Allow-Origin", "*");
       res.header("Cache-Control", "public, max-age=3600");
-    }
-  })
+    },
+  }),
 );
 
 // Socket.io connection handler

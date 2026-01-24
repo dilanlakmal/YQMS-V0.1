@@ -137,26 +137,26 @@ import createHumidityModel from "../../models/huminity/HumidityReport.js";
 
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
-  process.env.MongoDB_URI_ym_prod
+  process.env.MongoDB_URI_ym_prod,
 );
 
 export const ymEcoConnection = mongoose.createConnection(
-  process.env.MongoDB_URI_ym_eco_board
+  process.env.MongoDB_URI_ym_eco_board,
 );
 
 //Connection status
 ymProdConnection.on("connected", () =>
-  console.log("✅ Connected to ym_prod database...")
+  console.log("✅ Connected to ym_prod database..."),
 );
 ymProdConnection.on("error", (err) =>
-  console.error("❌ unexpected error:", err)
+  console.error("❌ unexpected error:", err),
 );
 
 ymEcoConnection.on("connected", () =>
-  console.log("✅ Connected to ym_eco_board database...")
+  console.log("✅ Connected to ym_eco_board database..."),
 );
 ymEcoConnection.on("error", (err) =>
-  console.error("❌ unexpected error:", err)
+  console.error("❌ unexpected error:", err),
 );
 
 //Collections
