@@ -73,17 +73,14 @@ export const calculateTotalOrderQty = (orderData) => {
   try {
     let totalQty = 0;
     
-    console.log('🔢 Calculating total order quantity...');
     
     // Check if OrderColors exists and is an array
     if (!orderData.OrderColors || !Array.isArray(orderData.OrderColors)) {
-      console.log('⚠️ No OrderColors found or invalid format');
       return 0;
     }
     
     // Loop through each color
     orderData.OrderColors.forEach((color, colorIndex) => {
-      console.log(`🎨 Processing color ${colorIndex + 1}: ${color.ColorCode || 'Unknown'}`);
       
       let colorTotal = 0;
       
@@ -95,16 +92,13 @@ export const calculateTotalOrderQty = (orderData) => {
           Object.keys(qtyItem).forEach(size => {
             const qty = parseInt(qtyItem[size]) || 0;
             colorTotal += qty;
-            console.log(`  📏 Size ${size}: ${qty}`);
           });
         });
       }
       
-      console.log(`  🎨 Color ${color.ColorCode} total: ${colorTotal}`);
       totalQty += colorTotal;
     });
     
-    console.log(`✅ Final total order quantity: ${totalQty}`);
     return totalQty;
     
   } catch (error) {
@@ -115,7 +109,6 @@ export const calculateTotalOrderQty = (orderData) => {
 
 export const updateTotalOrderQty = async (orderId, newTotalQty) => {
   try {
-    console.log(`🔄 Updating total quantity for order ${orderId} to ${newTotalQty}`);
     
     // Only update TotalQty and updatedAt - no user details
     const updateData = {
@@ -130,7 +123,6 @@ export const updateTotalOrderQty = async (orderId, newTotalQty) => {
     );
     
     if (updatedOrder) {
-      console.log(`✅ Total quantity updated successfully: ${newTotalQty}`);
       return updatedOrder;
     } else {
       console.log('❌ Failed to update total quantity - order not found');
@@ -183,7 +175,6 @@ export const updateDtOrder = async (req, res) => {
 
     // Calculate new total quantity
     const newTotalQty = calculateTotalOrderQty(updateData);
-    console.log(`🔢 Old total: ${oldTotalQty}, Calculated new total: ${newTotalQty}`);
     
     // Update the TotalQty in updateData
     updateData.TotalQty = newTotalQty;
@@ -239,8 +230,6 @@ export const updateDtOrder = async (req, res) => {
       });
     }
 
-    console.log(`✅ Order updated successfully. Total quantity: ${oldTotalQty} → ${newTotalQty}`);
-
     res.status(200).json({
       success: true,
       message: `Order updated successfully. Total quantity updated from ${oldTotalQty} to ${newTotalQty}`,
@@ -284,9 +273,6 @@ export const recalculateTotalQty = async (req, res) => {
     
     const newTotalQty = calculateTotalOrderQty(order.toObject());
     const oldTotalQty = order.TotalQty || 0;
-    
-    console.log(`🔄 Recalculating total quantity for order ${order.Order_No}`);
-    console.log(`📊 Old total: ${oldTotalQty}, New total: ${newTotalQty}`);
     
     if (newTotalQty !== oldTotalQty) {
       // Only update TotalQty, no user details for standalone recalculation
