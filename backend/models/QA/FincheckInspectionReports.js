@@ -133,6 +133,23 @@ const createFincheckInspectionReportsModel = (connection) => {
     { _id: false }
   );
 
+  // Define the innermost assignment schema (Enforces Number on Qty)
+  const InspectionAssignmentSchema = new mongoose.Schema(
+    {
+      // We explicitly define qty to force it to be a Number
+      qty: { type: Number, default: 0 }
+    },
+    { _id: false, strict: false }
+  );
+
+  // Define the Group schema containing assignments
+  const InspectionConfigGroupSchema = new mongoose.Schema(
+    {
+      assignments: [InspectionAssignmentSchema]
+    },
+    { _id: false, strict: false }
+  );
+
   // --- Inspection Config Schema ---
   const InspectionConfigItemSchema = new mongoose.Schema(
     {
@@ -140,7 +157,8 @@ const createFincheckInspectionReportsModel = (connection) => {
       inspectionMethod: { type: String, default: "Fixed" }, // "AQL" or "Fixed"
       sampleSize: { type: Number, default: 0 }, // Total Calculated Qty
       // Stores the array of groups (Line, Table, Color, Assignments) dynamically
-      configGroups: { type: mongoose.Schema.Types.Mixed, default: [] },
+      configGroups: { type: [InspectionConfigGroupSchema], default: [] },
+      //configGroups: { type: mongoose.Schema.Types.Mixed, default: [] },
       updatedAt: { type: Date, default: Date.now }
     },
     { _id: false }

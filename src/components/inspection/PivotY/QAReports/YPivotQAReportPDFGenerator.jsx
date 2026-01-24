@@ -153,6 +153,7 @@ const YPivotQAReportPDFGenerator = ({
   // Report Data
   report,
   orderData,
+  shippingBreakdown,
   inspectorInfo,
   definitions,
   headerData,
@@ -461,6 +462,8 @@ const YPivotQAReportPDFGenerator = ({
           reportData={report}
           orderData={orderData}
           inspectorInfo={inspectorWithPhoto}
+          inspectionDetails={report?.inspectionDetails}
+          shippingBreakdown={shippingBreakdown}
           definitions={definitions}
           headerData={headerData}
           measurementStageData={measurementStageData}

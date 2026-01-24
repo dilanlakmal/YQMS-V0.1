@@ -9,7 +9,8 @@ import {
   User,
   LayoutGrid,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  Bell
 } from "lucide-react";
 import axios from "axios";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -18,6 +19,7 @@ import { API_BASE_URL } from "../../config";
 // --- Import Tab Components ---
 import YPivotQAReportMain from "../components/inspection/PivotY/QAReports/YPivotQAReportMain";
 import FincheckApprovalAssignee from "../components/inspection/PivotY/QAReports/FincheckApprovalAssignee";
+import FincheckNotificationGroup from "../components/inspection/PivotY/QAReports/FincheckNotificationGroup";
 
 // --- Placeholder Components for Future Tabs ---
 const AnalyticsPlaceholder = () => (
@@ -122,13 +124,20 @@ const YPivotQAReport = () => {
       }
     ];
     if (!isLoadingPermission && isAdmin === true) {
-      console.log("✅ [TABS MEMO] Adding Assignees tab");
       baseTabs.push({
         id: "approval",
         label: "Assignees",
         icon: <ShieldCheck size={18} />,
         component: <FincheckApprovalAssignee />,
         color: "text-purple-600"
+      });
+      //  Notify Group Tab
+      baseTabs.push({
+        id: "notify",
+        label: "Notify Group",
+        icon: <Bell size={18} />,
+        component: <FincheckNotificationGroup />,
+        color: "text-pink-600"
       });
     }
     return baseTabs;
@@ -316,10 +325,10 @@ const YPivotQAReport = () => {
       </div>
 
       {/* --- CONTENT AREA --- */}
-      <div className="flex-1 overflow-hidden pt-[90px] lg:pt-[70px] flex flex-col">
-        <div className="relative max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 pb-4 h-full flex flex-col min-h-0">
+      <div className="flex-1 overflow-hidden pt-[90px] lg:pt-[70px] flex flex-col w-full max-w-full">
+        <div className="relative w-full max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 pb-4 h-full flex flex-col min-h-0">
           {/* Render Active Component */}
-          <div className="h-full animate-fadeIn">
+          <div className="h-full w-full max-w-full animate-fadeIn flex flex-col min-h-0">
             {tabs.find((tab) => tab.id === activeTab)?.component}
           </div>
         </div>

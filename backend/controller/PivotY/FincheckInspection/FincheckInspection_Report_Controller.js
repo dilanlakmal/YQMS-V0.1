@@ -2,13 +2,17 @@ import {
   FincheckInspectionReports,
   QASectionsMeasurementSpecs,
   DtOrder,
+  YorksysOrders,
   RoleManagment,
   UserMain,
   QASectionsProductLocation,
   FincheckUserPreferences,
   FincheckApprovalAssignees,
-  FincheckInspectionDecision
+  FincheckInspectionDecision,
+  FincheckNotificationGroup
 } from "../../MongoDB/dbConnectionController.js";
+
+import { sendPushToUser } from "./FincheckNotificationController.js";
 
 import axios from "axios";
 import fs from "fs";
@@ -34,14 +38,50 @@ export const getInspectionReports = async (req, res) => {
       custStyle,
       buyer,
       supplier,
+      poLine,
       page = 1,
       limit = 20
     } = req.query;
 
-    // --- 1. Build Query ---
+    // --- Build Query ---
     let query = {
       status: { $ne: "cancelled" }
     };
+
+    // --- PO Line Filter Logic ---
+    if (poLine) {
+      // Split by comma and trim
+      const poList = poLine
+        .split(",")
+        .map((p) => p.trim())
+        .filter((p) => p);
+
+      if (poList.length > 0) {
+        //  Find Order Numbers (moNo) from YorksysOrders that match ANY of these PO Lines
+        // Using $in with regex for partial match or exact match depending on requirement.
+        // Assuming strict filtering based on selection, we use $in.
+
+        // We create a regex array to allow case-insensitive exact matching
+        const regexList = poList.map((p) => new RegExp(`^${p}$`, "i"));
+
+        const matchingOrders = await YorksysOrders.find({
+          "SKUData.POLine": { $in: regexList }
+        })
+          .select("moNo")
+          .lean();
+
+        const matchingOrderNos = matchingOrders.map((o) => o.moNo);
+
+        // Report must contain at least one of these order numbers
+        // We use $in on the orderNos array field in the report
+        if (query.orderNos) {
+          // If orderNos query already exists (e.g. from Order No filter), we need to use $and or intersect
+          query.orderNos = { $in: matchingOrderNos };
+        } else {
+          query.orderNos = { $in: matchingOrderNos };
+        }
+      }
+    }
 
     // 1. Date Range Filter
     if (startDate && endDate) {
@@ -146,14 +186,59 @@ export const getInspectionReports = async (req, res) => {
       };
     });
 
+    // --- Fetch PO Lines from YorksysOrders ---
+
+    // A. Collect all unique Order Numbers from the fetched reports
+    const allOrderNos = reports.reduce((acc, report) => {
+      if (report.orderNos && Array.isArray(report.orderNos)) {
+        acc.push(...report.orderNos);
+      }
+      return acc;
+    }, []);
+
+    // B. Fetch only the PO Lines for these orders
+    const yorksysOrders = await YorksysOrders.find({
+      moNo: { $in: allOrderNos }
+    })
+      .select("moNo SKUData.POLine")
+      .lean();
+
+    // C. Create a Map: OrderNo -> Array of PO Lines
+    const orderPOMap = {};
+    yorksysOrders.forEach((yOrder) => {
+      const poSet = new Set();
+      if (yOrder.SKUData && Array.isArray(yOrder.SKUData)) {
+        yOrder.SKUData.forEach((sku) => {
+          if (sku.POLine) {
+            poSet.add(sku.POLine.trim());
+          }
+        });
+      }
+      orderPOMap[yOrder.moNo] = Array.from(poSet);
+    });
+
     // --- 4. Merge Data ---
     const mergedReports = reports.map((report) => {
       const decisionInfo = decisionMap[report.reportId];
+
+      // Calculate Unique PO Lines for this specific report
+      const reportPOs = new Set();
+      if (report.orderNos) {
+        report.orderNos.forEach((orderNo) => {
+          if (orderPOMap[orderNo]) {
+            orderPOMap[orderNo].forEach((po) => reportPOs.add(po));
+          }
+        });
+      }
+      // Convert to comma-separated string
+      const poLineString = Array.from(reportPOs).sort().join(", ");
+
       return {
         ...report,
         // Add the decision fields to the report object
         decisionStatus: decisionInfo ? decisionInfo.status : null,
-        decisionUpdatedAt: decisionInfo ? decisionInfo.updatedAt : null
+        decisionUpdatedAt: decisionInfo ? decisionInfo.updatedAt : null,
+        poLines: poLineString
       };
     });
 
@@ -305,6 +390,50 @@ export const autocompleteCustStyle = async (req, res) => {
 };
 
 // ============================================================
+// Autocomplete for PO Line (NEW)
+// ============================================================
+export const autocompletePOLine = async (req, res) => {
+  try {
+    const { term } = req.query;
+
+    if (!term || term.length < 2) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    // Search inside SKUData array for POLine field
+    const results = await YorksysOrders.find({
+      "SKUData.POLine": { $regex: term, $options: "i" }
+    })
+      .select("SKUData.POLine")
+      .limit(50) // Limit documents to scan
+      .lean();
+
+    const poSet = new Set();
+
+    results.forEach((order) => {
+      if (order.SKUData && Array.isArray(order.SKUData)) {
+        order.SKUData.forEach((sku) => {
+          if (
+            sku.POLine &&
+            sku.POLine.toLowerCase().includes(term.toLowerCase())
+          ) {
+            poSet.add(sku.POLine);
+          }
+        });
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: Array.from(poSet).slice(0, 15) // Return top 15 matches
+    });
+  } catch (error) {
+    console.error("Error in PO Line autocomplete:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
 // Get Flattened Defect Images for a Report
 // ============================================================
 export const getDefectImagesForReport = async (req, res) => {
@@ -433,14 +562,104 @@ export const getDefectImagesForReport = async (req, res) => {
 // Get Measurement Specifications Linked to a Report
 // ============================================================
 
+// export const getReportMeasurementSpecs = async (req, res) => {
+//   try {
+//     const { reportId } = req.params;
+
+//     // 1. Fetch the Report to get Order No
+//     const report = await FincheckInspectionReports.findOne({
+//       reportId: parseInt(reportId)
+//     }).select("orderNos");
+
+//     if (!report) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Report not found" });
+//     }
+
+//     const orderNos = report.orderNos;
+//     if (!orderNos || orderNos.length === 0) {
+//       return res.status(200).json({
+//         success: true,
+//         specs: { Before: null, After: null },
+//         sizeList: [] // Return empty size list
+//       });
+//     }
+
+//     // Use the first order number to find specs
+//     const primaryOrderNo = orderNos[0];
+
+//     // 2. Fetch DtOrder to get SizeList for ordering
+//     const dtOrder = await DtOrder.findOne({
+//       Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
+//     })
+//       .select("SizeList")
+//       .lean();
+
+//     const sizeList = dtOrder?.SizeList || [];
+
+//     // 3. Find the Specs in the Specs Collection
+//     const specsRecord = await QASectionsMeasurementSpecs.findOne({
+//       Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
+//     }).lean();
+
+//     const result = {
+//       Before: { full: [], selected: [] },
+//       After: { full: [], selected: [] }
+//     };
+
+//     if (specsRecord) {
+//       // Process Before
+//       result.Before.full = specsRecord.AllBeforeWashSpecs || [];
+//       result.Before.selected =
+//         specsRecord.selectedBeforeWashSpecs &&
+//         specsRecord.selectedBeforeWashSpecs.length > 0
+//           ? specsRecord.selectedBeforeWashSpecs
+//           : specsRecord.AllBeforeWashSpecs || [];
+
+//       // Process After
+//       result.After.full = specsRecord.AllAfterWashSpecs || [];
+//       result.After.selected =
+//         specsRecord.selectedAfterWashSpecs &&
+//         specsRecord.selectedAfterWashSpecs.length > 0
+//           ? specsRecord.selectedAfterWashSpecs
+//           : specsRecord.AllAfterWashSpecs || [];
+//     } else {
+//       // Fallback: Check DtOrder (Legacy - usually only Before)
+//       const dtOrderFull = await DtOrder.findOne({
+//         Order_No: primaryOrderNo
+//       }).lean();
+
+//       if (dtOrderFull && dtOrderFull.BeforeWashSpecs) {
+//         const legacySpecs = dtOrderFull.BeforeWashSpecs.map((s) => ({
+//           ...s,
+//           id: s._id ? s._id.toString() : s.id
+//         }));
+//         result.Before.full = legacySpecs;
+//         result.Before.selected = legacySpecs;
+//       }
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       specs: result,
+//       sizeList: sizeList // NEW: Include size list in response
+//     });
+//   } catch (error) {
+//     console.error("Error fetching report measurement specs:", error);
+//     return res.status(500).json({ success: false, error: error.message });
+//   }
+// };
+
 export const getReportMeasurementSpecs = async (req, res) => {
   try {
     const { reportId } = req.params;
 
-    // 1. Fetch the Report to get Order No
+    // 1. Fetch the Report
+    // MODIFICATION: Added "measurementData" to .select() to access the colors used in inspection
     const report = await FincheckInspectionReports.findOne({
       reportId: parseInt(reportId)
-    }).select("orderNos");
+    }).select("orderNos measurementData");
 
     if (!report) {
       return res
@@ -453,21 +672,51 @@ export const getReportMeasurementSpecs = async (req, res) => {
       return res.status(200).json({
         success: true,
         specs: { Before: null, After: null },
-        sizeList: [] // Return empty size list
+        sizeList: [],
+        activeColors: [] // Return empty colors
       });
     }
+
+    // --- NEW LOGIC START: Extract distinct colors from Report ---
+    // Get all unique colorNames from the measurementData array
+    const distinctReportColors = [
+      ...new Set(
+        report.measurementData
+          .map((m) => m.colorName)
+          .filter((c) => c && typeof c === "string") // Remove null/undefined/empty
+      )
+    ];
+    // --- NEW LOGIC END ---
 
     // Use the first order number to find specs
     const primaryOrderNo = orderNos[0];
 
-    // 2. Fetch DtOrder to get SizeList for ordering
+    // 2. Fetch DtOrder to get SizeList AND OrderColors for validation
+    // MODIFICATION: Added "OrderColors" to .select()
     const dtOrder = await DtOrder.findOne({
       Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
     })
-      .select("SizeList")
+      .select("SizeList OrderColors")
       .lean();
 
     const sizeList = dtOrder?.SizeList || [];
+
+    // --- NEW LOGIC START: Filter Colors ---
+    // 1. Extract valid colors from DtOrder
+    const validOrderColors = dtOrder?.OrderColors?.map((oc) => oc.Color) || [];
+
+    // 2. Create a Set for efficient, case-insensitive lookup
+    // (We trim and lowercase to ensure "NAVY" matches "Navy")
+    const validColorSet = new Set(
+      validOrderColors.map((c) => (c ? c.trim().toLowerCase() : ""))
+    );
+
+    // 3. Filter the colors found in the Report
+    // Only keep colors that actually exist in the DtOrder
+    const activeColors = distinctReportColors.filter((reportColor) =>
+      validColorSet.has(reportColor.trim().toLowerCase())
+    );
+    // --- NEW LOGIC END ---
 
     // 3. Find the Specs in the Specs Collection
     const specsRecord = await QASectionsMeasurementSpecs.findOne({
@@ -514,7 +763,8 @@ export const getReportMeasurementSpecs = async (req, res) => {
     return res.status(200).json({
       success: true,
       specs: result,
-      sizeList: sizeList // NEW: Include size list in response
+      sizeList: sizeList,
+      activeColors: activeColors // Return the filtered list of valid colors found in this report
     });
   } catch (error) {
     console.error("Error fetching report measurement specs:", error);
@@ -1042,7 +1292,9 @@ export const submitLeaderDecision = async (req, res) => {
       systemComment,
       additionalComment,
       leaderId,
-      leaderName
+      leaderName,
+      reworkPO,
+      reworkPOComment
     } = req.body;
 
     if (!reportId) {
@@ -1108,6 +1360,9 @@ export const submitLeaderDecision = async (req, res) => {
       decisionDoc.approvalEmpId = leaderId;
       decisionDoc.approvalEmpName = leaderName;
       decisionDoc.systemGeneratedComment = systemComment;
+      // Save Rework PO fields to top level
+      decisionDoc.reworkPO = reworkPO || "";
+      decisionDoc.reworkPOComment = reworkPOComment || "";
       decisionDoc.approvalHistory.push(historyEntry); // Add to history
 
       await decisionDoc.save();
@@ -1120,10 +1375,129 @@ export const submitLeaderDecision = async (req, res) => {
         approvalEmpName: leaderName,
         decisionStatus: status,
         systemGeneratedComment: systemComment,
+        reworkPO: reworkPO || "",
+        reworkPOComment: reworkPOComment || "",
         approvalHistory: [historyEntry] // Initialize history
       });
 
       await decisionDoc.save();
+    }
+
+    /* -------------------------------------------
+      TRIGGER PUSH NOTIFICATION
+    ------------------------------------------- */
+
+    // Common Data for Notifications
+    const qaEmpId = report.empId;
+    const dateObj = new Date(report.inspectionDate);
+    const dateStr = dateObj.toLocaleDateString("en-US");
+    const orderStr =
+      report.orderNosString ||
+      (report.orderNos ? report.orderNos.join(", ") : "N/A");
+    const reportName = report.reportType || "Inspection";
+    const targetUrl = `/fincheck-reports/view/${reportId}`;
+
+    // --- SCENARIO A: Critical Rework PO Notification ---
+    // Target: Members in FincheckNotificationGroup who have the report's buyer in their notifiedCustomers
+    if (reworkPO === "Yes") {
+      try {
+        // Get the buyer/customer from the report
+        const reportBuyer = report.buyer;
+
+        if (!reportBuyer) {
+          console.log(
+            "No buyer found in report, skipping Rework PO notifications"
+          );
+        } else {
+          // Find only group members who have this buyer in their notifiedCustomers array
+          const groupMembers = await FincheckNotificationGroup.find({
+            notifiedCustomers: { $in: [reportBuyer] }
+          });
+
+          if (groupMembers && groupMembers.length > 0) {
+            // Build the notification body
+            const line1 = `#${parsedReportId} [${reportName}]`;
+            const line2 = `[${dateStr} - ${orderStr} - ${qaEmpId}] marked for Rework PO due to quality issue by ${leaderId} - ${leaderName}`;
+            const line3 = reworkPOComment ? `Reason: ${reworkPOComment}` : "";
+
+            const criticalBody = line3
+              ? `${line1}\n${line2}\n${line3}`
+              : `${line1}\n${line2}`;
+
+            const criticalPayload = {
+              title: `🚨 CRITICAL: REWORK PO OPEN CARTON REQUIRED !!!`,
+              body: criticalBody,
+              icon: "/assets/Home/Fincheck_Critical.png",
+              url: targetUrl,
+              tag: `rework-po-${parsedReportId}`,
+              isCritical: true
+            };
+
+            // Send only to members who are subscribed to this buyer
+            for (const member of groupMembers) {
+              try {
+                await sendPushToUser(member.empId, criticalPayload);
+              } catch (pushErr) {
+                console.error(`Failed to send to ${member.empId}:`, pushErr);
+              }
+            }
+          } else {
+            console.log(
+              `No notification group members found for buyer: ${reportBuyer}`
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Error sending Rework PO notification:", err);
+      }
+    }
+
+    // --- SCENARIO B: QA Feedback Notification (Rework or Rejected) ---
+    // Target: QA User Only
+    if (status === "Rework" || status === "Rejected") {
+      try {
+        // Build the notification body
+        const line1 = `Report #${parsedReportId} [${reportName}]`;
+        const line2 = `[${dateStr} - ${orderStr} - ${qaEmpId}] marked for ${status.toUpperCase()} by ${leaderId} - ${leaderName}`;
+        const leaderComment = additionalComment || "";
+        const line3 = leaderComment ? `Leader Comment: ${leaderComment}` : "";
+
+        const qaBody = line3
+          ? `${line1}\n${line2}\n${line3}`
+          : `${line1}\n${line2}`;
+
+        const qaPayload = {
+          title: `Fincheck: Report ${status}`,
+          body: qaBody,
+          icon: "/assets/Home/Fincheck_Inspection.png",
+          url: targetUrl,
+          tag: `fincheck-${parsedReportId}`
+        };
+
+        await sendPushToUser(qaEmpId, qaPayload);
+      } catch (pushErr) {
+        console.error(`Failed to send ${status} notification to QA:`, pushErr);
+      }
+    }
+
+    // --- SCENARIO C: Approved Notification (Optional - Inform QA) ---
+    if (status === "Approved") {
+      try {
+        const line1 = `Report #${parsedReportId} [${reportName}]`;
+        const line2 = `[${dateStr} - ${orderStr}] has been APPROVED by ${leaderId} - ${leaderName}`;
+
+        const approvedPayload = {
+          title: `✅ Fincheck: Report Approved`,
+          body: `${line1}\n${line2}`,
+          icon: "/assets/Home/Fincheck_Inspection.png",
+          url: targetUrl,
+          tag: `fincheck-approved-${parsedReportId}`
+        };
+
+        await sendPushToUser(qaEmpId, approvedPayload);
+      } catch (pushErr) {
+        console.error("Failed to send Approved notification:", pushErr);
+      }
     }
 
     return res.status(200).json({
@@ -1298,5 +1672,132 @@ export const getActionRequiredCount = async (req, res) => {
   } catch (error) {
     console.error("Error fetching action count:", error);
     return res.status(200).json({ success: true, count: 0 });
+  }
+};
+
+// ============================================================
+// Get Order Qty Breakdown in Shipping Stage
+// ============================================================
+
+export const getShippingStageBreakdown = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    // 1. Fetch Report to get Order Nos
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    }).select("orderNos");
+
+    if (!report || !report.orderNos || report.orderNos.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: "No orders linked to report"
+      });
+    }
+
+    // 2. Fetch all related DtOrders
+    // We use $in to get all matching orders (e.g., PTCOC335, PTCOC335A)
+    const orders = await DtOrder.find({
+      Order_No: { $in: report.orderNos }
+    })
+      .select("OrderColorShip")
+      .lean();
+
+    if (!orders || orders.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: "No order details found"
+      });
+    }
+
+    // 3. Aggregate Data
+    // Structure: { "ColorName": { "SeqNo": TotalQty } }
+    const colorMap = {};
+    const allSeqNos = new Set();
+
+    orders.forEach((order) => {
+      if (order.OrderColorShip && Array.isArray(order.OrderColorShip)) {
+        order.OrderColorShip.forEach((colorItem) => {
+          const colorName = colorItem.Color;
+          if (!colorName) return;
+
+          if (!colorMap[colorName]) {
+            colorMap[colorName] = {};
+          }
+
+          if (colorItem.ShipSeqNo && Array.isArray(colorItem.ShipSeqNo)) {
+            colorItem.ShipSeqNo.forEach((shipSeq) => {
+              const seqNo = shipSeq.seqNo;
+              allSeqNos.add(seqNo);
+
+              // Calculate total qty for this sequence (Sum of all sizes)
+              let seqQty = 0;
+              if (shipSeq.sizes && Array.isArray(shipSeq.sizes)) {
+                shipSeq.sizes.forEach((sizeObj) => {
+                  // Iterate values in the object (e.g., {XS: 100})
+                  Object.values(sizeObj).forEach((val) => {
+                    seqQty += Number(val) || 0;
+                  });
+                });
+              }
+
+              // Add to existing count (handling multiple orders with same color/seq)
+              colorMap[colorName][seqNo] =
+                (colorMap[colorName][seqNo] || 0) + seqQty;
+            });
+          }
+        });
+      }
+    });
+
+    // 4. Transform for Frontend
+    const sortedSeqNos = Array.from(allSeqNos).sort((a, b) => a - b);
+
+    // Prepare Rows
+    const rows = Object.keys(colorMap).map((color) => {
+      const seqData = colorMap[color];
+      let rowTotal = 0;
+
+      const rowSeqValues = {};
+      sortedSeqNos.forEach((seq) => {
+        const val = seqData[seq] || 0;
+        rowSeqValues[seq] = val;
+        rowTotal += val;
+      });
+
+      return {
+        color: color,
+        seqValues: rowSeqValues,
+        rowTotal: rowTotal
+      };
+    });
+
+    // Prepare Column Totals
+    const columnTotals = {};
+    let grandTotal = 0;
+
+    sortedSeqNos.forEach((seq) => {
+      let colSum = 0;
+      rows.forEach((row) => {
+        colSum += row.seqValues[seq];
+      });
+      columnTotals[seq] = colSum;
+      grandTotal += colSum;
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        seqColumns: sortedSeqNos,
+        rows: rows.sort((a, b) => a.color.localeCompare(b.color)),
+        columnTotals,
+        grandTotal
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching shipping stage breakdown:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };

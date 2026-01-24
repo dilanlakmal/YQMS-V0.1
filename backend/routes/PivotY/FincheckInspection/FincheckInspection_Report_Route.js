@@ -11,14 +11,22 @@ import {
   getFilterOptions,
   autocompleteOrderNo,
   autocompleteCustStyle,
+  autocompletePOLine,
   saveUserPreference,
   getUserPreferences,
   deleteUserFilter,
   getLeaderDecision,
   submitLeaderDecision,
   getQANotifications,
-  getActionRequiredCount
+  getActionRequiredCount,
+  getShippingStageBreakdown
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Report_Controller.js";
+
+import {
+  getVapidPublicKey,
+  subscribeUser,
+  verifySubscription
+} from "../../../controller/PivotY/FincheckInspection/FincheckNotificationController.js";
 
 const router = express.Router();
 
@@ -34,6 +42,7 @@ router.get(
   "/api/fincheck-reports/autocomplete/cust-style",
   autocompleteCustStyle
 );
+router.get("/api/fincheck-reports/autocomplete/po-line", autocompletePOLine);
 
 // Route for Defect Images
 router.get(
@@ -98,5 +107,16 @@ router.get("/api/fincheck-reports/notifications", getQANotifications);
 
 // route (after getQANotifications route)
 router.get("/api/fincheck-reports/action-count", getActionRequiredCount);
+
+// ROUTE: Shipping Stage Breakdown
+router.get(
+  "/api/fincheck-inspection/report/:reportId/shipping-stage-breakdown",
+  getShippingStageBreakdown
+);
+
+// PUSH NOTIFICATION ROUTES
+router.get("/api/fincheck-reports/push/vapid-key", getVapidPublicKey);
+router.post("/api/fincheck-reports/push/subscribe", subscribeUser);
+router.post("/api/fincheck-reports/push/verify", verifySubscription);
 
 export default router;

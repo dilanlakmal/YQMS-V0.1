@@ -97,6 +97,10 @@ const FincheckInspectionDecisionSchema = new mongoose.Schema(
       required: true
     },
 
+    // --- NEW FIELDS: Rework PO ---
+    reworkPO: { type: String, default: "" }, // "Yes" or ""
+    reworkPOComment: { type: String, default: "" },
+
     systemGeneratedComment: { type: String, default: "" }, // Current system message
 
     // --- HISTORY TRACKING ---

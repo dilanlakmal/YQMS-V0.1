@@ -38,7 +38,10 @@ import {
   RotateCcw,
   Save,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  Menu
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
@@ -49,10 +52,10 @@ import YPivotQAInspectionQRCode from "../QADataCollection/YPivotQAInspectionQRCo
 // Helper: Filter Input Wrapper
 // =============================================================================
 const FilterWrapper = ({ label, icon: Icon, children }) => (
-  <div className="flex flex-col gap-1.5">
+  <div className="flex flex-col gap-1.5 min-w-0">
     <label className="text-xs font-bold text-gray-500 dark:text-gray-400 flex items-center gap-1.5 uppercase tracking-wide">
-      <Icon className="w-3.5 h-3.5 text-indigo-500" />
-      {label}
+      <Icon className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
+      <span className="truncate">{label}</span>
     </label>
     {children}
   </div>
@@ -339,6 +342,124 @@ const AutocompleteInput = ({ value, onChange, placeholder, apiEndpoint }) => {
 };
 
 // =============================================================================
+// Sub-Component: Multi-Select Autocomplete (For PO Line)
+// =============================================================================
+const MultiSelectAutocomplete = ({
+  selectedItems,
+  onChange,
+  placeholder,
+  apiEndpoint
+}) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [results, setResults] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const containerRef = useRef(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target)
+      ) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (searchTerm.length >= 2) {
+        setLoading(true);
+        try {
+          const res = await axios.get(
+            `${API_BASE_URL}${apiEndpoint}?term=${searchTerm}`
+          );
+          if (res.data.success) {
+            // Filter out already selected items
+            const filtered = (res.data.data || []).filter(
+              (item) => !selectedItems.includes(item)
+            );
+            setResults(filtered);
+            setShowDropdown(true);
+          }
+        } catch (error) {
+          console.error("Autocomplete error", error);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setResults([]);
+        setShowDropdown(false);
+      }
+    }, 300);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm, apiEndpoint, selectedItems]);
+
+  const handleSelect = (item) => {
+    onChange([...selectedItems, item]);
+    setSearchTerm("");
+    setShowDropdown(false);
+  };
+
+  const handleRemove = (itemToRemove) => {
+    onChange(selectedItems.filter((i) => i !== itemToRemove));
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full max-w-[250px]">
+      <div className="flex flex-wrap items-center gap-1 p-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl min-h-[38px] focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
+        {selectedItems.map((item) => (
+          <span
+            key={item}
+            className="flex items-center gap-1 px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold rounded-lg border border-indigo-200 dark:border-indigo-800"
+          >
+            <span className="truncate max-w-[80px]">{item}</span>
+            <button
+              onClick={() => handleRemove(item)}
+              className="hover:text-red-500 rounded-full focus:outline-none"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        ))}
+        <input
+          type="text"
+          placeholder={selectedItems.length === 0 ? placeholder : ""}
+          className="flex-1 min-w-[60px] bg-transparent text-sm outline-none px-1 text-gray-700 dark:text-gray-200"
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setShowDropdown(true);
+          }}
+          onFocus={() => setShowDropdown(true)}
+        />
+        {loading && (
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500 mr-2" />
+        )}
+      </div>
+
+      {showDropdown && results.length > 0 && (
+        <div className="absolute z-[100] mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+          {results.map((item, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleSelect(item)}
+              className="w-full text-left px-3 py-2 hover:bg-indigo-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0 text-xs font-medium text-gray-700 dark:text-gray-200 transition-colors"
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// =============================================================================
 // Helper: Inspector Detail Modal (Auto-Close)
 // =============================================================================
 const InspectorAutoCloseModal = ({ data, onClose }) => {
@@ -481,12 +602,12 @@ const ColumnCustomizeModal = ({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-[600px] max-h-[90vh]">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header with Tabs */}
-        <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+        <div className="px-4 sm:px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex-shrink-0">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
+            <h3 className="text-base sm:text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
               <Settings2 className="w-5 h-5 text-indigo-500" /> Settings
             </h3>
             <button
@@ -522,9 +643,9 @@ const ColumnCustomizeModal = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5">
           {activeTab === "columns" ? (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {/* ... (Existing Column list logic here) ... */}
               {columns.map((col) => {
                 const isSelected = selected.includes(col.id);
@@ -545,7 +666,7 @@ const ColumnCustomizeModal = ({
                     >
                       {isSelected && <Check className="w-3 h-3" />}
                     </div>
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
                       {col.label}
                     </span>
                   </button>
@@ -573,9 +694,9 @@ const ColumnCustomizeModal = ({
                         onApplyFilter(sf);
                         onClose();
                       }}
-                      className="flex-1 text-left"
+                      className="flex-1 text-left min-w-0"
                     >
-                      <p className="font-bold text-gray-800 dark:text-gray-200">
+                      <p className="font-bold text-gray-800 dark:text-gray-200 truncate">
                         {sf.name}
                       </p>
                       <p className="text-[10px] text-gray-400">
@@ -584,7 +705,7 @@ const ColumnCustomizeModal = ({
                     </button>
                     <button
                       onClick={() => onDeleteFilter(sf._id)}
-                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -597,7 +718,7 @@ const ColumnCustomizeModal = ({
 
         {/* Footer (Only show Apply for columns) */}
         {activeTab === "columns" && (
-          <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex items-center justify-end gap-3">
+          <div className="px-4 sm:px-5 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex items-center justify-end gap-3 flex-shrink-0">
             <button
               onClick={onClose}
               className="px-4 py-2 text-sm font-bold text-gray-600"
@@ -661,7 +782,7 @@ const AutoDismissModal = ({ isOpen, onClose, type, message }) => {
 };
 
 // =============================================================================
-// Pagination Component
+// Pagination Component - MOBILE RESPONSIVE
 // =============================================================================
 const PaginationControls = ({
   currentPage,
@@ -698,26 +819,42 @@ const PaginationControls = ({
     return pages;
   };
 
+  // Mobile-friendly page numbers (fewer visible)
+  const getMobilePageNumbers = () => {
+    const pages = [];
+    if (totalPages <= 3) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage === 1) {
+        pages.push(1, 2, "...", totalPages);
+      } else if (currentPage === totalPages) {
+        pages.push(1, "...", totalPages - 1, totalPages);
+      } else {
+        pages.push(1, "...", currentPage, "...", totalPages);
+      }
+    }
+    return pages;
+  };
+
   const startRecord = (currentPage - 1) * pageSize + 1;
   const endRecord = Math.min(currentPage * pageSize, totalCount);
 
   return (
-    <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
       {/* Record Info */}
-      <div className="text-sm text-gray-600 dark:text-gray-400">
+      <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-center sm:text-left">
         Showing{" "}
         <span className="font-bold text-gray-800 dark:text-white">
           {startRecord}
         </span>{" "}
-        to{" "}
+        -{" "}
         <span className="font-bold text-gray-800 dark:text-white">
           {endRecord}
         </span>{" "}
         of{" "}
         <span className="font-bold text-indigo-600 dark:text-indigo-400">
           {totalCount.toLocaleString()}
-        </span>{" "}
-        records
+        </span>
       </div>
 
       {/* Page Controls */}
@@ -726,7 +863,7 @@ const PaginationControls = ({
         <button
           onClick={() => onPageChange(1)}
           disabled={currentPage === 1 || loading}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           title="First Page"
         >
           <ChevronsLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />
@@ -736,14 +873,14 @@ const PaginationControls = ({
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1 || loading}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           title="Previous Page"
         >
           <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />
         </button>
 
-        {/* Page Numbers */}
-        <div className="flex items-center gap-1 mx-2">
+        {/* Page Numbers - Desktop */}
+        <div className="hidden sm:flex items-center gap-1 mx-2">
           {getPageNumbers().map((page, idx) =>
             page === "..." ? (
               <span
@@ -769,11 +906,38 @@ const PaginationControls = ({
           )}
         </div>
 
+        {/* Page Numbers - Mobile */}
+        <div className="flex sm:hidden items-center gap-1 mx-1">
+          {getMobilePageNumbers().map((page, idx) =>
+            page === "..." ? (
+              <span
+                key={`ellipsis-m-${idx}`}
+                className="px-1 text-gray-400 text-xs"
+              >
+                ..
+              </span>
+            ) : (
+              <button
+                key={page}
+                onClick={() => onPageChange(page)}
+                disabled={loading}
+                className={`min-w-[28px] h-7 px-2 rounded-lg text-xs font-bold transition-all ${
+                  currentPage === page
+                    ? "bg-indigo-600 text-white shadow-lg"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                }`}
+              >
+                {page}
+              </button>
+            )
+          )}
+        </div>
+
         {/* Next */}
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages || loading}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           title="Next Page"
         >
           <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" />
@@ -783,7 +947,7 @@ const PaginationControls = ({
         <button
           onClick={() => onPageChange(totalPages)}
           disabled={currentPage === totalPages || loading}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           title="Last Page"
         >
           <ChevronsRight className="w-4 h-4 text-gray-600 dark:text-gray-400" />
@@ -799,6 +963,7 @@ const PaginationControls = ({
 const ALL_COLUMNS = [
   { id: "date", label: "Date", required: true },
   { id: "reportId", label: "Report ID", requiresPermission: true },
+  { id: "poLines", label: "PO Line" },
   { id: "orderNo", label: "Order No", required: true },
   { id: "custStyle", label: "Cust. Style" },
   { id: "customer", label: "Customer" },
@@ -813,6 +978,7 @@ const ALL_COLUMNS = [
   { id: "factory", label: "Factory" },
   { id: "finishedQty", label: "Finished #" },
   { id: "sampleSize", label: "Sample Size" },
+  { id: "defectQty", label: "Defect Qty" },
   { id: "createdDate", label: "Created Date" },
   { id: "updatedDate", label: "Updated Date" },
   { id: "status", label: "QA Status" },
@@ -833,6 +999,9 @@ const YPivotQAReportMain = () => {
   const [viewingInspector, setViewingInspector] = useState(null);
   const [showColumnModal, setShowColumnModal] = useState(false);
 
+  // --- Mobile Filter Panel Toggle ---
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+
   // --- State for Preferences ---
   const [savedFiltersList, setSavedFiltersList] = useState([]);
   const [showSaveFilterModal, setShowSaveFilterModal] = useState(false);
@@ -848,6 +1017,7 @@ const YPivotQAReportMain = () => {
   const [visibleColumns, setVisibleColumns] = useState([
     "date",
     "reportId",
+    "poLines",
     "orderNo",
     "custStyle",
     "customer",
@@ -857,6 +1027,7 @@ const YPivotQAReportMain = () => {
     "factory",
     "finishedQty",
     "sampleSize",
+    "defectQty",
     "createdDate",
     "updatedDate",
     "status",
@@ -878,7 +1049,8 @@ const YPivotQAReportMain = () => {
     subConFactory: "All",
     custStyle: "",
     buyer: "All",
-    supplier: "All"
+    supplier: "All",
+    poLines: []
   });
 
   // Dynamic Options (for Dropdowns)
@@ -1102,8 +1274,17 @@ const YPivotQAReportMain = () => {
     try {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
-        if (value && value !== "All") params.append(key, value);
+        if (key === "poLines") {
+          if (value && value.length > 0) {
+            params.append("poLine", value.join(",")); // Send as comma-separated string
+          }
+        } else if (value && value !== "All") {
+          params.append(key, value);
+        }
       });
+      // Object.entries(filters).forEach(([key, value]) => {
+      //   if (value && value !== "All") params.append(key, value);
+      // });
       params.append("page", page);
       params.append("limit", pageSize);
 
@@ -1187,7 +1368,8 @@ const YPivotQAReportMain = () => {
       subConFactory: "All",
       custStyle: "",
       buyer: "All",
-      supplier: "All"
+      supplier: "All",
+      poLines: []
     });
   };
 
@@ -1225,11 +1407,17 @@ const YPivotQAReportMain = () => {
       // Approximate menu height is ~130px (3 items * ~40px + dividers)
       const menuHeight = 135;
 
+      // For mobile, ensure menu doesn't go off screen
+      const viewportWidth = window.innerWidth;
+      let leftPos = rect.right - 160;
+      if (leftPos < 10) leftPos = 10;
+      if (leftPos + 160 > viewportWidth - 10) leftPos = viewportWidth - 170;
+
       setMenuPos({
         // If upwards: Top of button - menu height - spacing
         // If downwards: Bottom of button + spacing
         top: shouldOpenUpwards ? rect.top - menuHeight - 5 : rect.bottom + 5,
-        left: rect.right - 160
+        left: leftPos
       });
       setOpenMenuId(id);
     }
@@ -1370,32 +1558,54 @@ const YPivotQAReportMain = () => {
     return `(${parts.join(", ")})`;
   }, [filters, activeFilterName]);
 
+  // --- Count active filters for mobile badge ---
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    Object.entries(filters).forEach(([key, val]) => {
+      if (val && val !== "All" && val !== "") count++;
+    });
+    return count;
+  }, [filters]);
+
   return (
-    <div className="space-y-4 animate-fadeIn">
+    <div className="w-full max-w-full min-w-0 overflow-x-hidden space-y-3 sm:space-y-4 animate-fadeIn">
       {/* --- 1. FILTER PANE --- */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 relative z-40">
-        <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100 dark:border-gray-700">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400 flex-shrink-0">
-              <Filter className="w-5 h-5" />
+      <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 relative z-40">
+        {/* Filter Header - Always Visible */}
+        <div
+          className="flex items-center justify-between p-3 sm:p-4 cursor-pointer sm:cursor-default"
+          onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+        >
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="p-1.5 sm:p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400 flex-shrink-0">
+              <Filter className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <h2 className="text-base font-bold text-gray-800 dark:text-white flex-shrink-0">
-              Report Filters
+            <h2 className="text-sm sm:text-base font-bold text-gray-800 dark:text-white flex-shrink-0">
+              Filters
             </h2>
-            {/* --- LOADED FILTER BADGE --- */}
+            {/* Active filter count badge - Mobile */}
+            {activeFilterCount > 0 && (
+              <span className="sm:hidden px-1.5 py-0.5 bg-indigo-600 text-white text-[10px] font-bold rounded-full">
+                {activeFilterCount}
+              </span>
+            )}
+            {/* --- LOADED FILTER BADGE - Hidden on Mobile when collapsed --- */}
             {activeFilterName && (
-              <div className="ml-2 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg flex items-center gap-2 min-w-0 animate-fadeIn">
+              <div className="hidden sm:flex ml-2 px-2 sm:px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg items-center gap-2 min-w-0 animate-fadeIn">
                 <span className="text-[10px] uppercase font-bold text-indigo-500 flex-shrink-0">
-                  Loaded Filter:
+                  Loaded:
                 </span>
                 <div className="text-xs text-indigo-700 dark:text-indigo-300 truncate">
                   <span className="font-bold mr-1">{activeFilterName}</span>
-                  <span className="text-indigo-400 dark:text-indigo-500 font-normal">
+                  <span className="hidden lg:inline text-indigo-400 dark:text-indigo-500 font-normal">
                     {activeFilterSummary}
                   </span>
                 </div>
                 <button
-                  onClick={() => setActiveFilterName(null)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveFilterName(null);
+                  }}
                   className="ml-1 p-0.5 rounded hover:bg-indigo-200 dark:hover:bg-indigo-800 text-indigo-400"
                   title="Clear saved filter label"
                 >
@@ -1404,214 +1614,321 @@ const YPivotQAReportMain = () => {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Mobile Toggle Button */}
+          <button
+            className="sm:hidden p-1.5 rounded-lg bg-gray-100 dark:bg-gray-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsFilterExpanded(!isFilterExpanded);
+            }}
+          >
+            {isFilterExpanded ? (
+              <ChevronUp className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+            )}
+          </button>
+
+          {/* Desktop Action Buttons */}
+          <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
             {/* Save Filters Button */}
             <button
               onClick={handleSaveFilterClick}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 rounded-lg transition-colors border border-indigo-200 dark:border-indigo-800"
+              className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 rounded-lg transition-colors border border-indigo-200 dark:border-indigo-800"
             >
-              <Save className="w-3.5 h-3.5" /> Save Filter
+              <Save className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Save Filter</span>
             </button>
 
             {/* Standard Reset (Soft) */}
             <button
               onClick={handleReset}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-green-200 dark:border-green-500"
+              className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs font-bold text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-green-200 dark:border-green-500"
               title="Reset fields (keep dates)"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> Reset/Default
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Reset/Default</span>
             </button>
 
             {/* Reset All (Hard) */}
             <button
               onClick={handleResetAll}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-red-400 dark:border-red-900/30"
+              className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs font-bold text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-red-400 dark:border-red-900/30"
               title="Reset ALL fields & dates"
             >
-              <RotateCcw className="w-3.5 h-3.5" /> Reset All
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Reset All</span>
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-12 gap-x-4 gap-y-4">
-          {/* Date Range */}
-          <FilterWrapper label="Start Date" icon={Calendar}>
-            <input
-              type="date"
-              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              value={filters.startDate}
-              onChange={(e) => handleFilterChange("startDate", e.target.value)}
-              placeholder="MM/DD/YYYY"
-            />
-          </FilterWrapper>
+        {/* Filter Content - Collapsible on Mobile */}
+        <div
+          className={`transition-all duration-300 ease-in-out ${
+            // On Mobile: Visible if expanded, Hidden if collapsed.
+            // On Desktop (sm): Always Visible.
+            isFilterExpanded
+              ? "overflow-visible"
+              : "overflow-hidden sm:overflow-visible"
+          } ${
+            isFilterExpanded
+              ? "max-h-[2000px] opacity-100"
+              : "max-h-0 sm:max-h-none opacity-0 sm:opacity-100"
+          }`}
+          // className={`transition-all duration-300 ease-in-out overflow-hidden ${
+          //   isFilterExpanded
+          //     ? "max-h-[2000px] opacity-100"
+          //     : "max-h-0 sm:max-h-none opacity-0 sm:opacity-100"
+          // }`}
+        >
+          <div className="px-3 sm:px-4 pb-3 sm:pb-4 border-t border-gray-100 dark:border-gray-700 sm:border-t-0">
+            {/* Mobile Active Filter Badge */}
+            {activeFilterName && (
+              <div className="sm:hidden mb-3 mt-3 px-2 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg flex items-center gap-2">
+                <span className="text-[10px] uppercase font-bold text-indigo-500 flex-shrink-0">
+                  Loaded:
+                </span>
+                <span className="text-xs text-indigo-700 dark:text-indigo-300 font-bold truncate flex-1">
+                  {activeFilterName}
+                </span>
+                <button
+                  onClick={() => setActiveFilterName(null)}
+                  className="p-0.5 rounded hover:bg-indigo-200 text-indigo-400"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
 
-          <FilterWrapper label="End Date" icon={Calendar}>
-            <input
-              type="date"
-              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              value={filters.endDate}
-              onChange={(e) => handleFilterChange("endDate", e.target.value)}
-              placeholder="MM/DD/YYYY"
-            />
-          </FilterWrapper>
+            {/* Filter Grid - Responsive */}
+            <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12 gap-3 sm:gap-4 mt-3 sm:mt-0">
+              {/* Date Range */}
+              <FilterWrapper label="Start Date" icon={Calendar}>
+                <input
+                  type="date"
+                  className="w-full px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={filters.startDate}
+                  onChange={(e) =>
+                    handleFilterChange("startDate", e.target.value)
+                  }
+                  placeholder="MM/DD/YYYY"
+                />
+              </FilterWrapper>
 
-          {/* IDs */}
-          <FilterWrapper label="Report ID" icon={Hash}>
-            <input
-              type="number"
-              placeholder="10-digit ID..."
-              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              value={filters.reportId}
-              onChange={(e) => handleFilterChange("reportId", e.target.value)}
-            />
-          </FilterWrapper>
+              <FilterWrapper label="End Date" icon={Calendar}>
+                <input
+                  type="date"
+                  className="w-full px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={filters.endDate}
+                  onChange={(e) =>
+                    handleFilterChange("endDate", e.target.value)
+                  }
+                  placeholder="MM/DD/YYYY"
+                />
+              </FilterWrapper>
 
-          <FilterWrapper label="QA ID" icon={User}>
-            <InspectorSearchFilter
-              value={filters.empId}
-              onChange={(val) => handleFilterChange("empId", val)}
-            />
-          </FilterWrapper>
+              {/* IDs */}
+              <FilterWrapper label="Report ID" icon={Hash}>
+                <input
+                  type="number"
+                  placeholder="10-digit ID..."
+                  className="w-full px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={filters.reportId}
+                  onChange={(e) =>
+                    handleFilterChange("reportId", e.target.value)
+                  }
+                />
+              </FilterWrapper>
 
-          {/* Order No with Autocomplete */}
-          <FilterWrapper label="Order No" icon={Search}>
-            <AutocompleteInput
-              value={filters.orderNo}
-              onChange={(val) => handleFilterChange("orderNo", val)}
-              placeholder="Search Order..."
-              apiEndpoint="/api/fincheck-reports/autocomplete/order-no"
-            />
-          </FilterWrapper>
+              <FilterWrapper label="QA ID" icon={User}>
+                <InspectorSearchFilter
+                  value={filters.empId}
+                  onChange={(val) => handleFilterChange("empId", val)}
+                />
+              </FilterWrapper>
 
-          <FilterWrapper label="Report Name" icon={FileText}>
-            <select
-              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              value={filters.reportType}
-              onChange={(e) => handleFilterChange("reportType", e.target.value)}
-            >
-              <option value="All">All Reports</option>
-              {options.reportTypes.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </FilterWrapper>
+              {/* Order No with Autocomplete */}
+              <FilterWrapper label="Order No" icon={Search}>
+                <AutocompleteInput
+                  value={filters.orderNo}
+                  onChange={(val) => handleFilterChange("orderNo", val)}
+                  placeholder="Search Order..."
+                  apiEndpoint="/api/fincheck-reports/autocomplete/order-no"
+                />
+              </FilterWrapper>
 
-          <FilterWrapper label="Order Type" icon={Layers}>
-            <select
-              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              value={filters.orderType}
-              onChange={(e) => handleFilterChange("orderType", e.target.value)}
-            >
-              <option value="All">All Types</option>
-              <option value="Single">Single</option>
-              <option value="Multi">Multi</option>
-              <option value="Batch">Batch</option>
-            </select>
-          </FilterWrapper>
+              <FilterWrapper label="Report Name" icon={FileText}>
+                <select
+                  className="w-full px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={filters.reportType}
+                  onChange={(e) =>
+                    handleFilterChange("reportType", e.target.value)
+                  }
+                >
+                  <option value="All">All Reports</option>
+                  {options.reportTypes.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </FilterWrapper>
 
-          <FilterWrapper label="Product Type" icon={Box}>
-            <select
-              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              value={filters.productType}
-              onChange={(e) =>
-                handleFilterChange("productType", e.target.value)
-              }
-            >
-              <option value="All">All Products</option>
-              {options.productTypes.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </FilterWrapper>
+              <FilterWrapper label="Order Type" icon={Layers}>
+                <select
+                  className="w-full px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={filters.orderType}
+                  onChange={(e) =>
+                    handleFilterChange("orderType", e.target.value)
+                  }
+                >
+                  <option value="All">All Types</option>
+                  <option value="Single">Single</option>
+                  <option value="Multi">Multi</option>
+                  <option value="Batch">Batch</option>
+                </select>
+              </FilterWrapper>
 
-          {/* Cust Style with Autocomplete */}
-          <FilterWrapper label="Cust. Style" icon={Search}>
-            <AutocompleteInput
-              value={filters.custStyle}
-              onChange={(val) => handleFilterChange("custStyle", val)}
-              placeholder="Search Style..."
-              apiEndpoint="/api/fincheck-reports/autocomplete/cust-style"
-            />
-          </FilterWrapper>
+              <FilterWrapper label="Product Type" icon={Box}>
+                <select
+                  className="w-full px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={filters.productType}
+                  onChange={(e) =>
+                    handleFilterChange("productType", e.target.value)
+                  }
+                >
+                  <option value="All">All Products</option>
+                  {options.productTypes.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </FilterWrapper>
 
-          <FilterWrapper label="Buyer" icon={User}>
-            <select
-              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              value={filters.buyer}
-              onChange={(e) => handleFilterChange("buyer", e.target.value)}
-            >
-              <option value="All">All Buyers</option>
-              {options.buyers.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          </FilterWrapper>
+              {/* Cust Style with Autocomplete */}
+              <FilterWrapper label="Cust. Style" icon={Search}>
+                <AutocompleteInput
+                  value={filters.custStyle}
+                  onChange={(val) => handleFilterChange("custStyle", val)}
+                  placeholder="Search Style..."
+                  apiEndpoint="/api/fincheck-reports/autocomplete/cust-style"
+                />
+              </FilterWrapper>
 
-          <FilterWrapper label="Supplier" icon={Building2}>
-            <select
-              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              value={filters.supplier}
-              onChange={(e) => handleFilterChange("supplier", e.target.value)}
-            >
-              <option value="All">All Suppliers</option>
-              {options.suppliers.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </FilterWrapper>
+              <FilterWrapper label="Buyer" icon={User}>
+                <select
+                  className="w-full px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={filters.buyer}
+                  onChange={(e) => handleFilterChange("buyer", e.target.value)}
+                >
+                  <option value="All">All Buyers</option>
+                  {options.buyers.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </FilterWrapper>
 
-          <FilterWrapper label="Ext. Factory" icon={Factory}>
-            <select
-              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              value={filters.subConFactory}
-              onChange={(e) =>
-                handleFilterChange("subConFactory", e.target.value)
-              }
-            >
-              <option value="All">All Factories</option>
-              {options.subConFactories.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
-            </select>
-          </FilterWrapper>
+              <FilterWrapper label="Supplier" icon={Building2}>
+                <select
+                  className="w-full px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={filters.supplier}
+                  onChange={(e) =>
+                    handleFilterChange("supplier", e.target.value)
+                  }
+                >
+                  <option value="All">All Suppliers</option>
+                  {options.suppliers.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </FilterWrapper>
+
+              <FilterWrapper label="Ext. Factory" icon={Factory}>
+                <select
+                  className="w-full px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={filters.subConFactory}
+                  onChange={(e) =>
+                    handleFilterChange("subConFactory", e.target.value)
+                  }
+                >
+                  <option value="All">All Factories</option>
+                  {options.subConFactories.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </select>
+              </FilterWrapper>
+            </div>
+
+            {/* Mobile Action Buttons */}
+            <div className="sm:hidden flex items-center gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+              <button
+                onClick={handleSaveFilterClick}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-lg border border-indigo-200"
+              >
+                <Save className="w-3.5 h-3.5" /> Save
+              </button>
+              <button
+                onClick={handleReset}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-gray-600 bg-gray-100 rounded-lg"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Reset
+              </button>
+              <button
+                onClick={handleResetAll}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-red-500 bg-red-50 rounded-lg border border-red-200"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Clear
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* --- 2. DATA TABLE CONTAINER --- */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
+      <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
         {/* Table Header / Toolbar - FIXED */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex flex-col gap-4 sticky top-0 z-30">
+        <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex flex-col gap-3 sm:gap-4 sticky top-0 z-30">
           {/* Top Row: Title and Actions */}
-          <div className="flex justify-between items-center flex-wrap gap-3">
+          <div className="flex justify-between items-center flex-wrap gap-2 sm:gap-3">
             <div className="flex items-center gap-2">
-              <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-600 text-white shadow-md">
-                <FileText className="w-4 h-4" />
+              <span className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-600 text-white shadow-md">
+                <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </span>
-              <h3 className="font-bold text-gray-800 dark:text-white text-lg">
-                Inspection Results
+              <h3 className="font-bold text-gray-800 dark:text-white text-base sm:text-lg">
+                Results
               </h3>
-              <span className="ml-2 px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-xs font-bold text-gray-600 dark:text-gray-300">
+              <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-[10px] sm:text-xs font-bold text-gray-600 dark:text-gray-300">
                 {totalCount.toLocaleString()}
               </span>
             </div>
 
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 sm:gap-3 flex-1 justify-end min-w-0">
+              {/* --- NEW PO LINE FILTER --- */}
+              <div className="w-full max-w-[140px] sm:max-w-[250px]">
+                <MultiSelectAutocomplete
+                  selectedItems={filters.poLines || []}
+                  onChange={(newItems) =>
+                    handleFilterChange("poLines", newItems)
+                  }
+                  placeholder="Filter PO Line..."
+                  apiEndpoint="/api/fincheck-reports/autocomplete/po-line"
+                />
+              </div>
               {/* Customize View Button */}
               <button
                 onClick={() => setShowColumnModal(true)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl shadow-sm transition-all active:scale-95 border bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600"
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold rounded-lg sm:rounded-xl shadow-sm transition-all active:scale-95 border bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600"
               >
-                <Settings2 className="w-4 h-4" /> Customize
+                <Settings2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Customize</span>
               </button>
             </div>
           </div>
@@ -1627,90 +1944,135 @@ const YPivotQAReportMain = () => {
           />
         </div>
 
-        {/* Table Content - Scrollable */}
+        {/* Table Content - Scrollable with touch support */}
         <div
-          className="overflow-auto flex-1"
+          className="overflow-auto flex-1 overscroll-x-contain"
           style={{
-            maxHeight: "calc(100vh - 400px)",
+            maxHeight: "calc(100vh - 350px)",
+            minHeight: "300px",
             WebkitOverflowScrolling: "touch"
           }}
         >
-          <table className="w-full text-sm text-left">
-            <thead className="bg-gray-900 dark:bg-gray-950 text-xs uppercase font-bold text-gray-100 sticky top-0 z-20">
+          <table className="w-full text-sm text-left min-w-[800px]">
+            <thead className="bg-gray-900 dark:bg-gray-950 text-[10px] sm:text-xs uppercase font-bold text-gray-100 sticky top-0 z-20">
               <tr>
                 {isColumnVisible("date") && (
-                  <th className="px-5 py-4 whitespace-nowrap">Date</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Date
+                  </th>
                 )}
                 {isColumnVisible("reportId") && canViewReportId && (
-                  <th className="px-5 py-4 whitespace-nowrap">Report ID</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Report ID
+                  </th>
+                )}
+                {isColumnVisible("poLines") && (
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    PO Line
+                  </th>
                 )}
                 {isColumnVisible("orderNo") && (
-                  <th className="px-5 py-4 whitespace-nowrap">Order No</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Order No
+                  </th>
                 )}
                 {isColumnVisible("custStyle") && (
-                  <th className="px-5 py-4 whitespace-nowrap">Cust. Style</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Cust. Style
+                  </th>
                 )}
                 {isColumnVisible("customer") && (
-                  <th className="px-5 py-4 whitespace-nowrap">Customer</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Customer
+                  </th>
                 )}
                 {isColumnVisible("reportType") && (
-                  <th className="px-5 py-4 whitespace-nowrap">Report Name</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Report Name
+                  </th>
                 )}
                 {isColumnVisible("product") && (
-                  <th className="px-5 py-4 whitespace-nowrap">Product</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Product
+                  </th>
                 )}
                 {isColumnVisible("orderType") && (
-                  <th className="px-5 py-4 whitespace-nowrap">Type</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Type
+                  </th>
                 )}
                 {isColumnVisible("method") && (
-                  <th className="px-5 py-4 whitespace-nowrap">Method</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Method
+                  </th>
                 )}
                 {isColumnVisible("wash") && (
-                  <th className="px-5 py-4 whitespace-nowrap">Wash</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Wash
+                  </th>
                 )}
                 {isColumnVisible("qaId") && (
-                  <th className="px-5 py-4 whitespace-nowrap">QA ID</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    QA ID
+                  </th>
                 )}
                 {isColumnVisible("supplier") && (
-                  <th className="px-5 py-4 whitespace-nowrap">Supplier</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Supplier
+                  </th>
                 )}
                 {isColumnVisible("external") && (
-                  <th className="px-5 py-4 whitespace-nowrap">External</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    External
+                  </th>
                 )}
                 {isColumnVisible("factory") && (
-                  <th className="px-5 py-4 whitespace-nowrap">Factory</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Factory
+                  </th>
                 )}
                 {isColumnVisible("finishedQty") && (
-                  <th className="px-5 py-4 text-right whitespace-nowrap">
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 text-right whitespace-nowrap">
                     Finished #
                   </th>
                 )}
                 {isColumnVisible("sampleSize") && (
-                  <th className="px-5 py-4 text-right whitespace-nowrap">
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 text-right whitespace-nowrap">
                     Sample Size
                   </th>
                 )}
+                {isColumnVisible("defectQty") && (
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 text-right whitespace-nowrap text-red-300">
+                    Defect Qty
+                  </th>
+                )}
                 {isColumnVisible("createdDate") && (
-                  <th className="px-5 py-4 whitespace-nowrap">Created Date</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Created Date
+                  </th>
                 )}
                 {isColumnVisible("updatedDate") && (
-                  <th className="px-5 py-4 whitespace-nowrap">Updated Date</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Updated Date
+                  </th>
                 )}
                 {isColumnVisible("status") && (
-                  <th className="px-5 py-4 whitespace-nowrap text-center">
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap text-center">
                     QA Status
                   </th>
                 )}
                 {isColumnVisible("resubmission") && (
-                  <th className="px-5 py-4 whitespace-nowrap">Resubmission</th>
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Resubmission
+                  </th>
                 )}
                 {isColumnVisible("decision") && (
-                  <th className="px-5 py-4 whitespace-nowrap">
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
                     Leader Decision
                   </th>
                 )}
                 {isColumnVisible("action") && (
-                  <th className="px-5 py-4 text-center whitespace-nowrap">
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 text-center whitespace-nowrap sticky right-0 bg-gray-900 dark:bg-gray-950">
                     Action
                   </th>
                 )}
@@ -1719,23 +2081,23 @@ const YPivotQAReportMain = () => {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={20} className="px-6 py-20 text-center">
-                    <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mx-auto mb-3" />
-                    <p className="text-gray-500 font-medium">
+                  <td colSpan={20} className="px-6 py-16 sm:py-20 text-center">
+                    <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-500 animate-spin mx-auto mb-3" />
+                    <p className="text-gray-500 font-medium text-sm">
                       Loading reports...
                     </p>
                   </td>
                 </tr>
               ) : reports.length === 0 ? (
                 <tr>
-                  <td colSpan={20} className="px-6 py-20 text-center">
-                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Search className="w-8 h-8 text-gray-400" />
+                  <td colSpan={20} className="px-6 py-16 sm:py-20 text-center">
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Search className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
                     </div>
-                    <p className="text-gray-800 dark:text-white font-bold text-lg">
+                    <p className="text-gray-800 dark:text-white font-bold text-base sm:text-lg">
                       No Reports Found
                     </p>
-                    <p className="text-gray-500 text-sm mt-1">
+                    <p className="text-gray-500 text-xs sm:text-sm mt-1">
                       Try adjusting your filters.
                     </p>
                   </td>
@@ -1762,6 +2124,11 @@ const YPivotQAReportMain = () => {
                     sampleSizeDisplay = config.sampleSize || 0;
                   }
 
+                  const totalDefectQty = (report.defectData || []).reduce(
+                    (sum, d) => sum + (d.qty || 0),
+                    0
+                  );
+
                   const productImage = report.productTypeId?.imageURL;
 
                   return (
@@ -1771,21 +2138,23 @@ const YPivotQAReportMain = () => {
                     >
                       {/* Date */}
                       {isColumnVisible("date") && (
-                        <td className="px-5 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-gray-400" />
-                            {new Date(
-                              report.inspectionDate
-                            ).toLocaleDateString()}
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap text-xs sm:text-sm">
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
+                            <span className="truncate">
+                              {new Date(
+                                report.inspectionDate
+                              ).toLocaleDateString()}
+                            </span>
                           </div>
                         </td>
                       )}
 
                       {/* Report ID */}
                       {isColumnVisible("reportId") && canViewReportId && (
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4">
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs">
                               {report.reportId}
                             </span>
                             <button
@@ -1793,20 +2162,43 @@ const YPivotQAReportMain = () => {
                                 e.stopPropagation();
                                 setViewingReportQR(report);
                               }}
-                              className="p-1.5 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-gray-400 hover:text-indigo-600 transition-colors"
+                              className="p-1 sm:p-1.5 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-gray-400 hover:text-indigo-600 transition-colors"
                               title="View Report QR"
                             >
-                              <Info className="w-3.5 h-3.5" />
+                              <Info className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                             </button>
                           </div>
                         </td>
                       )}
 
+                      {/* --- PO LINE COLUMN --- */}
+                      {isColumnVisible("poLines") && (
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 max-w-[100px] sm:max-w-[150px] align-top">
+                          {report.poLines ? (
+                            <div className="flex flex-col gap-1">
+                              {report.poLines.split(", ").map((line, idx) => (
+                                <p
+                                  key={idx}
+                                  className="text-[11px] sm:text-[12px] leading-tight text-gray-600 dark:text-gray-400 font-medium truncate border-b border-dashed border-gray-200 dark:border-gray-700 last:border-0 pb-0.5 last:pb-0"
+                                  title={line}
+                                >
+                                  {line}
+                                </p>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-[11px] sm:text-[12px]">
+                              -
+                            </span>
+                          )}
+                        </td>
+                      )}
+
                       {/* Order No */}
                       {isColumnVisible("orderNo") && (
-                        <td className="px-5 py-4 max-w-[200px]">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 max-w-[120px] sm:max-w-[200px]">
                           <p
-                            className="truncate font-medium text-gray-800 dark:text-gray-200"
+                            className="truncate font-medium text-gray-800 dark:text-gray-200 text-xs sm:text-sm"
                             title={report.orderNosString}
                           >
                             {report.orderNosString}
@@ -1816,8 +2208,8 @@ const YPivotQAReportMain = () => {
 
                       {/* Cust. Style */}
                       {isColumnVisible("custStyle") && (
-                        <td className="px-5 py-4 max-w-[120px]">
-                          <p className="text-[12px] leading-tight text-gray-600 dark:text-gray-400 break-words font-medium">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 max-w-[100px] sm:max-w-[120px]">
+                          <p className="text-[11px] sm:text-[12px] leading-tight text-gray-600 dark:text-gray-400 break-words font-medium">
                             {details.custStyle || "-"}
                           </p>
                         </td>
@@ -1825,25 +2217,25 @@ const YPivotQAReportMain = () => {
 
                       {/* Customer (Buyer) */}
                       {isColumnVisible("customer") && (
-                        <td className="px-5 py-4 text-xs font-bold text-gray-700 dark:text-gray-300 capitalize">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 text-[11px] sm:text-xs font-bold text-gray-700 dark:text-gray-300 capitalize">
                           {report.buyer ? report.buyer.toLowerCase() : "-"}
                         </td>
                       )}
 
                       {/* Report Name */}
                       {isColumnVisible("reportType") && (
-                        <td className="px-5 py-4 text-gray-600 dark:text-gray-300 text-[12px] break-words">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 text-gray-600 dark:text-gray-300 text-[11px] sm:text-[12px] break-words max-w-[100px] sm:max-w-none">
                           {report.reportType}
                         </td>
                       )}
 
                       {/* Product */}
                       {isColumnVisible("product") && (
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-2">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4">
+                          <div className="flex items-center gap-1.5 sm:gap-2">
                             {productImage ? (
                               <div
-                                className="w-8 h-8 rounded border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0 bg-white cursor-pointer hover:ring-2 hover:ring-indigo-500 transition-all"
+                                className="w-6 h-6 sm:w-8 sm:h-8 rounded border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0 bg-white cursor-pointer hover:ring-2 hover:ring-indigo-500 transition-all"
                                 onClick={() =>
                                   setPreviewImage({
                                     src: getProductImageUrl(productImage),
@@ -1858,11 +2250,11 @@ const YPivotQAReportMain = () => {
                                 />
                               </div>
                             ) : (
-                              <div className="w-8 h-8 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center bg-gray-50 dark:bg-gray-800 text-gray-400 text-[8px] font-bold">
+                              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center bg-gray-50 dark:bg-gray-800 text-gray-400 text-[6px] sm:text-[8px] font-bold flex-shrink-0">
                                 NO IMG
                               </div>
                             )}
-                            <span className="text-gray-600 dark:text-gray-300 font-medium">
+                            <span className="text-gray-600 dark:text-gray-300 font-medium text-[11px] sm:text-sm truncate max-w-[60px] sm:max-w-none">
                               {report.productType}
                             </span>
                           </div>
@@ -1871,9 +2263,9 @@ const YPivotQAReportMain = () => {
 
                       {/* Order Type */}
                       {isColumnVisible("orderType") && (
-                        <td className="px-5 py-4">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4">
                           <span
-                            className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${
+                            className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[9px] sm:text-[10px] font-bold uppercase border ${
                               report.orderType === "single"
                                 ? "bg-blue-50 text-blue-600 border-blue-100"
                                 : report.orderType === "multi"
@@ -1888,13 +2280,13 @@ const YPivotQAReportMain = () => {
 
                       {/* Method */}
                       {isColumnVisible("method") && (
-                        <td className="px-5 py-4">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4">
                           {report.inspectionMethod === "AQL" ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
+                            <span className="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-red-100 text-red-700 border border-red-200">
                               AQL
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                            <span className="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
                               {report.inspectionMethod || "Fixed"}
                             </span>
                           )}
@@ -1903,17 +2295,17 @@ const YPivotQAReportMain = () => {
 
                       {/* Wash */}
                       {isColumnVisible("wash") && (
-                        <td className="px-5 py-4">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4">
                           {report.measurementMethod === "Before" ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                            <span className="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">
                               Before
                             </span>
                           ) : report.measurementMethod === "After" ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
+                            <span className="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-green-100 text-green-700 border border-green-200">
                               After
                             </span>
                           ) : (
-                            <span className="text-gray-400 text-xs font-medium">
+                            <span className="text-gray-400 text-[10px] sm:text-xs font-medium">
                               N/A
                             </span>
                           )}
@@ -1922,18 +2314,19 @@ const YPivotQAReportMain = () => {
 
                       {/* QA ID */}
                       {isColumnVisible("qaId") && (
-                        <td className="px-5 py-4 align-top">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex flex-col">
-                              <span className="font-mono font-bold text-xs text-gray-600 dark:text-gray-400 mb-0.5">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 align-top">
+                          <div className="flex items-start justify-between gap-2 sm:gap-3">
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-mono font-bold text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 mb-0.5">
                                 {report.empId}
                               </span>
                               {(report.empName || "-")
                                 .split(" ")
+                                .slice(0, 2)
                                 .map((namePart, i) => (
                                   <span
                                     key={i}
-                                    className="text-[10px] font-bold text-gray-400 dark:text-gray-500 leading-3"
+                                    className="text-[9px] sm:text-[10px] font-bold text-gray-400 dark:text-gray-500 leading-3 truncate"
                                   >
                                     {namePart}
                                   </span>
@@ -1947,10 +2340,10 @@ const YPivotQAReportMain = () => {
                                   empName: report.empName
                                 });
                               }}
-                              className="p-1.5 rounded-full bg-gray-100 hover:bg-indigo-100 text-gray-400 hover:text-indigo-600 dark:bg-gray-800 dark:hover:bg-indigo-900/50 transition-colors mt-1"
+                              className="p-1 sm:p-1.5 rounded-full bg-gray-100 hover:bg-indigo-100 text-gray-400 hover:text-indigo-600 dark:bg-gray-800 dark:hover:bg-indigo-900/50 transition-colors flex-shrink-0"
                               title="View Inspector Info"
                             >
-                              <Info className="w-3.5 h-3.5" />
+                              <Info className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                             </button>
                           </div>
                         </td>
@@ -1958,21 +2351,23 @@ const YPivotQAReportMain = () => {
 
                       {/* Supplier */}
                       {isColumnVisible("supplier") && (
-                        <td className="px-5 py-4 text-gray-600 dark:text-gray-300 font-medium">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 text-gray-600 dark:text-gray-300 font-medium text-[11px] sm:text-sm">
                           {details.supplier || "YM"}
                         </td>
                       )}
 
                       {/* External */}
                       {isColumnVisible("external") && (
-                        <td className="px-5 py-4">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4">
                           {isSubCon ? (
-                            <div className="flex items-center gap-1.5 text-orange-600 font-bold text-xs">
-                              <Globe className="w-3.5 h-3.5" /> Yes
+                            <div className="flex items-center gap-1 sm:gap-1.5 text-orange-600 font-bold text-[10px] sm:text-xs">
+                              <Globe className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{" "}
+                              Yes
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1.5 text-gray-400 text-xs">
-                              <Building2 className="w-3.5 h-3.5" /> No
+                            <div className="flex items-center gap-1 sm:gap-1.5 text-gray-400 text-[10px] sm:text-xs">
+                              <Building2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{" "}
+                              No
                             </div>
                           )}
                         </td>
@@ -1980,7 +2375,7 @@ const YPivotQAReportMain = () => {
 
                       {/* Factory */}
                       {isColumnVisible("factory") && (
-                        <td className="px-5 py-4 text-gray-600 dark:text-gray-300 text-xs">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 text-gray-600 dark:text-gray-300 text-[10px] sm:text-xs">
                           {isSubCon
                             ? details.subConFactory || "Unknown"
                             : details.factory || "N/A"}
@@ -1989,16 +2384,16 @@ const YPivotQAReportMain = () => {
 
                       {/* Finished Qty */}
                       {isColumnVisible("finishedQty") && (
-                        <td className="px-5 py-4 text-right font-mono text-xs text-gray-800 dark:text-gray-200">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 text-right font-mono text-[10px] sm:text-xs text-gray-800 dark:text-gray-200">
                           {finishedQtyDisplay}
                         </td>
                       )}
 
                       {/* Sample Size */}
                       {isColumnVisible("sampleSize") && (
-                        <td className="px-5 py-4 text-right">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 text-right">
                           {sampleSizeDisplay > 0 ? (
-                            <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-bold rounded">
+                            <span className="inline-flex items-center justify-center min-w-[20px] sm:min-w-[24px] h-5 sm:h-6 px-1 sm:px-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-[10px] sm:text-xs font-bold rounded">
                               {sampleSizeDisplay}
                             </span>
                           ) : (
@@ -2007,15 +2402,30 @@ const YPivotQAReportMain = () => {
                         </td>
                       )}
 
+                      {/* --- DEFECT QTY COLUMN --- */}
+                      {isColumnVisible("defectQty") && (
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 text-right">
+                          <span
+                            className={`font-mono text-[10px] sm:text-xs font-bold ${
+                              totalDefectQty > 0
+                                ? "text-red-600 dark:text-red-400"
+                                : "text-gray-400"
+                            }`}
+                          >
+                            {totalDefectQty}
+                          </span>
+                        </td>
+                      )}
+
                       {/* Created At */}
                       {isColumnVisible("createdDate") && (
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                          <div className="flex flex-col gap-0.5 sm:gap-1">
+                            <span className="text-[10px] sm:text-xs font-bold text-gray-700 dark:text-gray-300">
                               {created.date}
                             </span>
-                            <div className="flex items-center gap-1 text-[10px] text-gray-500 font-medium bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded w-fit">
-                              <Clock className="w-3 h-3" />
+                            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-gray-500 font-medium bg-gray-100 dark:bg-gray-700 px-1 sm:px-1.5 py-0.5 rounded w-fit">
+                              <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                               {created.time}
                             </div>
                           </div>
@@ -2024,13 +2434,14 @@ const YPivotQAReportMain = () => {
 
                       {/* Updated At */}
                       {isColumnVisible("updatedDate") && (
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                          <div className="flex flex-col gap-0.5 sm:gap-1">
+                            <span className="text-[10px] sm:text-xs font-bold text-gray-700 dark:text-gray-300">
                               {updated.date}
                             </span>
-                            <div className="flex items-center gap-1 text-[10px] text-gray-500 font-medium bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded w-fit">
-                              <Clock className="w-3 h-3" /> {updated.time}
+                            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-gray-500 font-medium bg-gray-100 dark:bg-gray-700 px-1 sm:px-1.5 py-0.5 rounded w-fit">
+                              <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />{" "}
+                              {updated.time}
                             </div>
                           </div>
                         </td>
@@ -2038,9 +2449,9 @@ const YPivotQAReportMain = () => {
 
                       {/* 1. QA Status Column */}
                       {isColumnVisible("status") && (
-                        <td className="px-5 py-4 text-center">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 text-center">
                           <span
-                            className={`px-3 py-1 rounded-lg text-xs font-bold uppercase border shadow-sm ${
+                            className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg text-[9px] sm:text-xs font-bold uppercase border shadow-sm ${
                               report.status === "completed"
                                 ? "bg-green-100 text-green-700 border-green-300"
                                 : "bg-gray-100 text-gray-600 border-gray-300"
@@ -2055,7 +2466,7 @@ const YPivotQAReportMain = () => {
 
                       {/* 2. Resubmission Column */}
                       {isColumnVisible("resubmission") && (
-                        <td className="px-5 py-4">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4">
                           {report.resubmissionHistory &&
                           report.resubmissionHistory.length > 0 ? (
                             (() => {
@@ -2067,15 +2478,15 @@ const YPivotQAReportMain = () => {
                                 lastResub.resubmissionDate
                               );
                               return (
-                                <div className="flex items-start gap-3">
-                                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 border border-purple-300 text-purple-700 text-xs font-bold shadow-sm flex-shrink-0">
+                                <div className="flex items-start gap-2 sm:gap-3">
+                                  <div className="flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-purple-100 border border-purple-300 text-purple-700 text-[10px] sm:text-xs font-bold shadow-sm flex-shrink-0">
                                     {lastResub.resubmissionNo}
                                   </div>
                                   <div className="flex flex-col">
-                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                                    <span className="text-[10px] sm:text-xs font-bold text-gray-700 dark:text-gray-300">
                                       {resubDate.date}
                                     </span>
-                                    <span className="text-[10px] text-gray-500 font-mono">
+                                    <span className="text-[9px] sm:text-[10px] text-gray-500 font-mono">
                                       {resubDate.time}
                                     </span>
                                   </div>
@@ -2083,14 +2494,16 @@ const YPivotQAReportMain = () => {
                               );
                             })()
                           ) : (
-                            <span className="text-gray-300 text-xs">-</span>
+                            <span className="text-gray-300 text-[10px] sm:text-xs">
+                              -
+                            </span>
                           )}
                         </td>
                       )}
 
                       {/* 3. Decision Column */}
                       {isColumnVisible("decision") && (
-                        <td className="px-5 py-4">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4">
                           {(() => {
                             // 1. Determine Status Label
                             let statusLabel = "Pending";
@@ -2143,17 +2556,17 @@ const YPivotQAReportMain = () => {
                             }
 
                             return (
-                              <div className="flex flex-col items-start gap-1.5">
+                              <div className="flex flex-col items-start gap-1 sm:gap-1.5">
                                 <span
-                                  className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold uppercase border ${statusClass}`}
+                                  className={`px-1.5 sm:px-2.5 py-0.5 rounded-md text-[9px] sm:text-[11px] font-bold uppercase border ${statusClass}`}
                                 >
                                   {statusLabel}
                                 </span>
 
                                 {actionRequired && (
                                   <div className="flex items-center gap-1 animate-pulse">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                                    <span className="text-[10px] font-bold text-red-500 uppercase tracking-tight border border-red-200 bg-red-50 px-1.5 rounded">
+                                    <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-red-500"></span>
+                                    <span className="text-[8px] sm:text-[10px] font-bold text-red-500 uppercase tracking-tight border border-red-200 bg-red-50 px-1 sm:px-1.5 rounded">
                                       Action Required
                                     </span>
                                   </div>
@@ -2164,14 +2577,14 @@ const YPivotQAReportMain = () => {
                         </td>
                       )}
 
-                      {/* Action */}
+                      {/* Action - Sticky on mobile */}
                       {isColumnVisible("action") && (
-                        <td className="px-5 py-4 text-center relative">
+                        <td className="px-3 sm:px-5 py-3 sm:py-4 text-center relative sticky right-0 bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700/30">
                           <button
                             onClick={(e) =>
                               handleMenuToggle(e, report.reportId, index)
                             }
-                            className={`p-2 rounded-full transition-colors ${
+                            className={`p-1.5 sm:p-2 rounded-full transition-colors ${
                               openMenuId === report.reportId
                                 ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400"
                                 : "text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600"
@@ -2188,6 +2601,18 @@ const YPivotQAReportMain = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Bottom Pagination for Mobile */}
+        <div className="sm:hidden px-3 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+            loading={loading}
+          />
+        </div>
       </div>
 
       {/* --- FLOATING ACTION MENU PORTAL --- */}
@@ -2199,7 +2624,7 @@ const YPivotQAReportMain = () => {
 
           return createPortal(
             <div
-              className="fixed z-[9999] w-40 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-fadeIn"
+              className="fixed z-[9999] w-36 sm:w-40 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-fadeIn"
               style={{
                 top: menuPos.top,
                 left: menuPos.left
@@ -2212,7 +2637,7 @@ const YPivotQAReportMain = () => {
                     setOpenMenuId(null); // Close menu
                     handleViewReport(activeReport);
                   }}
-                  className="px-4 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 flex items-center gap-2 transition-colors"
+                  className="px-3 sm:px-4 py-2.5 sm:py-3 text-left text-[11px] sm:text-xs font-bold text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 flex items-center gap-2 transition-colors"
                 >
                   <Eye className="w-3.5 h-3.5 text-indigo-500" />
                   View Report
@@ -2225,10 +2650,10 @@ const YPivotQAReportMain = () => {
                     setOpenMenuId(null);
                     handleFilterByOrderNo(activeReport.orderNosString);
                   }}
-                  className="px-4 py-3 text-left text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 flex items-center gap-2 transition-colors"
+                  className="px-3 sm:px-4 py-2.5 sm:py-3 text-left text-[11px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 flex items-center gap-2 transition-colors"
                 >
                   <Filter className="w-3.5 h-3.5" />
-                  Filter All Reports
+                  Filter All
                 </button>
 
                 <div className="h-px bg-gray-100 dark:bg-gray-700"></div>
@@ -2238,7 +2663,7 @@ const YPivotQAReportMain = () => {
                     setOpenMenuId(null);
                     handleDeleteReport(activeReport);
                   }}
-                  className="px-4 py-3 text-left text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 transition-colors"
+                  className="px-3 sm:px-4 py-2.5 sm:py-3 text-left text-[11px] sm:text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   Delete
@@ -2287,9 +2712,9 @@ const YPivotQAReportMain = () => {
       {/* Save Filter Name Modal */}
       {showSaveFilterModal &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-sm w-full p-6 border border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm p-5 sm:p-6 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-base sm:text-lg font-bold text-gray-800 dark:text-white mb-4">
                 Save Current Filter
               </h3>
 
@@ -2303,7 +2728,7 @@ const YPivotQAReportMain = () => {
                   value={newFilterName}
                   onChange={(e) => setNewFilterName(e.target.value)}
                   placeholder="e.g. My Monthly AQL"
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
                   autoFocus
                 />
                 <p className="text-[10px] text-gray-400 text-right mt-1">
@@ -2362,6 +2787,11 @@ const YPivotQAReportMain = () => {
         }
         .animate-shrinkWidth {
           animation: shrinkWidth 3s linear forwards;
+        }
+        /* Better touch scrolling for mobile */
+        .overscroll-x-contain {
+          overscroll-behavior-x: contain;
+          -webkit-overflow-scrolling: touch;
         }
       `}</style>
     </div>

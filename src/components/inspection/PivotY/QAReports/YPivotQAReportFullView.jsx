@@ -75,6 +75,8 @@ import YPivotQAReportPPSheetSection from "./YPivotQAReportPPSheetSection";
 import YPivotQAReportMeasurementManualDisplay from "./YPivotQAReportMeasurementManualDisplay";
 import YPivotQAInspectionManualDefectDisplay from "./YPivotQAInspectionManualDefectDisplay";
 
+import OrderShippingStageBreakdownTable from "./OrderShippingStageBreakdownTable";
+
 import YPivotQAReportDecisionModal from "./YPivotQAReportDecisionModal";
 
 import YPivotQAReportPDFGenerator from "./YPivotQAReportPDFGenerator";
@@ -581,7 +583,7 @@ const ColorSizeBreakdownTable = ({ data, orderNo }) => {
                       className="w-2.5 h-2.5 rounded-full border border-gray-300 dark:border-gray-600"
                       style={{ backgroundColor: row.colorCode || "#ccc" }}
                     />
-                    <span className="truncate max-w-[100px] text-[11px]">
+                    <span className="text-[11px] whitespace-nowrap">
                       {row.color}
                     </span>
                   </div>
@@ -871,6 +873,8 @@ const YPivotQAReportFullView = () => {
     After: { full: [], selected: [] }
   });
   const [sizeList, setSizeList] = useState([]);
+  const [activeValidColors, setActiveValidColors] = useState([]);
+  const [shippingBreakdown, setShippingBreakdown] = useState(null);
 
   // UI States
   const [previewImage, setPreviewImage] = useState(null);
@@ -1000,6 +1004,8 @@ const YPivotQAReportFullView = () => {
             if (specsRes.data.success) {
               setMeasurementSpecs(specsRes.data.specs); // Save { Before:..., After:... }
               setSizeList(specsRes.data.sizeList || []);
+              // --- ADD THIS LINE to save the filtered colors from backend ---
+              setActiveValidColors(specsRes.data.activeColors || []);
             }
           } catch (err) {
             console.warn("Could not fetch measurement specs", err);
@@ -1162,6 +1168,30 @@ const YPivotQAReportFullView = () => {
 
   const savedMeasurements = processedMeasurementData.savedMeasurements;
 
+  // EFFECT: Fetch Shipping Breakdown if Shipping Stage exists
+  useEffect(() => {
+    const fetchShippingData = async () => {
+      // Logic: If we have a reportId AND the config says there is a shipping stage
+      if (reportId && config?.shippingStage) {
+        try {
+          const res = await axios.get(
+            `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}/shipping-stage-breakdown`
+          );
+          if (res.data.success) {
+            setShippingBreakdown(res.data.data);
+          }
+        } catch (err) {
+          console.error("Failed to load shipping breakdown", err);
+        }
+      }
+    };
+
+    // Ensure config is loaded before checking
+    if (config?.shippingStage) {
+      fetchShippingData();
+    }
+  }, [reportId, config?.shippingStage]);
+
   // =========================================================================
   // NEW: Process Measurement Data by Stage (Before / After)
   // =========================================================================
@@ -1171,9 +1201,23 @@ const YPivotQAReportFullView = () => {
     return stages
       .map((stage) => {
         // Filter measurements for this stage
-        const stageMeasurements = savedMeasurements.filter(
-          (m) => m.stage === stage || (!m.stage && stage === "Before")
-        );
+        const stageMeasurements = savedMeasurements.filter((m) => {
+          // 1. Check Stage
+          const isStageMatch =
+            m.stage === stage || (!m.stage && stage === "Before");
+
+          // 2. Check Color (If we have a valid list, ensure this measurement matches)
+          // We use m.colorName as that is what the backend used to generate the list
+          const isColorValid =
+            activeValidColors.length === 0 || // If list is empty, show all (backward compatibility)
+            activeValidColors.includes(m.colorName);
+
+          return isStageMatch && isColorValid;
+        });
+
+        // const stageMeasurements = savedMeasurements.filter(
+        //   (m) => m.stage === stage || (!m.stage && stage === "Before")
+        // );
 
         if (stageMeasurements.length === 0) return null;
 
@@ -1571,26 +1615,34 @@ const YPivotQAReportFullView = () => {
             {/* --- DECISION BUTTON --- */}
             {isApprover && (
               <button
-                onClick={() => setShowDecisionModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-800/40 hover:bg-indigo-900/40 text-white rounded-xl font-bold border border-indigo-400/30 transition-colors"
+                // Only allow click if status is 'completed'
+                onClick={() => {
+                  if (report.status === "completed") {
+                    setShowDecisionModal(true);
+                  }
+                }}
+                disabled={report.status !== "completed"}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold border transition-colors ${
+                  report.status === "completed"
+                    ? "bg-indigo-800/40 hover:bg-indigo-900/40 text-white border-indigo-400/30 cursor-pointer"
+                    : "bg-gray-400/20 text-gray-400 border-gray-500/20 cursor-not-allowed"
+                }`}
+                title={
+                  report.status !== "completed"
+                    ? "Report must be completed by QA first"
+                    : "Make Leader Decision"
+                }
               >
                 <Gavel className="w-4 h-4" />
                 <span className="hidden sm:inline">Decision</span>
               </button>
             )}
 
-            {/* <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-indigo-600 rounded-xl font-bold shadow-lg hover:bg-gray-50 transition-colors"
-            >
-              <Printer className="w-4 h-4" />
-              <span className="hidden sm:inline">Print</span>
-            </button> */}
-
             {/* New PDF Generator Button */}
             <YPivotQAReportPDFGenerator
               report={report}
               orderData={orderData}
+              shippingBreakdown={shippingBreakdown}
               inspectorInfo={inspectorInfo}
               definitions={definitions}
               headerData={headerData}
@@ -2345,6 +2397,15 @@ const YPivotQAReportFullView = () => {
                     value={yorksys.productType}
                     icon={Layers}
                   />
+                  {/* --- Carton Qty--- */}
+                  {config.cartonQty && (
+                    <InfoRow
+                      label="Carton Qty"
+                      value={config.cartonQty}
+                      icon={Truck}
+                    />
+                  )}
+
                   <InfoRow
                     label="Fabric Content"
                     value={yorksys.fabricContent
@@ -2353,6 +2414,15 @@ const YPivotQAReportFullView = () => {
                     icon={Shirt}
                     className="md:col-span-2"
                   />
+                  {/* --- Shipping Stage--- */}
+                  {config.shippingStage && (
+                    <InfoRow
+                      label="Shipping Stage"
+                      value={config.shippingStage}
+                      icon={Truck}
+                    />
+                  )}
+
                   <InfoRow
                     label="SKU Description"
                     value={yorksys.skuDescription}
@@ -2431,6 +2501,14 @@ const YPivotQAReportFullView = () => {
                       </div>
                     </div>
                   )}
+
+                {/* --- Shipping Stage Breakdown Table --- */}
+                {config?.shippingStage && shippingBreakdown && (
+                  <OrderShippingStageBreakdownTable
+                    shippingData={shippingBreakdown}
+                    orderNos={selectedOrders}
+                  />
+                )}
 
                 {/* 3. SKU Details Tables (Full Width, Below Breakdown) */}
                 {orderData.orderBreakdowns &&

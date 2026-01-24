@@ -264,6 +264,86 @@ const SearchableSingleSelect = ({
   );
 };
 
+// ============================================================
+// Multi-Select Dropdown Component
+// ============================================================
+const MultiSelectDropdown = ({
+  options,
+  selectedValues, // Array of strings e.g. ["D1", "D2"]
+  onChange, // Callback with new array
+  placeholder = "Select..."
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleOption = (value) => {
+    let newValues;
+    if (selectedValues.includes(value)) {
+      newValues = selectedValues.filter((v) => v !== value);
+    } else {
+      newValues = [...selectedValues, value];
+    }
+    onChange(newValues);
+  };
+
+  const displayText =
+    selectedValues.length > 0 ? selectedValues.join(", ") : placeholder;
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-left text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-transparent flex items-center justify-between"
+      >
+        <span className="truncate">{displayText}</span>
+        <ChevronDown className="w-4 h-4 text-gray-400" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+          {options.map((opt) => {
+            const isSelected = selectedValues.includes(opt.value);
+            return (
+              <div
+                key={opt.value}
+                onClick={() => toggleOption(opt.value)}
+                className={`px-4 py-2 cursor-pointer flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                  isSelected ? "bg-cyan-50 dark:bg-cyan-900/20" : ""
+                }`}
+              >
+                <span
+                  className={`text-sm ${
+                    isSelected
+                      ? "font-bold text-cyan-700 dark:text-cyan-400"
+                      : "text-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  {opt.label}
+                </span>
+                {isSelected && (
+                  <CheckCircle2 className="w-4 h-4 text-cyan-600" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AQLConfigTable = ({ aqlConfigs, inspectedQty, buyer }) => {
   if (!aqlConfigs || aqlConfigs.length === 0) {
     return (
@@ -448,9 +528,18 @@ const YPivotQAInspectionReportType = ({
   const [cartonQty, setCartonQty] = useState(
     savedState?.config?.cartonQty || ""
   );
-  const [shippingStage, setShippingStage] = useState(
-    savedState?.config?.shippingStage || null
-  );
+  const [shippingStage, setShippingStage] = useState(() => {
+    const raw = savedState?.config?.shippingStage;
+    if (!raw) return [];
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  });
+
+  // const [shippingStage, setShippingStage] = useState(
+  //   savedState?.config?.shippingStage || null
+  // );
   const [remarks, setRemarks] = useState(savedState?.config?.remarks || "");
 
   // Supplier State
@@ -681,7 +770,12 @@ const YPivotQAInspectionReportType = ({
             details.inspectedQty ? details.inspectedQty.toString() : ""
           );
           setCartonQty(details.cartonQty ? details.cartonQty.toString() : "");
-          setShippingStage(details.shippingStage || null);
+          setShippingStage(
+            details.shippingStage
+              ? details.shippingStage.split(",").map((s) => s.trim())
+              : []
+          );
+          //setShippingStage(details.shippingStage || null);
           setRemarks(details.remarks || "");
           setIsSubCon(details.isSubCon || false);
           setSelectedSubConFactory(details.subConFactoryId || null);
@@ -766,6 +860,11 @@ const YPivotQAInspectionReportType = ({
       }
     }
 
+    // JOIN ARRAY TO STRING
+    const shippingStageString = Array.isArray(shippingStage)
+      ? shippingStage.join(", ")
+      : "";
+
     if (onReportDataChange) {
       onReportDataChange({
         selectedTemplate,
@@ -777,7 +876,8 @@ const YPivotQAInspectionReportType = ({
           isSubCon,
           selectedSubConFactory,
           selectedSubConFactoryName: selectedFactoryName,
-          shippingStage,
+          shippingStage: shippingStageString,
+          //shippingStage,
           remarks,
           productTypeId: selectedProductTypeId
         }
@@ -886,8 +986,8 @@ const YPivotQAInspectionReportType = ({
 
       {/* Inspection Selection */}
       {showConfigurationSection && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 rounded-t-2xl">
             <h3 className="text-white font-bold text-sm flex items-center gap-2">
               <Box className="w-4 h-4" />
               Inspection Details
@@ -1015,29 +1115,21 @@ const YPivotQAInspectionReportType = ({
               )}
 
               {/* Shipping Stage */}
+              {/* Shipping Stage */}
               {showShippingStage && (
                 <div>
                   <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
                     <Truck className="w-3.5 h-3.5 text-cyan-500" />
                     Shipping Stage
                   </label>
-                  <div className="relative">
-                    <select
-                      value={shippingStage || ""}
-                      onChange={(e) => setShippingStage(e.target.value || null)}
-                      className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-transparent appearance-none"
-                    >
-                      <option value="">Select stage...</option>
-                      {/* Map over the dynamic options */}
-                      {shippingStageOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
 
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                  </div>
+                  {/* USE NEW COMPONENT */}
+                  <MultiSelectDropdown
+                    options={shippingStageOptions}
+                    selectedValues={shippingStage} // Pass array
+                    onChange={setShippingStage} // Receives new array
+                    placeholder="Select stages..."
+                  />
                 </div>
               )}
             </div>

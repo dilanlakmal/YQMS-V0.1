@@ -133,7 +133,8 @@
     "tesseract.js": "^6.0.1",
     "uuid": "^11.0.5",
     "xlsx": "^0.18.5",
-    "xlsx-style": "^0.8.13"
+    "xlsx-style": "^0.8.13",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/react": "^18.2.64",
