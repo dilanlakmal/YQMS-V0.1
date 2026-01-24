@@ -548,7 +548,7 @@ app.use(QASections_Shipping_Stage);
   PivotY - QA Measurements routes
 ------------------------------ */
 app.use(QASections_Measurement_Specs);
- 
+app.use(ModifyDTSpec);
 
 /* ------------------------------
   PivotY - QA Templates routes
