@@ -16,7 +16,7 @@ import {
   Target,
   Layers,
 } from 'lucide-react';
-import DrawingCanvas from '../../../components/inspection/YDT/drowingCanvas.jsx';
+import DrawingCanvas from './Dependent/drowingCanvas.jsx';
 import { useAuth } from '../../../components/authentication/AuthContext';
 import { API_BASE_URL } from '../../../../config.js';
 import Swal from 'sweetalert2';

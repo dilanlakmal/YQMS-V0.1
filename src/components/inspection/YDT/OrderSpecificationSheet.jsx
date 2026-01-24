@@ -21,7 +21,7 @@ import {
   X
 } from "lucide-react";
 import {API_BASE_URL} from "../../../../config.js";
-import RichTextEditor from '../YDT/RichTextEditor.jsx';
+import RichTextEditor from './Dependent/RichTextEditor.jsx';
 import Swal from 'sweetalert2';
 
 // Enhanced ColorDropdown with better styling

@@ -6,6 +6,11 @@ import {
   FileText,
   FileImage,
   File,
+  Ruler,
+  Info,
+  PackageOpen,
+  FileBox,
+  Eye,
   Upload,
   Search,
   Settings
@@ -16,6 +21,12 @@ import { useAuth } from "../components/authentication/AuthContext";
 import OrderSpecificationSheet from "../components/inspection/YDT/OrderSpecificationSheet";
 import SketchTechnicalSheet from "../components/inspection/YDT/sketchTechnicalSheet";
 import OverView from "../components/inspection/YDT/overView";
+import OrderData from "../components/inspection/YDT/OrderData";
+import OrderDetails from "../components/inspection/YDT/OrderDetails";
+import ProdInstruction from "../components/inspection/YDT/ProdInstruction";
+import ProdPacking from "../components/inspection/YDT/ProdPacking";
+import SizeChart from "../components/inspection/YDT/SizeChart";
+
 
 const CoverPage = () => {
   const { user } = useAuth();
@@ -24,6 +35,11 @@ const CoverPage = () => {
   // FIXED: Move component creation outside of useMemo to prevent recreation
   const orderSpecificationComponent = useMemo(() => <OrderSpecificationSheet />, []);
   const sketchTechnicalComponent = useMemo(() => <SketchTechnicalSheet />, []);
+  const orderDataComponent = useMemo(() => <OrderData />, []);
+  const orderDetailsComponent = useMemo(() => <OrderDetails />, []);
+  const prodInstructionComponent = useMemo(() => <ProdInstruction />, []);
+  const prodPackingComponent = useMemo(() => <ProdPacking />, []);
+  const sizeChartComponent = useMemo(() => <SizeChart />, []);
   const overViewComponent = useMemo(() => <OverView />, []);
 
   // Tab configuration  
@@ -32,20 +48,58 @@ const CoverPage = () => {
       id: "specification-sheet",
       label: "Specification Sheet",
       icon: <FileText size={20} />,
-      component: orderSpecificationComponent, // Use the memoized component
+      component: orderSpecificationComponent, 
       description: "Create Order Specification Documents"
     },
     {
       id: "sketch-technical-sheet",
-      label: "Sketch Technical Sheet",
+      label: "Technical Sheet",
       icon: <FileImage size={20} />,
-      component: sketchTechnicalComponent, // Use the memoized component
+      component: sketchTechnicalComponent, 
       description: "Create Sketch Technical Documents"
+    },
+    {
+      id: "Order Details",
+      label: "Order Details",
+      icon: < File size={20} />,
+      component:orderDetailsComponent, 
+      description: ""
+    },
+
+    {
+      id: "Prod_Instruction",
+      label: "Instruction",
+      icon: < Info size={20} />,
+      component:prodInstructionComponent, 
+      description: ""
+    },
+
+    {
+      id: "Prod_Packing",
+      label: "Packing",
+      icon: <PackageOpen size={20} />,
+      component:prodPackingComponent, 
+      description: ""
+    },
+    
+    {
+      id: "order-data",
+      label: "Order Data",
+      icon: <FileBox size={20} />,
+      component:orderDataComponent, 
+      description: ""
+    },
+    {
+      id: "size-chart",
+      label: "Size Chart",
+      icon: <Ruler size={20} />,
+      component: sizeChartComponent,
+      description: ""
     },
     {
       id: "overView",
       label: "Overview",
-      icon: <File size={20} />,
+      icon: <Eye size={20} />,
       component: overViewComponent,
       description: "Create Sketch Technical Documents"
     },
