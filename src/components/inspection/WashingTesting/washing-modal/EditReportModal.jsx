@@ -2,7 +2,7 @@ import React from "react";
 import Select from "react-select";
 import { DatePicker as AntDatePicker } from "antd";
 import dayjs from "dayjs";
-import { Calendar } from "lucide-react";
+import { Calendar, Trash2, RotateCw } from "lucide-react";
 
 const EditReportModal = ({
   isOpen,
@@ -55,7 +55,8 @@ const EditReportModal = ({
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                   required
                 >
-                  <option value="Home Wash/Garment Wash Test">Home Wash/Garment Wash Test</option>
+                  <option value="Home Wash Test">Home Wash Test</option>
+                  <option value="Garment Wash Report">Garment Wash Report</option>
                   <option value="HT Testing">HT Testing</option>
                   <option value="EMB testing">EMB testing</option>
                   <option value="Printing Testing">Printing Testing</option>
@@ -108,7 +109,7 @@ const EditReportModal = ({
                   </button>
 
                   {showEditColorDropdown && editAvailableColors.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
                       <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
                         <button
                           type="button"
@@ -202,7 +203,7 @@ const EditReportModal = ({
                   </button>
 
                   {showEditPODropdown && editAvailablePOs.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
                       <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
                         <button
                           type="button"
@@ -296,7 +297,7 @@ const EditReportModal = ({
                   </button>
 
                   {showEditETDDropdown && editAvailableETDs.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
                       <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
                         <button
                           type="button"
@@ -459,6 +460,89 @@ const EditReportModal = ({
                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none z-10" />
                 </div>
               </div>
+
+              {/* Care Label Section for Garment Wash */}
+              {editFormData.reportType === "Garment Wash Report" && (
+                <div className="md:col-span-2 bg-blue-50 dark:bg-gray-700/30 p-4 rounded-md border border-blue-200 dark:border-gray-600 mt-2">
+                  <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-3 border-b border-blue-100 dark:border-gray-600 pb-2">
+                    Care Label Information
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wider">
+                        Care Label Gallery
+                      </label>
+                      <div className="space-y-4">
+                        {/* 1. Gallery Grid (Appears Above) */}
+                        {(Array.isArray(editFormData.careLabelImage) && editFormData.careLabelImage.length > 0) && (
+                          <div className="grid grid-cols-2 gap-3">
+                            {editFormData.careLabelImage.map((img, index) => (
+                              <div key={index} className="relative aspect-square bg-gray-50 dark:bg-gray-900 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 group shadow-sm">
+                                <img
+                                  src={img instanceof File ? URL.createObjectURL(img) : img}
+                                  alt={`Care Label ${index + 1}`}
+                                  className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                                />
+                                <div className="absolute inset-x-0 bottom-0 p-1.5 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex justify-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const currentImages = Array.isArray(editFormData.careLabelImage) ? [...editFormData.careLabelImage] : (editFormData.careLabelImage ? [editFormData.careLabelImage] : []);
+                                      currentImages.splice(index, 1);
+                                      setEditFormData(prev => ({ ...prev, careLabelImage: currentImages }));
+                                    }}
+                                    className="bg-red-500 hover:bg-red-600 text-white p-1 rounded-md shadow-lg transition-colors"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                                <div className="absolute top-1 left-1 px-1 py-0.5 bg-black/40 backdrop-blur-sm rounded text-[8px] text-white font-bold">
+                                  #{index + 1}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 2. Add Action (Always at Bottom) */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'image/*';
+                            input.multiple = true;
+                            input.onchange = (e) => {
+                              const files = Array.from(e.target.files);
+                              if (files.length > 0) {
+                                const currentImages = Array.isArray(editFormData.careLabelImage) ? [...editFormData.careLabelImage] : (editFormData.careLabelImage ? [editFormData.careLabelImage] : []);
+                                setEditFormData(prev => ({ ...prev, careLabelImage: [...currentImages, ...files] }));
+                              }
+                            };
+                            input.click();
+                          }}
+                          className="w-full py-4 border-2 border-dashed border-blue-200 dark:border-gray-700 rounded-xl flex items-center justify-center gap-2 bg-blue-50/20 dark:bg-gray-800/40 hover:bg-blue-50/50 dark:hover:bg-gray-800/20 hover:border-blue-400 dark:hover:border-blue-500 transition-all group"
+                        >
+                          <Plus size={18} className="text-blue-500 group-hover:scale-110 transition-transform" />
+                          <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">ADD CARE LABEL PHOTOS</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Care Label Notes
+                      </label>
+                      <textarea
+                        value={editFormData.careLabelNotes || ""}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, careLabelNotes: e.target.value }))}
+                        rows={4}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
+                        placeholder="Care label notes..."
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Modal Actions */}

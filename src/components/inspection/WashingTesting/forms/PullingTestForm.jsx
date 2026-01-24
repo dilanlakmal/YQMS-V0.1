@@ -18,6 +18,7 @@ const PullingTestForm = ({
     handleInputChange,
     handleSubmit,
     isSubmitting,
+    isCompleting,
     // Images
     handleFileInputChange,
     handleCameraInputChange,
@@ -75,7 +76,7 @@ const PullingTestForm = ({
     };
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+        <div className="space-y-8">
             <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4 text-center">
                 PULLING TEST REPORT ( APPROVED )
             </h2>
@@ -346,7 +347,7 @@ const PullingTestForm = ({
                                         return (
                                             <div
                                                 key={index}
-                                                className="relative border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 p-3"
+                                                className="relative border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50/50 dark:bg-gray-800/50 p-3"
                                             >
                                                 <div className="relative w-full flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-md overflow-hidden">
                                                     <img
@@ -374,7 +375,7 @@ const PullingTestForm = ({
                                     })}
                                 </div>
                             ) : (
-                                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 p-8">
+                                <div className="border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50/30 dark:bg-gray-800/30 p-8">
                                     <div className="text-center text-gray-500 dark:text-gray-400">
                                         <Upload size={40} className="mx-auto mb-2" />
                                         <p>No image selected</p>
@@ -427,14 +428,14 @@ const PullingTestForm = ({
                     {/* Notes Field */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            General Notes
+                            {isCompleting ? "Completion Notes" : "General Notes"}
                         </label>
                         <textarea
-                            value={formData.notes || ''}
-                            onChange={(e) => handleInputChange("notes", e.target.value)}
+                            value={isCompleting ? (formData.completionNotes || "") : (formData.notes || "")}
+                            onChange={(e) => handleInputChange(isCompleting ? "completionNotes" : "notes", e.target.value)}
                             rows={4}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-vertical"
-                            placeholder="Add any additional notes or comments about this pulling test report..."
+                            placeholder={isCompleting ? "Add completion notes..." : "Add any additional notes or comments about this pulling test report..."}
                         />
                     </div>
                 </div>

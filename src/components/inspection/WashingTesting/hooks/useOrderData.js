@@ -9,8 +9,14 @@ export const useOrderData = () => {
   const [availableColors, setAvailableColors] = useState([]);
   const [availablePOs, setAvailablePOs] = useState([]);
   const [availableETDs, setAvailableETDs] = useState([]);
+  const [fabrication, setFabrication] = useState("");
+  const [season, setSeason] = useState("");
+  const [styleDescription, setStyleDescription] = useState("");
+  const [custStyle, setCustStyle] = useState("");
+  const [availableSizes, setAvailableSizes] = useState([]);
   const [isLoadingColors, setIsLoadingColors] = useState(false);
-  const lastFetchedStyleRef = useRef(null);
+  const lastFetchedColorStyleRef = useRef(null);
+  const lastFetchedYorksysStyleRef = useRef(null);
 
   // Helper function to validate if order number looks like a valid YM Style
   const isValidStyleFormat = useCallback((orderNo) => {
@@ -44,12 +50,22 @@ export const useOrderData = () => {
     const normalizedStyle = trimmedOrderNo.toUpperCase();
 
     // Check if we're already loading or if this is the same style we just fetched (case-insensitive)
-    if (isLoadingColors || (lastFetchedStyleRef.current?.toUpperCase() === normalizedStyle && availableColors.length > 0)) {
+    if (isLoadingColors || (lastFetchedColorStyleRef.current?.toUpperCase() === normalizedStyle && availableColors.length > 0)) {
+      // Still update formData if provided, as it might have been cleared externally
+      if (setFormData && custStyle) {
+        setFormData(prev => ({
+          ...prev,
+          custStyle: custStyle || prev.custStyle,
+          buyerStyle: custStyle || prev.buyerStyle
+        }));
+      }
       return; // Already loading or already fetched
     }
 
-    setIsLoadingColors(true);
     try {
+      // Always try to fetch sizes from ANF specs as they are most relevant for many reports
+      fetchAnfAvailableSizes(trimmedOrderNo);
+
       const response = await fetch(
         `${API_BASE_URL}/api/washing/order-details/${encodeURIComponent(trimmedOrderNo)}`
       );
@@ -58,11 +74,12 @@ export const useOrderData = () => {
         const orderData = await response.json();
 
         // Mark this style as fetched
-        lastFetchedStyleRef.current = trimmedOrderNo;
+        lastFetchedColorStyleRef.current = trimmedOrderNo;
 
         // Handle success: false (new 200 OK instead of 404)
         if (orderData.success === false) {
           setAvailableColors([]);
+          // Don't clear availableSizes here as fetchAnfAvailableSizes might have set them
           return;
         }
 
@@ -77,17 +94,31 @@ export const useOrderData = () => {
           setAvailableColors([]);
         }
 
+        // Extract sizes from sizeList if present
+        if (orderData.sizeList && Array.isArray(orderData.sizeList) && orderData.sizeList.length > 0) {
+          setAvailableSizes(orderData.sizeList);
+        }
+
         // Extract and populate Buyer Style (CustStyle) from dt_orders
-        if (orderData.custStyle && orderData.custStyle !== "N/A" && setFormData) {
-          setFormData((prev) => ({
-            ...prev,
-            buyerStyle: orderData.custStyle,
-          }));
+        if (orderData.custStyle && orderData.custStyle !== "N/A") {
+          const extractedCustStyle = orderData.custStyle;
+          setCustStyle(extractedCustStyle);
+
+          if (setFormData) {
+            setFormData((prev) => ({
+              ...prev,
+              buyerStyle: extractedCustStyle,
+              custStyle: extractedCustStyle,
+            }));
+          }
+        } else {
+          setCustStyle("");
         }
       } else if (response.status === 404) {
-        // 404 is expected if order doesn't exist - not an error, just no data
+        // 404 is expected if order doesn't exist in dt_orders
         setAvailableColors([]);
-        lastFetchedStyleRef.current = trimmedOrderNo; // Mark as fetched to prevent retries
+        setCustStyle("");
+        lastFetchedColorStyleRef.current = trimmedOrderNo;
       } else {
         // Other errors (500, etc.) - log but don't spam console
         console.warn(`Failed to fetch order details for ${trimmedOrderNo}: ${response.status}`);
@@ -105,7 +136,7 @@ export const useOrderData = () => {
   }, [isValidStyleFormat, isLoadingColors, availableColors.length]);
 
   // Fetch ETD and PO from yorksys_orders by Style (YM Style)
-  const fetchYorksysOrderETD = useCallback(async (orderNo) => {
+  const fetchYorksysOrderETD = useCallback(async (orderNo, setFormData) => {
     if (!orderNo) {
       setAvailablePOs([]);
       setAvailableETDs([]);
@@ -123,7 +154,15 @@ export const useOrderData = () => {
     const trimmedOrderNo = orderNo.trim();
     const normalizedStyle = trimmedOrderNo.toUpperCase();
 
-    if (lastFetchedStyleRef.current?.toUpperCase() === normalizedStyle) {
+    if (lastFetchedYorksysStyleRef.current?.toUpperCase() === normalizedStyle) {
+      // Still update formData if provided, as it might have been cleared externally
+      if (setFormData && (season || styleDescription)) {
+        setFormData(prev => ({
+          ...prev,
+          season: season || prev.season,
+          styleDescription: styleDescription || prev.styleDescription
+        }));
+      }
       return; // Already fetched for this style
     }
 
@@ -134,7 +173,7 @@ export const useOrderData = () => {
 
       if (response.ok) {
         // Mark this style as fetched to prevent duplicate calls
-        lastFetchedStyleRef.current = trimmedOrderNo;
+        lastFetchedYorksysStyleRef.current = trimmedOrderNo;
 
         const result = await response.json();
 
@@ -182,51 +221,219 @@ export const useOrderData = () => {
 
           const uniquePOLines = [...new Set(allPOLines)];
           setAvailablePOs(uniquePOLines.length > 0 ? uniquePOLines : []);
+
+          // Extract sizes if available
+          const sizes = result.data.sizeList || result.data.SizeList;
+          if (sizes && Array.isArray(sizes) && sizes.length > 0) {
+            setAvailableSizes(sizes);
+          }
+
+          // Also try to fetch sizes from ANF specs
+          fetchAnfAvailableSizes(trimmedOrderNo);
+
+          // Build fabrication string from FabricContent array
+          if (result.data.FabricContent && Array.isArray(result.data.FabricContent) && result.data.FabricContent.length > 0) {
+            const fabString = result.data.FabricContent
+              .map(f => `${f.percentageValue}% ${f.fabricName}`)
+              .join(", ");
+            setFabrication(fabString);
+
+            // Also update formData if setFormData is provided
+            if (setFormData) {
+              setFormData(prev => ({
+                ...prev,
+                fabrication: fabString
+              }));
+            }
+          } else {
+            setFabrication("");
+            if (setFormData) {
+              setFormData(prev => ({
+                ...prev,
+                fabrication: ""
+              }));
+            }
+          }
         } else {
           setAvailablePOs([]);
           setAvailableETDs([]);
+          setFabrication("");
+          if (setFormData) {
+            setFormData(prev => ({
+              ...prev,
+              fabrication: ""
+            }));
+          }
         }
+
+        let extractedSeason = "";
+        if (result.data.season && result.data.season !== "N/A") {
+          extractedSeason = result.data.season;
+          setSeason(extractedSeason);
+        } else {
+          setSeason("");
+        }
+
+        // Extract Style Description (Only use skuDescription)
+        let description = "";
+
+        if (result.data.skuDescription && result.data.skuDescription !== "N/A") {
+          description = result.data.skuDescription;
+        } else if (result.data.SKUData && Array.isArray(result.data.SKUData) && result.data.SKUData.length > 0) {
+          // Fallback only to skuDescription within SKUData array if not at root
+          const skuWithDesc = result.data.SKUData.find(sku => sku.skuDescription && sku.skuDescription !== "N/A");
+          if (skuWithDesc) {
+            description = skuWithDesc.skuDescription;
+          }
+        }
+
+        if (description) {
+          setStyleDescription(description);
+        } else {
+          setStyleDescription("");
+        }
+
+        // Populate formData with Season, Style Description and MO No if setFormData is provided
+        if (setFormData) {
+          setFormData(prev => ({
+            ...prev,
+            season: extractedSeason || '',
+            styleDescription: description || '',
+            moNo: result.data.moNo || ''
+          }));
+        }
+
       } else if (response.status === 404) {
-        // Order not found - this is expected if style doesn't exist in yorksys_orders
-        // Mark as fetched to prevent duplicate calls for non-existent orders
-        lastFetchedStyleRef.current = trimmedOrderNo;
+        // Order not found
+        lastFetchedYorksysStyleRef.current = trimmedOrderNo;
         setAvailablePOs([]);
         setAvailableETDs([]);
-        // Note: Browser console will show 404, but this is expected behavior
-        // Not all YM Styles exist in yorksys_orders collection
+        setFabrication("");
+        setSeason("");
+        setStyleDescription("");
+        if (setFormData) {
+          setFormData(prev => ({
+            ...prev,
+            season: '',
+            styleDescription: ''
+          }));
+        }
       } else {
-        // Only log non-404 errors (500, etc.)
         console.warn(`Failed to fetch yorksys order for ${trimmedOrderNo}: ${response.status} ${response.statusText}`);
         setAvailablePOs([]);
         setAvailableETDs([]);
+        setFabrication("");
+        setSeason("");
+        setStyleDescription("");
       }
     } catch (error) {
-      // Only log non-connection errors
       if (!error.message.includes("Failed to fetch") && !error.message.includes("ERR_CONNECTION_REFUSED")) {
         console.error("Error fetching yorksys order ETD:", error);
       }
       setAvailablePOs([]);
       setAvailableETDs([]);
+      setFabrication("");
+      setSeason("");
+      setStyleDescription("");
     }
   }, [isValidStyleFormat]);
+
+  const [anfSpecs, setAnfSpecs] = useState([]);
+  const [isLoadingSpecs, setIsLoadingSpecs] = useState(false);
+
+  // Fetch ANF Specs for a given MO and Size
+  const fetchAnfSpecs = useCallback(async (moNo, size) => {
+    if (!moNo || !size) {
+      setAnfSpecs([]);
+      return;
+    }
+
+    setIsLoadingSpecs(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/anf-measurement/spec-table?moNo=${encodeURIComponent(moNo)}&size=${encodeURIComponent(size)}`
+      );
+
+      if (response.ok) {
+        const specs = await response.json();
+        // If success: false, it means no template exists for this MO
+        if (specs && specs.success === false) {
+          setAnfSpecs([]);
+        } else {
+          setAnfSpecs(specs);
+        }
+      } else {
+        if (response.status !== 404) {
+          console.warn(`Failed to fetch ANF specs for MO ${moNo} Size ${size}: ${response.status}`);
+        }
+        setAnfSpecs([]);
+      }
+    } catch (error) {
+      console.error("Error fetching ANF specs:", error);
+      setAnfSpecs([]);
+    } finally {
+      setIsLoadingSpecs(false);
+    }
+  }, []);
+
+  // Fetch available sizes from ANF Spec Template
+  const fetchAnfAvailableSizes = useCallback(async (moNo) => {
+    // Only fetch if MO No is long enough to prevent 404s on partial typing
+    if (!moNo || moNo.length < 5) return;
+    const normalizedMo = moNo.trim().toUpperCase();
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/anf-measurement/mo-details/${encodeURIComponent(normalizedMo)}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result && result.success === false) {
+          // Silent clear or keep existing
+          return;
+        }
+        if (result.sizes && Array.isArray(result.sizes) && result.sizes.length > 0) {
+          setAvailableSizes(result.sizes);
+        }
+      } else {
+        // Silently fail for 404 as it's common for styles without ANF data
+        if (response.status !== 404) {
+          console.warn(`Failed to fetch ANF sizes for ${moNo}: ${response.status}`);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching ANF sizes:", error);
+    }
+  }, []);
 
   // Reset all order data
   const resetOrderData = useCallback(() => {
     setAvailableColors([]);
     setAvailablePOs([]);
     setAvailableETDs([]);
-    lastFetchedStyleRef.current = null;
+    setFabrication("");
+    setAvailableSizes([]);
+    setSeason("");
+    setStyleDescription("");
+    setCustStyle("");
+    setAnfSpecs([]);
+    lastFetchedColorStyleRef.current = null;
+    lastFetchedYorksysStyleRef.current = null;
   }, []);
 
   return {
     availableColors,
     availablePOs,
     availableETDs,
+    availableSizes,
+    fabrication,
+    season,
+    styleDescription,
+    custStyle,
+    anfSpecs,
     isLoadingColors,
+    isLoadingSpecs,
     fetchOrderColors,
     fetchYorksysOrderETD,
+    fetchAnfSpecs,
     resetOrderData,
-    isValidStyleFormat,
+    isValidStyleFormat
   };
 };
-

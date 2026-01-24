@@ -5,7 +5,8 @@ import fs from "fs";
 import { Server as SocketIO } from "socket.io";
 import path from "path";
 import { fileURLToPath } from "url";
-import https from "https";
+// import https from "https";
+import http from "http";
 // import http from "http";
 
 import gracefulFs from "graceful-fs";
@@ -23,25 +24,24 @@ export const __dirname = path.dirname(__filename);
 export const __backendDir = path.resolve(__dirname, "..");
 
 export const API_BASE_URL =
-  process.env.API_BASE_URL || "https://localhost:5001";
-const options = {
-  key: fs.readFileSync(
-    path.resolve(__dirname, "192.167.6.207-key.pem")
-  ),
-  cert: fs.readFileSync(
-    path.resolve(__dirname, "192.167.6.207.pem")
-  )
-};
+  process.env.API_BASE_URL || "http://localhost:5001";
+  // const options = {
+  //   key: fs.readFileSync(
+  //     path.resolve(__dirname, "192.167.6.207-key.pem")
+  //   ),
+  //   cert: fs.readFileSync(
+  //     path.resolve(__dirname, "192.167.6.207.pem")
+  //   )
+  // };
 
-export const server = https.createServer(options, app);
+export const server = http.createServer(app);
 
 // Define allowed origins once
 const allowedOrigins = [
-  "https://192.167.12.85:3001",
+  "http://192.167.12.85:3001",
   "http://localhost:3001",
-  "https://localhost:3001",
-  "https://yqms.yaikh.com",
-  "https://192.167.6.207:3001"
+  "http://yqms.yaikh.com",
+  "http://192.167.6.207:3001",
 ];
 
 // Initialize Socket.io

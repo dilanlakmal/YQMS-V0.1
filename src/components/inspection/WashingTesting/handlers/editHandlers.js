@@ -23,7 +23,7 @@ export const prepareEditFormData = async (
 ) => {
     // Populate edit form with current report data
     setEditFormData({
-        reportType: report.reportType || "Home Wash/Garment Wash Test",
+        reportType: report.reportType || "Home Wash Test",
         color: report.color || [],
         buyerStyle: report.buyerStyle || "",
         po: report.po || [],

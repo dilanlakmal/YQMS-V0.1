@@ -11,7 +11,8 @@
 
 // Report Type Enum
 export const REPORT_TYPES = {
-    HOME_WASH: 'Home Wash/Garment Wash Test',
+    HOME_WASH: 'Home Wash Test',
+    GARMENT_WASH: 'Garment Wash Report',
     HT_TESTING: 'HT Testing',
     EMB_PRINTING_TESTING: 'EMB/Printing Testing',
     PULLING_TEST: 'Pulling Test',
@@ -86,6 +87,12 @@ const COMMON_FIELDS = {
         required: false,
         placeholder: 'Add any additional notes or comments about this report...',
         rows: 4,
+    },
+    range: {
+        type: FIELD_TYPES.TEXT,
+        label: 'Range',
+        required: false,
+        placeholder: 'Enter range (e.g., XS-XXL, 2-16)',
     },
 };
 
@@ -493,6 +500,42 @@ const PULLING_TEST_FIELDS = {
     },
 };
 
+// Garment Wash Report specific fields
+const GARMENT_WASH_FIELDS = {
+    // Header
+    style: { type: FIELD_TYPES.TEXT, label: 'STYLE', required: true },
+    washType: { type: FIELD_TYPES.SELECT, label: 'Wash Type', required: true, options: ['Before Wash', 'After Wash'] },
+    moNo: { type: FIELD_TYPES.TEXT, label: 'MO NO', required: false, readonly: true },
+    custStyle: { type: FIELD_TYPES.TEXT, label: 'CUST. STYLE', required: true },
+    color: { type: FIELD_TYPES.MULTI_SELECT, label: 'COLOR', required: true },
+    season: { type: FIELD_TYPES.TEXT, label: 'SEASON', required: true },
+    styleDescription: { type: FIELD_TYPES.TEXT, label: 'STYLE DESCRIPTION', required: true },
+    sampleSize: { type: FIELD_TYPES.SELECT, label: 'Shrinkage Size', required: false },
+
+    // Material
+    mainFabric: { type: FIELD_TYPES.TEXT, label: 'MATERIAL MAIN FABRIC', required: true },
+    liningInserts: { type: FIELD_TYPES.TEXT, label: 'MATERIAL LINING/INSERTS', required: false },
+    // careLabel: { type: FIELD_TYPES.IMAGE, label: 'CARE LABEL', required: false }, // Use generic 'images' or specific? Maybe separate.
+    detergent: { type: FIELD_TYPES.TEXT, label: 'DETERGENT', required: false },
+    washingMethod: { type: FIELD_TYPES.TEXTAREA, label: 'Washing Method', required: true },
+
+    // Tables (Custom handled in form)
+    colorFastnessRows: { type: FIELD_TYPES.CUSTOM, label: 'Color Fastness Data', required: false },
+    colorStainingRows: { type: FIELD_TYPES.CUSTOM, label: 'Color Staining Data', required: false },
+    visualAssessmentRows: { type: FIELD_TYPES.CUSTOM, label: 'Visual Assessment Data', required: false },
+    shrinkageRows: { type: FIELD_TYPES.CUSTOM, label: 'Shrinkage Data', required: false },
+
+    // Comments
+    beforeWashComments: { type: FIELD_TYPES.TEXTAREA, label: 'BEFORE WASH COMMENTS', required: false },
+    afterWashComments: { type: FIELD_TYPES.TEXTAREA, label: 'AFTER WASH COMMENTS', required: false },
+
+    // Footer
+    finalResult: { type: FIELD_TYPES.SELECT, label: 'FINAL RESULTS', required: true },
+    date: { type: FIELD_TYPES.DATE, label: 'DATE', required: true },
+    checkedBy: { type: FIELD_TYPES.TEXT, label: 'CHECKED BY', required: true },
+    approvedBy: { type: FIELD_TYPES.TEXT, label: 'APPROVED BY', required: false },
+};
+
 /**
  * Report Type Configurations
  * Each report type defines:
@@ -506,7 +549,7 @@ const PULLING_TEST_FIELDS = {
 export const REPORT_TYPE_CONFIGS = {
     [REPORT_TYPES.HOME_WASH]: {
         id: 'home_wash',
-        label: 'Home Wash/Garment Wash Test',
+        label: 'Home Wash Test',
         description: 'Standard washing test for garments',
         fields: [
             'ymStyle',
@@ -515,6 +558,7 @@ export const REPORT_TYPE_CONFIGS = {
             'po',
             'exFtyDate',
             'factory',
+            'range',
             'sendToHomeWashingDate',
             'images',
             'notes',
@@ -648,6 +692,27 @@ export const REPORT_TYPE_CONFIGS = {
         useDefaultExcel: false,
         excelGenerator: 'generatePullingTestExcel',
     },
+
+    [REPORT_TYPES.GARMENT_WASH]: {
+        id: 'garment_wash',
+        label: 'Garment Wash Report',
+        description: 'Detailed Garment Wash Test Report',
+        fields: [
+            'style', 'washType', 'moNo', 'custStyle', 'color', 'season', 'styleDescription',
+            'mainFabric', 'liningInserts', 'detergent', 'washingMethod',
+            'colorFastnessRows', 'colorStainingRows', 'visualAssessmentRows', 'shrinkageRows',
+            'beforeWashComments', 'afterWashComments',
+            'finalResult', 'date', 'checkedBy', 'approvedBy',
+            'images', 'notes'
+        ],
+        fieldDefinitions: { ...COMMON_FIELDS, ...GARMENT_WASH_FIELDS },
+        useDefaultForm: false,
+        formComponent: 'GarmentWashForm',
+        useDefaultPDF: false, // TBD
+        pdfComponent: 'GarmentWashPDF',
+        useDefaultExcel: false, // TBD
+        excelGenerator: 'generateGarmentWashExcel',
+    },
 };
 
 /**
@@ -731,6 +796,36 @@ export const getInitialFormData = (reportType) => {
                             results: '',
                             remark: '',
                         }];
+                    } else if (fieldName === 'colorFastnessRows') {
+                        // Initialize default rows for Color Fastness
+                        initialData[fieldName] = [
+                            { fabricType: 'JERSEY', color: '', colorChange: '5', ratingAfterWash: '', requirement: '4-5', passFail: 'PASS' },
+                            { fabricType: 'RIB', color: '', colorChange: '5', ratingAfterWash: '', requirement: '4-5', passFail: 'PASS' }
+                        ];
+                    } else if (fieldName === 'colorStainingRows') {
+                        // Initialize default rows for Color Staining
+                        initialData[fieldName] = [
+                            { fabricType: 'JERSEY', color: '', colorStaining: '5', ratingAfterWash: '', requirement: '4-5', passFail: 'PASS' },
+                            { fabricType: 'RIB', color: '', colorStaining: '5', ratingAfterWash: '', requirement: '4-5', passFail: 'PASS' }
+                        ];
+                    } else if (fieldName === 'visualAssessmentRows') {
+                        // Initialize default rows for Visual Assessment
+                        initialData[fieldName] = [
+                            { item: 'General Outlook', accepted: true, rejected: false, comments: '' },
+                            { item: 'Seams', accepted: true, rejected: false, comments: '' },
+                            { item: 'Embroidery', accepted: true, rejected: false, comments: '' },
+                            { item: 'H.Transfer', accepted: true, rejected: false, comments: '' },
+                            { item: 'Printing', accepted: true, rejected: false, comments: '' },
+                            { item: 'Trimmings / Accessories', accepted: true, rejected: false, comments: '' },
+                            { item: 'Others / Care label', accepted: true, rejected: false, comments: '' },
+                        ];
+                    } else if (fieldName === 'shrinkageRows') {
+                        // Initialize with one empty row by default
+                        initialData[fieldName] = [
+                            { location: '', original: '', tolMinus: '-1/2', tolPlus: '1/2', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' }
+                        ];
+                    } else if (fieldName === 'sampleSize') {
+                        initialData[fieldName] = 'M';
                     } else {
                         initialData[fieldName] = '';
                     }

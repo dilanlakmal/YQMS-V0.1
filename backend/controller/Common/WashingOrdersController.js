@@ -44,7 +44,7 @@ export const getMoNoSearchWashing = async (req, res) => {
             ...yorksysResults.map((r) => r.moNo)
         ])].filter(Boolean);
 
-        // console.log(`[DEBUG] Combined MONo search for "${term}": found ${dtResults.length} DT, ${yorksysResults.length} Yorksys results. ${uniqueMONos.length} unique MONos`);
+        // console.log(`[DEBUG] Combined MONo search for "${term}": found ${dtResults.length} DT, ${yorksysResults.length} Yorksys results. Unique: ${uniqueMONos.length}`);
 
         res.json(uniqueMONos);
     } catch (error) {
@@ -58,24 +58,76 @@ export const getMoNoSearchWashing = async (req, res) => {
 export const getOrderDetailsWashing = async (req, res) => {
     try {
         const collection = ymProdConnection.db.collection("dt_orders");
-        const order = await collection.findOne({
+        const yorksysCollection = ymProdConnection.db.collection("yorksys_orders");
+        const specCollection = ymProdConnection.db.collection("buyer_spec_templates");
+
+        let order = await collection.findOne({
             $or: [
                 { Order_No: req.params.mono },
                 { CustStyle: req.params.mono }
             ]
         });
 
+        let source = "dt_orders";
+
         if (!order) {
+            order = await yorksysCollection.findOne({
+                $or: [
+                    { moNo: req.params.mono },
+                    { style: req.params.mono }
+                ]
+            });
+            source = "yorksys_orders";
+        }
+
+        // Try to get sizes from ANF Spec Template regardless of where the order was found
+        const specTemplate = await specCollection.findOne({ moNo: req.params.mono });
+        const anfSizes = specTemplate?.specData?.map(s => s.size) || [];
+
+        if (!order && anfSizes.length === 0) {
             return res.status(200).json({
                 success: false,
                 error: "Order not found",
                 colors: [],
+                sizeList: [],
                 engName: "N/A",
                 totalQty: 0,
                 factoryname: "N/A",
                 custStyle: "N/A",
                 country: "N/A",
                 colorSizeMap: {}
+            });
+        }
+
+        // If we only have ANF sizes but no order, return a minimal object
+        if (!order && anfSizes.length > 0) {
+            return res.json({
+                success: true,
+                engName: "N/A",
+                totalQty: 0,
+                factoryname: "N/A",
+                custStyle: "N/A",
+                country: "N/A",
+                colors: [],
+                sizeList: anfSizes,
+                colorSizeMap: {},
+                source: "anf_specs"
+            });
+        }
+
+        if (source === "yorksys_orders") {
+            const colors = [...new Set(order.SKUData.filter(s => s.Color).map(s => s.Color.trim()))];
+            return res.json({
+                success: true,
+                engName: order.product || "N/A",
+                totalQty: order.MOSummary?.[0]?.TotalQty || 0,
+                factoryname: order.factory || "N/A",
+                custStyle: order.style || "N/A",
+                country: order.destination || "N/A",
+                colors: colors.map(c => ({ original: c })),
+                sizeList: (anfSizes && anfSizes.length > 0) ? anfSizes : [],
+                colorSizeMap: {},
+                source: "yorksys_orders"
             });
         }
 
@@ -114,6 +166,12 @@ export const getOrderDetailsWashing = async (req, res) => {
             factoryname: order.Factory || "N/A",
             custStyle: order.CustStyle || "N/A",
             country: order.Country || "N/A",
+            sizeList: [...new Set([
+                ...(order.SizeList || []).map(s => s.split(';')[0].trim()),
+                ...anfSizes,
+                ...Array.from(colorMap.values()).flatMap(c => Array.from(c.sizes.keys()))
+            ])].filter(Boolean),
+
             colors: Array.from(colorMap.values()).map((c) => ({
                 original: c.originalColor,
                 code: c.colorCode,

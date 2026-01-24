@@ -1,6 +1,6 @@
 import React from "react";
 import { Pencil, Plus } from "lucide-react";
-import { normalizeImageUrl, getImageFilename } from "./utils";
+import { normalizeImageUrl, getImageFilename, getCompletionNotesField } from "./utils";
 
 const ReportTimeline = ({ report, savedImageRotations, openImageViewer, onEditInitialImages, onEditReceivedImages, onEditCompletionImages }) => {
   return (
@@ -105,6 +105,41 @@ const ReportTimeline = ({ report, savedImageRotations, openImageViewer, onEditIn
               <p className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
                 {report.notes}
               </p>
+            </div>
+          )}
+
+          {/* Care Label Info */}
+          {(report.careLabelImage || report.careLabelNotes) && (
+            <div className="mt-3 bg-white dark:bg-gray-800/40 p-2.5 rounded-lg border border-blue-100 dark:border-blue-800/50 shadow-sm">
+              <p className="text-[10px] font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                Care Label Details
+              </p>
+              <div className="flex flex-col gap-3">
+                {report.careLabelImage && (
+                  <div className="flex flex-wrap gap-2">
+                    {(Array.isArray(report.careLabelImage) ? report.careLabelImage : [report.careLabelImage]).map((imgUrl, idx) => (
+                      <div
+                        key={idx}
+                        className="relative w-16 h-16 rounded-md overflow-hidden border border-blue-200 dark:border-blue-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all shadow-sm"
+                        onClick={() => {
+                          const allCareLabelImages = Array.isArray(report.careLabelImage) ? report.careLabelImage : [report.careLabelImage];
+                          openImageViewer(normalizeImageUrl(imgUrl), `Care Label Photo ${idx + 1}`, allCareLabelImages, idx);
+                        }}
+                      >
+                        <img src={normalizeImageUrl(imgUrl)} className="w-full h-full object-cover" alt={`Care Label ${idx + 1}`} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {report.careLabelNotes && (
+                  <div className="min-w-0">
+                    <p className="text-[11px] text-gray-600 dark:text-gray-400 italic leading-relaxed break-words bg-blue-50/50 dark:bg-blue-900/10 p-2 rounded-md border border-blue-50 dark:border-blue-900/20">
+                      {report.careLabelNotes}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -304,10 +339,10 @@ const ReportTimeline = ({ report, savedImageRotations, openImageViewer, onEditIn
             )}
 
             {/* Completion Notes */}
-            {report.completionNotes && (
+            {(report.completionNotes || report[getCompletionNotesField(report.reportType)]) && (
               <div className="mt-2 px-2.5 py-1.5 bg-green-100 dark:bg-green-900/30 rounded border border-green-300 dark:border-green-700">
                 <p className="text-xs font-medium text-green-800 dark:text-green-300 mb-0.5">Notes</p>
-                <p className="text-xs text-green-900 dark:text-green-200 leading-relaxed">{report.completionNotes}</p>
+                <p className="text-xs text-green-900 dark:text-green-200 leading-relaxed">{report[getCompletionNotesField(report.reportType)] || report.completionNotes}</p>
               </div>
             )}
           </div>

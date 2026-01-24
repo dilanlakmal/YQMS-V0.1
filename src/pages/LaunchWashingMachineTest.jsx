@@ -42,7 +42,10 @@ import {
   TABS,
   REPORT_TYPES,
   getReportTypeConfig,
+  getImageFilename,
   getInitialFormData,
+  getCompletionNotesField,
+  normalizeDateForInput, // Added import
   // Edit handlers (only used ones)
   prepareEditFormData,
   handleEditFormSubmit,
@@ -105,10 +108,18 @@ const LaundryWashingMachineTest = () => {
     availableColors,
     availablePOs,
     availableETDs,
+    availableSizes,
+    fabrication,
+    season,
+    styleDescription,
+    custStyle,
     isLoadingColors,
+    isLoadingSpecs,
     fetchOrderColors,
     fetchYorksysOrderETD,
+    fetchAnfSpecs,
     resetOrderData,
+    anfSpecs,
   } = useOrderData();
 
   const {
@@ -197,6 +208,7 @@ const LaundryWashingMachineTest = () => {
     submitReport,
     saveReceivedStatus,
     saveCompletionStatus,
+    updateReport, // Expose updateReport
   } = useReportSubmission(user, refreshAllReports);
 
   // Received modal state
@@ -211,6 +223,9 @@ const LaundryWashingMachineTest = () => {
   const [completionReportId, setCompletionReportId] = useState(null);
   const [completionImages, setCompletionImages] = useState([]);
   const [completionNotes, setCompletionNotes] = useState("");
+
+  // Track if we are completing a report via the form
+  const [completingReport, setCompletingReport] = useState(null);
 
   // Image viewer hook
   const {
@@ -243,7 +258,7 @@ const LaundryWashingMachineTest = () => {
   const [showEditReceivedImagesModal, setShowEditReceivedImagesModal] = useState(false);
   const [showEditCompletionImagesModal, setShowEditCompletionImagesModal] = useState(false);
   const [editingImageReport, setEditingImageReport] = useState(null);
-  const [editingImageType, setEditingImageType] = useState(null); // 'initial', 'received', 'completion'
+  const [editingImageType, setEditingImageType] = useState(null); // 'initial', 'received', 'completion'  
   const [editingImages, setEditingImages] = useState([]);
   const [editingNotes, setEditingNotes] = useState("");
   const [isUpdatingImages, setIsUpdatingImages] = useState(false);
@@ -333,35 +348,58 @@ const LaundryWashingMachineTest = () => {
   const [showPODropdown, setShowPODropdown] = useState(false);
   const [showETDDropdown, setShowETDDropdown] = useState(false);
 
-  // Handle input change with order data clearing and report type switching
+  // Handle input change with order data clearing
   const handleInputChange = (field, value) => {
-    // Special handling for report type change
+    // 1. Handle Report Type Change - RESET EVERYTHING
     if (field === "reportType") {
-      // When report type changes, reset the form with new initial data
-      const newFormData = getInitialFormData(value);
-      // Preserve any common data if desired (optional)
-      setFormData(newFormData);
-      // Reset all dependent states
+      const newReportType = value;
+      // Get fresh initial data for the new report type
+      const newInitialData = getInitialFormData(newReportType);
+
+      // Reset form data entirely, but keep the new report type
+      setFormData({
+        ...newInitialData,
+        reportType: newReportType
+      });
+
+      // Clear all external state to prevent cross-contamination
       resetOrderData();
-      setImageRotations({});
+      setOrderNoSuggestions([]);
+      setShowOrderNoSuggestions(false);
+      setImageRotations({}); // Clear image rotations
       setShowColorDropdown(false);
       setShowPODropdown(false);
       setShowETDDropdown(false);
+
+      // Stop here - we've already set the new state
       return;
     }
 
     handleFormInputChange(field, value, (field, value, newData, prev) => {
-      // Clear color, PO, and ETD when Order_No changes manually
-      if (field === "ymStyle" && prev.ymStyle !== value) {
+      // Clear user-selected choices (color, PO, ETD) when Style changes manually
+      // But keep metadata (season, description) until new search results arrive
+      if ((field === "ymStyle" && prev.ymStyle !== value) ||
+        (field === "style" && prev.style !== value)) {
         newData.color = [];
         newData.po = [];
         newData.exFtyDate = [];
-        resetOrderData();
+        newData.washType = 'Before Wash';
+        newData.sampleSize = '';
+
+        // IMMEDIATELY clear metadata if style is cleared or too short
+        if (!value || value.length < 2) {
+          newData.season = '';
+          newData.styleDescription = '';
+          newData.custStyle = '';
+          newData.buyerStyle = '';
+        }
       }
     });
 
-    // If Order_No field is being changed, search for suggestions
-    if (field === "ymStyle" && value.length >= 2) {
+    // Unified logic for Style Search (supports both 'ymStyle' and 'style')
+    const isStyleField = field === "ymStyle" || field === "style";
+
+    if (isStyleField && value.length >= 2) {
       // Use handler function
       handleOrderNoSearch(
         value,
@@ -377,19 +415,53 @@ const LaundryWashingMachineTest = () => {
       }
 
       // Auto-fetch colors when user stops typing (debounced)
-      // Use helper to check if should auto-fetch
       if (shouldAutoFetchColors(value)) {
-        colorFetchTimerRef.current = setTimeout(() => {
+        colorFetchTimerRef.current = setTimeout(async () => {
           if (shouldAutoFetchColors(value)) {
-            fetchOrderColors(value, setFormData);
-            fetchYorksysOrderETD(value);
+            // Fetch the suggestions again or use the ones we have?
+            // Better to re-fetch or use results of handleOrderNoSearch
+            const suggestions = await handleOrderNoSearch(
+              value,
+              setOrderNoSuggestions,
+              setShowOrderNoSuggestions,
+              setIsSearchingOrderNo
+            );
+
+            // If exactly one suggestion or the exact match is in the list, auto-select it
+            if (suggestions && suggestions.length === 1) {
+              handleOrderNoSelect(suggestions[0]);
+            } else if (suggestions && suggestions.some(s => s.toUpperCase() === value.toUpperCase())) {
+              const exactMatch = suggestions.find(s => s.toUpperCase() === value.toUpperCase());
+              handleOrderNoSelect(exactMatch);
+            } else {
+              // No auto-select, just fetch data for what we have
+              fetchOrderColors(value, setFormData);
+              fetchYorksysOrderETD(value, setFormData);
+            }
           }
         }, 800); // Wait 800ms after user stops typing
       }
-    } else if (field === "ymStyle" && value.length < 2) {
+    } else if (isStyleField && value.length < 2) {
       setOrderNoSuggestions([]);
       setShowOrderNoSuggestions(false);
       resetOrderData();
+
+      // Close any open dropdowns
+      setShowColorDropdown(false);
+      setShowPODropdown(false);
+      setShowETDDropdown(false);
+
+      // Clear auto-populated fields in form data as well
+      setFormData(prev => ({
+        ...prev,
+        season: '',
+        styleDescription: '',
+        custStyle: '',
+        buyerStyle: '',
+        color: [],
+        po: [],
+        exFtyDate: []
+      }));
 
       // Clear timer if user deletes the value
       if (colorFetchTimerRef.current) {
@@ -476,6 +548,35 @@ const LaundryWashingMachineTest = () => {
   // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Check if we are completing a report
+    if (completingReport) {
+      const success = await updateReport(completingReport._id, {
+        ...formData,
+        status: "completed",
+        completedDate: new Date().toISOString().split("T")[0],
+        completedAt: new Date().toISOString(),
+      });
+
+      if (success) {
+        setCompletingReport(null);
+        // Reset form
+        const currentReportType = formData.reportType || REPORT_TYPES.HOME_WASH;
+        resetForm(getInitialFormData(currentReportType));
+
+        // Switch to reports tab
+        setActiveTab("reports");
+
+        // Clear rotations
+        setImageRotations({});
+        setShowColorDropdown(false);
+        setShowPODropdown(false);
+        setShowETDDropdown(false);
+        resetOrderData();
+      }
+      return;
+    }
+
     const currentReportType = formData.reportType || REPORT_TYPES.HOME_WASH;
     const success = await submitReport(formData, () => {
       // Keep on the form tab for faster subsequent entries
@@ -669,16 +770,36 @@ const LaundryWashingMachineTest = () => {
 
                 showToast.success(`QR Scan Success! Please add images and notes, then save to update status to "Received".`);
               } else if (currentStatus === "received") {
-                // Second scan - Open completion modal
+                // Second scan - Load report into form for completion
                 stopScanner();
                 setShowReportDateScanner(null);
                 setShowReportDateQR(null); // Close QR code modal if open
-                setCompletionReportId(targetReportId);
-                setCompletionImages([]);
-                setCompletionNotes("");
-                setShowCompletionModal(true);
-                // Switch to Reports tab
-                setActiveTab("reports");
+
+                // Set completing report state
+                setCompletingReport(currentReport);
+
+                // Populate form data
+                setFormData({
+                  ...currentReport,
+                  reportType: currentReport.reportType || "Home Wash Test",
+                  color: currentReport.color || [],
+                  po: currentReport.po || [],
+                  exFtyDate: currentReport.exFtyDate || [],
+                  images: [], // Don't preload previous images into input (unless we want to display them, but file input can't be preloaded)
+                  // Note: If we want to show existing images, we might need a separate display or handle it in the form.
+                });
+
+                // Fetch colors and other data for the style
+                if (currentReport.ymStyle) {
+                  fetchOrderColors(currentReport.ymStyle, setFormData);
+                  fetchYorksysOrderETD(currentReport.ymStyle, setFormData);
+                }
+
+                // Switch to Form tab
+                setActiveTab("form");
+
+                showToast.success("Report loaded for completion. Please fill in the results and submit.");
+
               } else if (currentStatus === "completed") {
                 showToast.info("This report is already completed.");
                 stopScanner();
@@ -793,11 +914,29 @@ const LaundryWashingMachineTest = () => {
         showToast.success(`QR Scan Success! Please add images and notes, then save to update status to "Received".`);
       } else if (currentStatus === "received") {
         setShowReportDateQR(null);
-        setCompletionReportId(targetReportId);
-        setCompletionImages([]);
-        setCompletionNotes("");
-        setShowCompletionModal(true);
-        setActiveTab("reports");
+
+        // Second scan - Load report into form for completion
+        setCompletingReport(currentReport);
+
+        // Populate form data
+        setFormData({
+          ...currentReport,
+          reportType: currentReport.reportType || "Home Wash Test",
+          color: currentReport.color || [],
+          po: currentReport.po || [],
+          exFtyDate: currentReport.exFtyDate || [],
+          images: [], // Don't preload previous images into input
+        });
+
+        // Fetch colors and other data for the style
+        if (currentReport.ymStyle) {
+          fetchOrderColors(currentReport.ymStyle, setFormData);
+          fetchYorksysOrderETD(currentReport.ymStyle);
+        }
+
+        // Switch to Form tab
+        setActiveTab("form");
+        showToast.success("Report loaded for completion. Please fill in the results and submit.");
       } else if (currentStatus === "completed") {
         showToast.info("This report is already completed.");
         setShowReportDateQR(null);
@@ -1051,7 +1190,7 @@ const LaundryWashingMachineTest = () => {
 
         showToast.success(`âœ“ QR Scan Success! Please add images and notes, then save to update status to "Received".`);
       } else if (currentStatus === "received") {
-        // Second scan - Open completion modal
+        // Second scan - Open completion mode in form
         // 1. Close QR code modal
         setShowReportDateQR(null);
         setShowReportDateScanner(null);
@@ -1067,16 +1206,29 @@ const LaundryWashingMachineTest = () => {
         }
         setScanningReportId(null);
 
-        // 3. Open completion modal
-        setCompletionReportId(targetReportId);
-        setCompletionImages([]);
-        setCompletionNotes("");
-        setShowCompletionModal(true);
+        // 3. Load report into form for completion
+        setCompletingReport(currentReport);
 
-        // 4. Switch to Reports tab
-        setActiveTab("reports");
+        // Populate form data
+        setFormData({
+          ...currentReport,
+          reportType: currentReport.reportType || "Home Wash Test",
+          color: currentReport.color || [],
+          po: currentReport.po || [],
+          exFtyDate: currentReport.exFtyDate || [],
+          images: [], // Don't preload previous images into input
+        });
 
-        showToast.success("QR Scan Success! Please complete the report details.");
+        // Fetch colors and other data for the style
+        if (currentReport.ymStyle) {
+          fetchOrderColors(currentReport.ymStyle, setFormData);
+          fetchYorksysOrderETD(currentReport.ymStyle);
+        }
+
+        // 4. Switch to Form tab
+        setActiveTab("form");
+
+        showToast.success("Report loaded for completion. Please fill in the results and submit.");
       } else if (currentStatus === "completed") {
         // Close modal and show info
         setShowReportDateQR(null);
@@ -1216,8 +1368,18 @@ const LaundryWashingMachineTest = () => {
   };
 
   // Handle completion form submit - Enhanced with better feedback
+  // Handle completion form submit - Enhanced with better feedback
   const handleCompletionSubmit = async () => {
     if (!completionReportId) return;
+
+    // Find the report to get its type so we can save notes to the correct field
+    let report = reports.find(r => (r._id === completionReportId || r.id === completionReportId));
+    if (!report) {
+      report = whReports.find(r => (r._id === completionReportId || r.id === completionReportId));
+    }
+
+    // Default to Home Wash if not found (though it should be found)
+    const reportType = report?.reportType || "Home Wash Test";
 
     const success = await saveCompletionStatus(
       completionReportId,
@@ -1252,7 +1414,8 @@ const LaundryWashingMachineTest = () => {
             }, 2000);
           }
         }, 200);
-      }
+      },
+      reportType // Pass the report type to saveCompletionStatus
     );
   };
 
@@ -1274,12 +1437,18 @@ const LaundryWashingMachineTest = () => {
     setShowEditReceivedImagesModal(true);
   };
 
+
+
   // Handle edit completion images
   const handleEditCompletionImages = (report) => {
     setEditingImageReport(report);
     setEditingImageType('completion');
     setEditingImages(report.completionImages || []);
-    setEditingNotes(report.completionNotes || "");
+
+    // Get notes from the specific field based on report type, fallback to generic completionNotes
+    const noteField = getCompletionNotesField(report.reportType);
+    setEditingNotes(report[noteField] || report.completionNotes || "");
+
     setShowEditCompletionImagesModal(true);
   };
 
@@ -1349,12 +1518,16 @@ const LaundryWashingMachineTest = () => {
         formDataToSubmit.append(`${fieldName}Urls`, JSON.stringify(existingImageUrls));
       }
 
-      // Add notes
-      const notesFieldName = editingImageType === 'initial'
-        ? 'notes'
-        : editingImageType === 'received'
-          ? 'receivedNotes'
-          : 'completionNotes';
+      // Add notes using correct field name
+      let notesFieldName;
+      if (editingImageType === 'initial') {
+        notesFieldName = 'notes';
+      } else if (editingImageType === 'received') {
+        notesFieldName = 'receivedNotes';
+      } else {
+        // completion
+        notesFieldName = getCompletionNotesField(editingImageReport.reportType);
+      }
 
       formDataToSubmit.append(notesFieldName, editingNotes);
 
@@ -1800,119 +1973,52 @@ const LaundryWashingMachineTest = () => {
                 Report Washing - Enter test details and view submitted reports
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                Report Type
-              </label>
-
-              <div className="relative" ref={dropdownRef}>
-                {/* Custom Selection Button */}
-                <button
-                  onClick={() => setIsReportTypeOpen(!isReportTypeOpen)}
-                  className={`flex items-center justify-between min-w-[260px] px-4 py-2 rounded-xl border-2 transition-all duration-300 shadow-sm
-                    ${isReportTypeOpen
-                      ? 'bg-white dark:bg-gray-800 border-blue-500 ring-4 ring-blue-500/10 shadow-blue-50/50'
-                      : 'bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-gray-800 dark:to-gray-700 border-blue-200/60 dark:border-gray-600 hover:border-blue-400 hover:shadow-md'
-                    }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-xl text-blue-600 dark:text-blue-400">
-                      {formData.reportType === "Home Wash/Garment Wash Test" && <MdLocalLaundryService />}
-                      {formData.reportType === "HT Testing" && <MdOutlineDeviceThermostat />}
-                      {formData.reportType === "EMB/Printing Testing" && <MdOutlineImagesearchRoller />}
-                      {formData.reportType === "Pulling Test" && <MdOutlineExpand />}
-                    </span>
-                    <span className="font-bold text-gray-800 dark:text-gray-100 text-[13px] tracking-tight">
-                      {formData.reportType}
-                    </span>
-                  </div>
-                  <svg
-                    className={`w-4 h-4 text-blue-600 transition-transform duration-300 ${isReportTypeOpen ? 'rotate-180' : ''}`}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                {/* Animated Dropdown Menu */}
-                {isReportTypeOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-1.5 z-50 overflow-hidden bg-white/98 dark:bg-gray-800/98 backdrop-blur-xl rounded-xl border-2 border-blue-100 dark:border-gray-600 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="p-1.5 space-y-0.5">
-                      {[
-                        { val: "Home Wash/Garment Wash Test", icon: <MdLocalLaundryService /> },
-                        { val: "HT Testing", icon: <MdOutlineDeviceThermostat /> },
-                        { val: "EMB/Printing Testing", icon: <MdOutlineImagesearchRoller /> },
-                        { val: "Pulling Test", icon: <MdOutlineExpand /> }
-                      ].map((type) => (
-                        <button
-                          key={type.val}
-                          onClick={() => {
-                            handleInputChange("reportType", type.val);
-                            setIsReportTypeOpen(false);
-                          }}
-                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group
-                            ${formData.reportType === type.val
-                              ? 'bg-blue-600 text-white shadow-md'
-                              : 'hover:bg-blue-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                            }`}
-                        >
-                          <span className={`text-lg ${formData.reportType === type.val ? 'text-white' : 'text-blue-500/70 group-hover:text-blue-600'}`}>
-                            {type.icon}
-                          </span>
-                          <span className={`flex-1 text-left font-semibold text-[11px] ${formData.reportType === type.val ? 'text-white' : ''}`}>
-                            {type.val}
-                          </span>
-                          {formData.reportType === type.val && (
-                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
 
-          {/* Tab Navigation */}
+          {/* Tab Navigation - Mobile Optimized */}
           <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-            <nav className="flex space-x-4" aria-label="Tabs">
+            <nav
+              className="flex overflow-x-auto scrollbar-hide -mb-px"
+              aria-label="Tabs"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
               <button
                 onClick={() => setActiveTab("form")}
-                className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${activeTab === "form"
+                className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "form"
                   ? "border-blue-500 text-blue-600 dark:text-blue-400"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
                   }`}
               >
-                <span className="flex items-center gap-2">
-                  <HiDocumentAdd className={`w-5 h-5 ${activeTab === "form" ? "text-emerald-600" : "text-emerald-500/70"}`} />
-                  Create New Report
+                <span className="flex items-center gap-1.5 sm:gap-2">
+                  <HiDocumentAdd className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "form" ? "text-emerald-600" : "text-emerald-500/70"}`} />
+                  <span className="hidden sm:inline">Create New Report</span>
+                  <span className="sm:hidden">Create</span>
                 </span>
               </button>
               <button
                 onClick={() => setActiveTab("reports")}
-                className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${activeTab === "reports"
+                className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "reports"
                   ? "border-blue-500 text-blue-600 dark:text-blue-400"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
                   }`}
               >
-                <span className="flex items-center gap-2">
-                  <HiClipboardList className={`w-5 h-5 ${activeTab === "reports" ? "text-blue-600" : "text-blue-500/70"}`} />
-                  Reports ({pagination.totalRecords})
+                <span className="flex items-center gap-1.5 sm:gap-2">
+                  <HiClipboardList className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "reports" ? "text-blue-600" : "text-blue-500/70"}`} />
+                  <span className="hidden sm:inline">Reports ({pagination.totalRecords})</span>
+                  <span className="sm:hidden">Reports <span className="text-[10px] bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded-full">{pagination.totalRecords}</span></span>
                 </span>
               </button>
               <button
                 onClick={() => setActiveTab("warehouse_reports")}
-                className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${activeTab === "warehouse_reports"
+                className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "warehouse_reports"
                   ? "border-blue-500 text-blue-600 dark:text-blue-400"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
                   }`}
               >
-                <span className="flex items-center gap-2">
-                  <MdWarehouse className={`w-5 h-5 ${activeTab === "warehouse_reports" ? "text-amber-600" : "text-amber-500/70"}`} />
-                  Warehouse Report
+                <span className="flex items-center gap-1.5 sm:gap-2">
+                  <MdWarehouse className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "warehouse_reports" ? "text-amber-600" : "text-amber-500/70"}`} />
+                  <span className="hidden sm:inline">Warehouse Report</span>
+                  <span className="sm:hidden">Warehouse</span>
                 </span>
               </button>
             </nav>
@@ -1925,6 +2031,7 @@ const LaundryWashingMachineTest = () => {
               handleInputChange={handleInputChange}
               handleSubmit={handleSubmit}
               isSubmitting={isSubmitting}
+              isCompleting={!!completingReport}
               orderNoSuggestions={orderNoSuggestions}
               showOrderNoSuggestions={showOrderNoSuggestions}
               setShowOrderNoSuggestions={setShowOrderNoSuggestions}
@@ -1953,6 +2060,31 @@ const LaundryWashingMachineTest = () => {
               fileInputRef={fileInputRef}
               cameraInputRef={cameraInputRef}
               imageRotations={imageRotations}
+              availableSizes={availableSizes}
+              season={season}
+              styleDescription={styleDescription}
+              custStyle={custStyle}
+              fabrication={fabrication}
+              anfSpecs={anfSpecs}
+              isLoadingSpecs={isLoadingSpecs}
+              fetchAnfSpecs={fetchAnfSpecs}
+              isReportTypeOpen={isReportTypeOpen}
+              setIsReportTypeOpen={setIsReportTypeOpen}
+              dropdownRef={dropdownRef}
+              reportTypeIcons={{
+                "Home Wash Test": <MdLocalLaundryService />,
+                "Garment Wash Report": <MdLocalLaundryService />,
+                "HT Testing": <MdOutlineDeviceThermostat />,
+                "EMB/Printing Testing": <MdOutlineImagesearchRoller />,
+                "Pulling Test": <MdOutlineExpand />
+              }}
+              reportTypes={[
+                { val: "Home Wash Test", icon: <MdLocalLaundryService /> },
+                { val: "Garment Wash Report", icon: <MdLocalLaundryService /> },
+                { val: "HT Testing", icon: <MdOutlineDeviceThermostat /> },
+                { val: "EMB/Printing Testing", icon: <MdOutlineImagesearchRoller /> },
+                { val: "Pulling Test", icon: <MdOutlineExpand /> }
+              ]}
             />
           )}
 
