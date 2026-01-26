@@ -179,6 +179,15 @@ const HistoryModal = ({
             </div>
 
             <div className="flex items-center gap-2">
+              {report.approvalStatus !== "approved" && onApprove && (
+                <button
+                  onClick={() => onApprove(report._id)}
+                  className="px-3 py-2.5 bg-white border-2 border-green-500 text-green-600 font-bold rounded-lg shadow-sm hover:bg-green-50 transition-all hover:scale-105 active:scale-95 text-xs uppercase tracking-widest flex items-center gap-2"
+                >
+                  <CheckCircle2 size={16} strokeWidth={3} />
+                  Approve Report
+                </button>
+              )}
               <button
                 onClick={printReport}
                 className="px-3 py-2.5 text-red-600 border-2 font-bold border-red-500 rounded-lg shadow-sm hover:bg-green-50 transition-all hover:scale-105 active:scale-95 text-xs uppercase tracking-widest flex items-center gap-2"
@@ -537,7 +546,7 @@ const HistoryModal = ({
                 </div>
               )}
 
-            {report.approvalStatus === "approved" ? (
+            {report.approvalStatus === "approved" && (
               <div className="p-5 bg-emerald-50/50 border border-emerald-200 rounded-2xl shadow-sm backdrop-blur-sm flex flex-col h-full transition-all hover:shadow-md group/approve">
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
@@ -603,65 +612,6 @@ const HistoryModal = ({
                       No approval remarks provided.
                     </div>
                   )}
-                </div>
-              </div>
-            ) : (
-              <div className="p-5 bg-blue-50/50 border border-blue-200 rounded-2xl shadow-sm backdrop-blur-sm flex flex-col h-full transition-all hover:bg-blue-50/80 group/pending">
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="p-2.5 bg-blue-500 text-white rounded-xl shadow-lg shadow-blue-200 ring-4 ring-blue-50">
-                    <AlertCircle size={20} />
-                  </div>
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-blue-800 m-0">
-                    Pending Approval
-                  </h3>
-                </div>
-
-                <div className="bg-white border border-blue-100 rounded-2xl p-5 flex flex-col gap-4 flex-grow shadow-sm">
-                  <p className="text-[13px] text-slate-600 leading-relaxed m-0 font-medium">
-                    This report requires a supervisor's review and approval.
-                  </p>
-
-                  {(() => {
-                    const AUTHORIZED_APPROVERS = ["YM7625", "TYM010"];
-                    const isAuthorized =
-                      currentUser?.emp_id &&
-                      AUTHORIZED_APPROVERS.some(
-                        (id) =>
-                          id.toLowerCase() ===
-                          String(currentUser.emp_id).trim().toLowerCase(),
-                      );
-
-                    if (isAuthorized) {
-                      return (
-                        <div className="mt-auto space-y-3">
-                          <div className="relative">
-                            <textarea
-                              value={approvalRemark}
-                              onChange={(e) =>
-                                setApprovalRemark(e.target.value)
-                              }
-                              placeholder="Add internal remark (optional)..."
-                              className="w-full text-xs p-3 rounded-xl border border-blue-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[80px] transition-all resize-none shadow-sm"
-                            />
-                          </div>
-                          <button
-                            onClick={() =>
-                              onApprove(report._id, approvalRemark)
-                            }
-                            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-95 font-black text-[11px] uppercase tracking-widest"
-                          >
-                            <Send size={14} />
-                            Confirm & Approve
-                          </button>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div className="mt-auto p-4 bg-gray-50 rounded-xl border border-gray-100 text-[11px] text-gray-500 text-center font-bold uppercase tracking-widest leading-relaxed">
-                        Awaiting Supervisor Authorization
-                      </div>
-                    );
-                  })()}
                 </div>
               </div>
             )}

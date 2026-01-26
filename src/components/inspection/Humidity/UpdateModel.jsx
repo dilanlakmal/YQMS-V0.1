@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
+import { CheckCircle2, AlertCircle, X } from "lucide-react";
 import { API_BASE_URL } from "../../../../config";
 import { useAuth } from "../../authentication/AuthContext";
 
@@ -1451,69 +1452,75 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
           </button>
         </div>
       </div>
+
+      {/* Premium Message Banner */}
       {message.text && (
         <div
-          className={`fixed bottom-4 right-4 z-[100] flex items-center p-4 mb-4 rounded-lg shadow-xl border transition-all duration-500 animate-in fade-in slide-in-from-bottom-4 ${
+          className={`fixed bottom-6 right-6 z-[200] flex items-center gap-4 p-4 pl-5 pr-6 rounded-2xl shadow-2xl border backdrop-blur-md transition-all duration-500 animate-in fade-in slide-in-from-right-8 ${
             message.type === "success"
-              ? "text-emerald-800 bg-emerald-50 border-emerald-100"
-              : "text-rose-800 bg-rose-50 border-rose-100"
+              ? "text-emerald-900 bg-white/95 border-emerald-100 ring-8 ring-emerald-500/5"
+              : "text-rose-900 bg-white/95 border-rose-100 ring-8 ring-rose-500/5"
           }`}
           role="alert"
         >
-          {message.type === "success" ? (
-            <div className="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-full bg-emerald-100 mr-3">
-              <svg
-                className="w-5 h-5 text-emerald-600"
-                aria-hidden="true"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 8.207-4 4a1 1 0 0 1-1.414 0l-2-2a1 1 0 0 1 1.414-1.414L9 10.586l3.293-3.293a1 1 0 0 1 1.414 1.414Z" />
-              </svg>
+          <div className="relative">
+            {message.type === "success" ? (
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-200 animate-bounce-slow">
+                <CheckCircle2 size={24} strokeWidth={3} />
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-200">
+                <AlertCircle size={24} strokeWidth={3} />
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col min-w-0 pr-4">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-0.5">
+              Notification
+            </span>
+            <div className="text-sm font-black tracking-tight leading-tight">
+              {message.text}
             </div>
-          ) : (
-            <div className="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-full bg-rose-100 mr-3">
-              <svg
-                className="w-5 h-5 text-rose-600"
-                aria-hidden="true"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 11.793a1 1 0 1 1-1.414 1.414L10 11.414l-2.293 2.293a1 1 0 0 1-1.414-1.414L8.586 10 6.293 7.707a1 1 0 0 1 1.414-1.414L10 8.586l2.293-2.293a1 1 0 0 1 1.414 1.414L11.414 10l2.293 2.293Z" />
-              </svg>
-            </div>
-          )}
-          <div className="text-base font-bold mr-8">{message.text}</div>
+          </div>
+
           <button
             type="button"
-            className={`p-1.5 inline-flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
+            className={`p-1.5 rounded-lg transition-colors shrink-0 ${
               message.type === "success"
-                ? "text-emerald-500 hover:bg-emerald-100"
-                : "text-rose-500 hover:bg-rose-100"
+                ? "text-emerald-400 hover:bg-emerald-50 hover:text-emerald-600"
+                : "text-rose-400 hover:bg-rose-50 hover:text-rose-600"
             }`}
             onClick={() => setMessage({ type: "", text: "" })}
             aria-label="Close"
           >
-            <svg
-              className="w-5 h-5"
-              aria-hidden="true"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 14 14"
-            >
-              <path
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"
-              />
-            </svg>
+            <X size={18} strokeWidth={3} />
           </button>
+
+          {/* Tiny Progress Bar */}
+          <div
+            className={`absolute bottom-0 left-0 h-1 rounded-full opacity-30 ${message.type === "success" ? "bg-emerald-500" : "bg-rose-500"}`}
+            style={{
+              width: "100%",
+              animation: "shrink-width 3s linear forwards",
+            }}
+          ></div>
         </div>
       )}
+
+      <style>{`
+                @keyframes shrink-width {
+                    from { width: 100%; }
+                    to { width: 0%; }
+                }
+                .animate-bounce-slow {
+                    animation: bounce-slow 2s infinite;
+                }
+                @keyframes bounce-slow {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-3px); }
+                }
+            `}</style>
     </div>
   );
 }
