@@ -146,121 +146,85 @@ const OrderDetails = () => {
   }, []);
 
   const fetchOrderData = async (orderNumber) => {
-  try {
-    setLoading(true);
-    setError(null);
-    setOrderData(null);
-    
-    console.log('Fetching data for order:', orderNumber);
-    console.log('API URL:', `${apiBaseUrl}/api/coverPage/orders/${orderNumber}`);
-    
-    const response = await fetch(`${apiBaseUrl}/api/coverPage/orders/${orderNumber}`);
-    console.log('Response status:', response.status);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    console.log('API Response:', result);
-    console.log('API Response keys:', Object.keys(result));
-    console.log('Has success property:', 'success' in result);
-    console.log('Has data property:', 'data' in result);
-    
-    // Handle the response format
-    if (result.success && result.data) {
-      // Wrapped response format
-      console.log('Using wrapped response format');
-      console.log('Color breakdown:', result.data.colorBreakdown);
-      console.log('Size list:', result.data.sizeList);
-      setOrderData(result.data);
-      setShipmentQty(result.data.totalQuantity || '');
-    } else if (result.orderNo || result.id || result.Order_No) {
-      // Direct response format - this shouldn't happen with the updated controller
-      console.log('Using direct response format (fallback)');
+    try {
+      setLoading(true);
+      setError(null);
+      setOrderData(null);
       
-      // Helper to process colors
-      const processColors = (colorsData) => {
-        if (!colorsData || !Array.isArray(colorsData)) return [];
+      const response = await fetch(`${apiBaseUrl}/api/coverPage/orders/${orderNumber}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      let processedData = null;
+
+      // 1. Handle Wrapped Format (from OrderDetailsController.js)
+      if (result.success && result.data) {
+        processedData = result.data;
+      } 
+      // 2. Handle Direct Format (from CoverPageController.js)
+      else if (result.orderNo || result.Order_No) {
+        console.log('Direct data received, processing sizes locally...');
         
-        return colorsData.map(color => {
-          let sizes = color.sizes || {};
-          // Handle OrderQty array from raw data
-          if ((!sizes || Object.keys(sizes).length === 0) && color.OrderQty && Array.isArray(color.OrderQty)) {
-             sizes = color.OrderQty.reduce((acc, item) => {
-                if (typeof item === 'object' && item !== null) {
-                    Object.keys(item).forEach(key => {
-                        const cleanKey = key.split(';')[0].trim();
-                        const val = Number(item[key]);
-                        if (!isNaN(val)) {
-                            acc[cleanKey] = val;
-                        }
-                    });
-                }
-                return acc;
-             }, {});
-          }
+        // Use result.originalData if available (MongoDB raw record), else use result
+        const raw = result.originalData || result;
+        
+        // Manually calculate color breakdown for the table
+        const colorBreakdown = (raw.OrderColors || []).map(color => {
+          const sizes = {};
+          let colorTotal = 0;
           
-          const total = color.colorTotal || Object.values(sizes).reduce((sum, val) => sum + (Number(val) || 0), 0);
+          if (Array.isArray(color.OrderQty)) {
+            color.OrderQty.forEach(sizeObj => {
+              Object.keys(sizeObj).forEach(key => {
+                const cleanKey = key.split(';')[0].trim();
+                const val = Number(sizeObj[key]);
+                if (!isNaN(val)) {
+                  sizes[cleanKey] = (sizes[cleanKey] || 0) + val;
+                  colorTotal += val;
+                }
+              });
+            });
+          }
 
           return {
-            colorCode: color.colorCode || color.ColorCode || 'N/A',
-            colorName: color.colorName || color.Color || color,
-            chineseColor: color.chineseColor || color.ChnColor || '',
+            ColorCode: color.ColorCode || 'N/A',
+            colorName: color.Color || color.colorName || 'Unknown',
             sizes: sizes,
-            colorTotal: total
+            colorTotal: colorTotal
           };
         });
-      };
 
-      // Prioritize OrderColors if available and valid
-      const rawColors = (result.OrderColors && Array.isArray(result.OrderColors) && result.OrderColors.length > 0) 
-        ? result.OrderColors 
-        : (result.colors || []);
+        processedData = {
+          orderNo: result.orderNo || result.Order_No,
+          cust_Code: result.custCode || result.Cust_Code || 'N/A',
+          customerStyle: result.customerStyle || result.CustStyle || 'N/A',
+          totalQuantity: result.quantity || result.TotalQty || 0,
+          countryOfOrigin: result.origin || result.Origin || '',
+          colorBreakdown: colorBreakdown,
+          sizeList: result.sizes || result.SizeList || ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL'],
+          // Add other fields needed for your header
+          companyName: result.engName || 'Yorkmars (cambodia) Garment MFG. Co. Ltd.',
+        };
+      }
 
-      // Prioritize SizeList if available and valid
-      const rawSizes = (result.SizeList && Array.isArray(result.SizeList) && result.SizeList.length > 0)
-        ? result.SizeList
-        : (result.sizes || ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL']);
+      if (processedData) {
+        setOrderData(processedData);
+        setShipmentQty(processedData.totalQuantity || '');
+      } else {
+        throw new Error('Could not parse order data structure');
+      }
 
-      const transformedData = {
-        orderNo: result.orderNo || result.Order_No,
-        companyName: result.engName || result.EngName || 'Yorkmars (cambodia) Garment MFG. Co. Ltd.',
-        cust_Code: result.custCode || result.customerCode || result.Cust_Code || 'N/A',
-        customerCode: result.custCode || result.customerCode || result.Cust_Code || 'N/A',
-        customerStyle: result.customerStyle || result.CustStyle || 'N/A',
-        totalQuantity: result.quantity || result.TotalQty || 0,
-        orderDate: result.createdAt,
-        exFactoryDate: result.updatedAt,
-        customerPO: result.customerPO || result.CustPORef || '',
-        season: result.season || '',
-        countryOfOrigin: result.origin || result.country || result.Origin || '',
-        productDescription: result.style || result.Style || '',
-        colorBreakdown: processColors(rawColors),
-        sizeList: rawSizes,
-        currency: result.currency || result.Ccy || '',
-        country: result.country || result.Country || '',
-        factory: result.factory || result.Factory || '',
-        mode: result.mode || result.Mode || '',
-        shortName: result.shortName || result.ShortName || '',
-        shipmentDetails: result.shipmentDetails || []
-      };
-      
-      console.log('Transformed data:', transformedData);
-      setOrderData(transformedData);
-      setShipmentQty(transformedData.totalQuantity || '');
-    } else {
-      console.error('Invalid response format:', result);
-      setError('Invalid response format from server');
+    } catch (err) {
+      console.error('Fetch error:', err);
+      setError('Failed to fetch order data: ' + err.message);
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error('Fetch error:', err);
-    setError('Failed to fetch order data: ' + err.message);
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
+  
   const handleSearch = (e) => {
     e.preventDefault();
     if (orderNo.trim()) {
@@ -760,25 +724,22 @@ const OrderDetails = () => {
                   <tr key={index} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-4 border-b border-gray-200">
                       <div className="bg-gray-100 rounded px-2 py-1 text-sm font-mono">
-                        {color.colorCode}
+                        {color.ColorCode} {/* Matches backend key */}
                       </div>
                     </td>
                     <td className="px-4 py-4 border-b border-gray-200">
-                      <div className="flex items-center">
-                        <div className="w-6 h-6 bg-gray-300 border-2 border-gray-400 rounded mr-3 shadow-sm"></div>
-                        <span className="text-sm text-gray-700">{color.colorName}</span>
-                      </div>
+                      <span className="text-sm text-gray-700">{color.colorName}</span> {/* Matches backend key */}
                     </td>
                     {(orderData?.sizeList || []).map((size) => (
                       <td key={size} className="px-4 py-4 text-center border-b border-gray-200">
                         <div className="bg-gray-50 rounded px-2 py-1 min-h-[32px] flex items-center justify-center">
-                          {color?.sizes?.[size] || 0}
+                          {color?.sizes?.[size] || 0} {/* This now works because backend 'sizes' is an object */}
                         </div>
                       </td>
                     ))}
                     <td className="px-4 py-4 text-center border-b border-gray-200 bg-blue-50">
-                      <div className="bg-blue-100 rounded px-3 py-1 font-bold text-blue-800 min-h-[32px] flex items-center justify-center">
-                        {color.colorTotal}
+                      <div className="bg-blue-100 rounded px-3 py-1 font-bold text-blue-800">
+                        {color.colorTotal} {/* Calculated by backend */}
                       </div>
                     </td>
                   </tr>
