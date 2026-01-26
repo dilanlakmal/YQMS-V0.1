@@ -123,63 +123,47 @@ export const getOrderDetails = async (req, res) => {
 
 export const searchOrderSuggestions = async (req, res) => {
   console.log('✅ searchOrderSuggestions called!');
-  console.log('✅ Request method:', req.method);
-  console.log('✅ Request path:', req.path);
-  console.log('✅ Request URL:', req.url);
-  console.log('✅ Request query:', req.query);
   
   try {
     const { query } = req.query;
     
     if (!query || query.length < 2) {
-      console.log('✅ Query too short or missing:', query);
-      return res.status(400).json({
-        success: false,
-        message: 'Query must be at least 2 characters long'
-      });
+      return res.status(400).json([]);
     }
 
     console.log('✅ Searching for orders with query:', query);
+    
+    // Try multiple search patterns
+    const searchPatterns = [
+      { Order_No: { $regex: query, $options: 'i' } },
+      { Order_No: { $regex: `.*${query}.*`, $options: 'i' } },
+      { Cust_Code: { $regex: query, $options: 'i' } },
+      { CustStyle: { $regex: query, $options: 'i' } }
+    ];
 
-    // Test database connection first
-    const totalCount = await DtOrder.countDocuments();
-    console.log('✅ Total orders in database:', totalCount);
-
-    // Search for orders
+    // Search with OR condition for better matching
     const orders = await DtOrder.find({
-      Order_No: { $regex: query, $options: 'i' }
+      $or: searchPatterns
     })
     .select('Order_No Cust_Code CustStyle')
     .limit(10)
     .sort({ Order_No: 1 });
 
     console.log('✅ Found orders count:', orders.length);
-    console.log('✅ Found orders:', orders);
+    console.log('✅ Sample order data:', orders[0]); // Log first order to see structure
 
     const suggestions = orders.map(order => ({
       orderNo: order.Order_No,
-      customerCode: order.Cust_Code,
-      customerStyle: order.CustStyle
+      customerCode: order.Cust_Code || 'N/A',
+      customerStyle: order.CustStyle || 'N/A'
     }));
 
-    console.log('✅ Mapped suggestions:', suggestions);
-
-    const response = {
-      success: true,
-      data: suggestions
-    };
-
-    console.log('✅ Sending response:', response);
-    res.status(200).json(response);
+    // Return direct array format since your frontend expects it
+    res.status(200).json(suggestions);
 
   } catch (error) {
     console.error('✅ Error in searchOrderSuggestions:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    res.status(500).json([]);
   }
 };
-
 

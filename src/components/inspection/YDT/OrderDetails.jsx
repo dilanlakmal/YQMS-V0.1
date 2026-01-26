@@ -49,22 +49,20 @@ const OrderDetails = () => {
     
     if (response.ok) {
       const result = await response.json();
-      console.log('🔍 Full response structure:', result); // This will show us what we're actually getting
-      console.log('🔍 Response type:', typeof result); // Check if it's an array or object
-      console.log('🔍 Is array?', Array.isArray(result)); // Check if it's an array
+      console.log('🔍 Full response:', result);
+      console.log('🔍 Response length:', result.length);
       
-      // Handle both possible response formats
-      if (result && result.success && result.data) {
-        // Expected format: {success: true, data: [...]}
-        console.log('🔍 Using success/data format');
-        setSuggestions(result.data);
-        setShowSuggestions(result.data.length > 0);
-        setSelectedIndex(-1);
-      } else if (Array.isArray(result)) {
-        // Direct array format: [...]
-        console.log('🔍 Using direct array format');
+      // Handle direct array response
+      if (Array.isArray(result)) {
+        console.log('🔍 Setting suggestions:', result);
         setSuggestions(result);
         setShowSuggestions(result.length > 0);
+        setSelectedIndex(-1);
+      } else if (result && result.success && Array.isArray(result.data)) {
+        // Handle wrapped response
+        console.log('🔍 Setting suggestions from data:', result.data);
+        setSuggestions(result.data);
+        setShowSuggestions(result.data.length > 0);
         setSelectedIndex(-1);
       } else {
         console.log('🔍 Unexpected response format:', result);
@@ -72,7 +70,9 @@ const OrderDetails = () => {
         setShowSuggestions(false);
       }
     } else {
-      console.error('🔍 HTTP Error:', response.status, response.statusText);
+      console.error('🔍 HTTP Error:', response.status);
+      const errorText = await response.text();
+      console.error('🔍 Error response:', errorText);
     }
   } catch (err) {
     console.error('🔍 Network/Parse Error:', err);
