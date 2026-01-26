@@ -40,17 +40,6 @@ const options = {
 
 export const server = https.createServer(options, app);
 
-
-// Initialize Socket.io
-export const io = new SocketIO(server, {
-  cors: {
-    origin: "https://192.167.6.207:3001",
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  },
-});
-
 // Define allowed origins once
 const allowedOrigins = [
   "https://192.167.12.85:3001",
@@ -60,9 +49,22 @@ const allowedOrigins = [
   "https://192.167.6.207:3001"
 ];
 
+
+// Initialize Socket.io
+export const io = new SocketIO(server, {
+  cors: {
+    // origin: "https://192.167.6.207:3001",
+    origin: allowedOrigins,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  },
+});
+
+
 // CORS configuration
 const corsOptions = {
-
+  
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin || allowedOrigins.includes(origin)) {
