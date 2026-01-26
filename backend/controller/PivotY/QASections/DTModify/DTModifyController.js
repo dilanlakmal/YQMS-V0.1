@@ -1,5 +1,6 @@
 import { DtOrder } from '../../../MongoDB/dbConnectionController.js'; 
 import mongoose from 'mongoose';
+import jwt from 'jsonwebtoken';
 
 // Get DT Order by Order Number
 export const getDtOrderByOrderNo = async (req, res) => {
@@ -142,17 +143,17 @@ export const updateDtOrder = async (req, res) => {
     let updateData = { ...req.body };
 
     // Extract user info from JWT token
-    const token = req.headers.authorization?.replace('Bearer ', '');
+    // const token = req.headers.authorization?.replace('Bearer ', '');
     let userInfo = null;
     
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        userInfo = decoded;
-      } catch (jwtError) {
-        console.log('JWT verification failed:', jwtError.message);
-      }
-    }
+    // if (token) {
+    //   try {
+    //     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    //     userInfo = decoded;
+    //   } catch (jwtError) {
+    //     console.log('JWT verification failed:', jwtError.message);
+    //   }
+    // }
 
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {

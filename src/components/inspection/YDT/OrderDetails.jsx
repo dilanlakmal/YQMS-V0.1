@@ -1,9 +1,199 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const OrderDetails = () => {
+  const [orderNo, setOrderNo] = useState('');
+  const [orderData, setOrderData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [uploadedImage, setUploadedImage] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  
+  // New states for autocomplete
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+  const inputRef = useRef(null);
+  const suggestionsRef = useRef(null);
 
+  // Debounce function for search
+  const debounce = (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  };
+
+  // Search for order suggestions
+  const searchOrderSuggestions = async (query) => {
+  if (query.length < 2) {
+    setSuggestions([]);
+    setShowSuggestions(false);
+    return;
+  }
+
+  try {
+    setLoadingSuggestions(true);
+    const searchUrl = `${apiBaseUrl}/api/coverPage/orders/search?query=${encodeURIComponent(query)}`;
+    console.log('🔍 Searching with URL:', searchUrl);
+    
+    const response = await fetch(searchUrl);
+    console.log('🔍 Response status:', response.status);
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log('🔍 Full response structure:', result); // This will show us what we're actually getting
+      console.log('🔍 Response type:', typeof result); // Check if it's an array or object
+      console.log('🔍 Is array?', Array.isArray(result)); // Check if it's an array
+      
+      // Handle both possible response formats
+      if (result && result.success && result.data) {
+        // Expected format: {success: true, data: [...]}
+        console.log('🔍 Using success/data format');
+        setSuggestions(result.data);
+        setShowSuggestions(result.data.length > 0);
+        setSelectedIndex(-1);
+      } else if (Array.isArray(result)) {
+        // Direct array format: [...]
+        console.log('🔍 Using direct array format');
+        setSuggestions(result);
+        setShowSuggestions(result.length > 0);
+        setSelectedIndex(-1);
+      } else {
+        console.log('🔍 Unexpected response format:', result);
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    } else {
+      console.error('🔍 HTTP Error:', response.status, response.statusText);
+    }
+  } catch (err) {
+    console.error('🔍 Network/Parse Error:', err);
+  } finally {
+    setLoadingSuggestions(false);
+  }
+};
+
+  // Debounced search function
+  const debouncedSearch = debounce(searchOrderSuggestions, 300);
+
+  // Handle input change
+  const handleInputChange = (e) => {
+    const value = e.target.value;
+    setOrderNo(value);
+    debouncedSearch(value);
+  };
+
+  // Handle suggestion selection
+  const handleSuggestionClick = (suggestion) => {
+    setOrderNo(suggestion.orderNo);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setSelectedIndex(-1);
+    // Automatically fetch order data when suggestion is selected
+    fetchOrderData(suggestion.orderNo);
+  };
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedIndex(prev => 
+          prev < suggestions.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedIndex(prev => prev > 0 ? prev - 1 : -1);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (selectedIndex >= 0) {
+          handleSuggestionClick(suggestions[selectedIndex]);
+        } else {
+          handleSearch(e);
+        }
+        break;
+      case 'Escape':
+        setShowSuggestions(false);
+        setSelectedIndex(-1);
+        break;
+    }
+  };
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        inputRef.current && 
+        !inputRef.current.contains(event.target) &&
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target)
+      ) {
+        setShowSuggestions(false);
+        setSelectedIndex(-1);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const fetchOrderData = async (orderNumber) => {
+    try {
+      setLoading(true);
+      setError(null);
+      setOrderData(null);
+      
+      console.log('Fetching data for order:', orderNumber);
+      console.log('API URL:', `${apiBaseUrl}/api/coverPage/${orderNumber}`);
+      
+      const response = await fetch(`${apiBaseUrl}/api/coverPage/${orderNumber}`);
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('API Response:', result);
+      
+      if (result.success) {
+        setOrderData(result.data);
+      } else {
+        setError(result.message || 'Failed to fetch order data');
+      }
+    } catch (err) {
+      console.error('Fetch error:', err);
+      setError('Failed to fetch order data: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (orderNo.trim()) {
+      fetchOrderData(orderNo.trim());
+      setShowSuggestions(false);
+    } else {
+      setError('Please enter an order number');
+    }
+  };
+
+  // Your existing image upload functions...
   const handleImageUpload = (file) => {
     if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
@@ -40,8 +230,184 @@ const OrderDetails = () => {
     setUploadedImage(null);
   };
 
+  if (!orderData && !loading) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 bg-gradient-to-br from-gray-50 to-white min-h-screen">
+        <div className="flex justify-center items-center min-h-screen">
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8 w-full max-w-md">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Order Details Search</h2>
+            
+            <form onSubmit={handleSearch} className="space-y-4">
+              <div className="relative">
+                <label htmlFor="orderNo" className="block text-sm font-medium text-gray-700 mb-2">
+                  Order Number
+                </label>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  id="orderNo"
+                  value={orderNo}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  onFocus={() => {
+                    if (suggestions.length > 0) {
+                      setShowSuggestions(true);
+                    }
+                  }}
+                  placeholder="Enter order number (e.g., PTAF0430)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                  autoComplete="off"
+                />
+                
+                {/* Loading indicator for suggestions */}
+                {loadingSuggestions && (
+                  <div className="absolute right-3 top-9 transform -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+
+                {/* Suggestions dropdown */}
+                {showSuggestions && suggestions.length > 0 && (
+                  <div 
+                    ref={suggestionsRef}
+                    className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
+                  >
+                    {suggestions.map((suggestion, index) => (
+                      <div
+                        key={suggestion.orderNo}
+                        className={`px-4 py-3 cursor-pointer border-b border-gray-100 last:border-b-0 hover:bg-blue-50 ${
+                          index === selectedIndex ? 'bg-blue-50 border-blue-200' : ''
+                        }`}
+                        onClick={() => handleSuggestionClick(suggestion)}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <div className="font-semibold text-gray-800">{suggestion.orderNo}</div>
+                            <div className="text-sm text-gray-600">
+                              {suggestion.customerCode} • {suggestion.customerStyle}
+                            </div>
+                          </div>
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* No suggestions message */}
+                {showSuggestions && suggestions.length === 0 && orderNo.length >= 2 && !loadingSuggestions && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                    <div className="px-4 py-3 text-gray-500 text-center">
+                      No orders found matching "{orderNo}"
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {error && (
+                <div className="text-red-600 text-sm mt-2">
+                  {error}
+                </div>
+              )}
+              
+              <button
+                type="submit"
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+              >
+                Search Order
+              </button>
+            </form>
+
+            {/* Search tips */}
+            <div className="mt-4 p-3 bg-gray-50 rounded-md">
+              <p className="text-xs text-gray-600">
+                💡 <strong>Tip:</strong> Start typing to see order suggestions. Use arrow keys to navigate and Enter to select.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Rest of your existing component code remains the same...
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">Loading order details for {orderNo}...</p>
+          <p className="mt-2 text-sm text-gray-500">API: {apiBaseUrl}/api/coverPage/{orderNo}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && orderNo) {
+    return (
+      <div className="flex justify-center items-center min-h-screen text-red-500">
+        <div className="text-center">
+          <p className="text-xl font-semibold">Error: {error}</p>
+          <p className="text-sm text-gray-600 mt-2">Order Number: {orderNo}</p>
+          <p className="text-sm text-gray-500 mt-1">API: {apiBaseUrl}/api/coverPage/{orderNo}</p>
+          <button 
+            onClick={() => {
+              setError(null);
+              setOrderData(null);
+              setOrderNo('');
+            }} 
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Search Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!orderData || !orderData.colorBreakdown || !orderData.sizeList) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <p className="text-xl font-semibold text-red-500">Incomplete order data received</p>
+          <p className="text-sm text-gray-600 mt-2">Order Number: {orderNo}</p>
+          <p className="text-sm text-gray-500 mt-1">Missing required data fields</p>
+          <button 
+            onClick={() => {
+              setError(null);
+              setOrderData(null);
+              setOrderNo('');
+            }} 
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Search Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Your existing JSX for displaying order details remains exactly the same...
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 bg-gradient-to-br from-gray-50 to-white min-h-screen">
+      {/* Add a search again button at the top */}
+      <div className="mb-4">
+        <button
+          onClick={() => {
+            setOrderData(null);
+            setOrderNo('');
+            setError(null);
+            setSuggestions([]);
+            setShowSuggestions(false);
+          }}
+          className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors"
+        >
+          ← Search Another Order
+        </button>
+      </div>
       {/* Header Section */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 mb-8 overflow-hidden">
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6">
@@ -120,7 +486,7 @@ const OrderDetails = () => {
               </h2>
               <div className="inline-flex items-center bg-white rounded-lg px-4 py-2 shadow-md">
                 <span className="text-sm text-gray-500 mr-2">Order #</span>
-                <span className="font-bold text-gray-800">{/* Order number */}</span>
+                <span className="font-bold text-gray-800">{orderData.orderNo}</span>
               </div>
             </div>
           </div>
@@ -142,19 +508,19 @@ const OrderDetails = () => {
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">CUSTOMER CODE</label>
                     <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center">
-                      {/* Customer code */}
+                       {orderData.cust_Code}
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">CUSTOMER STYLE</label>
                     <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center">
-                      {/* Customer style */}
+                      {orderData.customerStyle}
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">QUANTITY</label>
                     <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center font-semibold">
-                      {/* Quantity */}
+                     <span className="text-2xl font-bold text-blue-700">{orderData?.totalQuantity?.toLocaleString() || '0'}</span>
                     </div>
                   </div>
                 </div>
@@ -219,7 +585,7 @@ const OrderDetails = () => {
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">C.O.O.</label>
                 <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center">
-                  {/* Country of origin */}
+                  {orderData.countryOfOrigin}
                 </div>
               </div>
             </div>
@@ -248,13 +614,13 @@ const OrderDetails = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">COLOUR</label>
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 min-h-[80px] flex items-start">
-                {/* Product colour */}
+                {orderData?.colorBreakdown?.map(color => color.colorName).join(', ') || 'No colors available'}
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">QUANTITY</label>
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200 min-h-[80px] flex items-center justify-center">
-                <span className="text-2xl font-bold text-blue-700">{/* Total quantity */}</span>
+              <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center font-semibold">
+                {orderData?.totalQuantity?.toLocaleString() || '0'}
               </div>
             </div>
           </div>
@@ -282,7 +648,7 @@ const OrderDetails = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b-2 border-gray-200">
                     Colour
                   </th>
-                  {['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL'].map((size) => (
+                  {(orderData?.sizeList || []).map((size) => (
                     <th key={size} className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider border-b-2 border-gray-200">
                       {size}
                     </th>
@@ -292,32 +658,34 @@ const OrderDetails = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody>
-                <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-4 border-b border-gray-200">
-                    <div className="bg-gray-100 rounded px-2 py-1 text-sm font-mono">
-                      {/* Color code */}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 border-b border-gray-200">
-                    <div className="flex items-center">
-                      <div className="w-6 h-6 bg-gray-300 border-2 border-gray-400 rounded mr-3 shadow-sm"></div>
-                      <span className="text-sm text-gray-700">{/* Color description */}</span>
-                    </div>
-                  </td>
-                  {['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL'].map((size) => (
-                    <td key={size} className="px-4 py-4 text-center border-b border-gray-200">
-                      <div className="bg-gray-50 rounded px-2 py-1 min-h-[32px] flex items-center justify-center">
-                        {/* Size quantity */}
+               <tbody>
+                {(orderData?.colorBreakdown || []).map((color, index) => (
+                  <tr key={index} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-4 border-b border-gray-200">
+                      <div className="bg-gray-100 rounded px-2 py-1 text-sm font-mono">
+                        {color.colorCode}
                       </div>
                     </td>
-                  ))}
-                  <td className="px-4 py-4 text-center border-b border-gray-200 bg-blue-50">
-                    <div className="bg-blue-100 rounded px-3 py-1 font-bold text-blue-800 min-h-[32px] flex items-center justify-center">
-                      {/* Total quantity */}
-                    </div>
-                  </td>
-                </tr>
+                    <td className="px-4 py-4 border-b border-gray-200">
+                      <div className="flex items-center">
+                        <div className="w-6 h-6 bg-gray-300 border-2 border-gray-400 rounded mr-3 shadow-sm"></div>
+                        <span className="text-sm text-gray-700">{color.colorName}</span>
+                      </div>
+                    </td>
+                    {(orderData?.sizeList || []).map((size) => (
+                      <td key={size} className="px-4 py-4 text-center border-b border-gray-200">
+                        <div className="bg-gray-50 rounded px-2 py-1 min-h-[32px] flex items-center justify-center">
+                          {color?.sizes?.[size] || 0}
+                        </div>
+                      </td>
+                    ))}
+                    <td className="px-4 py-4 text-center border-b border-gray-200 bg-blue-50">
+                      <div className="bg-blue-100 rounded px-3 py-1 font-bold text-blue-800 min-h-[32px] flex items-center justify-center">
+                        {color.colorTotal}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

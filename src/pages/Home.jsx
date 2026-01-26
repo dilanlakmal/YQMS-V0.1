@@ -106,74 +106,33 @@ const SettingsModal = ({
   const [checkingSubscription, setCheckingSubscription] = useState(true);
 
   // Check subscription status - runs on mount and when user changes
-  useEffect(() => {
-    if (!user?.emp_id) {
+   useEffect(() => {
+    if (!isOpen) return;
+
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
       setCheckingSubscription(false);
       return;
     }
 
-    const checkSubscriptionStatus = async () => {
-      setCheckingSubscription(true);
+    setPermission(Notification.permission);
 
-      // Check browser support
-      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-        console.log("Push Messaging not supported");
-        setCheckingSubscription(false);
-        return;
-      }
-
-      // Get current permission
-      setPermission(Notification.permission);
-
-      try {
-        // Wait for service worker to be ready
-        const registration = await navigator.serviceWorker.ready;
-        const browserSubscription =
-          await registration.pushManager.getSubscription();
-
-        if (browserSubscription) {
-          // Browser has a subscription - verify it exists in our database
-          try {
-            const response = await axios.post(
-              `${API_BASE_URL}/api/fincheck-reports/push/verify`,
-              {
-                empId: user.emp_id,
-                endpoint: browserSubscription.endpoint
-              }
-            );
-
-            if (response.data.success && response.data.exists) {
-              setIsSubscribed(true);
-            } else {
-              // Browser has subscription but not in our DB - user needs to re-subscribe
-              setIsSubscribed(false);
-            }
-          } catch (verifyError) {
-            // If verify endpoint doesn't exist or fails, fall back to local check
-            console.log("Verify API not available, using local check");
+    navigator.serviceWorker.ready
+      .then(async (registration) => {
+        try {
+          const sub = await registration.pushManager.getSubscription();
+          if (sub) {
             setIsSubscribed(true);
           }
-        } else {
-          // No browser subscription
-          setIsSubscribed(false);
+        } catch (e) {
+          console.error("Error checking subscription", e);
+        } finally {
+          setCheckingSubscription(false);
         }
-      } catch (e) {
-        console.error("Error checking subscription:", e);
-        setIsSubscribed(false);
-      } finally {
+      })
+      .catch((e) => {
+        console.log("Service Worker not ready yet");
         setCheckingSubscription(false);
-      }
-    };
-
-    checkSubscriptionStatus();
-  }, [user?.emp_id]);
-
-  // Reset states when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setDebugError(null);
-      setSuccessMessage(null);
-    }
+      });
   }, [isOpen]);
 
   const subscribeToPush = async () => {
@@ -183,7 +142,6 @@ const SettingsModal = ({
     setSuccessMessage(null);
 
     try {
-      // --- STEP 1: Request Permission ---
       const perm = await Notification.requestPermission();
       setPermission(perm);
 
@@ -193,7 +151,6 @@ const SettingsModal = ({
         );
       }
 
-      // --- STEP 2: Register Service Worker ---
       let registration;
       try {
         registration = await navigator.serviceWorker.register("/sw.js");
@@ -202,7 +159,6 @@ const SettingsModal = ({
         throw new Error(`SW Register Failed: ${swError.message}`);
       }
 
-      // --- STEP 3: Get VAPID Public Key ---
       let publicVapidKey;
       try {
         const keyRes = await axios.get(
@@ -213,17 +169,6 @@ const SettingsModal = ({
         throw new Error(`API VAPID Key Error: ${apiError.message}`);
       }
 
-      // --- STEP 4: Unsubscribe existing subscription first (to get fresh one) ---
-      try {
-        const existingSub = await registration.pushManager.getSubscription();
-        if (existingSub) {
-          await existingSub.unsubscribe();
-        }
-      } catch (unsubError) {
-        console.log("No existing subscription to remove");
-      }
-
-      // --- STEP 5: Subscribe to Push Manager ---
       let subscription;
       try {
         const convertedKey = urlBase64ToUint8Array(publicVapidKey);
@@ -235,7 +180,6 @@ const SettingsModal = ({
         throw new Error(`PushManager Subscribe Error: ${subError.message}`);
       }
 
-      // --- STEP 6: Send to Backend ---
       try {
         await axios.post(
           `${API_BASE_URL}/api/fincheck-reports/push/subscribe`,
@@ -249,7 +193,6 @@ const SettingsModal = ({
         throw new Error(`Backend Save Error: ${backendError.message}`);
       }
 
-      // Success
       setIsSubscribed(true);
       setSuccessMessage("Notifications enabled successfully!");
     } catch (error) {
@@ -825,7 +768,7 @@ function Home() {
           },
           {
             path: "/humidity-report",
-            roles: ["QA"],
+            roles: ["Humidity"],
             image: "assets/Home/Humidity.jpg",
             title: "Humidity Report",
             description: "View Humidity Report",
@@ -1283,29 +1226,6 @@ function Home() {
   useEffect(() => {
     if (!user?.emp_id) return;
 
-    const fetchActionCount = async () => {
-      try {
-        const res = await axios.get(
-          `${API_BASE_URL}/api/fincheck-reports/action-count?empId=${user.emp_id}`
-        );
-        if (res.data.success) {
-          setFincheckActionCount(res.data.count);
-        }
-      } catch (error) {
-        console.error("Error fetching action count:", error);
-      }
-    };
-
-    fetchActionCount();
-
-    const interval = setInterval(fetchActionCount, 60000);
-    return () => clearInterval(interval);
-  }, [user?.emp_id]);
-
-  // Register Service Worker on Mount (Required for Push Notifications)
-  useEffect(() => {
-    if (!user?.emp_id) return;
-
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
       console.log("Push Messaging not supported");
       return;
@@ -1322,6 +1242,7 @@ function Home() {
 
     registerServiceWorker();
   }, [user?.emp_id]);
+
 
   if (loading || pageLoading) {
     return (

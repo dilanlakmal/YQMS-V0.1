@@ -278,6 +278,8 @@ import CoverPage from "./routes/YDT/CoverPage/CoverPageRoutes.js";
 /* -----------Sketch Technical-----------------*/
 import sketchTechnical from "./routes/YDT/CoverPage/sketchTechnicalRoutes.js";
 
+import OrderDetails from "./routes/YDT/CoverPage/OrderDetailsRoutes.js";
+
 
 /* -----------------------------
   CE System
@@ -596,6 +598,7 @@ app.use(OverView);
 app.use(CoverPage);
 /* -----------Sketch Technical-----------------*/
 app.use(sketchTechnical);
+app.use(OrderDetails);
 
 /* ------------------------------
   CE System Routes
