@@ -29,9 +29,7 @@ const HTTestingForm = ({
 }) => {
     return (
         <div className="space-y-8">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                Heat-Transfer Washing Test Report Form
-            </h2>
+
             <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Section 1: Style Information */}
                 <div className="border-b border-gray-200 dark:border-gray-700 pb-4">

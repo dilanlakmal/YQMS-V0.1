@@ -30,9 +30,7 @@ const EMBTestingForm = ({
 }) => {
     return (
         <div className="space-y-8">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                EMB/Printing Washing Test Report Form
-            </h2>
+
             <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Section 1: Style Information */}
                 <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
@@ -625,7 +623,7 @@ const EMBTestingForm = ({
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
                         Images & Additional Notes
                     </h3>
-        
+
                     {/* Image Upload */}
                     <div className="mb-4">
                         <div className="flex justify-between items-center mb-1">

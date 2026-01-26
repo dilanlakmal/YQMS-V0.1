@@ -151,14 +151,14 @@ const FormSection = ({
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
       {/* Form Header with Report Type */}
-      <div className="flex items-start sm:items-center justify-between mb-4 flex-col sm:flex-row gap-3">
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-          Form Report
+      <div className={`flex items-start sm:items-center justify-between mb-4 flex-col sm:flex-row gap-6`}>
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-white uppercase tracking-tight">
+          {formData.reportType === "Home Wash Test" ? "Form Report" : formData.reportType}
         </h2>
 
         {/* Report Type Dropdown */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-          <label className="text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 whitespace-nowrap">
+          <label className="text-xs sm:text-sm font-medium uppercase tracking-wider text-blue-600 dark:text-blue-400 whitespace-nowrap">
             Report Type
           </label>
 
@@ -180,7 +180,7 @@ const FormSection = ({
                 <span className={`text-lg ${isCompleting ? 'text-gray-500 dark:text-gray-400' : 'text-blue-600 dark:text-blue-400'}`}>
                   {reportTypeIcons && reportTypeIcons[formData.reportType]}
                 </span>
-                <span className={`font-bold text-[12px] sm:text-[13px] tracking-tight truncate ${isCompleting ? 'text-gray-600 dark:text-gray-400' : 'text-gray-800 dark:text-gray-100'}`}>
+                <span className={`font-medium text-[12px] sm:text-[13px] tracking-tight truncate ${isCompleting ? 'text-gray-600 dark:text-gray-400' : 'text-gray-800 dark:text-gray-100'}`}>
                   {formData.reportType}
                   {isCompleting && <span className="ml-2 text-[10px] text-orange-600 dark:text-orange-400">(Locked)</span>}
                 </span>

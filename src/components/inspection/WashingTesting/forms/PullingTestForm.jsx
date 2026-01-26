@@ -77,9 +77,7 @@ const PullingTestForm = ({
 
     return (
         <div className="space-y-8">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4 text-center">
-                PULLING TEST REPORT ( APPROVED )
-            </h2>
+
             <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Section 1: Basic Information */}
                 <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
