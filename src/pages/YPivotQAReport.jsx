@@ -10,7 +10,7 @@ import {
   LayoutGrid,
   Sparkles,
   ShieldCheck,
-  Bell
+  Bell,
 } from "lucide-react";
 import axios from "axios";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -20,6 +20,7 @@ import { API_BASE_URL } from "../../config";
 import YPivotQAReportMain from "../components/inspection/PivotY/QAReports/YPivotQAReportMain";
 import FincheckApprovalAssignee from "../components/inspection/PivotY/QAReports/FincheckApprovalAssignee";
 import FincheckNotificationGroup from "../components/inspection/PivotY/QAReports/FincheckNotificationGroup";
+import FincheckAnalyticsReport from "../components/inspection/PivotY/FincheckAnalytics/FincheckAnalyticsReport";
 
 // --- Placeholder Components for Future Tabs ---
 const AnalyticsPlaceholder = () => (
@@ -71,8 +72,8 @@ const YPivotQAReport = () => {
           `${API_BASE_URL}/api/fincheck-reports/check-permission`,
           {
             params: { empId: user.emp_id },
-            timeout: 10000 // 10 second timeout
-          }
+            timeout: 10000, // 10 second timeout
+          },
         );
 
         // VERY STRICT boolean check
@@ -106,22 +107,22 @@ const YPivotQAReport = () => {
         label: "Reports",
         icon: <FileText size={18} />,
         component: <YPivotQAReportMain />, // The actual content component
-        color: "text-indigo-600"
+        color: "text-indigo-600",
       },
       {
         id: "analytics",
         label: "Analytics",
         icon: <BarChart3 size={18} />,
-        component: <AnalyticsPlaceholder />,
-        color: "text-emerald-600"
+        component: <FincheckAnalyticsReport />,
+        color: "text-emerald-600",
       },
       {
         id: "export",
         label: "Export",
         icon: <Download size={18} />,
         component: <ExportPlaceholder />,
-        color: "text-orange-600"
-      }
+        color: "text-orange-600",
+      },
     ];
     if (!isLoadingPermission && isAdmin === true) {
       baseTabs.push({
@@ -129,7 +130,7 @@ const YPivotQAReport = () => {
         label: "Assignees",
         icon: <ShieldCheck size={18} />,
         component: <FincheckApprovalAssignee />,
-        color: "text-purple-600"
+        color: "text-purple-600",
       });
       //  Notify Group Tab
       baseTabs.push({
@@ -137,7 +138,7 @@ const YPivotQAReport = () => {
         label: "Notify Group",
         icon: <Bell size={18} />,
         component: <FincheckNotificationGroup />,
-        color: "text-pink-600"
+        color: "text-pink-600",
       });
     }
     return baseTabs;
@@ -356,7 +357,8 @@ const YPivotQAReport = () => {
           animation: fadeIn 0.4s ease-out;
         }
         .bg-grid-white {
-          background-image: linear-gradient(
+          background-image:
+            linear-gradient(
               to right,
               rgba(255, 255, 255, 0.1) 1px,
               transparent 1px
