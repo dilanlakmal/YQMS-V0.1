@@ -46,7 +46,7 @@ export const io = new SocketIO(server, {
   },
     credentials: true,
   },
-});
+);
 
 export const TRANSLATION_CONFIG = {
   // Chunk settings

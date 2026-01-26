@@ -118,6 +118,7 @@ import createCoverPageSchema from "../../models/YDT/coverPage.js";
 import createHumidityFiberNameModel from "../../models/HumidityFiberName.js";
 //Humidity Models
 import createHumidityModel from "../../models/huminity/HumidityReport.js";
+import createReitmansReportModel from "../../models/huminity/ReitmansReport.js";
 
 import feedbackModel from "../../models/Feedback/Feedback.js";
 import createRatingModel from "../../models/Feedback/Rating.js";
@@ -289,6 +290,7 @@ export const p88FailedReport = p88failedReportsModel(ymProdConnection);
 
 //Humidity Exported Models
 export const HumidityReport = createHumidityModel(ymProdConnection);
+export const ReitmansReport = createReitmansReportModel(ymProdConnection);
 
 export const Feedback = feedbackModel(ymProdConnection);
 export const Rating = createRatingModel(ymProdConnection);

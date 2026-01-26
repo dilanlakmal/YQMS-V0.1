@@ -9,7 +9,7 @@ import {
   getReitmansReports,
   createReitmansReport,
   updateReitmansReport,
-} from "./ReimansController.js";
+} from "./ReitmansController.js";
 import ExcelJS from "exceljs";
 export const getHumidityData = async (req, res) => {
   try {
