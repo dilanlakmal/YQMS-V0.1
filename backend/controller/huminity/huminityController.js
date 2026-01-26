@@ -1,11 +1,16 @@
 import { log } from "console";
 import {
   ymProdConnection,
-  HumidityReport
+  HumidityReport,
+  ReitmansReport,
 } from "../../controller/MongoDB/dbConnectionController.js";
+import {
+  transformReitmansHistory,
+  getReitmansReports,
+  createReitmansReport,
+  updateReitmansReport,
+} from "./ReimansController.js";
 import ExcelJS from "exceljs";
-
-// GET /api/humidity-data
 export const getHumidityData = async (req, res) => {
   try {
     const { limit, q } = req.query;
@@ -17,8 +22,8 @@ export const getHumidityData = async (req, res) => {
             { buyerStyle: { $regex: q, $options: "i" } },
             { customer: { $regex: q, $options: "i" } },
             { moNo: { $regex: q, $options: "i" } },
-            { style: { $regex: q, $options: "i" } }
-          ]
+            { style: { $regex: q, $options: "i" } },
+          ],
         }
       : {};
 
@@ -49,8 +54,8 @@ export const getHumidityDataByMoNo = async (req, res) => {
         { moNo: moNo },
         { factoryStyleNo: moNo },
         { style: moNo },
-        { buyerStyle: moNo }
-      ]
+        { buyerStyle: moNo },
+      ],
     };
 
     let doc = await col.findOne(exactQuery);
@@ -61,8 +66,8 @@ export const getHumidityDataByMoNo = async (req, res) => {
           { moNo: { $regex: regex } },
           { factoryStyleNo: { $regex: regex } },
           { style: { $regex: regex } },
-          { buyerStyle: { $regex: regex } }
-        ]
+          { buyerStyle: { $regex: regex } },
+        ],
       });
     }
 
@@ -70,25 +75,27 @@ export const getHumidityDataByMoNo = async (req, res) => {
       try {
         const ordersCol = ymProdConnection.db.collection("yorksys_orders");
         const order = await ordersCol.findOne({
-          $or: [{ moNo: moNo }, { style: moNo }, { factoryStyleNo: moNo }]
+          $or: [{ moNo: moNo }, { style: moNo }, { factoryStyleNo: moNo }],
         });
         if (order) {
           return res.json({
             success: true,
             data: {
               fallbackOrder: order,
-              note: "humidity_data not found — returned yorksys_orders fallback"
-            }
+              note: "humidity_data not found — returned yorksys_orders fallback",
+            },
           });
         }
       } catch (errOrder) {
         console.error("Error fetching yorksys_orders fallback:", errOrder);
       }
 
-      return res.status(404).json({
-        success: false,
-        message: "No humidity data found for this moNo"
-      });
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message: "No humidity data found for this moNo",
+        });
     }
 
     return res.json({ success: true, data: doc });
@@ -109,15 +116,14 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
         .status(400)
         .json({ success: false, message: "moNo is required" });
     const col = ymProdConnection.db.collection("humidity_data");
-    // find humidity doc
     const regex = new RegExp(`^${moNo}$`, "i");
     let doc = await col.findOne({
       $or: [
         { moNo: moNo },
         { factoryStyleNo: moNo },
         { style: moNo },
-        { buyerStyle: moNo }
-      ]
+        { buyerStyle: moNo },
+      ],
     });
     if (!doc) {
       doc = await col.findOne({
@@ -125,18 +131,16 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
           { moNo: { $regex: regex } },
           { factoryStyleNo: { $regex: regex } },
           { style: { $regex: regex } },
-          { buyerStyle: { $regex: regex } }
-        ]
+          { buyerStyle: { $regex: regex } },
+        ],
       });
     }
 
-    // fetch order to get FabricContent and total qty
     const ordersCol = ymProdConnection.db.collection("yorksys_orders");
     const order = await ordersCol.findOne({
-      $or: [{ moNo: moNo }, { style: moNo }]
+      $or: [{ moNo: moNo }, { style: moNo }],
     });
 
-    // determine totalQty
     let totalQty = 0;
     if (order && Array.isArray(order.MOSummary) && order.MOSummary.length > 0) {
       totalQty = order.MOSummary[0].TotalQty || 0;
@@ -144,7 +148,14 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
       totalQty = order.SKUData.reduce((s, it) => s + (it.Qty || 0), 0);
     }
 
-    // fabric allocations (from order if present)
+    const skuColors =
+      order && Array.isArray(order.SKUData)
+        ? [...new Set(order.SKUData.map((s) => s.Color).filter(Boolean))]
+        : [];
+    const colorName = skuColors.join(", ");
+    const product = order?.product || "";
+    const purchaseOrder = order?.SKUData?.[0]?.POLine || "";
+
     const fabricsDef =
       order && Array.isArray(order.FabricContent) ? order.FabricContent : [];
     const fabrics = fabricsDef.map((f) => {
@@ -155,11 +166,10 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
         percentage: pct,
         allocatedDecimal: decimal,
         allocatedRounded: Math.round(decimal),
-        allocatedFloor: Math.floor(decimal)
+        allocatedFloor: Math.floor(decimal),
       };
     });
 
-    // inspections summary from humidity doc (if present)
     const inspectionRecords =
       doc && Array.isArray(doc.inspectionRecords) ? doc.inspectionRecords : [];
     const totalInspections = inspectionRecords.length;
@@ -183,7 +193,6 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
       if (top.fail || middle.fail || bottom.fail) recordFailAny++;
     });
 
-    // allocate record-pass counts to fabrics proportionally
     const recordPassAllocation = fabrics.map((f) => {
       const proportion = f.percentage / 100;
       const passDecimal = recordPassAll * proportion;
@@ -192,11 +201,10 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
         percentage: f.percentage,
         passDecimal,
         passRounded: Math.round(passDecimal),
-        passFloor: Math.floor(passDecimal)
+        passFloor: Math.floor(passDecimal),
       };
     });
 
-    // If no humidity doc and no inspections, include note
     const note = !doc
       ? "No humidity_data found — summary derived from yorksys_orders (no inspections available)"
       : undefined;
@@ -212,243 +220,20 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
           sectionPass,
           sectionFail,
           recordPassAll,
-          recordFailAny
+          recordFailAny,
         },
         recordPassAllocation,
-        note
-      }
+        product,
+        purchaseOrder,
+        colorName,
+        note,
+      },
     });
   } catch (err) {
     console.error("Error computing humidity summary:", err);
     return res
       .status(500)
       .json({ success: false, message: "Failed to compute humidity summary" });
-  }
-};
-
-// GET /api/reitmans-humidity/:moNo
-export const getReitmansHumidityByMoNo = async (req, res) => {
-  try {
-    const moNo = req.params.moNo || req.query.moNo;
-    const col = ymProdConnection.db.collection("reitmans_humidity");
-
-    // If no moNo provided, return recent docs for debugging/testing
-    if (!moNo) {
-      const docs = await col.find({}).sort({ _id: -1 }).limit(200).toArray();
-      return res.json({ success: true, data: docs });
-    }
-
-    // try exact match on common fields
-    const exactQuery = {
-      $or: [{ factoryStyleNo: moNo }, { moNo: moNo }, { style: moNo }]
-    };
-    let doc = await col.findOne(exactQuery);
-
-    // fallback to regex search
-    if (!doc) {
-      const regex = new RegExp(moNo, "i");
-      doc = await col.findOne({
-        $or: [
-          { factoryStyleNo: { $regex: regex } },
-          { moNo: { $regex: regex } },
-          { style: { $regex: regex } }
-        ]
-      });
-    }
-
-    if (!doc)
-      return res.status(404).json({
-        success: false,
-        message: "No reitmans_humidity record found for this moNo"
-      });
-
-    // Fetch order data for fabric composition
-    const order = await ordersCol.findOne({
-      $or: [{ moNo: moNo }, { style: moNo }, { factoryStyleNo: moNo }]
-    });
-
-    let finalPrimary = null;
-    let finalSecondary = null;
-    let finalValue = null;
-    let matchNote = "";
-
-    // 1. Get Actual Composition from Order Data (if available) or fallback
-    let orderFabrics = [];
-    if (order && Array.isArray(order.FabricContent)) {
-      orderFabrics = order.FabricContent;
-      console.log(
-        `[ReitmansMatch] Order found for ${moNo}. FabricContent:`,
-        JSON.stringify(order.FabricContent)
-      );
-    } else {
-      console.log(
-        `[ReitmansMatch] No FabricContent found in order for ${moNo}`
-      );
-    }
-
-    if (orderFabrics.length > 0) {
-      // Sort by percentage descending to find Primary/Secondary
-      const sorted = [...orderFabrics].sort(
-        (a, b) =>
-          (parseFloat(b.percentageValue) || 0) -
-          (parseFloat(a.percentageValue) || 0)
-      );
-
-      const pFab = sorted[0];
-      const sFab = sorted.length > 1 ? sorted[1] : null;
-
-      const pName = (pFab.fabricName || pFab.fabric || "").toUpperCase().trim();
-      const pPct = parseFloat(pFab.percentageValue) || 0;
-
-      const sName = sFab
-        ? (sFab.fabricName || sFab.fabric || "").toUpperCase().trim()
-        : "";
-
-      console.log(
-        `[ReitmansMatch] Target: Primary=${pName} (${pPct}%), Secondary=${sName}`
-      );
-
-      finalPrimary = { fabricName: pName, percentage: pPct };
-      if (sName)
-        finalSecondary = {
-          fabricName: sName,
-          percentage: parseFloat(sFab.percentageValue) || 0
-        };
-
-      // 2. Find matching rule in ReitmansName array
-      if (doc && Array.isArray(doc.ReitmansName)) {
-        // Helper to check range "81-100" or single value
-        const isPctMatch = (ruleRange, actualPct) => {
-          if (!ruleRange) return false;
-          const rangeStr = String(ruleRange).trim();
-          if (rangeStr.includes("-")) {
-            const [min, max] = rangeStr.split("-").map(Number);
-            return actualPct >= min && actualPct <= max;
-          }
-          // direct match (allow small variance? strictly equal for now)
-          return Number(rangeStr) === actualPct;
-        };
-
-        console.log(
-          `[ReitmansMatch] Checking ${doc.ReitmansName.length} rules...`
-        );
-        let bestMatch = doc.ReitmansName.find((rule) => {
-          const rPName = (rule.primary || "").toUpperCase().trim();
-          const rSName = (rule.secondary || "").toUpperCase().trim();
-
-          const pMatch = pName.includes(rPName) || rPName.includes(pName); // loose name match
-          const rangeMatch = isPctMatch(
-            rule["primary%"] || rule.primaryPercent,
-            pPct
-          );
-          let sMatch = false;
-          if (sName && rSName) {
-            sMatch = sName.includes(rSName) || rSName.includes(sName);
-          } else if (!sName && !rSName) {
-            sMatch = true;
-          }
-
-          return pMatch && rangeMatch && sMatch;
-        });
-
-        if (bestMatch)
-          console.log(
-            `[ReitmansMatch] Strict match found:`,
-            JSON.stringify(bestMatch)
-          );
-
-        // Fallback: Try match just Primary Name + Pct Range (ignoring secondary mismatch if strict failed)
-        if (!bestMatch) {
-          console.log(
-            `[ReitmansMatch] No strict match. Trying fallback 1 (Primary + Range + No Secondary)...`
-          );
-          bestMatch = doc.ReitmansName.find((rule) => {
-            const rPName = (rule.primary || "").toUpperCase().trim();
-            const pMatch = pName.includes(rPName) || rPName.includes(pName);
-            const rangeMatch = isPctMatch(
-              rule["primary%"] || rule.primaryPercent,
-              pPct
-            );
-            return pMatch && rangeMatch && !rule.secondary; // prefer rules without secondary
-          });
-        }
-
-        // Fallback 2: Try match just Primary Name (if percentage slightly off)
-        if (!bestMatch) {
-          console.log(
-            `[ReitmansMatch] No Match yet. Trying fallback 2 (Primary Name Only + No Secondary)...`
-          );
-          bestMatch = doc.ReitmansName.find((rule) => {
-            const rPName = (rule.primary || "").toUpperCase().trim();
-            return (
-              (pName.includes(rPName) || rPName.includes(pName)) &&
-              !rule.secondary
-            );
-          });
-        }
-
-        // Fallback 3: Loose Match - Match Primary + Range, ignoring secondary mismatch
-        if (!bestMatch) {
-          console.log(
-            `[ReitmansMatch] No Match yet. Trying fallback 3 (Loose Primary + Range)...`
-          );
-          bestMatch = doc.ReitmansName.find((rule) => {
-            const rPName = (rule.primary || "").toUpperCase().trim();
-            const pMatch = pName.includes(rPName) || rPName.includes(pName);
-            const rangeMatch = isPctMatch(
-              rule["primary%"] || rule.primaryPercent,
-              pPct
-            );
-            return pMatch && rangeMatch;
-          });
-        }
-
-        if (bestMatch) {
-          console.log(
-            `[ReitmansMatch] FINAL MATCH:`,
-            JSON.stringify(bestMatch)
-          );
-          finalValue = bestMatch.upperCentisimal || bestMatch.value;
-          matchNote = "Matched rule: " + JSON.stringify(bestMatch);
-        } else {
-          console.log(`[ReitmansMatch] NO MATCH FOUND after all attempts.`);
-        }
-      }
-    } else {
-      // No order fabrics found, fallback to doc defaults
-      finalPrimary = {
-        fabricName: doc.primary || doc.primaryFabric,
-        percentage: doc.primaryPercent || doc["primary%"]
-      };
-      finalValue = doc.upperCentisimalIndex || doc.value;
-    }
-
-    // fallback for value if still null
-    if (!finalValue)
-      finalValue = doc.upperCentisimalIndex || doc.value || doc.aquaboySpec;
-
-    return res.json({
-      success: true,
-      data: {
-        primary: finalPrimary?.fabricName, // Send string name to match frontend expectation
-        secondary: finalSecondary?.fabricName, // Send string name
-        primaryPercent: finalPrimary?.percentage,
-        secondaryPercent: finalSecondary?.percentage,
-
-        doc: {
-          ...doc, // include original doc fields
-          upperCentisimalIndex: finalValue, // OVERWRITE with calculated specific value
-          upperCentisimal: finalValue,
-          value: finalValue,
-          matchNote
-        }
-      }
-    });
-  } catch (err) {
-    console.error("Error fetching reitmans_humidity by moNo:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch reitmans_humidity" });
   }
 };
 
@@ -486,10 +271,19 @@ export const getHumidityReports = async (req, res) => {
       }
     }
 
-    let q = model.find(query).sort({ createdAt: -1 });
-    if (limit && Number(limit) > 0) q = q.limit(Number(limit));
-    const docs = await q.exec();
-    return res.json({ success: true, data: docs });
+    let humidityDocs = await HumidityReport.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit ? Number(limit) : 1000)
+      .exec();
+    let reitmansDocs = await getReitmansReports(query, limit);
+
+    // Combine and sort
+    let allDocs = [...humidityDocs, ...reitmansDocs].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+    );
+    if (limit && Number(limit) > 0) allDocs = allDocs.slice(0, Number(limit));
+
+    return res.json({ success: true, data: allDocs });
   } catch (err) {
     console.error("Error fetching humidity reports:", err);
     return res
@@ -524,14 +318,20 @@ export const exportHumidityReportsXlsx = async (req, res) => {
       }
     }
 
-    const docs = await model.find(query).sort({ createdAt: -1 }).exec();
+    const humDocs = await HumidityReport.find(query)
+      .sort({ createdAt: -1 })
+      .exec();
+    const reitDocs = await getReitmansReports(query);
+    const docs = [...humDocs, ...reitDocs].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+    );
 
     // create workbook
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "YQMS";
     workbook.created = new Date();
     const sheet = workbook.addWorksheet("Humidity Reports", {
-      views: [{ state: "frozen", ySplit: 6 }]
+      views: [{ state: "frozen", ySplit: 6 }],
     });
 
     // page setup
@@ -546,7 +346,7 @@ export const exportHumidityReportsXlsx = async (req, res) => {
       top: 0.3,
       bottom: 0.3,
       header: 0.3,
-      footer: 0
+      footer: 0,
     };
 
     // add logo if exists (look in public/img/header.png)
@@ -556,7 +356,7 @@ export const exportHumidityReportsXlsx = async (req, res) => {
       if (fs.existsSync(logoPath)) {
         const imageId = workbook.addImage({
           filename: logoPath,
-          extension: "png"
+          extension: "png",
         });
         sheet.addImage(imageId, "B1:D5");
       }
@@ -581,7 +381,8 @@ export const exportHumidityReportsXlsx = async (req, res) => {
       { header: "customer", key: "customer", width: 16 },
       { header: "inspectionType", key: "inspectionType", width: 12 },
       { header: "fabrication", key: "fabrication", width: 18 },
-      { header: "aquaboyS", key: "aquaboySpec", width: 10 },
+      { header: "aquaboySpec(Body)", key: "aquaboySpecBody", width: 15 },
+      { header: "aquaboySpec(Ribs)", key: "aquaboySpecRibs", width: 15 },
       { header: "colorName", key: "colorName", width: 14 },
       { header: "beforeDryRoom", key: "beforeDryRoom", width: 12 },
       { header: "afterDryRoom", key: "afterDryRoom", width: 12 },
@@ -590,7 +391,7 @@ export const exportHumidityReportsXlsx = async (req, res) => {
       { header: "inspectorSignature", key: "inspectorSignature", width: 18 },
       { header: "qamSignature", key: "qamSignature", width: 18 },
       { header: "createdAt", key: "createdAt", width: 18 },
-      { header: "inspectionRecords", key: "inspectionRecords", width: 60 }
+      { header: "inspectionRecords", key: "inspectionRecords", width: 60 },
     ];
 
     sheet.columns = columns;
@@ -604,13 +405,13 @@ export const exportHumidityReportsXlsx = async (req, res) => {
       cell.fill = {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: "FFE5E7EB" }
+        fgColor: { argb: "FFE5E7EB" },
       };
       cell.border = {
         top: { style: "thin" },
         left: { style: "thin" },
         bottom: { style: "thin" },
-        right: { style: "thin" }
+        right: { style: "thin" },
       };
     });
 
@@ -634,7 +435,8 @@ export const exportHumidityReportsXlsx = async (req, res) => {
           d.customer || "",
           d.inspectionType || "",
           d.fabrication || "",
-          d.aquaboySpec || "",
+          d.aquaboySpecBody || "",
+          d.aquaboySpecRibs || "",
           rec.colorName || d.colorName || "",
           rec.beforeDryRoom || rec.beforeDryRoomTime || d.beforeDryRoom || "",
           rec.afterDryRoom || rec.afterDryRoomTime || d.afterDryRoom || "",
@@ -653,7 +455,7 @@ export const exportHumidityReportsXlsx = async (req, res) => {
           middle.fail ? "Fail" : middle.pass ? "Pass" : "",
           bottom.body || "",
           bottom.ribs || "",
-          bottom.fail ? "Fail" : bottom.pass ? "Pass" : ""
+          bottom.fail ? "Fail" : bottom.pass ? "Pass" : "",
         ];
 
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
@@ -661,12 +463,12 @@ export const exportHumidityReportsXlsx = async (req, res) => {
             top: { style: "thin" },
             left: { style: "thin" },
             bottom: { style: "thin" },
-            right: { style: "thin" }
+            right: { style: "thin" },
           };
           cell.alignment = {
             vertical: "middle",
             horizontal: "center",
-            wrapText: true
+            wrapText: true,
           };
 
           const colIdx = colNumber;
@@ -676,7 +478,7 @@ export const exportHumidityReportsXlsx = async (req, res) => {
               cell.fill = {
                 type: "pattern",
                 pattern: "solid",
-                fgColor: { argb: "FFFDECEA" }
+                fgColor: { argb: "FFFDECEA" },
               };
               cell.font = { color: { argb: "FFB02020" }, bold: true };
             }
@@ -687,11 +489,9 @@ export const exportHumidityReportsXlsx = async (req, res) => {
 
     res.setHeader(
       "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
-    const filename = `humidity-reports-${new Date()
-      .toISOString()
-      .slice(0, 10)}.xlsx`;
+    const filename = `humidity-reports-${new Date().toISOString().slice(0, 10)}.xlsx`;
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     await workbook.xlsx.write(res);
     res.end();
@@ -733,13 +533,20 @@ export const exportHumidityReportsPaper = async (req, res) => {
       }
     }
 
-    const docs = await model.find(query).sort({ createdAt: -1 }).exec();
+    const humDocs = await HumidityReport.find(query)
+      .sort({ createdAt: -1 })
+      .exec();
+    const reitDocs = await getReitmansReports(query);
+    const docs = [...humDocs, ...reitDocs].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+    );
 
     // simple HTML generator per report (similar to frontend preview)
     const renderReportHtml = (data) => {
       const recs = Array.isArray(data.inspectionRecords)
         ? data.inspectionRecords
         : [];
+      const hasRibs = data.ribsAvailable !== false; // Default to true if undefined
       const rows =
         recs
           .map((r) => {
@@ -754,9 +561,9 @@ export const exportHumidityReportsPaper = async (req, res) => {
               const status = secObj.fail
                 ? `<span style="color:#b02020;font-weight:600;border:2px solid #d9534f;padding:4px;display:inline-block;min-width:40px;">Fail</span>`
                 : secObj.pass
-                ? "Pass"
-                : "";
-              return `<td>${body}</td><td>${ribs}</td><td>${status}</td>`;
+                  ? "Pass"
+                  : "";
+              return `<td>${body}</td>${hasRibs ? `<td>${ribs}</td>` : ""}<td>${status}</td>`;
             };
             return `<tr>
           <td>${dateVal}</td>
@@ -768,7 +575,8 @@ export const exportHumidityReportsPaper = async (req, res) => {
           ${sec("bottom")}
         </tr>`;
           })
-          .join("\n") || '<tr><td colspan="14">No inspection records</td></tr>';
+          .join("\n") ||
+        `<tr><td colspan="${hasRibs ? 13 : 10}">No inspection records</td></tr>`;
 
       return `
         <div style="page-break-after:always;margin-bottom:12px;">
@@ -777,19 +585,14 @@ export const exportHumidityReportsPaper = async (req, res) => {
           <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:8px;">
             <div style="width:48%;">
               <div><strong>Buyer style#:</strong> ${data.buyerStyle || ""}</div>
-              <div><strong>Factory style no:</strong> ${
-                data.factoryStyleNo || ""
-              }</div>
+              <div><strong>Factory style no:</strong> ${data.factoryStyleNo || ""}</div>
               <div><strong>Fabrication:</strong> ${data.fabrication || ""}</div>
-              <div><strong>Aquaboy spec:</strong> ${
-                data.aquaboySpec || ""
-              }</div>
+              <div><strong>Aquaboy spec (Body):</strong> ${data.aquaboySpec || ""}</div>
+              ${hasRibs ? `<div><strong>Aquaboy spec (Ribs):</strong> ${data.aquaboySpecRibs || ""}</div>` : ""}
             </div>
             <div style="width:48%;text-align:right;">
               <div><strong>Customer:</strong> ${data.customer || ""}</div>
-              <div><strong>Inspection Type:</strong> ${
-                data.inspectionType || ""
-              }</div>
+              <div><strong>Inspection Type:</strong> ${data.inspectionType || ""}</div>
               <div><strong>Date:</strong> ${data.date || ""}</div>
               <div><strong>Color:</strong> ${data.colorName || ""}</div>
             </div>
@@ -801,22 +604,20 @@ export const exportHumidityReportsPaper = async (req, res) => {
                 <th style="border:1px solid #666;padding:6px">Color name</th>
                 <th style="border:1px solid #666;padding:6px">Before dry room</th>
                 <th style="border:1px solid #666;padding:6px">After dry room</th>
-                <th style="border:1px solid #666;padding:6px" colspan="3">Top</th>
-                <th style="border:1px solid #666;padding:6px" colspan="3">Middle</th>
-                <th style="border:1px solid #666;padding:6px" colspan="3">Bottom</th>
+                <th style="border:1px solid #666;padding:6px" colspan="${hasRibs ? 3 : 2}">Top</th>
+                <th style="border:1px solid #666;padding:6px" colspan="${hasRibs ? 3 : 2}">Middle</th>
+                <th style="border:1px solid #666;padding:6px" colspan="${hasRibs ? 3 : 2}">Bottom</th>
               </tr>
               <tr>
                 <th style="border:1px solid #666;padding:6px"></th><th style="border:1px solid #666;padding:6px"></th><th style="border:1px solid #666;padding:6px"></th><th style="border:1px solid #666;padding:6px"></th>
-                <th style="border:1px solid #666;padding:6px">Body</th><th style="border:1px solid #666;padding:6px">Ribs</th><th style="border:1px solid #666;padding:6px">Pass/Fail</th>
-                <th style="border:1px solid #666;padding:6px">Body</th><th style="border:1px solid #666;padding:6px">Ribs</th><th style="border:1px solid #666;padding:6px">Pass/Fail</th>
-                <th style="border:1px solid #666;padding:6px">Body</th><th style="border:1px solid #666;padding:6px">Ribs</th><th style="border:1px solid #666;padding:6px">Pass/Fail</th>
+                <th style="border:1px solid #666;padding:6px">Body</th>${hasRibs ? '<th style="border:1px solid #666;padding:6px">Ribs</th>' : ""}<th style="border:1px solid #666;padding:6px">Pass/Fail</th>
+                <th style="border:1px solid #666;padding:6px">Body</th>${hasRibs ? '<th style="border:1px solid #666;padding:6px">Ribs</th>' : ""}<th style="border:1px solid #666;padding:6px">Pass/Fail</th>
+                <th style="border:1px solid #666;padding:6px">Body</th>${hasRibs ? '<th style="border:1px solid #666;padding:6px">Ribs</th>' : ""}<th style="border:1px solid #666;padding:6px">Pass/Fail</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>
-          <div style="margin-top:12px;border-top:1px solid #444;padding-top:8px;"><strong>Remark:</strong> <div style="min-height:40px;margin-top:6px;">${
-            data.generalRemark || ""
-          }</div></div>
+          <div style="margin-top:12px;border-top:1px solid #444;padding-top:8px;"><strong>Remark:</strong> <div style="min-height:40px;margin-top:6px;">${data.generalRemark || ""}</div></div>
           <div style="display:flex;justify-content:space-between;margin-top:28px;"><div style="width:45%;border-top:1px solid #444;padding-top:6px;text-align:center;">Inspector</div><div style="width:45%;border-top:1px solid #444;padding-top:6px;text-align:center;">QAM / Supervisor</div></div>
         </div>
       `;
@@ -830,9 +631,7 @@ export const exportHumidityReportsPaper = async (req, res) => {
     res.setHeader("Content-Type", "text/html");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="humidity-reports-${new Date()
-        .toISOString()
-        .slice(0, 10)}.html"`
+      `attachment; filename="humidity-reports-${new Date().toISOString().slice(0, 10)}.html"`,
     );
     return res.send(allHtml);
   } catch (err) {
@@ -861,79 +660,156 @@ export const createHumidityReport = async (req, res) => {
         .json({ success: false, message: "factoryStyleNo is required" });
     }
 
+    const isReitmans =
+      (payload.customer || "").toLowerCase() === "reitmans" ||
+      payload.customer === "Reitmans_Form";
+
     // Transform inspectionRecords into history entry format
-    const historyEntry = {};
-    if (
-      Array.isArray(payload.inspectionRecords) &&
-      payload.inspectionRecords.length > 0
-    ) {
-      const record = payload.inspectionRecords[0]; // Take first record
+    let history = [];
+    if (isReitmans) {
+      history = transformReitmansHistory(payload);
+    } else {
+      history = (
+        Array.isArray(payload.inspectionRecords)
+          ? payload.inspectionRecords
+          : []
+      ).map((record) => {
+        const entry = {
+          date: payload.date || new Date().toISOString(),
+          beforeDryRoom: payload.beforeDryRoom || "",
+          afterDryRoom: payload.afterDryRoom || "",
+          colorName: payload.colorName || "",
+          generalRemark: payload.generalRemark || payload.remark || "",
 
-      // Add date and dry room times to each history entry
-      historyEntry.date = payload.date || new Date().toISOString();
-      historyEntry.beforeDryRoom = payload.beforeDryRoom || "";
-      historyEntry.afterDryRoom = payload.afterDryRoom || "";
-      historyEntry.colorName = payload.colorName || "";
+          top: {
+            body: record.top?.body || "",
+            bodyStatus:
+              record.top?.bodyStatus ||
+              (record.top?.pass ? "pass" : record.top?.fail ? "fail" : ""),
+            ribs: record.top?.ribs || "",
+            ribsStatus:
+              record.top?.ribsStatus ||
+              (record.top?.pass ? "pass" : record.top?.fail ? "fail" : ""),
+            status:
+              record.top?.status ||
+              (record.top?.pass ? "pass" : record.top?.fail ? "fail" : ""),
+          },
+          middle: {
+            body: record.middle?.body || "",
+            bodyStatus:
+              record.middle?.bodyStatus ||
+              (record.middle?.pass
+                ? "pass"
+                : record.middle?.fail
+                  ? "fail"
+                  : ""),
+            ribs: record.middle?.ribs || "",
+            ribsStatus:
+              record.middle?.ribsStatus ||
+              (record.middle?.pass
+                ? "pass"
+                : record.middle?.fail
+                  ? "fail"
+                  : ""),
+            status:
+              record.middle?.status ||
+              (record.middle?.pass
+                ? "pass"
+                : record.middle?.fail
+                  ? "fail"
+                  : ""),
+          },
+          bottom: {
+            body: record.bottom?.body || "",
+            bodyStatus:
+              record.bottom?.bodyStatus ||
+              (record.bottom?.pass
+                ? "pass"
+                : record.bottom?.fail
+                  ? "fail"
+                  : ""),
+            ribs: record.bottom?.ribs || "",
+            ribsStatus:
+              record.bottom?.ribsStatus ||
+              (record.bottom?.pass
+                ? "pass"
+                : record.bottom?.fail
+                  ? "fail"
+                  : ""),
+            status:
+              record.bottom?.status ||
+              (record.bottom?.pass
+                ? "pass"
+                : record.bottom?.fail
+                  ? "fail"
+                  : ""),
+          },
 
-      historyEntry.top = {
-        body: record.top?.body || "",
-        ribs: record.top?.ribs || "",
-        status: record.top?.pass ? "pass" : record.top?.fail ? "fail" : ""
-      };
-      historyEntry.middle = {
-        body: record.middle?.body || "",
-        ribs: record.middle?.ribs || "",
-        status: record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""
-      };
-      historyEntry.bottom = {
-        body: record.bottom?.body || "",
-        ribs: record.bottom?.ribs || "",
-        status: record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""
-      };
+          images: Array.isArray(record.images) ? record.images : [],
 
-      historyEntry.images = Array.isArray(record.images) ? record.images : [];
-      historyEntry.generalRemark = payload.generalRemark || "";
-
-      // Capture the exact time of the save action
-      const now = new Date();
-      historyEntry.saveTime = now.toLocaleTimeString("en-US", {
-        hour12: true,
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit"
+          saveTime: new Date().toLocaleTimeString("en-US", {
+            hour12: true,
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          }),
+        };
+        return entry;
       });
     }
 
-    const model = HumidityReport;
-
-    // Determine status: if all sections in the latest records are 'pass', set status to 'completed'
-    let finalStatus = "in_progress";
-    if (
-      historyEntry.top?.status === "pass" &&
-      historyEntry.middle?.status === "pass" &&
-      historyEntry.bottom?.status === "pass"
-    ) {
-      finalStatus = "completed";
+    // Determine status: if all sections in ALL history records are 'pass', set status to 'Passed'
+    let finalStatus = "Failed";
+    if (history.length > 0) {
+      const latest = history[history.length - 1];
+      if (
+        latest.top?.status === "pass" &&
+        latest.middle?.status === "pass" &&
+        latest.bottom?.status === "pass"
+      ) {
+        finalStatus = "Passed";
+      }
     }
 
-    const doc = new model({
-      ...payload,
-      status: finalStatus,
-      history: [historyEntry]
-    });
-
-    await doc.save();
+    let doc;
+    if (isReitmans) {
+      doc = await createReitmansReport(payload, history, finalStatus);
+    } else {
+      doc = new HumidityReport({
+        ...payload,
+        status: finalStatus,
+        history: history,
+      });
+      await doc.save();
+    }
 
     return res.json({
       success: true,
       message: "Report saved successfully!",
-      data: doc
+      data: doc,
     });
   } catch (err) {
     console.error("Error creating humidity report:", err);
+    if (err.name === "ValidationError") {
+      console.error(
+        "Validation Error Details:",
+        JSON.stringify(err.errors, null, 2),
+      );
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Validation failed",
+          errors: err.errors,
+        });
+    }
     return res
       .status(500)
-      .json({ success: false, message: "Failed to create report" });
+      .json({
+        success: false,
+        message: "Failed to create report",
+        error: err.message,
+      });
   }
 };
 
@@ -961,8 +837,8 @@ export const getAggregatedByCustomers = async (req, res) => {
           {
             $unwind: {
               path: "$FabricContent",
-              preserveNullAndEmptyArrays: false
-            }
+              preserveNullAndEmptyArrays: false,
+            },
           },
           {
             $group: {
@@ -970,16 +846,16 @@ export const getAggregatedByCustomers = async (req, res) => {
                 $ifNull: [
                   "$FabricContent.fabricName",
                   "$FabricContent.fabric",
-                  ""
-                ]
+                  "",
+                ],
               },
-              count: { $sum: 1 }
-            }
+              count: { $sum: 1 },
+            },
           },
           {
-            $project: { name: "$_id", value: { $toString: "$count" }, _id: 0 }
+            $project: { name: "$_id", value: { $toString: "$count" }, _id: 0 },
           },
-          { $sort: { value: -1 } }
+          { $sort: { value: -1 } },
         ])
         .toArray();
 
@@ -1020,13 +896,13 @@ export const getAggregatedByCustomers = async (req, res) => {
       resultObj[key] = {
         fabrics: fabricAgg,
         bodyCounts,
-        ribsCounts
+        ribsCounts,
       };
     }
 
     return res.json({
       success: true,
-      data: [{ _id: new Date().toISOString(), ...resultObj }]
+      data: [{ _id: new Date().toISOString(), ...resultObj }],
     });
   } catch (err) {
     console.error("Error aggregating customer data:", err);
@@ -1048,7 +924,7 @@ export const getFabricValuesByBuyer = async (req, res) => {
 
     if (moNo) {
       const order = await ordersCol.findOne({
-        $or: [{ moNo: moNo }, { style: moNo }, { factoryStyleNo: moNo }]
+        $or: [{ moNo: moNo }, { style: moNo }, { factoryStyleNo: moNo }],
       });
       if (!order)
         return res
@@ -1058,7 +934,7 @@ export const getFabricValuesByBuyer = async (req, res) => {
         buyerName || (order.buyer ? String(order.buyer).trim() : null);
       if (Array.isArray(order.FabricContent)) {
         fabricNames = order.FabricContent.map((f) =>
-          (f.fabricName || f.fabric || "").trim()
+          (f.fabricName || f.fabric || "").trim(),
         ).filter(Boolean);
       }
     } else if (buyerName) {
@@ -1075,10 +951,12 @@ export const getFabricValuesByBuyer = async (req, res) => {
       });
       fabricNames = [...new Set(fabricNames)];
     } else {
-      return res.status(400).json({
-        success: false,
-        message: "Provide either buyer or moNo query param"
-      });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Provide either buyer or moNo query param",
+        });
     }
 
     // lowercase buyer for matching
@@ -1088,13 +966,13 @@ export const getFabricValuesByBuyer = async (req, res) => {
     for (const fname of fabricNames) {
       const regex = new RegExp(
         fname.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"),
-        "i"
+        "i",
       );
       const query = {
         ...(buyerMatch
           ? { customer: { $regex: `^${buyerMatch}$`, $options: "i" } }
           : {}),
-        fabrication: { $regex: regex }
+        fabrication: { $regex: regex },
       };
       const count = await humidityCol.countDocuments(query);
       results.push({ name: fname, value: String(count) });
@@ -1127,8 +1005,14 @@ export const approveHumidityReport = async (req, res) => {
         .json({ success: false, message: "Approver information is required" });
     }
 
-    const model = HumidityReport;
-    const report = await model.findById(id);
+    let model = HumidityReport;
+    let report = await model.findById(id);
+
+    if (!report) {
+      // Check ReitmansReport collection if not found in standard HumidityReport
+      model = ReitmansReport;
+      report = await model.findById(id);
+    }
 
     if (!report) {
       return res
@@ -1147,13 +1031,17 @@ export const approveHumidityReport = async (req, res) => {
     report.approvalStatus = "approved";
     report.approvedBy = { empId, engName };
     report.approvedAt = new Date();
+    // optional remark provided by approver
+    if (req.body && typeof req.body.remark === "string") {
+      report.approvedRemark = req.body.remark;
+    }
 
     await report.save();
 
     return res.json({
       success: true,
       data: report,
-      message: "Report approved successfully"
+      message: "Report approved successfully",
     });
   } catch (err) {
     console.error("Error approving humidity report:", err);
@@ -1166,7 +1054,6 @@ export const approveHumidityReport = async (req, res) => {
 // PUT /api/humidity-reports/:id
 export const updateHumidityReport = async (req, res) => {
   try {
-    console.log("updateHumidityReport hehe ah ng men bro");
     const { id } = req.params;
     const payload = req.body;
 
@@ -1176,20 +1063,43 @@ export const updateHumidityReport = async (req, res) => {
         .json({ success: false, message: "Report ID is required" });
     }
 
-    const model = HumidityReport;
+    const isReitmans =
+      (payload.customer || "").toLowerCase() === "reitmans" ||
+      payload.customer === "Reitmans_Form";
 
-    // Remove _id from payload to avoid immutable field error
-    delete payload._id;
+    let updatedDoc;
+    if (isReitmans) {
+      updatedDoc = await updateReitmansReport(id, payload);
+    } else {
+      const model = HumidityReport;
 
-    // Remove immutable fields if present
-    delete payload.createdAt;
-    delete payload.updatedAt;
+      // Remove _id from payload to avoid immutable field error
+      delete payload._id;
 
-    const updatedDoc = await model.findByIdAndUpdate(
-      id,
-      { $set: payload },
-      { new: true }
-    );
+      // Remove immutable fields if present
+      delete payload.createdAt;
+      delete payload.updatedAt;
+
+      // Recalculate top-level status based on the latest history entry
+      if (Array.isArray(payload.history) && payload.history.length > 0) {
+        const latest = payload.history[payload.history.length - 1];
+        if (
+          latest.top?.status === "pass" &&
+          latest.middle?.status === "pass" &&
+          latest.bottom?.status === "pass"
+        ) {
+          payload.status = "Passed";
+        } else {
+          payload.status = "Failed";
+        }
+      }
+
+      updatedDoc = await model.findByIdAndUpdate(
+        id,
+        { $set: payload },
+        { new: true },
+      );
+    }
 
     if (!updatedDoc) {
       return res
@@ -1200,7 +1110,7 @@ export const updateHumidityReport = async (req, res) => {
     return res.json({
       success: true,
       data: updatedDoc,
-      message: "Report updated successfully"
+      message: "Report updated successfully",
     });
   } catch (err) {
     console.error("Error updating humidity report:", err);

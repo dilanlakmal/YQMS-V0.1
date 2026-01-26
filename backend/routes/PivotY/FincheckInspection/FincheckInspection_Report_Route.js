@@ -8,6 +8,7 @@ import {
   checkApprovalPermission,
   getReportImagesAsBase64,
   getReportDefectHeatmap,
+  getDefectsByQCInspector,
   getFilterOptions,
   autocompleteOrderNo,
   autocompleteCustStyle,
@@ -19,13 +20,13 @@ import {
   submitLeaderDecision,
   getQANotifications,
   getActionRequiredCount,
-  getShippingStageBreakdown
+  getShippingStageBreakdown,
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Report_Controller.js";
 
 import {
   getVapidPublicKey,
   subscribeUser,
-  verifySubscription
+  verifySubscription,
 } from "../../../controller/PivotY/FincheckInspection/FincheckNotificationController.js";
 
 const router = express.Router();
@@ -40,20 +41,20 @@ router.get("/api/fincheck-reports/filter-options", getFilterOptions);
 router.get("/api/fincheck-reports/autocomplete/order-no", autocompleteOrderNo);
 router.get(
   "/api/fincheck-reports/autocomplete/cust-style",
-  autocompleteCustStyle
+  autocompleteCustStyle,
 );
 router.get("/api/fincheck-reports/autocomplete/po-line", autocompletePOLine);
 
 // Route for Defect Images
 router.get(
   "/api/fincheck-reports/:reportId/defect-images",
-  getDefectImagesForReport
+  getDefectImagesForReport,
 );
 
 // Get Measurement Specs for a specific Report ID
 router.get(
   "/api/fincheck-reports/:reportId/measurement-specs",
-  getReportMeasurementSpecs
+  getReportMeasurementSpecs,
 );
 
 // Route to check permission
@@ -62,19 +63,25 @@ router.get("/api/fincheck-reports/check-permission", checkUserPermission);
 // Route to check Decision/Approval permission
 router.get(
   "/api/fincheck-reports/check-approval-permission",
-  checkApprovalPermission
+  checkApprovalPermission,
 );
 
 // Get all report images as base64 for PDF generation
 router.get(
   "/api/fincheck-reports/:reportId/images-base64",
-  getReportImagesAsBase64
+  getReportImagesAsBase64,
 );
 
 // GET - Defect Heatmap/Visual Summary
 router.get(
   "/api/fincheck-inspection/report/:reportId/defect-heatmap",
-  getReportDefectHeatmap
+  getReportDefectHeatmap,
+);
+
+// Get Defects grouped by QC Inspector
+router.get(
+  "/api/fincheck-inspection/report/:reportId/defects-by-qc",
+  getDefectsByQCInspector,
 );
 
 // User Preferences Routes
@@ -82,7 +89,7 @@ router.post("/api/fincheck-reports/preferences/save", saveUserPreference);
 router.get("/api/fincheck-reports/preferences/get", getUserPreferences);
 router.post(
   "/api/fincheck-reports/preferences/delete-filter",
-  deleteUserFilter
+  deleteUserFilter,
 );
 
 // Get existing decision for a report
@@ -95,11 +102,11 @@ router.post(
   // 1. Middleware: Activates only for this route to parse FormData/Audio
   fileUpload({
     createParentPath: true, // Creates folders if missing
-    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for audio
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit for audio
   }),
 
   // 2. Controller
-  submitLeaderDecision
+  submitLeaderDecision,
 );
 
 // Get Notifications for QA
@@ -111,7 +118,7 @@ router.get("/api/fincheck-reports/action-count", getActionRequiredCount);
 // ROUTE: Shipping Stage Breakdown
 router.get(
   "/api/fincheck-inspection/report/:reportId/shipping-stage-breakdown",
-  getShippingStageBreakdown
+  getShippingStageBreakdown,
 );
 
 // PUSH NOTIFICATION ROUTES

@@ -9,7 +9,7 @@ import {
   FincheckUserPreferences,
   FincheckApprovalAssignees,
   FincheckInspectionDecision,
-  FincheckNotificationGroup
+  FincheckNotificationGroup,
 } from "../../MongoDB/dbConnectionController.js";
 
 import { sendPushToUser } from "./FincheckNotificationController.js";
@@ -40,12 +40,12 @@ export const getInspectionReports = async (req, res) => {
       supplier,
       poLine,
       page = 1,
-      limit = 20
+      limit = 20,
     } = req.query;
 
     // --- Build Query ---
     let query = {
-      status: { $ne: "cancelled" }
+      status: { $ne: "cancelled" },
     };
 
     // --- PO Line Filter Logic ---
@@ -65,7 +65,7 @@ export const getInspectionReports = async (req, res) => {
         const regexList = poList.map((p) => new RegExp(`^${p}$`, "i"));
 
         const matchingOrders = await YorksysOrders.find({
-          "SKUData.POLine": { $in: regexList }
+          "SKUData.POLine": { $in: regexList },
         })
           .select("moNo")
           .lean();
@@ -133,7 +133,7 @@ export const getInspectionReports = async (req, res) => {
     if (custStyle) {
       query["inspectionDetails.custStyle"] = {
         $regex: custStyle,
-        $options: "i"
+        $options: "i",
       };
     }
 
@@ -172,7 +172,7 @@ export const getInspectionReports = async (req, res) => {
 
     // Find decisions matching these IDs
     const decisions = await FincheckInspectionDecision.find({
-      reportId: { $in: reportIds }
+      reportId: { $in: reportIds },
     })
       .select("reportId decisionStatus updatedAt")
       .lean();
@@ -182,7 +182,7 @@ export const getInspectionReports = async (req, res) => {
     decisions.forEach((d) => {
       decisionMap[d.reportId] = {
         status: d.decisionStatus,
-        updatedAt: d.updatedAt
+        updatedAt: d.updatedAt,
       };
     });
 
@@ -198,7 +198,7 @@ export const getInspectionReports = async (req, res) => {
 
     // B. Fetch only the PO Lines for these orders
     const yorksysOrders = await YorksysOrders.find({
-      moNo: { $in: allOrderNos }
+      moNo: { $in: allOrderNos },
     })
       .select("moNo SKUData.POLine")
       .lean();
@@ -238,7 +238,7 @@ export const getInspectionReports = async (req, res) => {
         // Add the decision fields to the report object
         decisionStatus: decisionInfo ? decisionInfo.status : null,
         decisionUpdatedAt: decisionInfo ? decisionInfo.updatedAt : null,
-        poLines: poLineString
+        poLines: poLineString,
       };
     });
 
@@ -249,7 +249,7 @@ export const getInspectionReports = async (req, res) => {
       totalCount,
       totalPages,
       currentPage: pageNum,
-      data: mergedReports
+      data: mergedReports,
       //data: reports
     });
   } catch (error) {
@@ -257,7 +257,7 @@ export const getInspectionReports = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server Error",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -287,12 +287,12 @@ export const getFilterOptions = async (req, res) => {
         FincheckInspectionReports.distinct("buyer", baseQuery),
         FincheckInspectionReports.distinct(
           "inspectionDetails.supplier",
-          baseQuery
+          baseQuery,
         ),
         FincheckInspectionReports.distinct(
           "inspectionDetails.subConFactory",
-          baseQuery
-        )
+          baseQuery,
+        ),
       ]);
 
     return res.status(200).json({
@@ -302,8 +302,8 @@ export const getFilterOptions = async (req, res) => {
         productTypes: productTypes.filter(Boolean).sort(),
         buyers: buyers.filter(Boolean).sort(),
         suppliers: suppliers.filter(Boolean).sort(),
-        subConFactories: factories.filter(Boolean).sort()
-      }
+        subConFactories: factories.filter(Boolean).sort(),
+      },
     });
   } catch (error) {
     console.error("Error fetching filter options:", error);
@@ -324,7 +324,7 @@ export const autocompleteOrderNo = async (req, res) => {
 
     const results = await FincheckInspectionReports.find({
       orderNosString: { $regex: term, $options: "i" },
-      status: { $ne: "cancelled" }
+      status: { $ne: "cancelled" },
     })
       .select("orderNosString orderNos")
       .limit(20)
@@ -344,7 +344,7 @@ export const autocompleteOrderNo = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: Array.from(orderSet).slice(0, 15)
+      data: Array.from(orderSet).slice(0, 15),
     });
   } catch (error) {
     console.error("Error in order autocomplete:", error);
@@ -365,7 +365,7 @@ export const autocompleteCustStyle = async (req, res) => {
 
     const results = await FincheckInspectionReports.find({
       "inspectionDetails.custStyle": { $regex: term, $options: "i" },
-      status: { $ne: "cancelled" }
+      status: { $ne: "cancelled" },
     })
       .select("inspectionDetails.custStyle")
       .limit(30)
@@ -381,7 +381,7 @@ export const autocompleteCustStyle = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: Array.from(styleSet).slice(0, 15)
+      data: Array.from(styleSet).slice(0, 15),
     });
   } catch (error) {
     console.error("Error in style autocomplete:", error);
@@ -402,7 +402,7 @@ export const autocompletePOLine = async (req, res) => {
 
     // Search inside SKUData array for POLine field
     const results = await YorksysOrders.find({
-      "SKUData.POLine": { $regex: term, $options: "i" }
+      "SKUData.POLine": { $regex: term, $options: "i" },
     })
       .select("SKUData.POLine")
       .limit(50) // Limit documents to scan
@@ -425,7 +425,7 @@ export const autocompletePOLine = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: Array.from(poSet).slice(0, 15) // Return top 15 matches
+      data: Array.from(poSet).slice(0, 15), // Return top 15 matches
     });
   } catch (error) {
     console.error("Error in PO Line autocomplete:", error);
@@ -441,7 +441,7 @@ export const getDefectImagesForReport = async (req, res) => {
     const { reportId } = req.params;
 
     const report = await FincheckInspectionReports.findOne({
-      reportId: parseInt(reportId)
+      reportId: parseInt(reportId),
     })
       .select("defectData defectManualData")
       .lean();
@@ -449,7 +449,7 @@ export const getDefectImagesForReport = async (req, res) => {
     if (!report) {
       return res.status(404).json({
         success: false,
-        message: "Report not found"
+        message: "Report not found",
       });
     }
 
@@ -472,7 +472,7 @@ export const getDefectImagesForReport = async (req, res) => {
                 defectCode: defectCode,
                 position: "General", // No specific position
                 locationInfo: "No Location Config",
-                type: "Defect"
+                type: "Defect",
               });
             });
           }
@@ -495,7 +495,7 @@ export const getDefectImagesForReport = async (req, res) => {
                       defectCode: defectCode,
                       position: positionType,
                       locationInfo: locationInfo,
-                      type: "Defect"
+                      type: "Defect",
                     });
                   }
 
@@ -512,7 +512,7 @@ export const getDefectImagesForReport = async (req, res) => {
                         defectCode: defectCode,
                         position: positionType,
                         locationInfo: locationInfo,
-                        type: "Defect (Add.)"
+                        type: "Defect (Add.)",
                       });
                     });
                   }
@@ -536,7 +536,7 @@ export const getDefectImagesForReport = async (req, res) => {
               defectCode: "N/A",
               position: item.line || "Manual",
               locationInfo: item.remarks || "",
-              type: "Manual"
+              type: "Manual",
             });
           });
         }
@@ -546,14 +546,14 @@ export const getDefectImagesForReport = async (req, res) => {
     return res.status(200).json({
       success: true,
       count: allImages.length,
-      data: allImages
+      data: allImages,
     });
   } catch (error) {
     console.error("Error fetching defect images:", error);
     return res.status(500).json({
       success: false,
       message: "Server Error",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -658,7 +658,7 @@ export const getReportMeasurementSpecs = async (req, res) => {
     // 1. Fetch the Report
     // MODIFICATION: Added "measurementData" to .select() to access the colors used in inspection
     const report = await FincheckInspectionReports.findOne({
-      reportId: parseInt(reportId)
+      reportId: parseInt(reportId),
     }).select("orderNos measurementData");
 
     if (!report) {
@@ -673,7 +673,7 @@ export const getReportMeasurementSpecs = async (req, res) => {
         success: true,
         specs: { Before: null, After: null },
         sizeList: [],
-        activeColors: [] // Return empty colors
+        activeColors: [], // Return empty colors
       });
     }
 
@@ -683,8 +683,8 @@ export const getReportMeasurementSpecs = async (req, res) => {
       ...new Set(
         report.measurementData
           .map((m) => m.colorName)
-          .filter((c) => c && typeof c === "string") // Remove null/undefined/empty
-      )
+          .filter((c) => c && typeof c === "string"), // Remove null/undefined/empty
+      ),
     ];
     // --- NEW LOGIC END ---
 
@@ -694,7 +694,7 @@ export const getReportMeasurementSpecs = async (req, res) => {
     // 2. Fetch DtOrder to get SizeList AND OrderColors for validation
     // MODIFICATION: Added "OrderColors" to .select()
     const dtOrder = await DtOrder.findOne({
-      Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
+      Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") },
     })
       .select("SizeList OrderColors")
       .lean();
@@ -708,24 +708,24 @@ export const getReportMeasurementSpecs = async (req, res) => {
     // 2. Create a Set for efficient, case-insensitive lookup
     // (We trim and lowercase to ensure "NAVY" matches "Navy")
     const validColorSet = new Set(
-      validOrderColors.map((c) => (c ? c.trim().toLowerCase() : ""))
+      validOrderColors.map((c) => (c ? c.trim().toLowerCase() : "")),
     );
 
     // 3. Filter the colors found in the Report
     // Only keep colors that actually exist in the DtOrder
     const activeColors = distinctReportColors.filter((reportColor) =>
-      validColorSet.has(reportColor.trim().toLowerCase())
+      validColorSet.has(reportColor.trim().toLowerCase()),
     );
     // --- NEW LOGIC END ---
 
     // 3. Find the Specs in the Specs Collection
     const specsRecord = await QASectionsMeasurementSpecs.findOne({
-      Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
+      Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") },
     }).lean();
 
     const result = {
       Before: { full: [], selected: [] },
-      After: { full: [], selected: [] }
+      After: { full: [], selected: [] },
     };
 
     if (specsRecord) {
@@ -747,13 +747,13 @@ export const getReportMeasurementSpecs = async (req, res) => {
     } else {
       // Fallback: Check DtOrder (Legacy - usually only Before)
       const dtOrderFull = await DtOrder.findOne({
-        Order_No: primaryOrderNo
+        Order_No: primaryOrderNo,
       }).lean();
 
       if (dtOrderFull && dtOrderFull.BeforeWashSpecs) {
         const legacySpecs = dtOrderFull.BeforeWashSpecs.map((s) => ({
           ...s,
-          id: s._id ? s._id.toString() : s.id
+          id: s._id ? s._id.toString() : s.id,
         }));
         result.Before.full = legacySpecs;
         result.Before.selected = legacySpecs;
@@ -764,7 +764,7 @@ export const getReportMeasurementSpecs = async (req, res) => {
       success: true,
       specs: result,
       sizeList: sizeList,
-      activeColors: activeColors // Return the filtered list of valid colors found in this report
+      activeColors: activeColors, // Return the filtered list of valid colors found in this report
     });
   } catch (error) {
     console.error("Error fetching report measurement specs:", error);
@@ -788,12 +788,12 @@ export const checkUserPermission = async (req, res) => {
     // of any document where the role is 'Admin' or 'Super Admin'
     const roleDoc = await RoleManagment.findOne({
       role: { $in: ["Admin", "Super Admin"] },
-      "users.emp_id": empId
+      "users.emp_id": empId,
     }).select("_id");
 
     return res.status(200).json({
       success: true,
-      isAdmin: !!roleDoc // Returns true if document found, false otherwise
+      isAdmin: !!roleDoc, // Returns true if document found, false otherwise
     });
   } catch (error) {
     console.error("Permission check error:", error);
@@ -816,21 +816,21 @@ export const checkApprovalPermission = async (req, res) => {
 
     // 2. Find the Assignee (The Leader)
     const assignee = await FincheckApprovalAssignees.findOne({
-      empId: empId
+      empId: empId,
     }).select("allowedCustomers");
 
     // If user is not in the approval list at all, return false
     if (!assignee) {
       return res.status(200).json({
         success: true,
-        isApprover: false
+        isApprover: false,
       });
     }
 
     // 3. If a specific Report ID is provided, validate the Buyer
     if (reportId) {
       const report = await FincheckInspectionReports.findOne({
-        reportId: parseInt(reportId)
+        reportId: parseInt(reportId),
       }).select("buyer");
 
       if (!report) {
@@ -847,7 +847,7 @@ export const checkApprovalPermission = async (req, res) => {
         return res.status(200).json({
           success: true,
           isApprover: false, // DENIED due to buyer mismatch
-          message: "User not authorized for this buyer"
+          message: "User not authorized for this buyer",
         });
       }
     }
@@ -856,14 +856,14 @@ export const checkApprovalPermission = async (req, res) => {
     return res.status(200).json({
       success: true,
       isApprover: true,
-      allowedCustomers: assignee.allowedCustomers || []
+      allowedCustomers: assignee.allowedCustomers || [],
     });
   } catch (error) {
     console.error("Approval permission check error:", error);
     return res.status(500).json({
       success: false,
       isApprover: false,
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -888,8 +888,8 @@ const imageToBase64 = async (imageUrl) => {
         timeout: 10000,
         headers: {
           "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        },
       });
       const mimeType = response.headers["content-type"] || "image/jpeg";
       const base64 = Buffer.from(response.data, "binary").toString("base64");
@@ -920,7 +920,7 @@ export const getReportImagesAsBase64 = async (req, res) => {
       defectImages: [],
       headerImages: {},
       photoImages: [],
-      inspectorImage: null
+      inspectorImage: null,
     };
 
     // Process Inspector Image (Server-Side)
@@ -928,7 +928,7 @@ export const getReportImagesAsBase64 = async (req, res) => {
       try {
         // Use UserMain as per your db connection code
         const inspector = await UserMain.findOne({
-          emp_id: report.empId
+          emp_id: report.empId,
         }).select("face_photo");
 
         if (inspector && inspector.face_photo) {
@@ -953,7 +953,7 @@ export const getReportImagesAsBase64 = async (req, res) => {
               const base64 = await imageToBase64(img.imageURL);
               imagesResult.defectImages.push({
                 id: img.imageId || img._id,
-                base64
+                base64,
               });
             }
           }
@@ -966,7 +966,7 @@ export const getReportImagesAsBase64 = async (req, res) => {
                 const base64 = await imageToBase64(pos.requiredImage.imageURL);
                 imagesResult.defectImages.push({
                   id: pos.requiredImage.imageId || pos._id,
-                  base64
+                  base64,
                 });
               }
               for (const addImg of pos.additionalImages || []) {
@@ -974,7 +974,7 @@ export const getReportImagesAsBase64 = async (req, res) => {
                   const base64 = await imageToBase64(addImg.imageURL);
                   imagesResult.defectImages.push({
                     id: addImg.imageId || addImg._id,
-                    base64
+                    base64,
                   });
                 }
               }
@@ -1008,7 +1008,7 @@ export const getReportImagesAsBase64 = async (req, res) => {
                 sectionId: section.sectionId,
                 itemNo: item.itemNo,
                 imageId: img.imageId || img._id,
-                base64
+                base64,
               });
             }
           }
@@ -1018,14 +1018,14 @@ export const getReportImagesAsBase64 = async (req, res) => {
 
     res.json({
       success: true,
-      data: imagesResult
+      data: imagesResult,
     });
   } catch (error) {
     console.error("Error fetching images:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch images",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -1039,7 +1039,7 @@ export const getReportDefectHeatmap = async (req, res) => {
     const { reportId } = req.params;
 
     const report = await FincheckInspectionReports.findOne({
-      reportId: parseInt(reportId)
+      reportId: parseInt(reportId),
     }).select("productTypeId defectData");
 
     if (!report || !report.productTypeId) {
@@ -1050,7 +1050,7 @@ export const getReportDefectHeatmap = async (req, res) => {
 
     const locationMap = await QASectionsProductLocation.findOne({
       productTypeId: report.productTypeId,
-      isActive: true
+      isActive: true,
     }).lean();
 
     if (!locationMap) {
@@ -1061,7 +1061,7 @@ export const getReportDefectHeatmap = async (req, res) => {
 
     const counts = {
       Front: {},
-      Back: {}
+      Back: {},
     };
 
     if (report.defectData && Array.isArray(report.defectData)) {
@@ -1078,7 +1078,7 @@ export const getReportDefectHeatmap = async (req, res) => {
             if (!counts[viewKey][locNo]) {
               counts[viewKey][locNo] = {
                 total: 0,
-                defects: {} // Map for defect breakdown
+                defects: {}, // Map for defect breakdown
               };
             }
 
@@ -1100,15 +1100,207 @@ export const getReportDefectHeatmap = async (req, res) => {
       success: true,
       data: {
         map: locationMap,
-        counts: counts
-      }
+        counts: counts,
+      },
     });
   } catch (error) {
     console.error("Error fetching defect heatmap:", error);
     return res.status(500).json({
       success: false,
       message: "Server Error",
-      error: error.message
+      error: error.message,
+    });
+  }
+};
+
+// ============================================================
+// Get Defects Grouped by QC Inspector (Missing Defects)
+// ============================================================
+
+export const getDefectsByQCInspector = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    // 1. Fetch the full report (Config + Defect Data)
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId),
+    })
+      .select("inspectionConfig defectData")
+      .lean();
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found",
+      });
+    }
+
+    // Map to store Inspector Data by Emp ID
+    const inspectorsMap = {};
+
+    // Helper to initialize an inspector object
+    const initInspector = (qcUser) => ({
+      _id: qcUser.emp_id,
+      qcDetails: {
+        emp_id: qcUser.emp_id,
+        eng_name: qcUser.eng_name,
+        face_photo: qcUser.face_photo || null,
+        job_title: qcUser.job_title || "", // Added Job Title
+      },
+      // Configs Map: Key = "Line|Table|Color" string to merge duplicates
+      configsMap: {},
+      totalDefects: 0,
+      minorCount: 0,
+      majorCount: 0,
+      criticalCount: 0,
+    });
+
+    // Helper to generate a unique key for a configuration
+    const getConfigKey = (line, table, color) => {
+      // Normalize to handle nulls/undefined
+      const l = line || "";
+      const t = table || "";
+      const c = color || "";
+      return JSON.stringify({ l, t, c });
+    };
+
+    // 2. PASS 1: Scan Inspection Config to get ALL assigned QCs (even those with 0 defects)
+    if (report.inspectionConfig?.configGroups) {
+      report.inspectionConfig.configGroups.forEach((group) => {
+        // Extract Config Details
+        const line = group.lineName || group.line || "";
+        const table = group.tableName || group.table || "";
+        const color = group.colorName || group.color || "";
+        const configKey = getConfigKey(line, table, color);
+
+        if (group.assignments && Array.isArray(group.assignments)) {
+          group.assignments.forEach((assign) => {
+            // Check if valid QC User object exists
+            if (assign.qcUser && assign.qcUser.emp_id) {
+              const empId = assign.qcUser.emp_id;
+
+              // Init if not exists
+              if (!inspectorsMap[empId]) {
+                inspectorsMap[empId] = initInspector(assign.qcUser);
+              }
+
+              // Ensure this config exists in their list (even if empty defects)
+              if (!inspectorsMap[empId].configsMap[configKey]) {
+                inspectorsMap[empId].configsMap[configKey] = {
+                  line,
+                  table,
+                  color,
+                  defects: [],
+                };
+              }
+            }
+          });
+        }
+      });
+    }
+
+    // 3. PASS 2: Scan Defect Data to map defects to QCs
+    if (report.defectData && Array.isArray(report.defectData)) {
+      report.defectData.forEach((defect) => {
+        // We only care about location-based defects for QC tracking
+        if (defect.locations && Array.isArray(defect.locations)) {
+          defect.locations.forEach((loc) => {
+            if (loc.positions && Array.isArray(loc.positions)) {
+              loc.positions.forEach((pos) => {
+                // Check if this specific defect position has a QC User tagged
+                if (pos.qcUser && pos.qcUser.emp_id) {
+                  const empId = pos.qcUser.emp_id;
+
+                  // Edge Case: QC found in defect but NOT in config (Ad-hoc) -> Add them
+                  if (!inspectorsMap[empId]) {
+                    inspectorsMap[empId] = initInspector(pos.qcUser);
+                  }
+
+                  // Identify Config Context from Defect Snapshot
+                  const line = defect.lineName || "";
+                  const table = defect.tableName || "";
+                  const color = defect.colorName || "";
+                  const configKey = getConfigKey(line, table, color);
+
+                  // Init config if missing
+                  if (!inspectorsMap[empId].configsMap[configKey]) {
+                    inspectorsMap[empId].configsMap[configKey] = {
+                      line,
+                      table,
+                      color,
+                      defects: [],
+                    };
+                  }
+
+                  // Add Defect to List
+                  // Aggregating by count: 1 position = 1 defect qty
+                  inspectorsMap[empId].configsMap[configKey].defects.push({
+                    name: defect.defectName,
+                    status: pos.status,
+                    qty: 1,
+                  });
+
+                  // Update Totals
+                  inspectorsMap[empId].totalDefects += 1;
+                  const status = pos.status?.toLowerCase();
+                  if (status === "minor") inspectorsMap[empId].minorCount += 1;
+                  else if (status === "major")
+                    inspectorsMap[empId].majorCount += 1;
+                  else if (status === "critical")
+                    inspectorsMap[empId].criticalCount += 1;
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+
+    // 4. Transform Map to Array & Consolidate Defect Lists
+    const results = Object.values(inspectorsMap)
+      .map((inspector) => {
+        // Convert configsMap to array
+        const configsArray = Object.values(inspector.configsMap).map(
+          (config) => {
+            // Consolidate defects list (Merge same Name + Status)
+            const consolidatedDefectsMap = {};
+            config.defects.forEach((d) => {
+              const key = `${d.name}_${d.status}`;
+              if (!consolidatedDefectsMap[key]) {
+                consolidatedDefectsMap[key] = { ...d };
+              } else {
+                consolidatedDefectsMap[key].qty += d.qty;
+              }
+            });
+            return {
+              ...config,
+              defects: Object.values(consolidatedDefectsMap),
+            };
+          },
+        );
+
+        return {
+          ...inspector,
+          configs: configsArray,
+          // Remove temp map
+        };
+      })
+      // Sort: High Defects first, then by Name
+      .sort((a, b) => b.totalDefects - a.totalDefects);
+
+    // Remove the temp `configsMap` from the final JSON
+    const finalData = results.map(({ configsMap, ...rest }) => rest);
+
+    return res.status(200).json({
+      success: true,
+      data: finalData,
+    });
+  } catch (error) {
+    console.error("Error fetching defects by QC:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+      error: error.message,
     });
   }
 };
@@ -1149,23 +1341,23 @@ export const saveUserPreference = async (req, res) => {
       const newFilterStr = JSON.stringify(filters);
 
       const duplicate = userPref.savedFilters.find(
-        (f) => JSON.stringify(f.filters) === newFilterStr
+        (f) => JSON.stringify(f.filters) === newFilterStr,
       );
       if (duplicate) {
         return res.status(400).json({
           success: false,
-          message: `This exact filter configuration is already saved as "${duplicate.name}". Please select different filters.`
+          message: `This exact filter configuration is already saved as "${duplicate.name}". Please select different filters.`,
         });
       }
 
       // Check for duplicate name
       const nameDuplicate = userPref.savedFilters.find(
-        (f) => f.name.toLowerCase() === name.toLowerCase()
+        (f) => f.name.toLowerCase() === name.toLowerCase(),
       );
       if (nameDuplicate) {
         return res.status(400).json({
           success: false,
-          message: "A filter with this name already exists."
+          message: "A filter with this name already exists.",
         });
       }
 
@@ -1197,7 +1389,7 @@ export const getUserPreferences = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: userPref || { favoriteColumns: [], savedFilters: [] }
+      data: userPref || { favoriteColumns: [], savedFilters: [] },
     });
   } catch (error) {
     console.error("Error fetching preferences:", error);
@@ -1214,7 +1406,7 @@ export const deleteUserFilter = async (req, res) => {
 
     await FincheckUserPreferences.updateOne(
       { empId },
-      { $pull: { savedFilters: { _id: filterId } } }
+      { $pull: { savedFilters: { _id: filterId } } },
     );
 
     const updated = await FincheckUserPreferences.findOne({ empId });
@@ -1235,7 +1427,7 @@ const __dirname = path.dirname(__filename);
 // Define Decision Audio Storage Path
 const uploadDirDecision = path.join(
   __dirname,
-  "../../../storage/PivotY/Fincheck/Decision"
+  "../../../storage/PivotY/Fincheck/Decision",
 );
 
 // Ensure directory exists
@@ -1254,25 +1446,25 @@ export const getLeaderDecision = async (req, res) => {
 
     // 1. Fetch Decision Data
     const decision = await FincheckInspectionDecision.findOne({
-      reportId: parsedId
+      reportId: parsedId,
     });
 
     // 2. Fetch Report Data (For Resubmission History & Emp Name)
     const report = await FincheckInspectionReports.findOne({
-      reportId: parsedId
+      reportId: parsedId,
     }).select("resubmissionHistory empId empName"); // Only select needed fields
 
     // Prepare response data
     const responseData = {
       decision: decision || null,
       resubmissionHistory: report ? report.resubmissionHistory : [],
-      qaInfo: report ? { empId: report.empId, empName: report.empName } : null
+      qaInfo: report ? { empId: report.empId, empName: report.empName } : null,
     };
 
     return res.status(200).json({
       success: true,
       exists: !!decision,
-      data: responseData // Send combined data
+      data: responseData, // Send combined data
     });
   } catch (error) {
     console.error("Error fetching decision:", error);
@@ -1294,7 +1486,7 @@ export const submitLeaderDecision = async (req, res) => {
       leaderId,
       leaderName,
       reworkPO,
-      reworkPOComment
+      reworkPOComment,
     } = req.body;
 
     if (!reportId) {
@@ -1306,7 +1498,7 @@ export const submitLeaderDecision = async (req, res) => {
 
     // 1. Check if Report Exists
     const report = await FincheckInspectionReports.findOne({
-      reportId: parsedReportId
+      reportId: parsedReportId,
     });
     if (!report) {
       return res
@@ -1316,7 +1508,7 @@ export const submitLeaderDecision = async (req, res) => {
 
     // 2. Check for Existing Decision Document
     let decisionDoc = await FincheckInspectionDecision.findOne({
-      reportId: parsedReportId
+      reportId: parsedReportId,
     });
 
     // Determine Approval Number (Increment if exists, else 1)
@@ -1350,7 +1542,7 @@ export const submitLeaderDecision = async (req, res) => {
       additionalComment: additionalComment || "",
       hasAudio: hasAudio,
       audioUrl: audioUrl,
-      approvalDate: new Date()
+      approvalDate: new Date(),
     };
 
     // 5. Update or Create Document
@@ -1377,7 +1569,7 @@ export const submitLeaderDecision = async (req, res) => {
         systemGeneratedComment: systemComment,
         reworkPO: reworkPO || "",
         reworkPOComment: reworkPOComment || "",
-        approvalHistory: [historyEntry] // Initialize history
+        approvalHistory: [historyEntry], // Initialize history
       });
 
       await decisionDoc.save();
@@ -1406,12 +1598,12 @@ export const submitLeaderDecision = async (req, res) => {
 
         if (!reportBuyer) {
           console.log(
-            "No buyer found in report, skipping Rework PO notifications"
+            "No buyer found in report, skipping Rework PO notifications",
           );
         } else {
           // Find only group members who have this buyer in their notifiedCustomers array
           const groupMembers = await FincheckNotificationGroup.find({
-            notifiedCustomers: { $in: [reportBuyer] }
+            notifiedCustomers: { $in: [reportBuyer] },
           });
 
           if (groupMembers && groupMembers.length > 0) {
@@ -1430,7 +1622,7 @@ export const submitLeaderDecision = async (req, res) => {
               icon: "/assets/Home/Fincheck_Critical.png",
               url: targetUrl,
               tag: `rework-po-${parsedReportId}`,
-              isCritical: true
+              isCritical: true,
             };
 
             // Send only to members who are subscribed to this buyer
@@ -1443,7 +1635,7 @@ export const submitLeaderDecision = async (req, res) => {
             }
           } else {
             console.log(
-              `No notification group members found for buyer: ${reportBuyer}`
+              `No notification group members found for buyer: ${reportBuyer}`,
             );
           }
         }
@@ -1471,7 +1663,7 @@ export const submitLeaderDecision = async (req, res) => {
           body: qaBody,
           icon: "/assets/Home/Fincheck_Inspection.png",
           url: targetUrl,
-          tag: `fincheck-${parsedReportId}`
+          tag: `fincheck-${parsedReportId}`,
         };
 
         await sendPushToUser(qaEmpId, qaPayload);
@@ -1491,7 +1683,7 @@ export const submitLeaderDecision = async (req, res) => {
           body: `${line1}\n${line2}`,
           icon: "/assets/Home/Fincheck_Inspection.png",
           url: targetUrl,
-          tag: `fincheck-approved-${parsedReportId}`
+          tag: `fincheck-approved-${parsedReportId}`,
         };
 
         await sendPushToUser(qaEmpId, approvedPayload);
@@ -1503,7 +1695,7 @@ export const submitLeaderDecision = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Decision saved successfully",
-      data: decisionDoc
+      data: decisionDoc,
     });
   } catch (error) {
     console.error("Error saving decision:", error);
@@ -1528,7 +1720,7 @@ export const getQANotifications = async (req, res) => {
     // We only need reportId to join with decisions
     const userReports = await FincheckInspectionReports.find({
       empId: empId,
-      status: { $ne: "cancelled" } // Optional: Exclude cancelled
+      status: { $ne: "cancelled" }, // Optional: Exclude cancelled
     }).select("reportId orderNosString inspectionDate");
 
     const reportIds = userReports.map((r) => r.reportId);
@@ -1540,7 +1732,7 @@ export const getQANotifications = async (req, res) => {
     // 2. Find Decisions for these reports
     // We want all decisions where status exists (Approved, Rework, Rejected)
     const decisions = await FincheckInspectionDecision.find({
-      reportId: { $in: reportIds }
+      reportId: { $in: reportIds },
     }).lean();
 
     // 3. Merge Data & Filter Logic
@@ -1559,7 +1751,7 @@ export const getQANotifications = async (req, res) => {
       // Get full report details to check resubmission time
       // Fetching again here to get resubmissionHistory array (optimized query would use aggregation, but this is fine for logic clarity)
       const fullReport = await FincheckInspectionReports.findOne({
-        reportId: decision.reportId
+        reportId: decision.reportId,
       }).select("resubmissionHistory");
 
       const lastDecisionTime = new Date(decision.updatedAt).getTime();
@@ -1597,7 +1789,7 @@ export const getQANotifications = async (req, res) => {
             ? decision.approvalHistory[decision.approvalHistory.length - 1]
                 .audioUrl
             : decision.audioUrl,
-        updatedAt: decision.updatedAt
+        updatedAt: decision.updatedAt,
       });
     }
 
@@ -1606,7 +1798,7 @@ export const getQANotifications = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: notifications
+      data: notifications,
     });
   } catch (error) {
     console.error("Error fetching notifications:", error);
@@ -1628,7 +1820,7 @@ export const getActionRequiredCount = async (req, res) => {
     // 1. Find all reports by this QA
     const userReports = await FincheckInspectionReports.find({
       empId: empId,
-      status: { $ne: "cancelled" }
+      status: { $ne: "cancelled" },
     }).select("reportId resubmissionHistory");
 
     const reportIds = userReports.map((r) => r.reportId);
@@ -1640,7 +1832,7 @@ export const getActionRequiredCount = async (req, res) => {
     // 2. Find Decisions with Rework or Rejected ONLY
     const decisions = await FincheckInspectionDecision.find({
       reportId: { $in: reportIds },
-      decisionStatus: { $in: ["Rework", "Rejected"] } // Only action-required statuses
+      decisionStatus: { $in: ["Rework", "Rejected"] }, // Only action-required statuses
     }).lean();
 
     // 3. Count only those NOT resubmitted after decision
@@ -1667,7 +1859,7 @@ export const getActionRequiredCount = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      count: actionCount
+      count: actionCount,
     });
   } catch (error) {
     console.error("Error fetching action count:", error);
@@ -1685,21 +1877,21 @@ export const getShippingStageBreakdown = async (req, res) => {
 
     // 1. Fetch Report to get Order Nos
     const report = await FincheckInspectionReports.findOne({
-      reportId: parseInt(reportId)
+      reportId: parseInt(reportId),
     }).select("orderNos");
 
     if (!report || !report.orderNos || report.orderNos.length === 0) {
       return res.status(200).json({
         success: true,
         data: null,
-        message: "No orders linked to report"
+        message: "No orders linked to report",
       });
     }
 
     // 2. Fetch all related DtOrders
     // We use $in to get all matching orders (e.g., PTCOC335, PTCOC335A)
     const orders = await DtOrder.find({
-      Order_No: { $in: report.orderNos }
+      Order_No: { $in: report.orderNos },
     })
       .select("OrderColorShip")
       .lean();
@@ -1708,7 +1900,7 @@ export const getShippingStageBreakdown = async (req, res) => {
       return res.status(200).json({
         success: true,
         data: null,
-        message: "No order details found"
+        message: "No order details found",
       });
     }
 
@@ -1770,7 +1962,7 @@ export const getShippingStageBreakdown = async (req, res) => {
       return {
         color: color,
         seqValues: rowSeqValues,
-        rowTotal: rowTotal
+        rowTotal: rowTotal,
       };
     });
 
@@ -1793,8 +1985,8 @@ export const getShippingStageBreakdown = async (req, res) => {
         seqColumns: sortedSeqNos,
         rows: rows.sort((a, b) => a.color.localeCompare(b.color)),
         columnTotals,
-        grandTotal
-      }
+        grandTotal,
+      },
     });
   } catch (error) {
     console.error("Error fetching shipping stage breakdown:", error);
