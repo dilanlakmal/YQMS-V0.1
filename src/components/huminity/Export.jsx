@@ -582,10 +582,11 @@ export default function ExportPanel() {
 
                             <button
                                 onClick={() => { setShowApproveModal(false); setApproveTargetId(null); setShowApproveConfirm(false); }}
-                                className="absolute right-6 top-6 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2.5 transition-all focus:outline-none backdrop-blur-md"
+                                className="absolute right-4 top-4 text-white hover:bg-white/20 rounded-full p-2.5 transition-all focus:outline-none backdrop-blur-md z-20 flex items-center justify-center group"
                                 type="button"
+                                title="Close"
                             >
-                                <X size={20} />
+                                <X size={20} strokeWidth={3} className="transition-transform group-hover:rotate-90" />
                             </button>
 
                             <div className="relative z-10">
@@ -680,7 +681,7 @@ export default function ExportPanel() {
                                             <div className="flex gap-4">
                                                 <button
                                                     onClick={() => { setShowApproveModal(false); setApproveTargetId(null); }}
-                                                    className="px-6 py-4 text-slate-400 hover:text-slate-600 font-bold text-xs uppercase tracking-widest transition-colors flex-1"
+                                                    className="px-4 py-2 text-slate-400 hover:text-slate-600 border border-slate-500 rounded-2xl font-bold text-xs uppercase tracking-widest transition-colors flex-1"
                                                 >
                                                     Discard
                                                 </button>
