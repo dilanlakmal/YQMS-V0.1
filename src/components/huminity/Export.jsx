@@ -8,6 +8,7 @@ import HistoryModelReitmans from './HistoryModelReitmans';
 import UpdateModel from './UpdateModel';
 import UpdateModelReimans from './UpdateModelReimans';
 import { useAuth } from '../authentication/AuthContext';
+import { CheckCircle2, AlertCircle, Send, X, ShieldCheck, MessageSquare } from 'lucide-react';
 
 export default function ExportPanel() {
     const { user } = useAuth();
@@ -16,11 +17,22 @@ export default function ExportPanel() {
     const [factoryStyleFilter, setFactoryStyleFilter] = useState('');
     const [buyerStyleFilter, setBuyerStyleFilter] = useState('');
     const [customerFilter, setCustomerFilter] = useState('');
+    const [factorySuggestions, setFactorySuggestions] = useState([]);
+    const [showFactoryDropdown, setShowFactoryDropdown] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [ordersRaw, setOrdersRaw] = useState([]);
+    const [showApproveModal, setShowApproveModal] = useState(false);
+    const [approveTargetId, setApproveTargetId] = useState(null);
+    const [approvalRemarkInput, setApprovalRemarkInput] = useState('');
+    const [isApproving, setIsApproving] = useState(false);
+    const [showApproveConfirm, setShowApproveConfirm] = useState(false);
+    // approval success message removed — do not show inline banner
+    const [approveErrorMessage, setApproveErrorMessage] = useState('');
+    const [approveCompleted, setApproveCompleted] = useState(false);
     const [docsRaw, setDocsRaw] = useState([]);
     const [displayedReports, setDisplayedReports] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
+
 
     // Modal state
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -80,6 +92,32 @@ export default function ExportPanel() {
             setBuyerStyleFilter(match.buyerStyle || match.style || '');
             setCustomerFilter(match.customer || match.buyer || match.brand || '');
         }
+    }, [factoryStyleFilter, ordersRaw]);
+
+    // Compute suggestions for factory style input
+    useEffect(() => {
+        if (!factoryStyleFilter || !ordersRaw || ordersRaw.length === 0) {
+            setFactorySuggestions([]);
+            return;
+        }
+        const q = String(factoryStyleFilter).trim().toLowerCase();
+        const seen = new Set();
+        const suggestions = [];
+        for (const d of ordersRaw) {
+            const candidate = (d.factoryStyleNo || d.factoryStyle || d.moNo || d.style || '').toString();
+            if (!candidate) continue;
+            const lower = candidate.toLowerCase();
+            if (lower.includes(q) && !seen.has(lower)) {
+                seen.add(lower);
+                suggestions.push({
+                    value: candidate,
+                    buyerStyle: d.buyerStyle || d.style || '',
+                    customer: d.customer || d.buyer || d.brand || ''
+                });
+                if (suggestions.length >= 20) break;
+            }
+        }
+        setFactorySuggestions(suggestions);
     }, [factoryStyleFilter, ordersRaw]);
 
     // Apply filters to displayed reports
@@ -233,52 +271,102 @@ export default function ExportPanel() {
         fetchData();
     };
 
+    const AUTHORIZED_APPROVERS = ['YM7625', 'TYM010'];
+
     const handleApprove = async (reportId) => {
+        // Reset states before opening modal
+        setApproveTargetId(reportId);
+        setApprovalRemarkInput('');
+        setShowApproveConfirm(false);
+        setApproveCompleted(false);
+        setApproveErrorMessage('');
+        setShowApproveModal(true);
+    };
+
+    const confirmApprove = async (skipConfirm = false) => {
+        if (!approveTargetId) return;
+        // if remark empty and we haven't shown the inline confirm yet, show it
+        if (!skipConfirm && (!approvalRemarkInput || approvalRemarkInput.trim() === '')) {
+            setShowApproveConfirm(true);
+            return;
+        }
         try {
-            if (!user || !user.empId || !user.engName) {
+            if (!user || !user.emp_id || !user.eng_name) {
                 alert('User information not available. Please log in again.');
                 return;
             }
+            const isAuthorized = AUTHORIZED_APPROVERS.some(id =>
+                id.toLowerCase() === String(user.emp_id).trim().toLowerCase()
+            );
+            if (!isAuthorized) {
+                alert(`You are not authorized to approve reports. Your ID is: ${user.emp_id}`);
+                return;
+            }
 
-            const confirmApprove = window.confirm('Are you sure you want to approve this report?');
-            if (!confirmApprove) return;
-
+            // proceed without native confirm; inline confirm handled in modal when remark is empty
+            setIsApproving(true);
             const base = (API_BASE_URL && API_BASE_URL !== '') ? API_BASE_URL : '';
             const prefix = base.endsWith('/') ? base.slice(0, -1) : base;
-
-            const res = await fetch(`${prefix}/api/humidity-reports/${reportId}/approve`, {
+            const res = await fetch(`${prefix}/api/humidity-reports/${approveTargetId}/approve`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    empId: user.empId,
-                    engName: user.engName
+                    empId: user.emp_id,
+                    engName: user.eng_name,
+                    remark: approvalRemarkInput || ''
                 })
             });
-
             const json = await res.json();
-
             if (res.ok && json.success) {
-                alert('Report approved successfully!');
-
-                // Update the local state to reflect the approval
-                setDisplayedReports(prev => prev.map(report =>
-                    report._id === reportId
-                        ? { ...report, approvalStatus: 'approved', approvedBy: { empId: user.empId, engName: user.engName }, approvedAt: new Date() }
-                        : report
-                ));
-                setOrdersRaw(prev => prev.map(report =>
-                    report._id === reportId
-                        ? { ...report, approvalStatus: 'approved', approvedBy: { empId: user.empId, engName: user.engName }, approvedAt: new Date() }
-                        : report
-                ));
+                // refetch reports from server to get persisted remark and latest state
+                try {
+                    const res2 = await fetch(`${prefix}/api/humidity-reports?limit=0`);
+                    if (res2.ok) {
+                        const j2 = await res2.json();
+                        if (j2.data && Array.isArray(j2.data)) {
+                            setOrdersRaw(j2.data);
+                            setDisplayedReports(j2.data);
+                        }
+                    }
+                } catch (rfErr) {
+                    console.error('Error refetching reports after approve', rfErr);
+                }
+                // remark saved; not showing inline success banner here
+                // keep modal open so user can see the saved remark; mark completed
+                setApproveCompleted(true);
+                // Automatically close modal after success feedback
+                setTimeout(() => {
+                    setShowApproveModal(false);
+                    setApproveTargetId(null);
+                    setApproveCompleted(false);
+                }, 2000);
             } else {
-                alert(json.message || 'Failed to approve report');
+                // show error inline and refresh list if server indicates already approved
+                const err = json.message || 'Approval failed';
+                setApproveErrorMessage(err);
+                try {
+                    if (String(err).toLowerCase().includes('already approved')) {
+                        // refresh the list to reflect current server state
+                        const base2 = (API_BASE_URL && API_BASE_URL !== '') ? API_BASE_URL : '';
+                        const prefix2 = base2.endsWith('/') ? base2.slice(0, -1) : base2;
+                        const r = await fetch(`${prefix2}/api/humidity-reports?limit=0`);
+                        if (r.ok) {
+                            const j = await r.json();
+                            if (j.data && Array.isArray(j.data)) {
+                                setOrdersRaw(j.data);
+                                setDisplayedReports(j.data);
+                            }
+                        }
+                    }
+                } catch (refreshErr) {
+                    console.error('Error refreshing reports after failed approve', refreshErr);
+                }
             }
         } catch (err) {
             console.error('Approval error', err);
             alert('Failed to approve report. See console for details.');
+        } finally {
+            setIsApproving(false);
         }
     };
 
@@ -330,9 +418,11 @@ export default function ExportPanel() {
         if (!history || history.length === 0) return <span className="px-2 py-1 text-xs rounded bg-gray-200 text-gray-700">No checks</span>;
 
         const latestCheck = history[history.length - 1];
-        const allPassed = latestCheck.top?.status === 'pass' &&
-            latestCheck.middle?.status === 'pass' &&
-            latestCheck.bottom?.status === 'pass';
+        const isPass = (status) => String(status || '').toLowerCase() === 'pass';
+
+        const allPassed = isPass(latestCheck.top?.status) &&
+            isPass(latestCheck.middle?.status) &&
+            isPass(latestCheck.bottom?.status);
 
         if (allPassed) {
             return (
@@ -363,6 +453,30 @@ export default function ExportPanel() {
 
     return (
         <div className="space-y-6">
+            {/* DEBUG INFO - REMOVE AFTER FIXING */}
+            {/* <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-xl mb-6 shadow-sm">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-mono">
+                    <div>
+                        <span className="text-gray-500 block">Logged In:</span>
+                        <code className="font-bold text-blue-700">{user?.emp_id}</code>
+                    </div>
+                    <div>
+                        <span className="text-gray-500 block">Is Authorized:</span>
+                        <code className={`font-bold ${AUTHORIZED_APPROVERS.some(id => id.toLowerCase() === String(user?.emp_id).trim().toLowerCase()) ? 'text-green-600' : 'text-red-600'}`}>
+                            {AUTHORIZED_APPROVERS.some(id => id.toLowerCase() === String(user?.emp_id).trim().toLowerCase()) ? 'YES' : 'NO'}
+                        </code>
+                    </div>
+                    <div>
+                        <span className="text-gray-500 block">Authorized IDs:</span>
+                        <code className="text-gray-600 truncate">{AUTHORIZED_APPROVERS.join(',')}</code>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                        <span className="text-gray-400">Backend Fix Applied</span>
+                    </div>
+                </div>
+            </div> */}
+
             <div className="bg-white p-4 rounded-md border">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                     <div>
@@ -379,10 +493,35 @@ export default function ExportPanel() {
                             <input
                                 type="text"
                                 value={factoryStyleFilter}
-                                onChange={e => setFactoryStyleFilter(e.target.value)}
+                                onChange={e => {
+                                    setFactoryStyleFilter(e.target.value);
+                                    setShowFactoryDropdown(true);
+                                }}
                                 placeholder="Search Style No..."
                                 className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
+                            {showFactoryDropdown && factorySuggestions.length > 0 && (
+                                <div className="absolute left-0 right-0 mt-2 z-50 bg-white border border-gray-200 rounded-md shadow-lg max-h-52 overflow-y-auto">
+                                    {factorySuggestions.map((s, i) => (
+                                        <button
+                                            key={i}
+                                            type="button"
+                                            onMouseDown={(ev) => {
+                                                // prevent blur before click
+                                                ev.preventDefault();
+                                                setFactoryStyleFilter(s.value);
+                                                setBuyerStyleFilter(s.buyerStyle || '');
+                                                setCustomerFilter(s.customer || '');
+                                                setShowFactoryDropdown(false);
+                                            }}
+                                            className="w-full text-left px-3 py-2 hover:bg-gray-100 text-sm"
+                                        >
+                                            <div className="font-semibold">{s.value}</div>
+                                            <div className="text-xs text-gray-500">{s.buyerStyle} · {s.customer}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                             {factoryStyleFilter && (
                                 <button
                                     onClick={() => setFactoryStyleFilter('')}
@@ -431,6 +570,143 @@ export default function ExportPanel() {
                     </div>
                 </div>
             </div>
+            {/* Approve remark modal */}
+            {showApproveModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-all duration-300">
+                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden relative animate-in zoom-in-95 duration-200">
+                        {/* Header Banner */}
+                        <div className="bg-gradient-to-br from-green-500 to-green-600 px-6 py-6 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 transform rotate-12 scale-150 pointer-events-none">
+                                <CheckCircle2 size={120} />
+                            </div>
+
+                            <button
+                                onClick={() => { setShowApproveModal(false); setApproveTargetId(null); setShowApproveConfirm(false); }}
+                                className="absolute right-6 top-6 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2.5 transition-all focus:outline-none backdrop-blur-md"
+                                type="button"
+                            >
+                                <X size={20} />
+                            </button>
+
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-4 mb-2">
+                                    <div className="p-3 bg-white/20 backdrop-blur-lg rounded-2xl border border-white/30 shadow-xl ring-4 ring-white/10">
+                                        <ShieldCheck size={28} className="text-white" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-2xl font-black text-white m-0 tracking-tight">Final Approval</h3>
+                                        <p className="text-green-100/80 text-xs font-bold uppercase tracking-[0.2em] mt-1">Quality Assurance Record</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-8">
+                            {approveCompleted ? (
+                                <div className="py-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="relative w-24 h-24 mx-auto mb-6">
+                                        <div className="absolute inset-0 bg-emerald-100 rounded-full animate-ping opacity-25"></div>
+                                        <div className="relative flex items-center justify-center w-24 h-24 rounded-full bg-emerald-500 text-white shadow-xl shadow-emerald-200">
+                                            <CheckCircle2 size={48} strokeWidth={3} />
+                                        </div>
+                                    </div>
+                                    <h4 className="text-2xl font-black text-slate-800 mb-2">Approved Successfully!</h4>
+                                    <p className="text-slate-500 font-medium px-4 leading-relaxed">The report has been verified and marked as approved on the system.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    {approveErrorMessage && (
+                                        <div className="flex items-center gap-3 bg-rose-50 border border-rose-100 text-rose-600 px-5 py-3 rounded-2xl animate-in slide-in-from-top-2">
+                                            <AlertCircle size={20} className="shrink-0" />
+                                            <div className="text-[13px] font-bold">{approveErrorMessage}</div>
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between px-1">
+                                            <label className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                                                <MessageSquare size={14} className="text-slate-300" />
+                                                Supervisor Remarks
+                                            </label>
+                                            <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">Optional</span>
+                                        </div>
+                                        <div className="relative group">
+                                            <textarea
+                                                value={approvalRemarkInput}
+                                                onChange={e => setApprovalRemarkInput(e.target.value)}
+                                                rows={4}
+                                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:bg-white transition-all outline-none resize-none shadow-inner-white"
+                                                placeholder="Enter verification notes or quality remarks..."
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-2">
+                                        {showApproveConfirm ? (
+                                            <div className="space-y-4 animate-in fade-in duration-300">
+                                                <div className="bg-rose-50 border-2 border-rose-100 rounded-2xl p-4 flex items-start gap-4 ring-8 ring-rose-50/50">
+                                                    <div className="p-2 bg-white rounded-xl shadow-sm">
+                                                        <AlertCircle size={20} className="text-rose-500" />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <p className="text-sm font-black text-rose-900 m-0">No Remark Provided</p>
+                                                        <p className="text-xs text-rose-600/80 font-medium leading-relaxed m-0">Are you sure you want to approve this report without any quality notes?</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-3">
+                                                    <button
+                                                        onClick={() => setShowApproveConfirm(false)}
+                                                        className="flex-1 py-4 bg-white hover:bg-slate-50 text-slate-600 rounded-2xl border-2 border-slate-100 font-bold text-xs uppercase tracking-widest transition-all shadow-sm active:scale-95"
+                                                    >
+                                                        No, Wait
+                                                    </button>
+                                                    <button
+                                                        onClick={() => confirmApprove(true)}
+                                                        disabled={isApproving}
+                                                        className="flex-[2] py-4 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-emerald-200 active:scale-95 flex items-center justify-center gap-2 group"
+                                                    >
+                                                        {isApproving ? (
+                                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                                        ) : (
+                                                            <>
+                                                                <Send size={16} className="transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+                                                                Confirm Now
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex gap-4">
+                                                <button
+                                                    onClick={() => { setShowApproveModal(false); setApproveTargetId(null); }}
+                                                    className="px-6 py-4 text-slate-400 hover:text-slate-600 font-bold text-xs uppercase tracking-widest transition-colors flex-1"
+                                                >
+                                                    Discard
+                                                </button>
+                                                <button
+                                                    onClick={() => confirmApprove(false)}
+                                                    disabled={isApproving}
+                                                    className="flex-[2] py-4 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-emerald-200 active:scale-95 flex items-center justify-center gap-2 group"
+                                                >
+                                                    {isApproving ? (
+                                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                                    ) : (
+                                                        <>
+                                                            <CheckCircle2 size={16} />
+                                                            Authorize Approval
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Saved Reports Display */}
             <div className="bg-white rounded-md border overflow-hidden">
@@ -475,8 +751,17 @@ export default function ExportPanel() {
                                     const reportId = report._id || idx;
                                     const history = report.history || [];
                                     const latestDate = report.updatedAt || report.createdAt || '';
-                                    const isSupervisor = user && user.roles && user.roles.includes('supervisor');
                                     const isApproved = report.approvalStatus === 'approved';
+                                    const isPass = (status) => String(status || '').toLowerCase() === 'pass';
+                                    const latestCheck = history[history.length - 1];
+                                    const reportStatus = (latestCheck &&
+                                        isPass(latestCheck.top?.status) &&
+                                        isPass(latestCheck.middle?.status) &&
+                                        isPass(latestCheck.bottom?.status)) ? 'pass' : 'fail';
+
+                                    const isAuthorized = user?.emp_id && AUTHORIZED_APPROVERS.some(id =>
+                                        id.toLowerCase() === String(user.emp_id).trim().toLowerCase()
+                                    );
 
                                     return (
                                         <React.Fragment key={reportId}>
@@ -496,13 +781,24 @@ export default function ExportPanel() {
                                                 <td className="px-4 py-3 text-sm text-center">
                                                     {isApproved ? (
                                                         <div className="flex flex-col items-center gap-1">
-                                                            <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700 font-medium">✓ Approved</span>
+                                                            <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium">✓ Approved</span>
                                                             {report.approvedBy && (
                                                                 <span className="text-xs text-gray-500">by {report.approvedBy.engName}</span>
                                                             )}
                                                         </div>
+                                                    ) : isAuthorized ? (
+                                                        <button
+                                                            onClick={() => handleApprove(reportId)}
+                                                            className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-green-600 hover:text-green-800 hover:bg-green-50 rounded-full border border-green-200 transition-colors"
+                                                            title="Supervisor Approve"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                            Approve
+                                                        </button>
                                                     ) : (
-                                                        <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-700 font-medium">Pending</span>
+                                                        <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-500 font-medium border border-gray-200">Pending</span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-center">
@@ -541,18 +837,6 @@ export default function ExportPanel() {
                                                                 </button>
                                                             );
                                                         })()}
-                                                        {isSupervisor && !isApproved && (
-                                                            <button
-                                                                onClick={() => handleApprove(reportId)}
-                                                                className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
-                                                                title="Supervisor Approve"
-                                                            >
-                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                                </svg>
-                                                                Approve
-                                                            </button>
-                                                        )}
 
                                                     </div>
                                                 </td>
@@ -649,6 +933,10 @@ export default function ExportPanel() {
                             report={selectedReportForHistory}
                             formatDate={formatDate}
                             formatTime={formatTime}
+                            onApprove={(reportId) => {
+                                setIsHistoryModalOpen(false);
+                                handleApprove(reportId);
+                            }}
                         />
                     );
                 }
@@ -659,6 +947,10 @@ export default function ExportPanel() {
                         report={selectedReportForHistory}
                         formatDate={formatDate}
                         formatTime={formatTime}
+                        onApprove={(reportId) => {
+                            setIsHistoryModalOpen(false);
+                            handleApprove(reportId);
+                        }}
                     />
                 );
             })()}

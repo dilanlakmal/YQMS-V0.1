@@ -1,5 +1,5 @@
 import { log } from "console";
-import { ymProdConnection, HumidityReport } from "../../controller/MongoDB/dbConnectionController.js";
+import { ymProdConnection, HumidityReport, ReitmansReport } from "../../controller/MongoDB/dbConnectionController.js";
 import { transformReitmansHistory, getReitmansReports, createReitmansReport, updateReitmansReport } from "./ReimansController.js";
 import ExcelJS from "exceljs";
 export const getHumidityData = async (req, res) => {
@@ -774,8 +774,14 @@ export const approveHumidityReport = async (req, res) => {
       return res.status(400).json({ success: false, message: "Approver information is required" });
     }
 
-    const model = HumidityReport;
-    const report = await model.findById(id);
+    let model = HumidityReport;
+    let report = await model.findById(id);
+
+    if (!report) {
+      // Check ReitmansReport collection if not found in standard HumidityReport
+      model = ReitmansReport;
+      report = await model.findById(id);
+    }
 
     if (!report) {
       return res.status(404).json({ success: false, message: "Report not found" });
@@ -790,6 +796,10 @@ export const approveHumidityReport = async (req, res) => {
     report.approvalStatus = 'approved';
     report.approvedBy = { empId, engName };
     report.approvedAt = new Date();
+    // optional remark provided by approver
+    if (req.body && typeof req.body.remark === 'string') {
+      report.approvedRemark = req.body.remark;
+    }
 
     await report.save();
 

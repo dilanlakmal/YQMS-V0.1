@@ -84,23 +84,25 @@ const HistoryModelReitmans = ({ open, onCancel, report, formatDate, formatTime }
                 mask: { backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0, 0, 0, 0.45)' }
             }}
         >
-            {/* Header: Exact Match to "Request Details" */}
-            <div className="bg-emerald-500 px-6 py-5 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center text-white">
-                        <FileText size={22} />
+            {/* Compact header */}
+            <div className="bg-emerald-500 px-6 py-4 flex items-center justify-between gap-4 shrink-0">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center text-white shadow-sm">
+                        <FileText size={20} />
                     </div>
                     <div className="flex flex-col">
-                        <h3 className="text-xl font-bold text-white leading-tight">Reitmans Humidity History</h3>
-                        <p className="text-white text-sm font-bold mt-1">
-                            Factory Style No: {report.factoryStyleNo || 'N/A'} • Buyer Style: {report.buyerStyle || 'N/A'} • Po Line: {report.poLine || 'N/A'}
+                        <h3 className="text-lg font-extrabold text-white leading-tight">Reitmans Humidity History</h3>
+                        <p className="text-white text-xs opacity-95 mt-1 flex flex-wrap gap-2 items-center">
+                            <span className="inline-block px-2 py-1 bg-white/10 rounded text-white text-[12px] font-semibold">{report.factoryStyleNo || 'N/A'}</span>
+                            <span className="inline-block px-2 py-1 bg-white/10 rounded text-white text-[12px] font-semibold">{report.buyerStyle || 'N/A'}</span>
+                            <span className="inline-block px-2 py-1 bg-white/10 rounded text-white text-[12px] font-semibold">Upper Centisimal Index: {report.upperCentisimalIndex || report.aquaboySpecBody || report.aquaboySpec || 'N/A'}%</span>
                         </p>
                     </div>
                 </div>
                 <button
                     onClick={onCancel}
-                    className="text-white/80 hover:text-white hover:bg-white/20 rounded-lg p-2 transition-colors">
-                    <CloseIcon size={24} />
+                    className="text-white/90 hover:text-white hover:bg-white/10 rounded-full p-2 transition-colors">
+                    <CloseIcon size={20} />
                 </button>
             </div>
 
@@ -111,15 +113,15 @@ const HistoryModelReitmans = ({ open, onCancel, report, formatDate, formatTime }
                     return (
                         <div
                             key={idx}
-                            className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8 animate-fade-in items-stretch"
-                            style={{ animationDelay: `${idx * 0.1}s` }}
+                            className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 animate-fade-in items-stretch"
+                            style={{ animationDelay: `${idx * 0.06}s` }}
                         >
                             {/* Card 1: Session Information */}
-                            <div className="bg-white rounded-2xl border border-gray-100/50 p-6 space-y-4 shadow-sm">
-                                <div className="flex items-center gap-3 text-emerald-600 border-b border-gray-100 pb-4">
+                            <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 shadow-md">
+                                <div className="flex items-center gap-3 text-emerald-600 border-b border-gray-100 pb-3">
                                     <Clock size={18} />
                                     <h4 className="text-sm font-bold uppercase tracking-wide">Check #{String(idx + 1).padStart(2, '0')}</h4>
-                                    {isLatest && <span className="ml-auto bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase">Latest</span>}
+                                    {isLatest && <span className="ml-auto bg-emerald-600 text-white text-xs font-black px-3 py-1 rounded-full uppercase">Latest</span>}
                                 </div>
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-center py-1 border-b border-slate-50">
@@ -177,8 +179,8 @@ const HistoryModelReitmans = ({ open, onCancel, report, formatDate, formatTime }
                             </div>
 
                             {/* Card 2: Technical Readings */}
-                            <div className="bg-white rounded-2xl border border-gray-100/50 p-6 space-y-3 shadow-sm">
-                                <div className="flex items-center gap-3 text-emerald-600 border-b border-gray-100 pb-4">
+                            <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 shadow-md">
+                                <div className="flex items-center gap-3 text-emerald-600 border-b border-gray-100 pb-3">
                                     <Beaker size={18} />
                                     <h4 className="text-sm font-bold uppercase tracking-wide">Record</h4>
                                 </div>
@@ -205,12 +207,12 @@ const HistoryModelReitmans = ({ open, onCancel, report, formatDate, formatTime }
                                     ))}
 
                                     <div className="space-y-3">
-                                        <div className="flex items-center gap-3 text-emerald-600 border-b border-gray-100 pb-4">
+                                        <div className="flex items-center gap-3 text-emerald-600 border-b border-gray-100 pb-3">
                                             <MessageSquare size={18} />
                                             <h4 className="text-sm font-bold uppercase">General Remark</h4>
                                         </div>
-                                        <div className="bg-emerald-50/30 border border-emerald-100 rounded-xl p-6 min-h-[80px]">
-                                            <p className="text-[14px] text-gray-600 font-medium leading-relaxed">
+                                        <div className="bg-emerald-50/30 border border-emerald-100 rounded-lg p-4 min-h-[70px]">
+                                            <p className="text-sm text-gray-600 font-medium leading-relaxed m-0">
                                                 {record.generalRemark || 'N/A'}
                                             </p>
                                         </div>
@@ -233,26 +235,21 @@ const HistoryModelReitmans = ({ open, onCancel, report, formatDate, formatTime }
             <div className="p-6 bg-white border-t border-slate-100 flex justify-between items-center">
                 <div className="flex items-center gap-4">
                     <div className="flex flex-col">
-                        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest leading-none">Upper Centisimal Index</span>
-                        <span className="text-xs font-black text-emerald-600 leading-none mt-1">{specLimit}%</span>
-                    </div>
-                    <div className="h-6 w-px bg-slate-200" />
-                    <div className="flex flex-col">
-                        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest leading-none">Total Nodes</span>
-                        <span className="text-xs font-black text-slate-800 leading-none mt-1">{history.length} Entries</span>
+                        <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest leading-none">Total Nodes</span>
+                        <span className="text-xs font-black text-slate-800 leading-none mt-2">{history.length} Entries</span>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
                     {/* <button
                         onClick={handlePrint}
-                        className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-blue-100 transition-all active:scale-95 flex items-center gap-2"
+                        className="inline-flex items-center gap-2 bg-white border border-slate-200 px-4 py-2 rounded-md text-sm font-semibold hover:shadow"
                     >
-                        <Printer size={18} />
-                        Print Report
+                        <Printer size={16} />
+                        Print
                     </button> */}
                     <button
                         onClick={onCancel}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-emerald-100 transition-all active:scale-95"
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all active:scale-95"
                     >
                         Close Details
                     </button>

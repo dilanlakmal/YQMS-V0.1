@@ -3,8 +3,10 @@ import { API_BASE_URL } from '../../../config';
 import ExportPanel from './Export';
 import Dashboard from './dashboard';
 import ReitmansForm from './Reitmans';
+import { useAuth } from '../authentication/AuthContext';
 
 const FormPage = () => {
+    const { user } = useAuth();
     const [errors, setErrors] = useState({});
     const [orderNoSearch, setOrderNoSearch] = useState('');
     const [orderNoSuggestions, setOrderNoSuggestions] = useState([]);
@@ -29,7 +31,7 @@ const FormPage = () => {
         factoryStyleNo: '',
         customer: '',
         fabrication: '',
-        aquaboySpec: '',
+        aquaboySpecBody: '',
         aquaboySpecRibs: '',
         colorName: '',
         beforeDryRoom: '',
@@ -388,7 +390,7 @@ const FormPage = () => {
 
                     setFabricFiberMatches(matches);
                     addCalcStep(`Mapping complete. Matches count: ${matches.length}`);
-                    // Sum computedValue across matches and put into aquaboySpec
+                    // Sum computedValue across matches and put into aquaboySpecBody
                     try {
                         const total = matches.reduce((acc, m) => {
                             const v = (m && m.computedValue !== null && m.computedValue !== undefined) ? Number(m.computedValue) : 0;
@@ -399,12 +401,12 @@ const FormPage = () => {
                         if (Number.isFinite(total)) {
                             totalFormatted = String(Math.round(total));
                         }
-                        setFormData(prev => ({ ...prev, aquaboySpec: totalFormatted }));
-                        console.log('FabricContent -> FiberName matches:', matches, { buyerEntry, aquaboySpec: totalFormatted });
-                        addCalcStep(`Computed aquaboySpec total raw=${total} rounded="${totalFormatted}"`);
+                        setFormData(prev => ({ ...prev, aquaboySpecBody: totalFormatted }));
+                        console.log('FabricContent -> FiberName matches:', matches, { buyerEntry, aquaboySpecBody: totalFormatted });
+                        addCalcStep(`Computed aquaboySpecBody total raw=${total} rounded="${totalFormatted}"`);
                     } catch (sumErr) {
-                        console.error('Error computing total aquaboySpec:', sumErr);
-                        addCalcStep(`Error computing aquaboySpec: ${sumErr && sumErr.message ? sumErr.message : String(sumErr)}`);
+                        console.error('Error computing total aquaboySpecBody:', sumErr);
+                        addCalcStep(`Error computing aquaboySpecBody: ${sumErr && sumErr.message ? sumErr.message : String(sumErr)}`);
                     }
                 } catch (mapErr) {
                     console.error('Error mapping FabricContent to FiberName:', mapErr);
@@ -452,7 +454,7 @@ const FormPage = () => {
                         if (!section) return 'fail';
                         const bodyVal = parseFloat(section.body);
                         const ribsVal = parseFloat(section.ribs);
-                        const bodySpecVal = parseFloat(report.aquaboySpec);
+                        const bodySpecVal = parseFloat(report.aquaboySpecBody);
                         const ribsSpecVal = parseFloat(report.aquaboySpecRibs);
 
                         const isBodyFail = !isNaN(bodyVal) && !isNaN(bodySpecVal) && bodyVal > bodySpecVal;
@@ -491,7 +493,7 @@ const FormPage = () => {
                             beforeDryRoom: historyEntry.beforeDryRoom || historyEntry.beforeDryRoomTime || '',
                             afterDryRoom: historyEntry.afterDryRoom || historyEntry.afterDryRoomTime || '',
                             images: historyEntry.images || [],
-                            aquaboySpec: report.aquaboySpec || '',
+                            aquaboySpecBody: report.aquaboySpecBody || report.aquaboySpec || '',
                             aquaboySpecRibs: report.aquaboySpecRibs || ''
                         });
                     });
@@ -567,7 +569,7 @@ const FormPage = () => {
 
     const updateSectionData = (index, section, field, value) => {
         setFormData(prev => {
-            const bodySpecNum = Number(prev.aquaboySpec);
+            const bodySpecNum = Number(prev.aquaboySpecBody);
             const ribsSpecNum = Number(prev.aquaboySpecRibs);
             const inspectionRecords = prev.inspectionRecords.map((record, i) => {
                 if (i !== index) return record;
@@ -655,7 +657,7 @@ const FormPage = () => {
 
     const updateAdditionalSectionData = (index, section, field, value) => {
         setFormData(prev => {
-            const bodySpecNum = Number(prev.aquaboySpec);
+            const bodySpecNum = Number(prev.aquaboySpecBody);
             const ribsSpecNum = Number(prev.aquaboySpecRibs);
             const inspectionRecords = prev.inspectionRecords.map((record, i) => {
                 if (i !== index) return record;
@@ -908,12 +910,12 @@ const FormPage = () => {
         if (!formData.fabrication.trim()) newErrors.fabrication = 'Fabrication is required';
         if (!formData.colorName?.trim()) newErrors.colorName = 'Color Name is required';
 
-        // Reitmans uses upperCentisimalIndex instead of aquaboySpec in its UI, 
+        // Reitmans uses upperCentisimalIndex instead of aquaboySpecBody in its UI, 
         // though they are often mapped to each other
-        if (!formData.aquaboySpec.trim() && !isReitmans) {
-            newErrors.aquaboySpec = 'Aquaboy spec is required';
-        } else if (isReitmans && !formData.aquaboySpec.trim() && !formData.upperCentisimalIndex?.trim()) {
-            newErrors.aquaboySpec = 'Upper Centisimal index is required';
+        if (!formData.aquaboySpecBody?.trim() && !isReitmans) {
+            newErrors.aquaboySpecBody = 'Aquaboy spec is required';
+        } else if (isReitmans && !formData.aquaboySpecBody?.trim() && !formData.upperCentisimalIndex?.trim()) {
+            newErrors.aquaboySpecBody = 'Upper Centisimal index is required';
         }
 
         // Only require dry room times for non-Reitmans flows
@@ -948,7 +950,7 @@ const FormPage = () => {
             beforeDryRoomTime: check.beforeDryRoom,
             afterDryRoom: check.afterDryRoom,
             afterDryRoomTime: check.afterDryRoom,
-            aquaboySpec: check.aquaboySpec || prev.aquaboySpec || '',
+            aquaboySpecBody: check.aquaboySpecBody || check.aquaboySpec || prev.aquaboySpecBody || '',
             aquaboySpecRibs: check.aquaboySpecRibs || prev.aquaboySpecRibs || '',
             date: check.date ? check.date.split('T')[0] : prev.date,
             inspectionRecords: [
@@ -1025,6 +1027,7 @@ const FormPage = () => {
 
             const payload = {
                 ...formData,
+                createdBy: user ? { empId: user.emp_id, engName: user.eng_name || user.name || user.username } : null,
                 ribsAvailable: ribsAvailable,
                 beforeDryRoom: formData.beforeDryRoomTime || formData.beforeDryRoom || '',
                 afterDryRoom: formData.afterDryRoomTime || formData.afterDryRoom || '',
@@ -1089,7 +1092,7 @@ const FormPage = () => {
                     factoryStyleNo: '',
                     customer: '',
                     fabrication: '',
-                    aquaboySpec: '',
+                    aquaboySpecBody: '',
                     aquaboySpecRibs: '',
                     colorName: '',
                     beforeDryRoom: '',
@@ -1527,13 +1530,13 @@ const FormPage = () => {
                                         </label>
                                         <div className="relative">
                                             <label className="sr-only">Aquaboy Reading Spec (Body)</label>
-                                            <div className={`w-full rounded-lg p-1 border ${errors.aquaboySpec ? 'border-blue-300 bg-red-50' : 'border-blue-200 bg-gradient-to-r from-blue-50/60 to-white'} shadow-inner`}>
+                                            <div className={`w-full rounded-lg p-1 border ${errors.aquaboySpecBody ? 'border-blue-300 bg-red-50' : 'border-blue-200 bg-gradient-to-r from-blue-50/60 to-white'} shadow-inner`}>
                                                 <div className="relative">
                                                     <input
                                                         type="text"
-                                                        value={formData.aquaboySpec}
-                                                        onChange={(e) => setFormData(prev => ({ ...prev, aquaboySpec: e.target.value }))}
-                                                        className={`w-full px-4 py-1 bg-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors ${errors.aquaboySpec ? 'text-blue-700' : 'text-blue-900'}`}
+                                                        value={formData.aquaboySpecBody}
+                                                        onChange={(e) => setFormData(prev => ({ ...prev, aquaboySpecBody: e.target.value }))}
+                                                        className={`w-full px-4 py-1 bg-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors ${errors.aquaboySpecBody ? 'text-blue-700' : 'text-blue-900'}`}
                                                         placeholder=""
                                                         required
                                                         aria-required="true"
@@ -1544,7 +1547,7 @@ const FormPage = () => {
                                                     </div>
                                                 </div>
                                             </div>
-                                            {errors.aquaboySpec && <p className="text-red-500 text-sm mt-1">{errors.aquaboySpec}</p>}
+                                            {errors.aquaboySpecBody && <p className="text-red-500 text-sm mt-1">{errors.aquaboySpecBody}</p>}
                                         </div>
                                     </div>
 

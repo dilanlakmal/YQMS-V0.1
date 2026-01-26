@@ -63,6 +63,14 @@ const reitmansReportSchema = new mongoose.Schema(
             engName: { type: String }
         },
         approvedAt: { type: Date },
+        createdBy: {
+            empId: { type: String },
+            engName: { type: String }
+        },
+        updatedBy: {
+            empId: { type: String },
+            engName: { type: String }
+        },
         history: [reitmansHistorySchema]
     },
     {

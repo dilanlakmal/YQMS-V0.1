@@ -66,6 +66,10 @@ const humidityReportSchema = new mongoose.Schema(
       empId: { type: String },
       engName: { type: String }
     },
+    updatedBy: {
+      empId: { type: String },
+      engName: { type: String }
+    },
     approvalStatus: {
       type: String,
       enum: ['pending', 'approved'],
@@ -75,7 +79,8 @@ const humidityReportSchema = new mongoose.Schema(
       empId: { type: String },
       engName: { type: String }
     },
-    approvedAt: { type: Date }
+    approvedAt: { type: Date },
+    approvedRemark: { type: String, default: "" }
   },
   {
     collection: "humidity_reports",
