@@ -40,8 +40,8 @@ const PaperPreview = ({ data }) => {
             {formData.fabrication}
           </div>
           <div>
-            <span className="font-bold">Aquaboy spec:</span>{" "}
-            {formData.aquaboySpec}
+            <span className="font-bold">Aquaboy spec (Body):</span>{" "}
+            {formData.aquaboySpecBody || formData.aquaboySpec}
           </div>
         </div>
         <div className="w-1/2 text-right">
@@ -167,39 +167,72 @@ const PaperPreview = ({ data }) => {
                     </td>
                     {["top", "middle", "bottom"].map((section) => {
                       const s = rec[section] || {};
-                      // Get status from database or calculate from pass/fail flags
-                      const status =
-                        s.status || (s.fail ? "fail" : s.pass ? "pass" : "");
+
+                      // Specific status for Body/Ribs
+                      const getSpecStatus = (val, spec, explicitStatus) => {
+                        if (explicitStatus) return explicitStatus;
+                        const v = parseFloat(val);
+                        const sp = parseFloat(spec);
+                        if (isNaN(v) || isNaN(sp)) return "";
+                        return v <= sp ? "pass" : "fail";
+                      };
+
+                      const bodyStatus = getSpecStatus(
+                        s.body,
+                        formData.aquaboySpecBody || formData.aquaboySpec,
+                        s.bodyStatus ||
+                          (s.bodyPass ? "pass" : s.bodyFail ? "fail" : ""),
+                      );
+                      const ribsStatus = getSpecStatus(
+                        s.ribs,
+                        formData.aquaboySpecRibs || formData.aquaboySpec,
+                        s.ribsStatus ||
+                          (s.ribsPass ? "pass" : s.ribsFail ? "fail" : ""),
+                      );
+
+                      // Section status
+                      let sectionStatus =
+                        s.status || (s.pass ? "pass" : s.fail ? "fail" : "");
+                      if (!sectionStatus && (bodyStatus || ribsStatus)) {
+                        if (bodyStatus === "fail" || ribsStatus === "fail")
+                          sectionStatus = "fail";
+                        else if (
+                          bodyStatus === "pass" &&
+                          (ribsVisible ? ribsStatus === "pass" : true)
+                        )
+                          sectionStatus = "pass";
+                      }
+
                       return (
                         <React.Fragment key={section}>
                           <td className="border border-black px-2 py-2 text-center">
                             {s.body || ""}
-                            {s.bodyStatus && (
+                            {bodyStatus && (
                               <div
-                                className={`text-[8px] font-bold uppercase ${s.bodyStatus === "fail" ? "text-red-600" : "text-green-600"}`}
+                                className={`text-[8px] font-bold uppercase ${bodyStatus === "fail" ? "text-red-600" : "text-green-600"}`}
                               >
-                                {s.bodyStatus}
+                                {bodyStatus}
                               </div>
                             )}
                           </td>
                           {ribsVisible && (
                             <td className="border border-black px-2 py-2 text-center">
                               {s.ribs || ""}
-                              {s.ribsStatus && (
+                              {ribsStatus && (
                                 <div
-                                  className={`text-[8px] font-bold uppercase ${s.ribsStatus === "fail" ? "text-red-600" : "text-green-600"}`}
+                                  className={`text-[8px] font-bold uppercase ${ribsStatus === "fail" ? "text-red-600" : "text-green-600"}`}
                                 >
-                                  {s.ribsStatus}
+                                  {ribsStatus}
                                 </div>
                               )}
                             </td>
                           )}
                           <td
-                            className={`border border-black px-2 py-2 text-center ${status === "fail" ? "font-bold text-red-600" : status === "pass" ? "font-bold text-green-600" : ""}`}
+                            className={`border border-black px-2 py-2 text-center ${sectionStatus === "fail" ? "font-bold text-red-600" : sectionStatus === "pass" ? "font-bold text-green-600" : ""}`}
                           >
-                            {status === "fail"
+                            {sectionStatus === "fail"
                               ? "Fail"
-                              : status === "pass"
+                              : sectionStatus === "pass"
                                 ? "Pass"
                                 : ""}
                           </td>
@@ -224,11 +257,45 @@ const PaperPreview = ({ data }) => {
       </div>
 
       <div className="mt-2 flex justify-end px-16 gap-8">
-        <div className="w-64 border-b border-black text-center p-6 font-bold">
-          Inspector
+        <div className="flex flex-col items-center">
+          <div className="w-64 text-center p-6 font-bold pb-2">Inspector</div>
+          {formData.inspectorSignature && (
+            <div className="mt-2 text-center">
+              <img
+                src={formData.inspectorSignature}
+                className="max-h-12 grayscale opacity-80"
+                alt="inspector"
+              />
+            </div>
+          )}
+          {(formData.updatedBy?.engName || formData.createdBy?.engName) && (
+            <div className="text-sm font-medium text-gray-700 mt-1">
+              {formData.updatedBy?.engName || formData.createdBy?.engName}
+            </div>
+          )}
         </div>
-        <div className="w-64 border-b border-black text-center p-6 font-bold">
-          QAM / Supervisor
+        <div className="flex flex-col items-center">
+          <div className="w-64 text-center p-6 font-bold pb-2">
+            QAM / Supervisor
+          </div>
+          {formData.approvalStatus === "approved" && formData.approvedBy && (
+            <div className="mt-2 text-center">
+              <div className="inline-flex items-center gap-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                ✓ Approved
+              </div>
+              <div className="text-xs text-gray-600 mt-1">
+                by {formData.approvedBy.engName || formData.approvedBy.empId}{" "}
+                {formData.approvedAt
+                  ? `on ${formatDate(formData.approvedAt)}`
+                  : ""}
+              </div>
+              {formData.approvedRemark && (
+                <div className="text-xs text-gray-600 mt-1 italic">
+                  Remark: {formData.approvedRemark}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
       <div className="h-8 print:hidden"></div>

@@ -10,7 +10,7 @@ import {
   approveHumidityReport,
   updateHumidityReport,
 } from "../../controller/huminity/huminityController.js";
-import { getReitmansHumidityByMoNo } from "../../controller/huminity/ReimansController.js";
+import { getReitmansHumidityByMoNo } from "../../controller/huminity/ReitmansController.js";
 
 const router = express.Router();
 router.get("/api/humidity-data", getHumidityData);
