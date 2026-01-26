@@ -122,30 +122,88 @@ const getImageUrl = (imagePath, baseUrl) => {
 export const searchOrderNo = async (req, res) => {
   try {
     const { term } = req.query;
-
+    
+    
     // Add validation for search term
     if (!term || term.length < 2) {
       return res.json([]);
     }
+    
+    // Check if DtOrder is properly initialized
+    if (!DtOrder) {
+      return res.status(500).json({ 
+        error: 'Database connection error',
+        message: 'DtOrder model is not initialized' 
+      });
+    }
 
-    const searchPatterns = [
-      { Order_No: { $regex: term, $options: 'i' } },
-      { Cust_Code: { $regex: term, $options: 'i' } },
-      { CustStyle: { $regex: term, $options: 'i' } }
-    ];
-
-    const orders = await DtOrder.find({ $or: searchPatterns })
+    let orders;
+    
+    try {
+      
+      // Improved search - works with both letters and numbers
+      const searchTerm = term.trim();
+      
+      // Create multiple search patterns
+      const searchQueries = [
+        // Exact prefix match (case insensitive)
+        { Order_No: { $regex: `^${searchTerm}`, $options: 'i' } },
+        // Contains search (case insensitive)
+        { Order_No: { $regex: searchTerm, $options: 'i' } },
+        // Search in customer style as well
+        { CustStyle: { $regex: searchTerm, $options: 'i' } }
+      ];
+      
+      // Use $or to search multiple fields
+      orders = await DtOrder.find({
+        $or: searchQueries
+      })
       .limit(10)
       .lean();
+      
+      // If no results with the above search, try a more flexible search
+      if (orders.length === 0) {
+        
+        // Remove special characters and search
+        const cleanTerm = searchTerm.replace(/[^a-zA-Z0-9]/g, '');
+        
+        orders = await DtOrder.find({
+          $or: [
+            { Order_No: { $regex: cleanTerm, $options: 'i' } },
+            { CustStyle: { $regex: cleanTerm, $options: 'i' } },
+            { Factory: { $regex: cleanTerm, $options: 'i' } }
+          ]
+        })
+        .limit(10)
+        .lean();
+        
+      }
+      
+    } catch (queryError) {
+      return res.status(500).json({ 
+        error: 'Database query failed',
+        message: queryError.message,
+        details: queryError.toString()
+      });
+    }
+
+    // Check if orders exist
+    if (!orders || orders.length === 0) {
+      return res.json([]);
+    }
 
     const suggestions = orders.map((order, index) => {
       try {
+
         return {
+          id: order._id,
           orderNo: order.Order_No,
           customerStyle: order.CustStyle,
-          customerCode: order.Cust_Code,
+          // orderNo: order.Order_No,
           quantity: order.TotalQty,
-          colors: order.OrderColors ? order.OrderColors.map(c => c.Color) : []
+          colors: order.OrderColors ? order.OrderColors.map(color => color.Color) : [],
+          sizes: order.SizeList || [],
+          originalData: order
         };
       } catch (docError) {
         console.error(`❌ Error processing document ${index}:`, docError);
@@ -156,11 +214,10 @@ export const searchOrderNo = async (req, res) => {
     res.json(suggestions);
 
   } catch (error) {
-    console.error('Error fetching order suggestions:', error);
     res.status(500).json({ 
-      success: false,
-      message: 'Internal server error',
-      error: error.message
+      error: 'Internal server error',
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
@@ -168,109 +225,59 @@ export const searchOrderNo = async (req, res) => {
 export const getOrderDetails = async (req, res) => {
   try {
     const { orderNo } = req.params;
-
-    // Find order by Order_No
-    const order = await DtOrder.findOne({ Order_No: orderNo.toUpperCase() }).lean();
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: 'Order not found'
+    
+    // Check if DtOrder is properly initialized
+    if (!DtOrder) {
+      return res.status(500).json({ 
+        error: 'Database connection error',
+        message: 'DtOrder model is not initialized' 
       });
     }
 
-    // Ensure colorBreakdown is always an array (even if empty)
-    const colorBreakdown = order.OrderColors && Array.isArray(order.OrderColors)
-      ? order.OrderColors.map(color => {
-        const sizes = {};
-        let colorTotal = 0;
+    let order;
+    
+    try {
+      // Use Mongoose syntax
+      order = await DtOrder.findOne({
+        Order_No: orderNo.toUpperCase()
+      }).lean();
+      
+    } catch (queryError) {
+      console.error('MongoDB query error:', queryError);
+      return res.status(500).json({ 
+        error: 'Database query failed',
+        message: queryError.message 
+      });
+    }
 
-        if (color.OrderQty && Array.isArray(color.OrderQty)) {
-          color.OrderQty.forEach(sizeObj => {
-            if (typeof sizeObj === 'object' && sizeObj !== null) {
-              Object.keys(sizeObj).forEach(key => {
-                const cleanKey = key.split(';')[0].trim();
-                const val = Number(sizeObj[key]);
-                if (!isNaN(val)) {
-                  sizes[cleanKey] = val;
-                  colorTotal += val;
-                }
-              });
-            }
-          });
-        }
-
-        return {
-          colorCode: color.ColorCode || 'N/A',
-          colorName: color.Color || 'Unknown Color',
-          chineseColor: color.ChnColor || '',
-          sizes: sizes,
-          colorTotal: colorTotal
-        };
-      })
-      : [];
-
-    // Ensure sizeList is always an array (even if empty)
-    const sizeList = order.SizeList && Array.isArray(order.SizeList) && order.SizeList.length > 0
-      ? order.SizeList
-      : ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL']; // Default sizes if none found
-
-    // Format the response data
-    const orderDetails = {
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    const orderData = {
+      id: order._id,
       orderNo: order.Order_No,
-      companyName: order.EngName || 'Yorkmars (cambodia) Garment MFG. Co. Ltd.',
-      cust_Code: order.Cust_Code || 'N/A',
-      customerCode: order.Cust_Code || 'N/A',
-      customerStyle: order.CustStyle || 'N/A',
-      totalQuantity: order.TotalQty || 0,
-      orderDate: order.createdAt,
-      exFactoryDate: order.updatedAt,
-      customerPO: order.CustPORef || '',
-      season: order.Season || '',
-      countryOfOrigin: order.Origin || '',
-      
-      // Product details
-      productDescription: order.Style || '',
-      
-      // Colors and sizes breakdown - ALWAYS arrays
-      colorBreakdown: colorBreakdown,
-      sizeList: sizeList,
-      sizeSpec: order.SizeSpec || [],
-      
-      // Additional order information
-      currency: order.Ccy || '',
-      country: order.Country || '',
-      factory: order.Factory || '',
-      mode: order.Mode || '',
-      shortName: order.ShortName || '',
-      
-      // Shipment information (if available)
-      shipmentDetails: order.OrderColorShip ? order.OrderColorShip.map(colorShip => ({
-        colorCode: colorShip.ColorCode,
-        shipments: colorShip.ShipSeqNo.map(ship => ({
-          seqNo: ship.seqNo,
-          shipId: ship.Ship_ID,
-          sizes: ship.sizes.reduce((sizeObj, size) => {
-            const sizeKey = Object.keys(size)[0].split(';')[0].trim();
-            const sizeValue = Object.values(size)[0];
-            sizeObj[sizeKey] = sizeValue || 0;
-            return sizeObj;
-          }, {})
-        }))
-      })) : []
+      customerStyle: order.CustStyle,
+      // orderNo: order.Order_No,
+      quantity: order.TotalQty,
+      colors: order.OrderColors ? order.OrderColors.map(color => color.Color) : [],
+      sizes: order.SizeList || [],
+      country: order.Country,
+      currency: order.Ccy,
+      custCode: order.Cust_Code,
+      engName: order.EngName,
+      mode: order.Mode,
+      origin: order.Origin,
+      originalData: order
     };
 
-    res.status(200).json({
-      success: true,
-      data: orderDetails
-    });
+    res.json(orderData);
 
   } catch (error) {
     console.error('Error fetching order details:', error);
     res.status(500).json({ 
-      success: false,
-      message: 'Internal server error',
-      error: error.message
+      error: 'Failed to fetch order details',
+      message: error.message 
     });
   }
 };
