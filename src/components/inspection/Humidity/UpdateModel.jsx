@@ -9,6 +9,8 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
     customer: "",
     fabrication: "",
     aquaboySpec: "",
+    aquaboySpecBody: "",
+    aquaboySpecRibs: "",
     colorName: "",
     beforeDryRoom: "",
     beforeDryRoomTime: "",
@@ -19,7 +21,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
     inspectionRecords: [],
     generalRemark: "",
     inspectorSignature: "",
-    qamSignature: ""
+    qamSignature: "",
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -29,7 +31,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
   const [showColorDropdown, setShowColorDropdown] = useState(false);
   const colorRef = useRef(null);
 
-  const ribsAvailable = true; // Assume true for edit or derive from data
+  const ribsAvailable = report?.ribsAvailable ?? true;
 
   useEffect(() => {
     if (open && report) {
@@ -37,16 +39,57 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         report.inspectionRecords && report.inspectionRecords.length > 0
           ? report.inspectionRecords
           : report.history && report.history.length > 0
-          ? report.history
-          : [];
+            ? report.history
+            : [];
+
+      const specLimit = Number(report.aquaboySpec);
+      const parseNumberInternal = (v) => {
+        if (v === undefined || v === null) return NaN;
+        const s = String(v).trim();
+        if (s === "") return NaN;
+        const cleaned = s.replace(/[^0-9.\-]/g, "");
+        if (cleaned.length === 0) return NaN;
+        const n = Number(cleaned);
+        return Number.isFinite(n) ? n : NaN;
+      };
 
       const safeRecords = sourceRecords.map((rec) => {
-        const processSection = (sec) => ({
-          body: sec?.body || "",
-          ribs: sec?.ribs || "",
-          pass: sec?.pass === true || sec?.status === "pass",
-          fail: sec?.fail === true || sec?.status === "fail"
-        });
+        const processSection = (sec) => {
+          const body = sec?.body || "";
+          const ribs = sec?.ribs || "";
+          const bodyVal = parseNumberInternal(body);
+          const ribsVal = parseNumberInternal(ribs);
+
+          return {
+            body,
+            ribs,
+            bodyPass:
+              !Number.isNaN(bodyVal) && !Number.isNaN(specLimit)
+                ? bodyVal <= specLimit
+                : sec?.bodyPass || false,
+            bodyFail:
+              !Number.isNaN(bodyVal) && !Number.isNaN(specLimit)
+                ? bodyVal > specLimit
+                : sec?.bodyFail || false,
+            ribsPass:
+              !Number.isNaN(ribsVal) && !Number.isNaN(specLimit)
+                ? ribsVal <= specLimit
+                : sec?.ribsPass || false,
+            ribsFail:
+              !Number.isNaN(ribsVal) && !Number.isNaN(specLimit)
+                ? ribsVal > specLimit
+                : sec?.ribsFail || false,
+            pass:
+              sec?.pass === true ||
+              sec?.status === "pass" ||
+              (sec?.bodyPass && (!ribsAvailable || sec?.ribsPass)),
+            fail:
+              sec?.fail === true ||
+              sec?.status === "fail" ||
+              sec?.bodyFail ||
+              (ribsAvailable && sec?.ribsFail),
+          };
+        };
 
         return {
           ...rec,
@@ -57,28 +100,109 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
             ? {
                 top: processSection(rec.additional.top),
                 middle: processSection(rec.additional.middle),
-                bottom: processSection(rec.additional.bottom)
+                bottom: processSection(rec.additional.bottom),
               }
             : {
-                top: { body: "", ribs: "", pass: false, fail: false },
-                middle: { body: "", ribs: "", pass: false, fail: false },
-                bottom: { body: "", ribs: "", pass: false, fail: false }
+                top: {
+                  body: "",
+                  ribs: "",
+                  bodyPass: false,
+                  bodyFail: false,
+                  ribsPass: false,
+                  ribsFail: false,
+                  pass: false,
+                  fail: false,
+                },
+                middle: {
+                  body: "",
+                  ribs: "",
+                  bodyPass: false,
+                  bodyFail: false,
+                  ribsPass: false,
+                  ribsFail: false,
+                  pass: false,
+                  fail: false,
+                },
+                bottom: {
+                  body: "",
+                  ribs: "",
+                  bodyPass: false,
+                  bodyFail: false,
+                  ribsPass: false,
+                  ribsFail: false,
+                  pass: false,
+                  fail: false,
+                },
               },
-          images: rec.images || []
+          images: rec.images || [],
         };
       });
 
       if (safeRecords.length === 0) {
         safeRecords.push({
-          top: { body: "", ribs: "", pass: false, fail: false },
-          middle: { body: "", ribs: "", pass: false, fail: false },
-          bottom: { body: "", ribs: "", pass: false, fail: false },
-          additional: {
-            top: { body: "", ribs: "", pass: false, fail: false },
-            middle: { body: "", ribs: "", pass: false, fail: false },
-            bottom: { body: "", ribs: "", pass: false, fail: false }
+          top: {
+            body: "",
+            ribs: "",
+            bodyPass: false,
+            bodyFail: false,
+            ribsPass: false,
+            ribsFail: false,
+            pass: false,
+            fail: false,
           },
-          images: []
+          middle: {
+            body: "",
+            ribs: "",
+            bodyPass: false,
+            bodyFail: false,
+            ribsPass: false,
+            ribsFail: false,
+            pass: false,
+            fail: false,
+          },
+          bottom: {
+            body: "",
+            ribs: "",
+            bodyPass: false,
+            bodyFail: false,
+            ribsPass: false,
+            ribsFail: false,
+            pass: false,
+            fail: false,
+          },
+          additional: {
+            top: {
+              body: "",
+              ribs: "",
+              bodyPass: false,
+              bodyFail: false,
+              ribsPass: false,
+              ribsFail: false,
+              pass: false,
+              fail: false,
+            },
+            middle: {
+              body: "",
+              ribs: "",
+              bodyPass: false,
+              bodyFail: false,
+              ribsPass: false,
+              ribsFail: false,
+              pass: false,
+              fail: false,
+            },
+            bottom: {
+              body: "",
+              ribs: "",
+              bodyPass: false,
+              bodyFail: false,
+              ribsPass: false,
+              ribsFail: false,
+              pass: false,
+              fail: false,
+            },
+          },
+          images: [],
         });
       }
 
@@ -88,7 +212,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         const date = new Date(report.createdAt);
         initialBeforeTime = date.toLocaleTimeString("en-GB", {
           hour: "2-digit",
-          minute: "2-digit"
+          minute: "2-digit",
         });
       }
 
@@ -105,6 +229,8 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         customer: report.customer || "",
         fabrication: report.fabrication || "",
         aquaboySpec: report.aquaboySpec || "",
+        aquaboySpecBody: report.aquaboySpecBody || report.aquaboySpec || "",
+        aquaboySpecRibs: report.aquaboySpecRibs || report.aquaboySpec || "",
         colorName: report.colorName || "",
         beforeDryRoom: report.beforeDryRoom || "",
         beforeDryRoomTime: initialBeforeTime,
@@ -115,10 +241,10 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         inspectionRecords: safeRecords,
         generalRemark: report.generalRemark || "",
         inspectorSignature: report.inspectorSignature || "",
-        qamSignature: report.qamSignature || ""
+        qamSignature: report.qamSignature || "",
       });
       setExpandedRecordIndex(
-        safeRecords.length > 0 ? safeRecords.length - 1 : 0
+        safeRecords.length > 0 ? safeRecords.length - 1 : 0,
       );
     }
   }, [open, report]);
@@ -145,9 +271,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
               : "http://localhost:5001";
           const prefix = base.endsWith("/") ? base.slice(0, -1) : base;
           const res = await fetch(
-            `${prefix}/api/yorksys-orders/${encodeURIComponent(
-              formData.factoryStyleNo
-            )}`
+            `${prefix}/api/yorksys-orders/${encodeURIComponent(formData.factoryStyleNo)}`,
           );
           const json = await res.json();
           const order = json && json.data ? json.data : json || null;
@@ -160,7 +284,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
               order.OrderQtyByCountry.forEach((c) => {
                 if (Array.isArray(c.ColorQty))
                   c.ColorQty.forEach(
-                    (col) => col.ColorName && colors.push(col.ColorName)
+                    (col) => col.ColorName && colors.push(col.ColorName),
                   );
               });
             }
@@ -183,11 +307,14 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       const updatedRecord = { ...newRecords[recordIndex] };
       updatedRecord[section] = {
         ...updatedRecord[section],
-        [field]: value
+        [field]: value,
       };
 
       // Auto-grading logic
-      const specNum = Number(prev.aquaboySpec);
+      const specNumBody =
+        Number(prev.aquaboySpecBody) || Number(prev.aquaboySpec);
+      const specNumRibs =
+        Number(prev.aquaboySpecRibs) || Number(prev.aquaboySpec);
 
       // Try to parse numeric readings from body and ribs (allow strings like "51")
       const parseNumber = (v) => {
@@ -195,7 +322,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         const s = String(v).trim();
         if (s === "") return NaN;
         const cleaned = s.replace(/[^0-9.\-]/g, "");
-        if (cleaned.length < 1) return NaN;
+        if (cleaned.length === 0) return NaN;
         const n = Number(cleaned);
         return Number.isFinite(n) ? n : NaN;
       };
@@ -206,23 +333,64 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       const bodyVal = parseNumber(bodyStr);
       const ribsVal = parseNumber(ribsStr);
 
-      let reading = NaN;
-      if (!Number.isNaN(bodyVal) && bodyStr.length >= 2) reading = bodyVal;
-      if (!Number.isNaN(ribsVal) && ribsStr.length >= 2) {
-        reading = Number.isNaN(reading) ? ribsVal : Math.max(reading, ribsVal);
+      // Body Status
+      if (!Number.isNaN(bodyVal) && !Number.isNaN(specNumBody)) {
+        updatedRecord[section].bodyPass = bodyVal <= specNumBody;
+        updatedRecord[section].bodyFail = bodyVal > specNumBody;
+        updatedRecord[section].bodyStatus =
+          bodyVal <= specNumBody ? "pass" : "fail";
+      } else {
+        updatedRecord[section].bodyPass = false;
+        updatedRecord[section].bodyFail = false;
+        updatedRecord[section].bodyStatus = "";
       }
 
-      if (!Number.isNaN(reading) && !Number.isNaN(specNum)) {
-        if (reading <= specNum) {
-          updatedRecord[section].pass = true;
-          updatedRecord[section].fail = false;
-        } else {
-          updatedRecord[section].pass = false;
-          updatedRecord[section].fail = true;
-        }
+      // Ribs Status
+      if (!Number.isNaN(ribsVal) && !Number.isNaN(specNumRibs)) {
+        updatedRecord[section].ribsPass = ribsVal <= specNumRibs;
+        updatedRecord[section].ribsFail = ribsVal > specNumRibs;
+        updatedRecord[section].ribsStatus =
+          ribsVal <= specNumRibs ? "pass" : "fail";
       } else {
+        updatedRecord[section].ribsPass = false;
+        updatedRecord[section].ribsFail = false;
+        updatedRecord[section].ribsStatus = "";
+      }
+
+      // Overall Status (Synthesis)
+      // We wait for all available inputs before showing a row-level verdict
+      const isBodyMissing = Number.isNaN(bodyVal);
+      const isRibsMissing = ribsAvailable && Number.isNaN(ribsVal);
+
+      if (isBodyMissing || isRibsMissing) {
         updatedRecord[section].pass = false;
         updatedRecord[section].fail = false;
+        updatedRecord[section].status = "";
+      } else {
+        const hasFail =
+          updatedRecord[section].bodyFail ||
+          (ribsAvailable && updatedRecord[section].ribsFail);
+        let hasPass = false;
+        if (ribsAvailable) {
+          hasPass =
+            updatedRecord[section].bodyPass && updatedRecord[section].ribsPass;
+        } else {
+          hasPass = updatedRecord[section].bodyPass;
+        }
+
+        if (hasFail) {
+          updatedRecord[section].pass = false;
+          updatedRecord[section].fail = true;
+          updatedRecord[section].status = "fail";
+        } else if (hasPass) {
+          updatedRecord[section].pass = true;
+          updatedRecord[section].fail = false;
+          updatedRecord[section].status = "pass";
+        } else {
+          updatedRecord[section].pass = false;
+          updatedRecord[section].fail = false;
+          updatedRecord[section].status = "";
+        }
       }
 
       newRecords[recordIndex] = updatedRecord;
@@ -246,54 +414,103 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         newRecords[recordIndex].additional = {
           top: { body: "", ribs: "", pass: false, fail: false },
           middle: { body: "", ribs: "", pass: false, fail: false },
-          bottom: { body: "", ribs: "", pass: false, fail: false }
+          bottom: { body: "", ribs: "", pass: false, fail: false },
         };
       }
       newRecords[recordIndex].additional[section] = {
         ...newRecords[recordIndex].additional[section],
-        [field]: value
+        [field]: value,
       };
 
       // Auto-grading logic for additional readings
-      const specNum = Number(prev.aquaboySpec);
+      const specNumBody =
+        Number(prev.aquaboySpecBody) || Number(prev.aquaboySpec);
+      const specNumRibs =
+        Number(prev.aquaboySpecRibs) || Number(prev.aquaboySpec);
 
       const parseNumber = (v) => {
         if (v === undefined || v === null) return NaN;
         const s = String(v).trim();
         if (s === "") return NaN;
         const cleaned = s.replace(/[^0-9.\-]/g, "");
-        if (cleaned.length < 1) return NaN;
+        if (cleaned.length === 0) return NaN;
         const n = Number(cleaned);
         return Number.isFinite(n) ? n : NaN;
       };
 
       const bodyStr = String(
-        newRecords[recordIndex].additional[section].body || ""
+        newRecords[recordIndex].additional[section].body || "",
       ).trim();
       const ribsStr = String(
-        newRecords[recordIndex].additional[section].ribs || ""
+        newRecords[recordIndex].additional[section].ribs || "",
       ).trim();
 
       const bodyVal = parseNumber(bodyStr);
       const ribsVal = parseNumber(ribsStr);
 
-      let reading = NaN;
-      if (!Number.isNaN(bodyVal) && bodyStr.length >= 2) reading = bodyVal;
-      if (!Number.isNaN(ribsVal) && ribsStr.length >= 2) {
-        reading = Number.isNaN(reading) ? ribsVal : Math.max(reading, ribsVal);
+      // Body Status
+      if (!Number.isNaN(bodyVal) && !Number.isNaN(specNumBody)) {
+        newRecords[recordIndex].additional[section].bodyPass =
+          bodyVal <= specNumBody;
+        newRecords[recordIndex].additional[section].bodyFail =
+          bodyVal > specNumBody;
+        newRecords[recordIndex].additional[section].bodyStatus =
+          bodyVal <= specNumBody ? "pass" : "fail";
+      } else {
+        newRecords[recordIndex].additional[section].bodyPass = false;
+        newRecords[recordIndex].additional[section].bodyFail = false;
+        newRecords[recordIndex].additional[section].bodyStatus = "";
       }
 
-      if (!Number.isNaN(reading) && !Number.isNaN(specNum)) {
-        if (reading <= specNum) {
-          newRecords[recordIndex].additional[section].pass = true;
-          newRecords[recordIndex].additional[section].fail = false;
-        } else {
-          newRecords[recordIndex].additional[section].pass = false;
-          newRecords[recordIndex].additional[section].fail = true;
-        }
+      // Ribs Status
+      if (!Number.isNaN(ribsVal) && !Number.isNaN(specNumRibs)) {
+        newRecords[recordIndex].additional[section].ribsPass =
+          ribsVal <= specNumRibs;
+        newRecords[recordIndex].additional[section].ribsFail =
+          ribsVal > specNumRibs;
+        newRecords[recordIndex].additional[section].ribsStatus =
+          ribsVal <= specNumRibs ? "pass" : "fail";
       } else {
+        newRecords[recordIndex].additional[section].ribsPass = false;
+        newRecords[recordIndex].additional[section].ribsFail = false;
+        newRecords[recordIndex].additional[section].ribsStatus = "";
+      }
+
+      // Overall Status (Synthesis)
+      const isBodyMissing = Number.isNaN(bodyVal);
+      const isRibsMissing = ribsAvailable && Number.isNaN(ribsVal);
+
+      if (isBodyMissing || isRibsMissing) {
         newRecords[recordIndex].additional[section].pass = false;
         newRecords[recordIndex].additional[section].fail = false;
+        newRecords[recordIndex].additional[section].status = "";
+      } else {
+        const hasFail =
+          newRecords[recordIndex].additional[section].bodyFail ||
+          (ribsAvailable &&
+            newRecords[recordIndex].additional[section].ribsFail);
+        let hasPass = false;
+        if (ribsAvailable) {
+          hasPass =
+            newRecords[recordIndex].additional[section].bodyPass &&
+            newRecords[recordIndex].additional[section].ribsPass;
+        } else {
+          hasPass = newRecords[recordIndex].additional[section].bodyPass;
+        }
+
+        if (hasFail) {
+          newRecords[recordIndex].additional[section].pass = false;
+          newRecords[recordIndex].additional[section].fail = true;
+          newRecords[recordIndex].additional[section].status = "fail";
+        } else if (hasPass) {
+          newRecords[recordIndex].additional[section].pass = true;
+          newRecords[recordIndex].additional[section].fail = false;
+          newRecords[recordIndex].additional[section].status = "pass";
+        } else {
+          newRecords[recordIndex].additional[section].pass = false;
+          newRecords[recordIndex].additional[section].fail = false;
+          newRecords[recordIndex].additional[section].status = "";
+        }
       }
 
       return { ...prev, inspectionRecords: newRecords };
@@ -307,7 +524,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         "image/jpeg",
         "image/jpg",
         "image/png",
-        "image/webp"
+        "image/webp",
       ].includes(file.type);
       const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB limit
       return isValidType && isValidSize;
@@ -322,7 +539,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
             id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             preview: reader.result, // Base64 string
             name: file.name,
-            size: file.size
+            size: file.size,
           });
         };
         reader.readAsDataURL(file);
@@ -338,7 +555,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       const currentImages = newRecords[recordIndex].images || [];
       newRecords[recordIndex] = {
         ...newRecords[recordIndex],
-        images: [...currentImages, ...newImages]
+        images: [...currentImages, ...newImages],
       };
       return { ...prev, inspectionRecords: newRecords };
     });
@@ -352,7 +569,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       const currentImages = newRecords[recordIndex].images || [];
       newRecords[recordIndex] = {
         ...newRecords[recordIndex],
-        images: currentImages.filter((img) => img.id !== imageId)
+        images: currentImages.filter((img) => img.id !== imageId),
       };
       return { ...prev, inspectionRecords: newRecords };
     });
@@ -373,7 +590,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         Swal.fire({
           icon: "warning",
           title: "Validation Error",
-          text: "After Dry Room Time is required."
+          text: "After Dry Room Time is required.",
         });
         setIsSaving(false);
         return;
@@ -384,17 +601,17 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         top: {
           body: rec.top.body,
           ribs: rec.top.ribs,
-          status: rec.top.pass ? "pass" : rec.top.fail ? "fail" : ""
+          status: rec.top.pass ? "pass" : rec.top.fail ? "fail" : "",
         },
         middle: {
           body: rec.middle.body,
           ribs: rec.middle.ribs,
-          status: rec.middle.pass ? "pass" : rec.middle.fail ? "fail" : ""
+          status: rec.middle.pass ? "pass" : rec.middle.fail ? "fail" : "",
         },
         bottom: {
           body: rec.bottom.body,
           ribs: rec.bottom.ribs,
-          status: rec.bottom.pass ? "pass" : rec.bottom.fail ? "fail" : ""
+          status: rec.bottom.pass ? "pass" : rec.bottom.fail ? "fail" : "",
         },
         additional: rec.additional
           ? {
@@ -404,8 +621,8 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                 status: rec.additional.top?.pass
                   ? "pass"
                   : rec.additional.top?.fail
-                  ? "fail"
-                  : ""
+                    ? "fail"
+                    : "",
               },
               middle: {
                 body: rec.additional.middle?.body || "",
@@ -413,8 +630,8 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                 status: rec.additional.middle?.pass
                   ? "pass"
                   : rec.additional.middle?.fail
-                  ? "fail"
-                  : ""
+                    ? "fail"
+                    : "",
               },
               bottom: {
                 body: rec.additional.bottom?.body || "",
@@ -422,9 +639,9 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                 status: rec.additional.bottom?.pass
                   ? "pass"
                   : rec.additional.bottom?.fail
-                  ? "fail"
-                  : ""
-              }
+                    ? "fail"
+                    : "",
+              },
             }
           : undefined,
         images: rec.images || [],
@@ -441,7 +658,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
           rec.afterDryRoomTime ||
           rec.afterDryRoom ||
           "",
-        generalRemark: formData.generalRemark || rec.remark || ""
+        generalRemark: formData.generalRemark || rec.remark || "",
       }));
 
       const previousHistory = report.history || [];
@@ -452,7 +669,8 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       const payload = {
         ...formData,
         history: newHistory,
-        inspectionRecords: [lastEditedRecord]
+        ribsAvailable: ribsAvailable,
+        inspectionRecords: [lastEditedRecord],
       };
 
       const response = await fetch(
@@ -460,8 +678,8 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        }
+          body: JSON.stringify(payload),
+        },
       );
       const result = await response.json();
       if (response.ok) {
@@ -470,7 +688,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
           title: "Success",
           text: "Report updated successfully!",
           timer: 2000,
-          showConfirmButton: false
+          showConfirmButton: false,
         });
         onUpdate();
         onCancel();
@@ -478,7 +696,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: result.message || "Failed to update report"
+          text: result.message || "Failed to update report",
         });
       }
     } catch (err) {
@@ -486,7 +704,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: "Error updating report"
+        text: "Error updating report",
       });
     } finally {
       setIsSaving(false);
@@ -634,9 +852,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                     }}
                   >
                     <svg
-                      className={`fill-current h-4 w-4 transition-transform ${
-                        showColorDropdown ? "rotate-180" : ""
-                      }`}
+                      className={`fill-current h-4 w-4 transition-transform ${showColorDropdown ? "rotate-180" : ""}`}
                       xmlns="http://www.w3.org/2000/svg"
                       viewBox="0 0 20 20"
                     >
@@ -653,7 +869,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                               !colorSearch ||
                               c
                                 .toLowerCase()
-                                .includes(colorSearch.toLowerCase())
+                                .includes(colorSearch.toLowerCase()),
                           )
                           .map((color, idx) => (
                             <div
@@ -683,13 +899,16 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  Aquaboy Reading Spec
+                  Aquaboy Reading Spec (Body)
                 </label>
                 <input
                   type="text"
-                  value={formData.aquaboySpec}
+                  value={formData.aquaboySpecBody}
                   onChange={(e) =>
-                    setFormData({ ...formData, aquaboySpec: e.target.value })
+                    setFormData({
+                      ...formData,
+                      aquaboySpecBody: e.target.value,
+                    })
                   }
                   readOnly
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
@@ -705,10 +924,27 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      beforeDryRoomTime: e.target.value
+                      beforeDryRoomTime: e.target.value,
                     })
                   }
                   disabled
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Aquaboy Reading Spec (Ribs)
+                </label>
+                <input
+                  type="text"
+                  value={formData.aquaboySpecRibs}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      aquaboySpecRibs: e.target.value,
+                    })
+                  }
+                  readOnly
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
                 />
               </div>
@@ -722,7 +958,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      afterDryRoomTime: e.target.value
+                      afterDryRoomTime: e.target.value,
                     })
                   }
                   onClick={() => {
@@ -730,11 +966,11 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                       const now = new Date();
                       const timeString = now.toLocaleTimeString("en-GB", {
                         hour: "2-digit",
-                        minute: "2-digit"
+                        minute: "2-digit",
                       });
                       setFormData((prev) => ({
                         ...prev,
-                        afterDryRoomTime: timeString
+                        afterDryRoomTime: timeString,
                       }));
                     }
                   }}
@@ -774,9 +1010,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                   return (
                     <div
                       key={index}
-                      className={`border rounded-lg p-4 ${
-                        isPassed ? "bg-green-50 border-green-200" : "bg-gray-50"
-                      }`}
+                      className={`border rounded-lg p-4 ${isPassed ? "bg-green-50 border-green-200" : "bg-gray-50"}`}
                     >
                       <div
                         className="flex justify-between items-center cursor-pointer mb-2"
@@ -797,58 +1031,32 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                           {["top", "middle", "bottom"].map((section) => (
                             <div
                               key={section}
-                              className="flex flex-col md:flex-row gap-4 items-center p-3 rounded shadow-sm bg-white"
+                              className="flex flex-col md:flex-row gap-4 w-full items-center p-3 rounded-xl shadow-sm bg-white border border-gray-100"
                             >
-                              <div className="w-20 font-semibold capitalize">
+                              <div className="w-20 font-bold capitalize text-gray-700">
                                 {section}
                               </div>
-                              <div className="flex-1">
-                                <input
-                                  type="number"
-                                  placeholder="Body"
-                                  value={record[section].body}
-                                  onChange={(e) =>
-                                    updateSectionData(
-                                      index,
-                                      section,
-                                      "body",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="px-3 w-full border rounded p-1"
-                                />
-                              </div>
-                              {ribsAvailable && (
+
+                              {/* Body Reading + Status */}
+                              <div className="flex flex-1 items-center gap-2 w-full">
                                 <div className="flex-1">
                                   <input
                                     type="number"
-                                    placeholder="Ribs"
-                                    value={record[section].ribs}
+                                    placeholder="Body"
+                                    value={record[section].body}
                                     onChange={(e) =>
                                       updateSectionData(
                                         index,
                                         section,
-                                        "ribs",
-                                        e.target.value
+                                        "body",
+                                        e.target.value,
                                       )
                                     }
-                                    className="px-3 w-full border rounded p-1"
+                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
                                   />
                                 </div>
-                              )}
-                              <div className="flex items-center gap-2">
-                                {!record[section].fail && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setPassFail(index, section, true)
-                                    }
-                                    className={`inline-flex items-center px-2 py-1 rounded-full text-sm font-semibold transition-colors ${
-                                      record[section].pass
-                                        ? "bg-green-100 text-green-600"
-                                        : "bg-gray-100 text-gray-400 hover:bg-gray-200"
-                                    }`}
-                                  >
+                                {record[section].bodyPass ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
                                     <svg
                                       className="w-3 h-3 mr-1"
                                       fill="none"
@@ -863,20 +1071,9 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                       />
                                     </svg>
                                     Pass
-                                  </button>
-                                )}
-                                {!record[section].pass && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setPassFail(index, section, false)
-                                    }
-                                    className={`inline-flex items-center px-2 py-1 rounded-full text-sm font-semibold transition-colors ${
-                                      record[section].fail
-                                        ? "bg-red-100 text-red-500"
-                                        : "bg-gray-100 text-gray-400 hover:bg-gray-200"
-                                    }`}
-                                  >
+                                  </span>
+                                ) : record[section].bodyFail ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
                                     <svg
                                       className="w-3 h-3 mr-1"
                                       fill="none"
@@ -891,9 +1088,73 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                       />
                                     </svg>
                                     Fail
-                                  </button>
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400 text-xs px-2 italic">
+                                    N/A
+                                  </span>
                                 )}
                               </div>
+
+                              {ribsAvailable && (
+                                <div className="flex flex-1 items-center gap-2 w-full">
+                                  <div className="flex-1">
+                                    <input
+                                      type="number"
+                                      placeholder="Ribs"
+                                      value={record[section].ribs}
+                                      onChange={(e) =>
+                                        updateSectionData(
+                                          index,
+                                          section,
+                                          "ribs",
+                                          e.target.value,
+                                        )
+                                      }
+                                      className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                                    />
+                                  </div>
+                                  {record[section].ribsPass ? (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
+                                      <svg
+                                        className="w-3 h-3 mr-1"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M5 13l4 4L19 7"
+                                        />
+                                      </svg>
+                                      Pass
+                                    </span>
+                                  ) : record[section].ribsFail ? (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
+                                      <svg
+                                        className="w-3 h-3 mr-1"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M6 18L18 6M6 6l12 12"
+                                        />
+                                      </svg>
+                                      Fail
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400 text-xs px-2 italic">
+                                      N/A
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -994,9 +1255,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                   return (
                     <div
                       key={`add-${index}`}
-                      className={`mb-4 p-4 rounded border ${
-                        isPassed ? "bg-green-50 border-green-200" : "bg-gray-50"
-                      }`}
+                      className={`mb-4 p-4 rounded border ${isPassed ? "bg-green-50 border-green-200" : "bg-gray-50"}`}
                     >
                       <div className="flex justify-between items-center mb-2">
                         <h4 className="font-semibold">
@@ -1006,40 +1265,131 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                       {["top", "middle", "bottom"].map((section) => (
                         <div
                           key={section}
-                          className="flex gap-4 mb-2 items-center"
+                          className="flex flex-col md:flex-row gap-4 w-full items-center mb-3"
                         >
-                          <span className="w-16 capitalize text-sm font-medium">
+                          <span className="w-20 font-bold capitalize text-gray-700">
                             {section}
                           </span>
-                          <input
-                            type="number"
-                            placeholder="Body"
-                            value={record.additional?.[section]?.body || ""}
-                            onChange={(e) =>
-                              updateAdditionalSectionData(
-                                index,
-                                section,
-                                "body",
-                                e.target.value
-                              )
-                            }
-                            className="border rounded p-1 w-24"
-                          />
+
+                          {/* Body Reading + Status */}
+                          <div className="flex flex-1 items-center gap-2 w-full">
+                            <div className="flex-1">
+                              <input
+                                type="number"
+                                placeholder="Body"
+                                value={record.additional?.[section]?.body || ""}
+                                onChange={(e) =>
+                                  updateAdditionalSectionData(
+                                    index,
+                                    section,
+                                    "body",
+                                    e.target.value,
+                                  )
+                                }
+                                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                              />
+                            </div>
+                            {record.additional?.[section]?.bodyPass ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
+                                <svg
+                                  className="w-3 h-3 mr-1"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M5 13l4 4L19 7"
+                                  />
+                                </svg>
+                                Pass
+                              </span>
+                            ) : record.additional?.[section]?.bodyFail ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
+                                <svg
+                                  className="w-3 h-3 mr-1"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                  />
+                                </svg>
+                                Fail
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-xs px-2 italic">
+                                N/A
+                              </span>
+                            )}
+                          </div>
+
                           {ribsAvailable && (
-                            <input
-                              type="number"
-                              placeholder="Ribs"
-                              value={record.additional?.[section]?.ribs || ""}
-                              onChange={(e) =>
-                                updateAdditionalSectionData(
-                                  index,
-                                  section,
-                                  "ribs",
-                                  e.target.value
-                                )
-                              }
-                              className="border rounded p-1 w-24"
-                            />
+                            <div className="flex flex-1 items-center gap-2 w-full">
+                              <div className="flex-1">
+                                <input
+                                  type="number"
+                                  placeholder="Ribs"
+                                  value={
+                                    record.additional?.[section]?.ribs || ""
+                                  }
+                                  onChange={(e) =>
+                                    updateAdditionalSectionData(
+                                      index,
+                                      section,
+                                      "ribs",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                                />
+                              </div>
+                              {record.additional?.[section]?.ribsPass ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
+                                  <svg
+                                    className="w-3 h-3 mr-1"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M5 13l4 4L19 7"
+                                    />
+                                  </svg>
+                                  Pass
+                                </span>
+                              ) : record.additional?.[section]?.ribsFail ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
+                                  <svg
+                                    className="w-3 h-3 mr-1"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M6 18L18 6M6 6l12 12"
+                                    />
+                                  </svg>
+                                  Fail
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-xs px-2 italic">
+                                  N/A
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
                       ))}

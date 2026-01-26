@@ -6,9 +6,9 @@ dotenv.config();
 
 // Initialize VAPID
 webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT || "mailto:admin@example.com",
+  process.env.VAPID_SUBJECT,
   process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
+  process.env.VAPID_PRIVATE_KEY,
 );
 
 // 1. Get Public Key (Frontend needs this)
@@ -34,9 +34,9 @@ export const subscribeUser = async (req, res) => {
         empId,
         endpoint: subscription.endpoint,
         keys: subscription.keys,
-        userAgent
+        userAgent,
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
     res.status(201).json({ success: true, message: "Subscribed successfully" });
@@ -60,9 +60,9 @@ export const sendPushToUser = async (empId, payload) => {
         await webpush.sendNotification(
           {
             endpoint: sub.endpoint,
-            keys: sub.keys
+            keys: sub.keys,
           },
-          JSON.stringify(payload)
+          JSON.stringify(payload),
         );
       } catch (error) {
         // 410 Gone means the subscription is no longer valid (user cleared cache/unsubscribed)
@@ -89,25 +89,25 @@ export const verifySubscription = async (req, res) => {
       return res.status(400).json({
         success: false,
         exists: false,
-        message: "empId and endpoint required"
+        message: "empId and endpoint required",
       });
     }
 
     const subscription = await FincheckPushSubscription.findOne({
       empId: empId,
-      endpoint: endpoint
+      endpoint: endpoint,
     });
 
     return res.status(200).json({
       success: true,
-      exists: !!subscription
+      exists: !!subscription,
     });
   } catch (error) {
     console.error("Verify subscription error:", error);
     return res.status(500).json({
       success: false,
       exists: false,
-      error: error.message
+      error: error.message,
     });
   }
 };

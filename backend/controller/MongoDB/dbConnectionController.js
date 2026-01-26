@@ -140,7 +140,7 @@ export const ymEcoConnection = mongoose.createConnection(
 );
 //Connection status
 ymEcoConnection.on("connected", () =>
-  console.log("✅ Connected to ym_eco_board database...")
+  console.log("✅ Connected to ym_eco_board database..."),
 );
 ymEcoConnection.on("error", (err) => console.error("❌ unexpected error:", err));
 
