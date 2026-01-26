@@ -198,6 +198,7 @@ import QASections_Shipping_Stage from "./routes/PivotY/QASections/QASections_Shi
 ------------------------------ */
 
 import QASections_Measurement_Specs from "./routes/PivotY/QASections/QASections_Measurement_Specs_Route.js";
+import ModifyDTSpec from "./routes/PivotY/QASections/DTModify/DTModifyRoutes.js";
 
 /* ------------------------------
   PivotY - QA Templates
@@ -209,6 +210,8 @@ PivotY - Fincheck Inspection
 ------------------------------ */
 import FincheckInspection from "./routes/PivotY/FincheckInspection/FincheckInspection_Route.js";
 import FincheckInspection_Report from "./routes/PivotY/FincheckInspection/FincheckInspection_Report_Route.js";
+import FincheckInspection_Approval from "./routes/PivotY/FincheckInspection/FincheckInspection_Approval_Route.js";
+import FincheckNotificationGroup from "./routes/PivotY/FincheckInspection/FincheckNotificationGroup_Routes.js";
 
 /* ------------------------------
  P88 Data Upoad Routes
@@ -216,6 +219,7 @@ import FincheckInspection_Report from "./routes/PivotY/FincheckInspection/Finche
 import p88Upload from "./routes/PivotY/P88Data/uploadP88DataRoutes.js";
 import p88Summarydata from "./routes/PivotY/P88Data/summaryP88DataRoutes.js";
 import downloadP88Report from "./routes/PivotY/P88Data/downloadP88ReportRoutes.js";
+import p88failedReports from "./routes/PivotY/P88Data/p88failedReportsRoutes.js";
 
 /* -----------------------------
 QA Random Inspection Imports
@@ -509,6 +513,7 @@ app.use(QASections_Shipping_Stage);
   PivotY - QA Measurements routes
 ------------------------------ */
 app.use(QASections_Measurement_Specs);
+app.use(ModifyDTSpec);
 
 /* ------------------------------
   PivotY - QA Templates routes
@@ -520,6 +525,8 @@ PivotY - Fincheck Inspection routes
 ------------------------------ */
 app.use(FincheckInspection);
 app.use(FincheckInspection_Report);
+app.use(FincheckInspection_Approval);
+app.use(FincheckNotificationGroup);
 
 /* ------------------------------
  P88 Data Upoad Routes
@@ -527,6 +534,7 @@ app.use(FincheckInspection_Report);
 app.use(p88Upload);
 app.use(p88Summarydata);
 app.use(downloadP88Report);
+app.use(p88failedReports);
 
 /* -----------------------------
   QA Random Inspection Routes
@@ -650,5 +658,5 @@ app.get("/api/health", (req, res) => {
 
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`HTTP Server is running on http://localhost:${PORT}`);
+  console.log(`HTTPS Server is running on https://localhost:${PORT}`);
 });

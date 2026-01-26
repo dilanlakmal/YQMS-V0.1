@@ -8,24 +8,24 @@ export default defineConfig({
   assetsInclude: ["**/*.ttf"],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src")
-    }
+      "@": path.resolve(__dirname, "./src"),
+    },
   },
   optimizeDeps: {
-    include: ["jspdf", "jspdf-autotable"]
+    include: ["jspdf", "jspdf-autotable"],
   },
   server: {
     host: "0.0.0.0",
     port: 3001,
     open: true,
-    // https: {
-    //   key: fs.readFileSync(
-    //     "./backend/Config/192.167.6.207-key.pem"
-    //   ),
-    //   cert: fs.readFileSync(
-    //     "./backend/Config/192.167.6.207.pem"
-    //   )
-    // }
+    https: {
+      key: fs.readFileSync(
+        "./backend/Config/192.167.14.235-key.pem"
+      ),
+      cert: fs.readFileSync(
+        "./backend/Config/192.167.14.235.pem"
+      )
+    }
   },
   build: {
     //minify: false, // Use esbuild for minification
@@ -33,8 +33,8 @@ export default defineConfig({
     chunkSizeWarningLimit: 20000,
     rollupOptions: {
       manualChunks: {
-        "jspdf-autotable": ["jspdf-autotable"]
-      }
-    }
-  }
+        "jspdf-autotable": ["jspdf-autotable"],
+      },
+    },
+  },
 });

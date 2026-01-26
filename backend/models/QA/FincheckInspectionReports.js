@@ -40,7 +40,11 @@ const createFincheckInspectionReportsModel = (connection) => {
       supplier: { type: String, default: "" },
       isSubCon: { type: Boolean, default: false },
       subConFactory: { type: String, default: "" },
-      subConFactoryId: { type: mongoose.Schema.Types.ObjectId, default: null },
+      subConFactoryId: {
+        type: mongoose.Schema.Types.ObjectId,
+        default: null,
+        ref: "SubconSewingFactory"
+      },
       factory: { type: String, default: "" },
 
       inspectedQty: { type: Number, default: null },
@@ -129,6 +133,23 @@ const createFincheckInspectionReportsModel = (connection) => {
     { _id: false }
   );
 
+  // Define the innermost assignment schema (Enforces Number on Qty)
+  const InspectionAssignmentSchema = new mongoose.Schema(
+    {
+      // We explicitly define qty to force it to be a Number
+      qty: { type: Number, default: 0 }
+    },
+    { _id: false, strict: false }
+  );
+
+  // Define the Group schema containing assignments
+  const InspectionConfigGroupSchema = new mongoose.Schema(
+    {
+      assignments: [InspectionAssignmentSchema]
+    },
+    { _id: false, strict: false }
+  );
+
   // --- Inspection Config Schema ---
   const InspectionConfigItemSchema = new mongoose.Schema(
     {
@@ -136,7 +157,8 @@ const createFincheckInspectionReportsModel = (connection) => {
       inspectionMethod: { type: String, default: "Fixed" }, // "AQL" or "Fixed"
       sampleSize: { type: Number, default: 0 }, // Total Calculated Qty
       // Stores the array of groups (Line, Table, Color, Assignments) dynamically
-      configGroups: { type: mongoose.Schema.Types.Mixed, default: [] },
+      configGroups: { type: [InspectionConfigGroupSchema], default: [] },
+      //configGroups: { type: mongoose.Schema.Types.Mixed, default: [] },
       updatedAt: { type: Date, default: Date.now }
     },
     { _id: false }
@@ -167,6 +189,9 @@ const createFincheckInspectionReportsModel = (connection) => {
     {
       // Context / Config Link
       groupId: { type: Number, required: true }, // Matches the ID from InspectionConfig
+
+      // Distinguishes between Tab 1 and Tab 2 ***
+      stage: { type: String, enum: ["Before", "After"], default: "Before" },
 
       // Scopes
       line: { type: String, default: "" },
@@ -421,7 +446,16 @@ const createFincheckInspectionReportsModel = (connection) => {
     { _id: false }
   );
 
-  // 3. Main Report Schema
+  // --- Resubmission History Sub-Schema ---
+  const ResubmissionHistorySchema = new mongoose.Schema(
+    {
+      resubmissionNo: { type: Number, required: true },
+      resubmissionDate: { type: Date, default: Date.now }
+    },
+    { _id: false }
+  );
+
+  // Main Report Schema
   const FincheckInspectionReportsSchema = new mongoose.Schema(
     {
       inspectionDate: { type: Date, required: true },
@@ -450,13 +484,13 @@ const createFincheckInspectionReportsModel = (connection) => {
       empName: { type: String },
       measurementMethod: {
         type: String,
-        enum: ["Before", "After", "N/A"],
+        enum: ["Before", "After", "N/A", "No"],
         default: "N/A"
       },
       inspectionMethod: {
         type: String,
-        enum: ["Fixed", "AQL", "N/A"],
-        default: "N/A"
+        enum: ["Fixed", "AQL", "N/A", "No"],
+        default: "AQL"
       },
 
       // --- Report ID is a Number ---
@@ -470,6 +504,7 @@ const createFincheckInspectionReportsModel = (connection) => {
         enum: ["draft", "in_progress", "completed", "cancelled"],
         default: "draft"
       },
+      resubmissionHistory: { type: [ResubmissionHistorySchema], default: [] },
       inspectionDetails: InspectionDetailsSchema,
       // --- Header Data Array ---
       headerData: { type: [HeaderDataItemSchema], default: [] },

@@ -13,7 +13,147 @@ import {
   Percent,
   Hash
 } from "lucide-react";
-import { checkTolerance } from "../QATemplates/YPivotQATemplatesHelpers";
+
+/**
+ * Sort sizes based on a reference SizeList order
+ * Sizes not in SizeList will be placed at the end, sorted alphabetically
+ * @param {string[]} sizes - Array of size strings to sort
+ * @param {string[]} sizeList - Reference order from DtOrder.SizeList
+ * @returns {string[]} Sorted sizes array
+ */
+
+export const sortSizesByReference = (sizes, sizeList = []) => {
+  if (!sizeList || sizeList.length === 0) {
+    return [...sizes].sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true })
+    );
+  }
+
+  // Create a map for quick index lookup
+  const orderMap = new Map();
+  sizeList.forEach((size, index) => {
+    orderMap.set(size, index);
+  });
+
+  // HELPER: Remove (A), (B) suffix to match the reference list
+  const cleanSize = (s) => {
+    if (!s) return "";
+    return s.replace(/\s*\([AB]\)$/i, "").trim();
+  };
+
+  return [...sizes].sort((a, b) => {
+    // Clean the sizes before looking them up
+    const realA = cleanSize(a);
+    const realB = cleanSize(b);
+
+    const indexA = orderMap.has(realA) ? orderMap.get(realA) : Infinity;
+    const indexB = orderMap.has(realB) ? orderMap.get(realB) : Infinity;
+
+    // If both are in the reference list, sort by their order
+    if (indexA !== Infinity && indexB !== Infinity) {
+      return indexA - indexB;
+    }
+
+    // If only one is in the list, it comes first
+    if (indexA !== Infinity) return -1;
+    if (indexB !== Infinity) return 1;
+
+    // Both are not in the list, sort alphabetically
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
+};
+
+// ============================================================================
+// TOLERANCE UTILITIES
+// ============================================================================
+
+/**
+ * Normalize decimal tolerance for CALCULATION: Always use absolute value
+ */
+const normalizeToleranceDecimal = (value) => {
+  if (value === null || value === undefined) return 0;
+  const num = parseFloat(value);
+  if (isNaN(num)) return 0;
+  return Math.abs(num);
+};
+
+/**
+ * Normalize Tol- for DISPLAY: Always negative (unless 0 or empty)
+ */
+const normalizeTolMinusDisplay = (value) => {
+  if (!value || value === "-" || value === "0" || value === 0) {
+    return value === 0 ? "0" : value || "-";
+  }
+
+  const strVal = String(value).trim();
+  if (strVal === "0") return "0";
+  if (strVal.startsWith("-")) return strVal;
+  return `-${strVal}`;
+};
+
+/**
+ * Normalize Tol+ for DISPLAY: Always positive (unless 0 or empty)
+ */
+const normalizeTolPlusDisplay = (value) => {
+  if (!value || value === "-" || value === "0" || value === 0) {
+    return value === 0 ? "0" : value || "-";
+  }
+
+  const strVal = String(value).trim();
+  if (strVal === "0") return "0";
+  if (strVal.startsWith("-")) return strVal.substring(1);
+  return strVal;
+};
+
+/**
+ * Check if measured value is within tolerance
+ * @param {Object} spec - The specification object containing TolPlus and TolMinus
+ * @param {number} value - The measured decimal value (deviation from spec)
+ * @returns {Object} { isWithin: boolean, isDefault: boolean }
+ */
+export const checkTolerance = (spec, value) => {
+  // Empty/zero values are considered within tolerance by default
+  if (value === 0 || value === "" || value === null || value === undefined) {
+    return { isWithin: true, isDefault: true };
+  }
+
+  const reading = parseFloat(value);
+  if (isNaN(reading)) {
+    return { isWithin: true, isDefault: true };
+  }
+
+  // Get tolerance decimal values
+  const tolMinusDecimal = parseFloat(spec.TolMinus?.decimal);
+  const tolPlusDecimal = parseFloat(spec.TolPlus?.decimal);
+
+  // If both tolerance values are not available, consider within tolerance
+  if (isNaN(tolMinusDecimal) && isNaN(tolPlusDecimal)) {
+    return { isWithin: true, isDefault: true };
+  }
+
+  // TolMinus represents lower bound - always use as negative (or 0)
+  // TolPlus represents upper bound - always use as positive (or 0)
+  const lowerLimit = isNaN(tolMinusDecimal) ? 0 : -Math.abs(tolMinusDecimal);
+  const upperLimit = isNaN(tolPlusDecimal) ? 0 : Math.abs(tolPlusDecimal);
+
+  // Check if reading is within range (with small epsilon for floating point)
+  const epsilon = 0.0001;
+  const isWithin =
+    reading >= lowerLimit - epsilon && reading <= upperLimit + epsilon;
+
+  return { isWithin, isDefault: false, upperLimit, lowerLimit };
+};
+
+/**
+ * Format spec fraction value for display
+ * Converts "19-1/2" to "19 1/2" (replaces dash with space between whole number and fraction)
+ */
+const formatSpecFraction = (fractionStr) => {
+  if (!fractionStr || fractionStr === "-") return fractionStr || "-";
+  // Replace dash between whole number and fraction with space
+  // e.g., "19-1/2" → "19 1/2"
+  return String(fractionStr).replace(/(\d)-(\d)/g, "$1 $2");
+};
 
 // ============================================================================
 // EXPORTED UTILITIES
@@ -62,48 +202,57 @@ export const groupMeasurementsByGroupId = (savedMeasurements) => {
 
 /**
  * Build table structure for a group of measurements
+ * @param {Array} measurements - Array of measurement objects
+ * @param {Array} sizeList - Reference size order from DtOrder.SizeLis
  */
-export const buildTableData = (measurements) => {
-  const sortedMeasurements = [...measurements].sort((a, b) => {
-    const sizeA = a.size || "";
-    const sizeB = b.size || "";
-    return sizeA.localeCompare(sizeB, undefined, { numeric: true });
-  });
+export const buildTableData = (measurements, sizeList = []) => {
+  const validMeasurements = measurements.filter(
+    (m) => m.size !== "Manual_Entry"
+  );
+  // Get unique sizes and sort by reference list
+  const uniqueSizes = [...new Set(validMeasurements.map((m) => m.size))];
+  const sortedSizes = sortSizesByReference(uniqueSizes, sizeList);
 
-  return sortedMeasurements.map((m) => {
-    const columns = [];
+  // Build data in the correct order
+  return sortedSizes
+    .map((size) => {
+      const m = measurements.find((meas) => meas.size === size);
+      if (!m) return null;
 
-    const allEnabledPcs = Array.from(m.allEnabledPcs || []);
-    allEnabledPcs
-      .sort((a, b) => a - b)
-      .forEach((pcsIndex) => {
-        columns.push({
-          pcsIndex,
-          pcsNumber: columns.length + 1,
-          isAllMode: true,
-          measurements: m.allMeasurements || {}
+      const columns = [];
+
+      const allEnabledPcs = Array.from(m.allEnabledPcs || []);
+      allEnabledPcs
+        .sort((a, b) => a - b)
+        .forEach((pcsIndex) => {
+          columns.push({
+            pcsIndex,
+            pcsNumber: columns.length + 1,
+            isAllMode: true,
+            measurements: m.allMeasurements || {}
+          });
         });
-      });
 
-    const criticalEnabledPcs = Array.from(m.criticalEnabledPcs || []);
-    criticalEnabledPcs
-      .sort((a, b) => a - b)
-      .forEach((pcsIndex) => {
-        columns.push({
-          pcsIndex,
-          pcsNumber: columns.length + 1,
-          isAllMode: false,
-          measurements: m.criticalMeasurements || {}
+      const criticalEnabledPcs = Array.from(m.criticalEnabledPcs || []);
+      criticalEnabledPcs
+        .sort((a, b) => a - b)
+        .forEach((pcsIndex) => {
+          columns.push({
+            pcsIndex,
+            pcsNumber: columns.length + 1,
+            isAllMode: false,
+            measurements: m.criticalMeasurements || {}
+          });
         });
-      });
 
-    return {
-      size: m.size,
-      kValue: m.kValue,
-      inspectorDecision: m.inspectorDecision,
-      columns
-    };
-  });
+      return {
+        size: m.size,
+        kValue: m.kValue,
+        inspectorDecision: m.inspectorDecision,
+        columns
+      };
+    })
+    .filter(Boolean); // Remove nulls
 };
 
 /**
@@ -136,7 +285,7 @@ export const calculateGroupStats = (
         if (value === 0) {
           passPoints++;
         } else {
-          const toleranceResult = checkTolerance(spec, value, m.size);
+          const toleranceResult = checkTolerance(spec, value);
           if (toleranceResult.isWithin || toleranceResult.isDefault) {
             passPoints++;
           } else {
@@ -167,7 +316,7 @@ export const calculateGroupStats = (
         if (value === 0) {
           passPoints++;
         } else {
-          const toleranceResult = checkTolerance(spec, value, m.size);
+          const toleranceResult = checkTolerance(spec, value);
           if (toleranceResult.isWithin || toleranceResult.isDefault) {
             passPoints++;
           } else {
@@ -379,7 +528,7 @@ export const MeasurementLegend = ({ compact = false }) => (
       <span
         className={`${compact ? "text-[9px]" : "text-[10px]"} text-gray-600`}
       >
-        Pass
+        Within Tol
       </span>
     </div>
     <div className="flex items-center gap-1">
@@ -391,7 +540,7 @@ export const MeasurementLegend = ({ compact = false }) => (
       <span
         className={`${compact ? "text-[9px]" : "text-[10px]"} text-gray-600`}
       >
-        Fail
+        Out of Tol
       </span>
     </div>
   </div>
@@ -404,9 +553,10 @@ export const MeasurementSummaryTable = ({
   measurements,
   specsData,
   selectedSpecsList,
+  sizeList = [],
   compact = false
 }) => {
-  const tableData = buildTableData(measurements);
+  const tableData = buildTableData(measurements, sizeList);
 
   const isCriticalSpec = useMemo(() => {
     const criticalIds = new Set((selectedSpecsList || []).map((s) => s.id));
@@ -444,7 +594,9 @@ export const MeasurementSummaryTable = ({
         }`}
       >
         <thead>
+          {/* --- HEADER ROW 1 --- */}
           <tr className="bg-gray-100 dark:bg-gray-800">
+            {/* 1. Point Name Header */}
             <th
               rowSpan={2}
               className={`border border-gray-300 dark:border-gray-600 ${
@@ -460,12 +612,36 @@ export const MeasurementSummaryTable = ({
                 <span>Point</span>
               </div>
             </th>
+
+            {/* 2. Tolerance Headers */}
+            <th
+              rowSpan={2}
+              className={`border border-gray-300 dark:border-gray-600 ${
+                compact ? "p-1" : "p-1.5"
+              } text-center bg-red-50 dark:bg-red-900/20 w-[50px]`}
+            >
+              <span className="text-red-600 dark:text-red-400 font-bold">
+                TOL (-)
+              </span>
+            </th>
+            <th
+              rowSpan={2}
+              className={`border border-gray-300 dark:border-gray-600 ${
+                compact ? "p-1" : "p-1.5"
+              } text-center bg-green-50 dark:bg-green-900/20 w-[50px]`}
+            >
+              <span className="text-green-600 dark:text-green-400 font-bold">
+                TOL (+)
+              </span>
+            </th>
+
+            {/* 3. Size Headers */}
             {tableData.map(
               (sizeData, sIdx) =>
                 sizeData.columns.length > 0 && (
                   <th
                     key={sIdx}
-                    colSpan={sizeData.columns.length}
+                    colSpan={sizeData.columns.length + 1}
                     className={`border border-gray-300 dark:border-gray-600 ${
                       compact ? "p-1" : "p-1.5"
                     } text-center bg-indigo-100 dark:bg-indigo-900/40`}
@@ -486,43 +662,71 @@ export const MeasurementSummaryTable = ({
                 )
             )}
           </tr>
+
+          {/* --- HEADER ROW 2 --- */}
           <tr className="bg-gray-50 dark:bg-gray-700">
-            {tableData.map((sizeData, sIdx) =>
-              sizeData.columns.map((col, cIdx) => (
-                <th
-                  key={`${sIdx}-${cIdx}`}
-                  className={`border border-gray-300 dark:border-gray-600 ${
-                    compact ? "p-1" : "p-1.5"
-                  } text-center min-w-[40px] ${
-                    col.isAllMode
-                      ? "bg-purple-100 dark:bg-purple-900/40"
-                      : "bg-amber-100 dark:bg-amber-900/40"
-                  }`}
-                >
-                  <div
-                    className={`${
-                      compact ? "text-[9px]" : "text-[10px]"
-                    } font-bold`}
+            {tableData.map((sizeData, sIdx) => (
+              <React.Fragment key={sIdx}>
+                {/* 1. Spec Sub-Header */}
+                {sizeData.columns.length > 0 && (
+                  <th
+                    className={`border border-gray-300 dark:border-gray-600 ${
+                      compact ? "p-1" : "p-1.5"
+                    } text-center bg-blue-50 dark:bg-blue-900/20`}
                   >
-                    #{col.pcsNumber}
-                  </div>
-                  <div
-                    className={`text-[7px] font-bold px-1 py-0.5 rounded inline-block ${
+                    <span
+                      className={`font-bold text-blue-600 dark:text-blue-400 ${
+                        compact ? "text-[9px]" : "text-[10px]"
+                      }`}
+                    >
+                      Spec
+                    </span>
+                  </th>
+                )}
+
+                {/* 2. Reading Headers (#1, #2...) */}
+                {sizeData.columns.map((col, cIdx) => (
+                  <th
+                    key={`${sIdx}-${cIdx}`}
+                    className={`border border-gray-300 dark:border-gray-600 ${
+                      compact ? "p-1" : "p-1.5"
+                    } text-center min-w-[40px] ${
                       col.isAllMode
-                        ? "bg-purple-500 text-white"
-                        : "bg-amber-500 text-white"
+                        ? "bg-purple-100 dark:bg-purple-900/40"
+                        : "bg-amber-100 dark:bg-amber-900/40"
                     }`}
                   >
-                    {col.isAllMode ? "A" : "C"}
-                  </div>
-                </th>
-              ))
-            )}
+                    <div
+                      className={`${
+                        compact ? "text-[9px]" : "text-[10px]"
+                      } font-bold`}
+                    >
+                      #{col.pcsNumber}
+                    </div>
+                    <div
+                      className={`text-[7px] font-bold px-1 py-0.5 rounded inline-block ${
+                        col.isAllMode
+                          ? "bg-purple-500 text-white"
+                          : "bg-amber-500 text-white"
+                      }`}
+                    >
+                      {col.isAllMode ? "A" : "C"}
+                    </div>
+                  </th>
+                ))}
+              </React.Fragment>
+            ))}
           </tr>
         </thead>
         <tbody>
           {displaySpecs.map((spec, specIdx) => {
             const isCritical = isCriticalSpec(spec.id);
+
+            // Extract and normalize Tolerances for display (keep as fractions)
+            const rawTolMinus = spec.TolMinus?.fraction || "-";
+            const rawTolPlus = spec.TolPlus?.fraction || "-";
+            const displayTolMinus = normalizeTolMinusDisplay(rawTolMinus);
+            const displayTolPlus = normalizeTolPlusDisplay(rawTolPlus);
 
             return (
               <tr
@@ -535,6 +739,7 @@ export const MeasurementSummaryTable = ({
                     : "bg-gray-50 dark:bg-gray-800/50"
                 }`}
               >
+                {/* 1. Point Name Cell */}
                 <td
                   className={`border border-gray-300 dark:border-gray-600 ${
                     compact ? "p-1" : "p-1.5"
@@ -561,58 +766,114 @@ export const MeasurementSummaryTable = ({
                   </div>
                 </td>
 
-                {tableData.map((sizeData, sIdx) =>
-                  sizeData.columns.map((col, cIdx) => {
-                    if (!col.isAllMode && !isCritical) {
-                      return (
+                {/* 2. Tol- Cell (Always negative display - keep fraction) */}
+                <td
+                  className={`border border-gray-300 dark:border-gray-600 ${
+                    compact ? "p-1" : "p-1.5"
+                  } text-center bg-red-50/50 dark:bg-red-900/10`}
+                >
+                  <span className="text-red-600 dark:text-red-400 font-bold text-[10px]">
+                    {displayTolMinus}
+                  </span>
+                </td>
+
+                {/* 3. Tol+ Cell (Always positive display - keep fraction) */}
+                <td
+                  className={`border border-gray-300 dark:border-gray-600 ${
+                    compact ? "p-1" : "p-1.5"
+                  } text-center bg-green-50/50 dark:bg-green-900/10`}
+                >
+                  <span className="text-green-600 dark:text-green-400 font-bold text-[10px]">
+                    {displayTolPlus}
+                  </span>
+                </td>
+
+                {/* 4. Size Data Loop */}
+                {tableData.map((sizeData, sIdx) => {
+                  // Find Spec Value for this specific size and format it
+                  const matchingSpec = spec.Specs?.find(
+                    (s) => s.size === sizeData.size
+                  );
+                  // Use decimal and convert, or format fraction with space instead of dash
+                  const specValue = matchingSpec
+                    ? formatSpecFraction(matchingSpec.fraction)
+                    : "-";
+
+                  return (
+                    <React.Fragment key={sIdx}>
+                      {/* 4a. Spec Value Cell */}
+                      {sizeData.columns.length > 0 && (
                         <td
-                          key={`${sIdx}-${cIdx}`}
-                          className="border border-gray-300 dark:border-gray-600 p-1 text-center bg-gray-200 dark:bg-gray-700"
+                          className={`border border-gray-300 dark:border-gray-600 ${
+                            compact ? "p-1" : "p-1.5"
+                          } text-center bg-blue-50/50 dark:bg-blue-900/10`}
                         >
-                          <span className="text-[8px] text-gray-400">—</span>
+                          <span className="text-blue-600 dark:text-blue-400 font-bold text-[10px]">
+                            {specValue}
+                          </span>
                         </td>
-                      );
-                    }
+                      )}
 
-                    const measurement =
-                      col.measurements?.[spec.id]?.[col.pcsIndex];
-                    const value = measurement?.decimal || 0;
-                    const displayValue = measurement?.fraction || "0";
-                    const toleranceResult = checkTolerance(
-                      spec,
-                      value,
-                      sizeData.size
-                    );
+                      {/* 4b. Reading Cells */}
+                      {sizeData.columns.map((col, cIdx) => {
+                        if (!col.isAllMode && !isCritical) {
+                          return (
+                            <td
+                              key={`${sIdx}-${cIdx}`}
+                              className="border border-gray-300 dark:border-gray-600 p-1 text-center bg-gray-200 dark:bg-gray-700"
+                            >
+                              <span className="text-[8px] text-gray-400">
+                                —
+                              </span>
+                            </td>
+                          );
+                        }
 
-                    let bgColor, textColor;
-                    if (
-                      value === 0 ||
-                      toleranceResult.isDefault ||
-                      toleranceResult.isWithin
-                    ) {
-                      bgColor = "bg-green-100 dark:bg-green-900/50";
-                      textColor = "text-green-700 dark:text-green-300";
-                    } else {
-                      bgColor = "bg-red-100 dark:bg-red-900/50";
-                      textColor = "text-red-700 dark:text-red-300";
-                    }
+                        const measurement =
+                          col.measurements?.[spec.id]?.[col.pcsIndex];
+                        // Use decimal for comparison
+                        const decimalValue = measurement?.decimal || 0;
+                        // Use fraction for display
+                        const displayValue = measurement?.fraction || "0";
 
-                    return (
-                      <td
-                        key={`${sIdx}-${cIdx}`}
-                        className={`border border-gray-300 dark:border-gray-600 p-0.5 text-center ${bgColor}`}
-                      >
-                        <span
-                          className={`${
-                            compact ? "text-[9px]" : "text-[10px]"
-                          } font-mono font-bold ${textColor}`}
-                        >
-                          {displayValue}
-                        </span>
-                      </td>
-                    );
-                  })
-                )}
+                        // Use the checkTolerance function with decimal value
+                        const toleranceResult = checkTolerance(
+                          spec,
+                          decimalValue
+                        );
+
+                        let bgColor, textColor;
+                        // Within tolerance = light green, Out of tolerance = light red
+                        if (
+                          decimalValue === 0 ||
+                          toleranceResult.isDefault ||
+                          toleranceResult.isWithin
+                        ) {
+                          bgColor = "bg-green-100 dark:bg-green-900/50";
+                          textColor = "text-green-700 dark:text-green-300";
+                        } else {
+                          bgColor = "bg-red-100 dark:bg-red-900/50";
+                          textColor = "text-red-700 dark:text-red-300";
+                        }
+
+                        return (
+                          <td
+                            key={`${sIdx}-${cIdx}`}
+                            className={`border border-gray-300 dark:border-gray-600 p-0.5 text-center ${bgColor}`}
+                          >
+                            <span
+                              className={`${
+                                compact ? "text-[9px]" : "text-[10px]"
+                              } font-mono font-bold ${textColor}`}
+                            >
+                              {displayValue}
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                })}
               </tr>
             );
           })}
@@ -625,7 +886,10 @@ export const MeasurementSummaryTable = ({
 /**
  * Overall Measurement Summary Table
  */
-export const OverallMeasurementSummaryTable = ({ groupedMeasurements }) => {
+export const OverallMeasurementSummaryTable = ({
+  groupedMeasurements,
+  sizeList = []
+}) => {
   if (
     !groupedMeasurements?.groups?.length &&
     !groupedMeasurements?.noContext?.length
@@ -655,9 +919,8 @@ export const OverallMeasurementSummaryTable = ({ groupedMeasurements }) => {
       if (m.size) allSizes.add(m.size);
     });
   });
-  const sortedSizes = Array.from(allSizes).sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true })
-  );
+
+  const sortedSizes = sortSizesByReference(Array.from(allSizes), sizeList);
 
   return (
     <div className="overflow-x-auto">
@@ -767,7 +1030,8 @@ const YPivotQAInspectionMeasurementSummary = ({
   savedMeasurements,
   specsData,
   selectedSpecsList,
-  activeGroup
+  activeGroup,
+  sizeList = []
 }) => {
   const groupedMeasurements = useMemo(
     () => groupMeasurementsByGroupId(savedMeasurements),
@@ -858,6 +1122,7 @@ const YPivotQAInspectionMeasurementSummary = ({
               measurements={group.measurements}
               specsData={specsData}
               selectedSpecsList={selectedSpecsList}
+              sizeList={sizeList}
               compact
             />
           </div>

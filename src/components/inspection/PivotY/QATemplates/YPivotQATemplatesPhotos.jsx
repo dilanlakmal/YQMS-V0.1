@@ -21,10 +21,14 @@ import {
   Trash2,
   Save,
   Images,
-  Check
+  Check,
+  UploadCloud,
+  Clock
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQATemplatesImageEditor from "./YPivotQATemplatesImageEditor";
+import MultipleImageUpload from "./MultipleImageUpload"; // ✅ IMPORTED NEW COMPONENT
+import { usePhotoUpload } from "./PhotoUploadContext";
 
 // ==============================================================================
 // INTERNAL COMPONENT: REMARK MODAL
@@ -112,6 +116,9 @@ const YPivotQATemplatesPhotos = ({
   // Access saved state from parent
   const savedState = reportData?.photoData || {};
 
+  // --- CONTEXT HOOK ---
+  const { addToUploadQueue, uploadStatus } = usePhotoUpload();
+
   const [sections, setSections] = useState([]);
   const [filteredSections, setFilteredSections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -136,11 +143,9 @@ const YPivotQATemplatesPhotos = ({
     title: ""
   });
 
-  // NEW: Track save operations
-  const saveInProgressRef = useRef(false);
+  // Track scroll for returning from editor
   const scrollPositionRef = useRef(0);
   const lastEditedItemRef = useRef(null);
-  const [autoSaveStatus, setAutoSaveStatus] = useState(null); // 'saving' | 'success' | 'error' | null
 
   // Sync Helper
   const updateParent = (updates) => {
@@ -152,98 +157,6 @@ const YPivotQATemplatesPhotos = ({
       });
     }
   };
-
-  // NEW: Auto-save images to server when Image Editor completes
-  const autoSaveImagesToServer = useCallback(
-    async (sectionId, itemNo, imagesToSave, sectionName, itemName) => {
-      // Check if report exists using the prop
-      if (!reportId) {
-        console.log("📷 Report not saved yet, skipping auto-save");
-        return { success: false, reason: "no_report" };
-      }
-
-      if (saveInProgressRef.current) {
-        console.log("📷 Save already in progress");
-        return { success: false, reason: "in_progress" };
-      }
-
-      if (!imagesToSave || imagesToSave.length === 0) {
-        return { success: false, reason: "no_images" };
-      }
-
-      saveInProgressRef.current = true;
-      setAutoSaveStatus("saving");
-
-      try {
-        const imagesPayload = imagesToSave.map((img, idx) => ({
-          id: img.id || `${sectionId}_${itemNo}_${idx}_${Date.now()}`,
-          imgSrc: img.editedImgSrc || img.imgSrc || img.url,
-          index: idx
-        }));
-
-        const response = await axios.post(
-          `${API_BASE_URL}/api/fincheck-inspection/upload-photo-batch`,
-          {
-            reportId: reportId,
-            sectionId,
-            sectionName,
-            itemNo: parseInt(itemNo),
-            itemName,
-            images: imagesPayload,
-            remarks: remarks[`${sectionId}_${itemNo}`] || ""
-          }
-        );
-
-        if (response.data.success) {
-          console.log("✅ Auto-save successful:", response.data.message);
-          setAutoSaveStatus("success");
-
-          const serverImages = response.data.data.savedImages;
-          const newCapturedImages = { ...capturedImages };
-
-          Object.keys(newCapturedImages).forEach((key) => {
-            if (key.startsWith(`${sectionId}_${itemNo}_`)) {
-              delete newCapturedImages[key];
-            }
-          });
-
-          serverImages.forEach((img, idx) => {
-            const key = `${sectionId}_${itemNo}_${idx}`;
-            let displayUrl = img.imageURL;
-            if (
-              displayUrl &&
-              !displayUrl.startsWith("http") &&
-              !displayUrl.startsWith("data:")
-            ) {
-              displayUrl = `${API_BASE_URL}${displayUrl}`;
-            }
-            newCapturedImages[key] = {
-              id: img.imageId,
-              url: displayUrl,
-              imgSrc: displayUrl,
-              history: []
-            };
-          });
-
-          setCapturedImages(newCapturedImages);
-          updateParent({ capturedImages: newCapturedImages });
-
-          setTimeout(() => setAutoSaveStatus(null), 2000);
-          return { success: true, savedImages: serverImages };
-        } else {
-          throw new Error(response.data.message);
-        }
-      } catch (error) {
-        console.error("❌ Auto-save error:", error);
-        setAutoSaveStatus("error");
-        setTimeout(() => setAutoSaveStatus(null), 3000);
-        return { success: false, reason: error.message };
-      } finally {
-        saveInProgressRef.current = false;
-      }
-    },
-    [reportId, capturedImages, remarks, updateParent]
-  );
 
   // Device detection
   useEffect(() => {
@@ -353,7 +266,7 @@ const YPivotQATemplatesPhotos = ({
       return;
     }
 
-    // NEW: Save current scroll position and item reference
+    // Save current scroll position and item reference
     scrollPositionRef.current = window.scrollY;
     lastEditedItemRef.current = { sectionId, itemNo };
 
@@ -369,32 +282,12 @@ const YPivotQATemplatesPhotos = ({
     setShowImageEditor(true);
   };
 
-  // const openImageEditorForNew = (mode, sectionId, itemNo, maxCount) => {
-  //   const availableSlots = getAvailableSlots(sectionId, itemNo, maxCount);
-
-  //   if (availableSlots <= 0) {
-  //     alert("Maximum images reached for this item!");
-  //     return;
-  //   }
-
-  //   setCurrentEditContext({
-  //     mode,
-  //     sectionId,
-  //     itemNo,
-  //     isEditing: false,
-  //     maxImages: Math.min(availableSlots, 7), // Editor max is 7
-  //     existingData: null
-  //   });
-  //   setShowImageEditor(true);
-  // };
-
   // Open image editor for EDITING existing image
   const openImageEditorForEdit = (sectionId, itemNo, imageIndex) => {
     const key = `${sectionId}_${itemNo}_${imageIndex}`;
     const imageData = capturedImages[key];
 
     if (imageData) {
-      // NEW: Save current scroll position and item reference
       scrollPositionRef.current = window.scrollY;
       lastEditedItemRef.current = { sectionId, itemNo };
 
@@ -416,38 +309,113 @@ const YPivotQATemplatesPhotos = ({
     }
   };
 
-  // const openImageEditorForEdit = (sectionId, itemNo, imageIndex) => {
-  //   const key = `${sectionId}_${itemNo}_${imageIndex}`;
-  //   const imageData = capturedImages[key];
+  // ✅ NEW HANDLER: Handle Batch Upload directly from MultipleImageUpload
+  const handleDirectBatchUpload = (sectionId, itemNo, newImages) => {
+    if (!newImages || newImages.length === 0) return;
 
-  //   if (imageData) {
-  //     setCurrentEditContext({
-  //       mode: "edit",
-  //       sectionId,
-  //       itemNo,
-  //       imageIndex,
-  //       isEditing: true,
-  //       maxImages: 1,
-  //       existingData: [
-  //         {
-  //           imgSrc: imageData.imgSrc || imageData.url,
-  //           history: imageData.history || []
-  //         }
-  //       ]
-  //     });
-  //     setShowImageEditor(true);
-  //   }
-  // };
+    const section = sections.find((s) => s._id === sectionId);
+    const sectionName = section?.sectionName || "Unknown";
+    const item = section?.itemList.find((i) => i.no === itemNo);
+    const itemName = item?.itemName || `Item ${itemNo}`;
+
+    // 1. Prepare Local State (With Blob URLs for immediate display)
+    let newCapturedImages = { ...capturedImages };
+    let finalImageListForUpload = [];
+    let nextIndex = getNextImageIndex(sectionId, itemNo);
+
+    // Get existing images for upload queue order
+    const imagesForItem = getImagesForItem(sectionId, itemNo);
+    imagesForItem.forEach(({ data }) => {
+      finalImageListForUpload.push({
+        id: data.id,
+        url: data.url,
+        file: null
+      });
+    });
+
+    // Append new images
+    newImages.forEach((img) => {
+      const key = `${sectionId}_${itemNo}_${nextIndex}`;
+
+      // Update Local State
+      newCapturedImages[key] = {
+        id: `${sectionId}_${itemNo}_${nextIndex}_${Date.now()}`,
+        url: img.imgSrc, // Blob URL
+        imgSrc: img.imgSrc,
+        history: []
+      };
+
+      // Add to Upload List (This is where context picks it up for compression)
+      finalImageListForUpload.push({
+        id: newCapturedImages[key].id,
+        url: img.imgSrc,
+        file: img.file // ✅ RAW FILE PASSED HERE
+      });
+
+      nextIndex++;
+    });
+
+    // Update React State
+    setCapturedImages(newCapturedImages);
+    updateParent({ capturedImages: newCapturedImages });
+
+    // Send to Upload Queue (Context handles compression)
+    if (reportId && finalImageListForUpload.length > 0) {
+      addToUploadQueue({
+        reportId,
+        sectionId,
+        sectionName,
+        itemNo: parseInt(itemNo),
+        itemName,
+        images: finalImageListForUpload,
+        remarks: remarks[`${sectionId}_${itemNo}`] || "",
+        // ✅ Callback to replace Blob URLs with Server URLs on success
+        onSuccess: (savedServerImages) => {
+          setCapturedImages((prev) => {
+            const updated = { ...prev };
+            let hasChanges = false;
+
+            savedServerImages.forEach((serverImg) => {
+              const stateKey = Object.keys(updated).find(
+                (key) => updated[key].id === serverImg.imageId
+              );
+
+              if (stateKey) {
+                let fullDisplayUrl = serverImg.imageURL;
+                if (
+                  fullDisplayUrl &&
+                  !fullDisplayUrl.startsWith("http") &&
+                  !fullDisplayUrl.startsWith("blob:")
+                ) {
+                  fullDisplayUrl = `${API_BASE_URL}${fullDisplayUrl}`;
+                }
+
+                updated[stateKey] = {
+                  ...updated[stateKey],
+                  url: fullDisplayUrl,
+                  imgSrc: fullDisplayUrl
+                };
+                hasChanges = true;
+              }
+            });
+
+            if (hasChanges) {
+              updateParent({ capturedImages: updated });
+              return updated;
+            }
+            return prev;
+          });
+        }
+      });
+    }
+  };
 
   const handleImageEditorClose = () => {
     const editedItem = lastEditedItemRef.current;
-
     setShowImageEditor(false);
     setCurrentEditContext(null);
 
-    // NEW: Restore scroll position after render
     requestAnimationFrame(() => {
-      // First, ensure the section is still expanded
       if (editedItem) {
         setExpandedSections((prev) => {
           const newSet = new Set(prev);
@@ -455,59 +423,133 @@ const YPivotQATemplatesPhotos = ({
           return newSet;
         });
       }
-
-      // Then restore scroll position
       setTimeout(() => {
         window.scrollTo({
           top: scrollPositionRef.current,
-          behavior: "instant" // Use 'instant' to avoid animation delay
+          behavior: "instant"
         });
       }, 50);
     });
   };
 
-  // const handleImageEditorClose = () => {
-  //   setShowImageEditor(false);
-  //   setCurrentEditContext(null);
-  // };
-
-  // NEW: Handle multiple images save from editor
+  // Handle multiple images save from editor (Camera/Canvas mode)
   const handleImagesSave = async (savedImages) => {
+    // 1. Safety Check
     if (!currentEditContext || !savedImages || savedImages.length === 0) {
       handleImageEditorClose();
       return;
     }
 
     const { sectionId, itemNo, isEditing, imageIndex } = currentEditContext;
-
     const section = sections.find((s) => s._id === sectionId);
-    const sectionName = section?.sectionName || "Unknown Section";
+    const sectionName = section?.sectionName || "Unknown";
     const item = section?.itemList.find((i) => i.no === itemNo);
     const itemName = item?.itemName || `Item ${itemNo}`;
 
-    let newCapturedImages = { ...capturedImages };
+    // 2. Ensure every image has a valid 'file' object
+    // If 'file' is missing but we have a blob URL, fetch it to create the file.
+    const processedSavedImages = await Promise.all(
+      savedImages.map(async (img) => {
+        // If file exists, return as is
+        if (img.file) return img;
 
-    if (isEditing && imageIndex !== undefined) {
-      const img = savedImages[0];
-      const key = `${sectionId}_${itemNo}_${imageIndex}`;
-      newCapturedImages[key] = {
-        id:
-          newCapturedImages[key]?.id ||
-          `${sectionId}_${itemNo}_${imageIndex}_${Date.now()}`,
-        url: img.editedImgSrc,
-        imgSrc: img.imgSrc,
-        history: img.history || []
-      };
+        // If no file, but we have a Blob URL (common in first-time camera captures)
+        const src = img.editedImgSrc || img.imgSrc;
+        if (src && src.startsWith("blob:")) {
+          try {
+            const response = await fetch(src);
+            const blob = await response.blob();
+            const rebuiltFile = new File([blob], `captured_${Date.now()}.jpg`, {
+              type: blob.type || "image/jpeg"
+            });
+            return { ...img, file: rebuiltFile };
+          } catch (error) {
+            console.error("Error recovering file from blob:", error);
+            return img;
+          }
+        }
+        return img;
+      })
+    );
+
+    let newCapturedImages = { ...capturedImages };
+    const uploadList = [];
+
+    // 3. Prepare Upload List
+    let finalImageListForUpload = [];
+
+    // A. Add existing images (that are not being edited)
+    const existingItemImages = [];
+    let idx = 0;
+    while (idx < 20) {
+      const key = `${sectionId}_${itemNo}_${idx}`;
+      if (newCapturedImages[key] && (!isEditing || idx !== imageIndex)) {
+        // Push to local state helper
+        existingItemImages.push({
+          ...newCapturedImages[key],
+          originalIndex: idx
+        });
+        // Push to upload queue (file: null tells context it's an existing server image)
+        finalImageListForUpload.push({
+          id: newCapturedImages[key].id,
+          url: newCapturedImages[key].url,
+          file: null
+        });
+      }
+      idx++;
+    }
+
+    if (isEditing) {
+      for (let i = 0; i < 20; i++) {
+        const key = `${sectionId}_${itemNo}_${i}`;
+        if (i === imageIndex) {
+          const editedImg = processedSavedImages[0]; // Use processed image
+          const displayUrl = editedImg.editedImgSrc || editedImg.imgSrc;
+
+          newCapturedImages[key] = {
+            id:
+              newCapturedImages[key]?.id ||
+              `${sectionId}_${itemNo}_${i}_${Date.now()}`,
+            url: displayUrl,
+            imgSrc: displayUrl,
+            history: editedImg.history || []
+          };
+
+          // Add to upload list
+          finalImageListForUpload.push({
+            id: newCapturedImages[key].id,
+            url: displayUrl,
+            file: editedImg.file // ✅ Guaranteed to exist now
+          });
+        } else if (newCapturedImages[key]) {
+          finalImageListForUpload.push({
+            id: newCapturedImages[key].id,
+            url: newCapturedImages[key].url,
+            file: null
+          });
+        }
+      }
     } else {
+      // C. Process NEW Additions
       let nextIndex = getNextImageIndex(sectionId, itemNo);
-      savedImages.forEach((img) => {
+
+      processedSavedImages.forEach((img) => {
         const key = `${sectionId}_${itemNo}_${nextIndex}`;
+        const displayUrl = img.editedImgSrc || img.imgSrc;
+
         newCapturedImages[key] = {
           id: `${sectionId}_${itemNo}_${nextIndex}_${Date.now()}`,
-          url: img.editedImgSrc,
-          imgSrc: img.imgSrc,
+          url: displayUrl,
+          imgSrc: displayUrl,
           history: img.history || []
         };
+
+        finalImageListForUpload.push({
+          id: newCapturedImages[key].id,
+          url: displayUrl,
+          file: img.file // ✅ Guaranteed to exist now
+        });
+
         nextIndex++;
       });
     }
@@ -516,72 +558,56 @@ const YPivotQATemplatesPhotos = ({
     updateParent({ capturedImages: newCapturedImages });
     handleImageEditorClose();
 
-    // Collect ALL images for this item
-    const allItemImages = [];
-    let idx = 0;
-    while (idx < 20) {
-      const key = `${sectionId}_${itemNo}_${idx}`;
-      if (newCapturedImages[key]) {
-        allItemImages.push({
-          id: newCapturedImages[key].id,
-          imgSrc: newCapturedImages[key].url,
-          url: newCapturedImages[key].url,
-          editedImgSrc: newCapturedImages[key].url,
-          index: idx
-        });
-      }
-      idx++;
-    }
-
-    // AUTO-SAVE to server
-    if (reportId && allItemImages.length > 0) {
-      await autoSaveImagesToServer(
+    // 5. ✅ FIX: Ensure we have a ReportID (Fallback to reportData if prop is lagging)
+    const activeReportId = reportId || reportData?.reportId;
+    if (activeReportId && finalImageListForUpload.length > 0) {
+      addToUploadQueue({
+        reportId: activeReportId,
         sectionId,
-        itemNo,
-        allItemImages,
         sectionName,
-        itemName
-      );
+        itemNo: parseInt(itemNo),
+        itemName,
+        images: finalImageListForUpload,
+        remarks: remarks[`${sectionId}_${itemNo}`] || "",
+        onSuccess: (savedServerImages) => {
+          // ... (Existing onSuccess logic) ...
+          setCapturedImages((prev) => {
+            const updated = { ...prev };
+            let hasChanges = false;
+            savedServerImages.forEach((serverImg) => {
+              const stateKey = Object.keys(updated).find(
+                (key) => updated[key].id === serverImg.imageId
+              );
+              if (stateKey) {
+                let fullDisplayUrl = serverImg.imageURL;
+                if (
+                  fullDisplayUrl &&
+                  !fullDisplayUrl.startsWith("http") &&
+                  !fullDisplayUrl.startsWith("blob:")
+                ) {
+                  fullDisplayUrl = `${API_BASE_URL}${fullDisplayUrl}`;
+                }
+                updated[stateKey] = {
+                  ...updated[stateKey],
+                  url: fullDisplayUrl,
+                  imgSrc: fullDisplayUrl
+                };
+                hasChanges = true;
+              }
+            });
+            if (hasChanges) {
+              updateParent({ capturedImages: updated });
+              return updated;
+            }
+            return prev;
+          });
+        }
+      });
+    } else if (!activeReportId) {
+      // Optional: Alert user if they are trying to save without an Order/Report ID
+      console.warn("Cannot auto-save photo: Report ID is missing.");
     }
   };
-
-  // const handleImagesSave = (savedImages) => {
-  //   if (!currentEditContext || !savedImages || savedImages.length === 0) {
-  //     handleImageEditorClose();
-  //     return;
-  //   }
-
-  //   const { sectionId, itemNo, isEditing, imageIndex } = currentEditContext;
-  //   let newImages = { ...capturedImages };
-
-  //   if (isEditing && imageIndex !== undefined) {
-  //     // Editing single existing image
-  //     const img = savedImages[0];
-  //     const key = `${sectionId}_${itemNo}_${imageIndex}`;
-  //     newImages[key] = {
-  //       url: img.editedImgSrc,
-  //       imgSrc: img.imgSrc,
-  //       history: img.history || []
-  //     };
-  //   } else {
-  //     // Adding new images - fill consecutive slots
-  //     let nextIndex = getNextImageIndex(sectionId, itemNo);
-
-  //     savedImages.forEach((img) => {
-  //       const key = `${sectionId}_${itemNo}_${nextIndex}`;
-  //       newImages[key] = {
-  //         url: img.editedImgSrc,
-  //         imgSrc: img.imgSrc,
-  //         history: img.history || []
-  //       };
-  //       nextIndex++;
-  //     });
-  //   }
-
-  //   setCapturedImages(newImages);
-  //   updateParent({ capturedImages: newImages });
-  //   handleImageEditorClose();
-  // };
 
   const removeImage = async (sectionId, itemNo, imageIndex, e) => {
     if (e) e.stopPropagation();
@@ -615,7 +641,6 @@ const YPivotQATemplatesPhotos = ({
     setCapturedImages(newImages);
     updateParent({ capturedImages: newImages });
 
-    // Delete from server
     if (reportId && imageId) {
       try {
         await axios.post(
@@ -634,51 +659,12 @@ const YPivotQATemplatesPhotos = ({
     }
   };
 
-  // const removeImage = (sectionId, itemNo, imageIndex, e) => {
-  //   if (e) e.stopPropagation();
-
-  //   if (!window.confirm("Remove this image?")) return;
-
-  //   const newImages = { ...capturedImages };
-
-  //   // Remove the image at index
-  //   const keyToRemove = `${sectionId}_${itemNo}_${imageIndex}`;
-  //   delete newImages[keyToRemove];
-
-  //   // Re-index remaining images to fill gaps
-  //   const remainingImages = [];
-  //   let idx = 0;
-  //   while (idx < 20) {
-  //     const key = `${sectionId}_${itemNo}_${idx}`;
-  //     if (idx !== imageIndex && capturedImages[key]) {
-  //       remainingImages.push(capturedImages[key]);
-  //     }
-  //     idx++;
-  //   }
-
-  //   // Clear all old keys for this item
-  //   Object.keys(newImages).forEach((key) => {
-  //     if (key.startsWith(`${sectionId}_${itemNo}_`)) {
-  //       delete newImages[key];
-  //     }
-  //   });
-
-  //   // Re-add with sequential indices
-  //   remainingImages.forEach((img, i) => {
-  //     newImages[`${sectionId}_${itemNo}_${i}`] = img;
-  //   });
-
-  //   setCapturedImages(newImages);
-  //   updateParent({ capturedImages: newImages });
-  // };
-
   const editExistingImage = (e, sectionId, itemNo, imageIndex) => {
     e.stopPropagation();
     openImageEditorForEdit(sectionId, itemNo, imageIndex);
   };
 
   // --- Remark Handlers ---
-
   const openRemarkModal = (sectionId, itemNo, itemName) => {
     setRemarkModal({
       isOpen: true,
@@ -712,7 +698,6 @@ const YPivotQATemplatesPhotos = ({
               remarks: text
             }
           );
-          console.log("✅ Remark saved to server");
         } catch (error) {
           console.error("Failed to save remark:", error);
         }
@@ -720,16 +705,6 @@ const YPivotQATemplatesPhotos = ({
     }
     setRemarkModal({ isOpen: false, key: null, title: "" });
   };
-
-  // const handleSaveRemark = (text) => {
-  //   const { key } = remarkModal;
-  //   if (key) {
-  //     const newRemarks = { ...remarks, [key]: text };
-  //     setRemarks(newRemarks);
-  //     updateParent({ remarks: newRemarks });
-  //   }
-  //   setRemarkModal({ isOpen: false, key: null, title: "" });
-  // };
 
   const clearRemark = (sectionId, itemNo) => {
     if (window.confirm("Clear this remark?")) {
@@ -742,7 +717,6 @@ const YPivotQATemplatesPhotos = ({
   };
 
   // --- Utilities ---
-
   const getImagesForItem = useMemo(() => {
     return (sectionId, itemNo) => {
       const images = [];
@@ -810,38 +784,6 @@ const YPivotQATemplatesPhotos = ({
         </div>
       </div>
 
-      {/* Auto-Save Status Indicator */}
-      {autoSaveStatus && (
-        <div
-          className={`fixed top-20 right-4 z-50 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 text-sm font-medium animate-fadeIn ${
-            autoSaveStatus === "saving"
-              ? "bg-blue-500 text-white"
-              : autoSaveStatus === "success"
-              ? "bg-green-500 text-white"
-              : "bg-red-500 text-white"
-          }`}
-        >
-          {autoSaveStatus === "saving" && (
-            <>
-              <Loader className="w-4 h-4 animate-spin" />
-              <span>Saving images...</span>
-            </>
-          )}
-          {autoSaveStatus === "success" && (
-            <>
-              <Check className="w-4 h-4" />
-              <span>Images saved!</span>
-            </>
-          )}
-          {autoSaveStatus === "error" && (
-            <>
-              <X className="w-4 h-4" />
-              <span>Save failed</span>
-            </>
-          )}
-        </div>
-      )}
-
       {/* Sections List */}
       {filteredSections.length > 0 ? (
         <div className="space-y-3">
@@ -889,13 +831,15 @@ const YPivotQATemplatesPhotos = ({
                       const availableSlots = item.maxCount - images.length;
                       const remarkKey = `${section._id}_${item.no}`;
                       const currentRemark = remarks[remarkKey];
+                      const statusKey = `${section._id}_${item.no}`;
+                      const status = uploadStatus[statusKey];
 
                       return (
                         <div
                           key={item.no}
                           className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-sm hover:shadow-md transition-shadow"
                         >
-                          {/* Sub-card Title + Remark Button */}
+                          {/* Sub-card Title + Remark */}
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2 min-w-0 flex-1">
                               <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded text-xs font-bold">
@@ -954,6 +898,72 @@ const YPivotQATemplatesPhotos = ({
                             </span>
                           </div>
 
+                          {/* Progress Indicator */}
+                          {status && (
+                            <div className="mb-3 px-1 animate-fadeIn">
+                              <div className="flex justify-between items-center text-[10px] text-gray-500 dark:text-gray-400 mb-1">
+                                <div className="flex items-center gap-1.5">
+                                  {status.status === "compressing" ? (
+                                    <>
+                                      <Clock className="w-3 h-3 text-amber-500 animate-spin" />
+                                      <span className="text-amber-600 dark:text-amber-400 font-medium">
+                                        Compressing...
+                                      </span>
+                                    </>
+                                  ) : status.status === "queued" ? (
+                                    <>
+                                      <Clock className="w-3 h-3 text-gray-400" />
+                                      <span className="font-medium">
+                                        Queued
+                                      </span>
+                                    </>
+                                  ) : status.status === "uploading" ? (
+                                    <>
+                                      <UploadCloud className="w-3 h-3 text-blue-500 animate-bounce" />
+                                      <span className="text-blue-600 dark:text-blue-400 font-medium">
+                                        Uploading...
+                                      </span>
+                                    </>
+                                  ) : status.status === "success" ? (
+                                    <>
+                                      <Check className="w-3 h-3 text-green-500" />
+                                      <span className="text-green-600 dark:text-green-400 font-medium">
+                                        Saved
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-red-500 font-medium">
+                                      Error
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="font-mono">
+                                  {status.progress}/{status.total}
+                                </span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-1.5 dark:bg-gray-700 overflow-hidden">
+                                <div
+                                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                                    status.status === "success"
+                                      ? "bg-green-500"
+                                      : status.status === "error"
+                                      ? "bg-red-500"
+                                      : "bg-indigo-600"
+                                  } ${
+                                    status.status === "compressing"
+                                      ? "animate-pulse"
+                                      : ""
+                                  }`}
+                                  style={{
+                                    width: `${
+                                      (status.progress / status.total) * 100
+                                    }%`
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
+
                           {/* Images Container */}
                           <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
                             {images.map(({ key, data, index }) => (
@@ -991,40 +1001,65 @@ const YPivotQATemplatesPhotos = ({
                               </div>
                             ))}
 
+                            {/* ✅ MODIFIED ADD BUTTONS CONTAINER */}
                             {canAddMore && (
-                              <div className="flex-shrink-0 w-20 h-20 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors bg-gray-50 dark:bg-gray-900/30">
-                                <button
-                                  onClick={() =>
-                                    openImageEditorForNew(
-                                      "camera",
-                                      section._id,
-                                      item.no,
-                                      item.maxCount
-                                    )
-                                  }
-                                  className="w-full h-1/2 flex flex-col items-center justify-center hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors group border-b border-gray-300 dark:border-gray-600"
-                                  title={`Take photos (${availableSlots} slots available)`}
-                                >
-                                  <Camera className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors" />
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    openImageEditorForNew(
-                                      "upload",
-                                      section._id,
-                                      item.no,
-                                      item.maxCount
-                                    )
-                                  }
-                                  className="w-full h-1/2 flex flex-col items-center justify-center hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors group"
-                                  title={`Upload images (${availableSlots} slots available)`}
-                                >
-                                  <Upload className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors" />
-                                </button>
+                              <div className="flex-shrink-0 w-32 md:w-20 h-20 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors bg-gray-50 dark:bg-gray-900/30 flex md:flex-col">
+                                {/* LEFT SIDE (Mobile) / TOP SIDE (Desktop) - Contains Camera & Single Upload */}
+                                <div className="flex flex-col w-1/2 md:w-full h-full md:h-2/3 border-r md:border-r-0 md:border-b border-gray-300 dark:border-gray-600">
+                                  {/* 1. Camera Button */}
+                                  <button
+                                    onClick={() =>
+                                      openImageEditorForNew(
+                                        "camera",
+                                        section._id,
+                                        item.no,
+                                        item.maxCount
+                                      )
+                                    }
+                                    className="w-full h-1/2 flex flex-col items-center justify-center hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors group border-b border-gray-300 dark:border-gray-600"
+                                    title={`Take photos (${availableSlots} slots available)`}
+                                  >
+                                    <Camera className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors" />
+                                  </button>
+
+                                  {/* 2. Editor Upload Button */}
+                                  <button
+                                    onClick={() =>
+                                      openImageEditorForNew(
+                                        "upload",
+                                        section._id,
+                                        item.no,
+                                        item.maxCount
+                                      )
+                                    }
+                                    className="w-full h-1/2 flex flex-col items-center justify-center hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors group"
+                                    title={`Upload & Edit images (${availableSlots} slots available)`}
+                                  >
+                                    <Upload className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors" />
+                                  </button>
+                                </div>
+
+                                {/* RIGHT SIDE (Mobile) / BOTTOM SIDE (Desktop) - Contains Multi Upload */}
+                                <div className="w-1/2 md:w-full h-full md:h-1/3">
+                                  {/* 3. DIRECT BATCH UPLOAD BUTTON */}
+                                  <MultipleImageUpload
+                                    sectionId={section._id}
+                                    itemNo={item.no}
+                                    maxCount={item.maxCount}
+                                    currentCount={images.length}
+                                    onImagesSelected={(files) =>
+                                      handleDirectBatchUpload(
+                                        section._id,
+                                        item.no,
+                                        files
+                                      )
+                                    }
+                                  />
+                                </div>
                               </div>
                             )}
 
-                            {/* Show slots indicator when there are images but still room for more */}
+                            {/* Show slots indicator */}
                             {images.length > 0 &&
                               canAddMore &&
                               availableSlots > 1 && (
@@ -1036,7 +1071,6 @@ const YPivotQATemplatesPhotos = ({
                               )}
                           </div>
 
-                          {/* Multi-image hint for empty state */}
                           {images.length === 0 && (
                             <div className="mt-2 text-center">
                               <p className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center justify-center gap-1">

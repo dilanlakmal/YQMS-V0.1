@@ -8,13 +8,13 @@
     "build": "vite build",
     "server": "nodemon backend/server.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
-    "electron": "wait-port http://localhost:5173 && electron electron.js",
+    "electron": "wait-port https://localhost:5173 && electron electron.js",
     "electron:serve": "concurrently -k \"npm run dev\" \"npm run electron\"",
     "electron:build": "vite build && electron-builder",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
-  "proxy": "http://192.167.6.207:5001",
+  "proxy": "https://192.167.6.207:5001",
   "dependencies": {
     "@base-ui-components/react": "^1.0.0-beta.6",
     "@emotion/react": "^11.14.0",
@@ -65,9 +65,10 @@
     "csv-parser": "^3.2.0",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
-    "dotenv": "^16.3.0",
+    "dotenv": "^16.6.1",
     "exceljs": "^4.4.0",
     "express": "^4.21.2",
+    "express-fileupload": "^1.5.2",
     "file-saver": "^2.0.5",
     "helmet": "^6.0.0",
     "html2canvas": "^1.4.1",
@@ -122,6 +123,7 @@
     "sweetalert2-react-content": "^5.1.0",
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^3.4.1",
+    "web-push": "^3.6.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

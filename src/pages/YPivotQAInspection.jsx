@@ -18,7 +18,8 @@ import {
   Loader2,
   Plus,
   AlertTriangle,
-  QrCode
+  QrCode,
+  Bell
 } from "lucide-react";
 import React, {
   useMemo,
@@ -29,6 +30,7 @@ import React, {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/authentication/AuthContext";
+import { PhotoUploadProvider } from "../components/inspection/PivotY/QATemplates/PhotoUploadContext";
 import YPivotQAInspectionOrderData from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionOrderData";
 import YPivotQAInspectionSummary from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionSummary";
 import YPivotQAInspectionHeaderDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionHeaderDataSave";
@@ -38,6 +40,7 @@ import YPivotQAInspectionMeasurementDataSave from "../components/inspection/Pivo
 import YPivotQAInspectionDefectDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionDefectDataSave";
 import YPivotQAInspectionPPSheetDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPPSheetDataSave";
 import YPivotQAInspectionPreviousReport from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPreviousReport";
+import YPivotQAInspectionNotifications from "../components/inspection/PivotY/QAReports/YPivotQAInspectionNotifications";
 
 import axios from "axios";
 import { API_BASE_URL } from "../../config";
@@ -235,6 +238,39 @@ const StatusModal = ({ isOpen, onClose, type, title, message, subMessage }) => {
 // HELPER FUNCTIONS TO TRANSFORM BACKEND DATA TO COMPONENT FORMAT
 // ==================================================================================
 
+// Transform PP Sheet data from backend (Fix image URLs)
+const transformPPSheetDataFromBackend = (backendData) => {
+  if (!backendData) return null;
+
+  // Create a copy to modify images
+  const processedData = { ...backendData };
+
+  if (processedData.images && Array.isArray(processedData.images)) {
+    processedData.images = processedData.images.map((img) => {
+      let displayUrl = img.imageURL;
+
+      // Prepend API_BASE_URL if it's a relative path
+      if (
+        displayUrl &&
+        !displayUrl.startsWith("http") &&
+        !displayUrl.startsWith("data:")
+      ) {
+        displayUrl = `${API_BASE_URL}${displayUrl}`;
+      }
+
+      return {
+        id: img.imageId || img.id,
+        url: displayUrl, // Used by <img> src
+        imgSrc: displayUrl, // Used by Editor
+        imageURL: img.imageURL, // Keep original relative path
+        history: []
+      };
+    });
+  }
+
+  return processedData;
+};
+
 // Transform header data from backend format to component format
 const transformHeaderDataFromBackend = (backendHeaderData) => {
   if (!backendHeaderData || !Array.isArray(backendHeaderData)) {
@@ -320,7 +356,10 @@ const transformDefectManualData = (backendManualData) => {
 };
 
 // Transform measurement data from backend format to component format
-const transformMeasurementDataFromBackend = (backendMeasurementData) => {
+const transformMeasurementDataFromBackend = (
+  backendMeasurementData,
+  orderSizes = []
+) => {
   if (!backendMeasurementData || !Array.isArray(backendMeasurementData)) {
     return { savedMeasurements: [], manualDataByGroup: {} };
   }
@@ -331,21 +370,18 @@ const transformMeasurementDataFromBackend = (backendMeasurementData) => {
     .map((m) => ({
       ...m,
       allEnabledPcs: new Set(m.allEnabledPcs || []),
-      criticalEnabledPcs: new Set(m.criticalEnabledPcs || [])
+      criticalEnabledPcs: new Set(m.criticalEnabledPcs || []),
+      // Ensure stage is preserved - default to "Before" for legacy data
+      stage: m.stage || "Before"
     }));
 
   // 2. Process Manual Data by Group
   const processedManualDataByGroup = {};
-
   backendMeasurementData.forEach((item) => {
     if (item.manualData) {
       const groupId = item.groupId;
-
-      // Process Images - prepend API_BASE_URL for relative paths
       const processedImages = (item.manualData.images || []).map((img) => {
         let displayUrl = img.imageURL;
-
-        // Prepend API_BASE_URL for display if it's a relative path
         if (
           displayUrl &&
           !displayUrl.startsWith("http") &&
@@ -353,7 +389,6 @@ const transformMeasurementDataFromBackend = (backendMeasurementData) => {
         ) {
           displayUrl = `${API_BASE_URL}${displayUrl}`;
         }
-
         return {
           id: img.imageId || img.id,
           url: displayUrl,
@@ -363,7 +398,6 @@ const transformMeasurementDataFromBackend = (backendMeasurementData) => {
           history: []
         };
       });
-
       processedManualDataByGroup[groupId] = {
         remarks: item.manualData.remarks || "",
         status: item.manualData.status || "Pass",
@@ -372,11 +406,60 @@ const transformMeasurementDataFromBackend = (backendMeasurementData) => {
     }
   });
 
-  return {
+  // 3. Group measurements by stage and extract last selected values
+  const beforeMeasurements = processedMeasurements.filter(
+    (m) => m.stage === "Before"
+  );
+  const afterMeasurements = processedMeasurements.filter(
+    (m) => m.stage === "After"
+  );
+
+  // Extract unique K values from Before measurements
+  const beforeKValues = [
+    ...new Set(
+      beforeMeasurements.map((m) => m.kValue).filter((k) => k && k !== "NA")
+    )
+  ].sort();
+
+  // Get last selected K value (most recently used)
+  const lastBeforeKValue =
+    beforeMeasurements.length > 0
+      ? beforeMeasurements[beforeMeasurements.length - 1].kValue || ""
+      : "";
+
+  // 4. Build stage-specific config stubs
+  const result = {
     savedMeasurements: processedMeasurements,
     manualDataByGroup: processedManualDataByGroup,
     isConfigured: processedMeasurements.length > 0
   };
+
+  // Add configBefore if Before measurements exist
+  if (beforeMeasurements.length > 0) {
+    result.configBefore = {
+      isConfigured: true,
+      lastSelectedKValue: lastBeforeKValue,
+      usedKValues: beforeKValues,
+      orderSizes: orderSizes,
+      // These will be populated when specs are fetched
+      fullSpecsList: [],
+      selectedSpecsList: [],
+      kValuesList: beforeKValues.length > 0 ? beforeKValues : []
+    };
+  }
+
+  // Add configAfter if After measurements exist
+  if (afterMeasurements.length > 0) {
+    result.configAfter = {
+      isConfigured: true,
+      orderSizes: orderSizes,
+      fullSpecsList: [],
+      selectedSpecsList: [],
+      kValuesList: [] // After wash has no K values
+    };
+  }
+
+  return result;
 };
 
 // Helper function to extract sizes from order data
@@ -445,7 +528,7 @@ const YPivotQAInspection = () => {
   const [activeGroup, setActiveGroup] = useState(null);
 
   // ===========================================================================
-  // NEW: DIRTY SECTIONS STATE - Tracks which sections have unsaved changes
+  // DIRTY SECTIONS STATE - Tracks which sections have unsaved changes
   // ===========================================================================
   const [dirtySections, setDirtySections] = useState({
     inspectionDetails: false,
@@ -457,6 +540,8 @@ const YPivotQAInspection = () => {
     defectManualData: false,
     ppSheetData: false
   });
+
+  const [notificationCount, setNotificationCount] = useState(0);
 
   // Add a ref to track if we're currently loading data from backend
   const isLoadingFromBackendRef = useRef(false);
@@ -506,7 +591,7 @@ const YPivotQAInspection = () => {
   }, [dirtySections]);
   // ===========================================================================
 
-  // NEW: State for the Status Modal
+  //  State for the Status Modal
   const [statusModal, setStatusModal] = useState({
     isOpen: false,
     type: "success", // 'success' or 'info'
@@ -515,7 +600,7 @@ const YPivotQAInspection = () => {
     subMessage: ""
   });
 
-  // NEW: State for confirmation modal
+  //  State for confirmation modal
   const [showNewConfirm, setShowNewConfirm] = useState(false);
 
   // ======================================================================
@@ -591,87 +676,146 @@ const YPivotQAInspection = () => {
   // FETCH MEASUREMENT SPECS WHEN REPORT IS LOADED (for Summary to display properly)
   // ==================================================================================
   useEffect(() => {
-    const fetchMeasurementSpecs = async () => {
+    const fetchAllMeasurementSpecs = async () => {
       // Only run if we have a loaded report
       if (!savedReportData || !isReportSaved) return;
 
       const template = sharedReportState.selectedTemplate;
-      const measConfig = template?.Measurement;
-
-      // Skip if no measurement required
-      if (!measConfig || measConfig === "No") return;
-
-      // Skip if specs already loaded
-      if (sharedReportState.measurementData?.fullSpecsList?.length > 0) return;
-
       const moNo = sharedOrderState.selectedOrders?.[0];
       if (!moNo) return;
 
-      console.log(
-        "Fetching measurement specs for loaded report...",
-        moNo,
-        measConfig
-      );
+      const orderSizes = extractOrderSizes(sharedOrderState.orderData);
+      const stagesToFetch = [];
 
-      try {
-        const endpoint =
-          measConfig === "Before"
-            ? `/api/qa-sections/measurement-specs/${moNo}`
-            : `/api/qa-sections/measurement-specs-aw/${moNo}`;
-
-        const res = await axios.get(`${API_BASE_URL}${endpoint}`);
-        const { source, data } = res.data;
-
-        let all = [];
-        let selected = [];
-        let kValues = [];
-
-        if (measConfig === "Before") {
-          all = data.AllBeforeWashSpecs || [];
-          selected = data.selectedBeforeWashSpecs || [];
-          const kSet = new Set(
-            all.map((s) => s.kValue).filter((k) => k && k !== "NA")
-          );
-          kValues = Array.from(kSet).sort();
-        } else {
-          all = data.AllAfterWashSpecs || [];
-          selected = data.selectedAfterWashSpecs || [];
+      // Check primary measurement type
+      const primaryType = template?.Measurement;
+      if (primaryType && primaryType !== "No") {
+        const configKey = `config${primaryType}`;
+        const hasSpecs =
+          sharedReportState.measurementData?.[configKey]?.fullSpecsList
+            ?.length > 0;
+        if (!hasSpecs) {
+          stagesToFetch.push(primaryType);
         }
+      }
 
-        const finalList =
-          source === "qa_sections" && selected.length > 0 ? selected : all;
+      // Check secondary measurement type
+      const secondaryType = template?.MeasurementAdditional;
+      if (secondaryType && secondaryType !== "No") {
+        const configKey = `config${secondaryType}`;
+        const hasSpecs =
+          sharedReportState.measurementData?.[configKey]?.fullSpecsList
+            ?.length > 0;
+        if (!hasSpecs && !stagesToFetch.includes(secondaryType)) {
+          stagesToFetch.push(secondaryType);
+        }
+      }
 
-        // Extract sizes from order data
-        const orderSizes = extractOrderSizes(sharedOrderState.orderData);
+      if (stagesToFetch.length === 0) {
+        console.log("[Main] All specs already loaded");
+        return;
+      }
 
-        // Update measurement data with specs (preserving existing savedMeasurements)
-        setSharedReportState((prev) => ({
-          ...prev,
-          measurementData: {
-            ...prev.measurementData,
-            fullSpecsList: all,
-            selectedSpecsList: finalList,
-            sourceType: source,
-            isConfigured: source === "qa_sections",
-            kValuesList: kValues,
-            orderSizes: orderSizes
+      console.log("[Main] Fetching specs for stages:", stagesToFetch);
+
+      // Fetch specs for each stage
+      for (const stage of stagesToFetch) {
+        try {
+          const endpoint =
+            stage === "Before"
+              ? `/api/qa-sections/measurement-specs/${moNo}`
+              : `/api/qa-sections/measurement-specs-aw/${moNo}`;
+
+          const res = await axios.get(`${API_BASE_URL}${endpoint}`);
+          const { source, data } = res.data;
+
+          let all = [];
+          let selected = [];
+          let kValues = [];
+
+          if (stage === "Before") {
+            all = data.AllBeforeWashSpecs || [];
+            selected = data.selectedBeforeWashSpecs || [];
+            const kSet = new Set(
+              all.map((s) => s.kValue).filter((k) => k && k !== "NA")
+            );
+            kValues = Array.from(kSet).sort();
+          } else {
+            all = data.AllAfterWashSpecs || [];
+            selected = data.selectedAfterWashSpecs || [];
+            kValues = []; // No K values for After wash
           }
-        }));
 
-        console.log("Measurement specs loaded:", all.length, "specs");
-      } catch (error) {
-        console.error("Error fetching measurement specs:", error);
+          const finalList =
+            source === "qa_sections" && selected.length > 0 ? selected : all;
+          const configKey = `config${stage}`;
+
+          // Get existing config for this stage (might have lastSelectedKValue, etc.)
+          const existingConfig =
+            sharedReportState.measurementData?.[configKey] || {};
+
+          // Update state with fetched specs
+          setSharedReportState((prev) => ({
+            ...prev,
+            measurementData: {
+              ...prev.measurementData,
+              [configKey]: {
+                ...existingConfig,
+                fullSpecsList: all,
+                selectedSpecsList: finalList,
+                sourceType: source,
+                isConfigured:
+                  source === "qa_sections" || existingConfig.isConfigured,
+                kValuesList:
+                  kValues.length > 0
+                    ? kValues
+                    : existingConfig.usedKValues || [],
+                orderSizes: orderSizes,
+                // Preserve last selected K value if it exists
+                lastSelectedKValue:
+                  existingConfig.lastSelectedKValue ||
+                  (kValues.length > 0 ? kValues[0] : "")
+              }
+            }
+          }));
+
+          console.log(`[Main] Loaded ${all.length} specs for ${stage} wash`);
+        } catch (error) {
+          console.error(`[Main] Error fetching ${stage} wash specs:`, error);
+        }
       }
     };
 
-    fetchMeasurementSpecs();
+    fetchAllMeasurementSpecs();
   }, [
     savedReportData?._id,
     isReportSaved,
     sharedReportState.selectedTemplate?.Measurement,
+    sharedReportState.selectedTemplate?.MeasurementAdditional,
     sharedOrderState.selectedOrders?.[0],
-    sharedReportState.measurementData?.fullSpecsList?.length // Track if already loaded
+    sharedOrderState.orderData
   ]);
+
+  // Fetch Notification Count
+  useEffect(() => {
+    if (!user?.emp_id) return;
+    const fetchCount = async () => {
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/fincheck-reports/notifications?empId=${user.emp_id}`
+        );
+        if (res.data.success) {
+          setNotificationCount(res.data.data.length);
+        }
+      } catch (e) {
+        /* silent fail */
+      }
+    };
+    fetchCount();
+    // Poll every 60s
+    const interval = setInterval(fetchCount, 60000);
+    return () => clearInterval(interval);
+  }, [user?.emp_id]);
 
   // Handler to update PP Sheet data - MODIFIED to mark dirty
   const handlePPSheetUpdate = useCallback(
@@ -702,14 +846,16 @@ const YPivotQAInspection = () => {
       markSectionClean("inspectionConfig");
 
       // ========================================================================
-      // NEW: HYDRATE sharedReportState when loading an EXISTING report
+      //  HYDRATE sharedReportState when loading an EXISTING report
       // ========================================================================
       if (!isNew && reportData) {
         console.log("Hydrating state from loaded report:", reportData._id);
 
         // *** PROCESS MEASUREMENT DATA PROPERLY ***
+        const orderSizes = extractOrderSizes(sharedOrderState.orderData);
         const processedMeasurementData = transformMeasurementDataFromBackend(
-          reportData.measurementData
+          reportData.measurementData,
+          orderSizes
         );
 
         // Hydrate sharedReportState from loaded report data
@@ -774,12 +920,15 @@ const YPivotQAInspection = () => {
             measurementData: {
               ...prev.measurementData,
               ...processedMeasurementData,
-              // Keep other measurement config if exists
-              fullSpecsList: prev.measurementData?.fullSpecsList || [],
-              selectedSpecsList: prev.measurementData?.selectedSpecsList || [],
-              sourceType: prev.measurementData?.sourceType || "",
-              orderSizes: prev.measurementData?.orderSizes || [],
-              kValuesList: prev.measurementData?.kValuesList || []
+              // Merge with existing config if present
+              configBefore: {
+                ...(prev.measurementData?.configBefore || {}),
+                ...(processedMeasurementData.configBefore || {})
+              },
+              configAfter: {
+                ...(prev.measurementData?.configAfter || {}),
+                ...(processedMeasurementData.configAfter || {})
+              }
             },
 
             // Defect Data
@@ -793,7 +942,9 @@ const YPivotQAInspection = () => {
             },
 
             // PP Sheet Data
-            ppSheetData: reportData.ppSheetData || prev.ppSheetData
+            ppSheetData: reportData.ppSheetData
+              ? transformPPSheetDataFromBackend(reportData.ppSheetData)
+              : prev.ppSheetData
           };
 
           return newState;
@@ -985,7 +1136,7 @@ const YPivotQAInspection = () => {
   }, [savedReportData, sharedOrderState, sharedReportState, user]);
 
   // ===========================================================================
-  // NEW: Callback for when a section is saved individually (passed to children)
+  //  Callback for when a section is saved individually (passed to children)
   // ===========================================================================
   const handleSectionSaveSuccess = useCallback(
     (sectionName) => {
@@ -993,6 +1144,19 @@ const YPivotQAInspection = () => {
     },
     [markSectionClean]
   );
+
+  // Handler for when the full report is submitted/finalized from the Summary tab
+  const handleReportFinalized = useCallback((updatedReportData) => {
+    setSavedReportData((prev) => ({
+      ...prev,
+      status: updatedReportData.status,
+      resubmissionHistory: updatedReportData.resubmissionHistory,
+      updatedAt: updatedReportData.updatedAt
+    }));
+
+    // Optional: If you want to force the UI to lock/unlock based on status immediately
+    // setIsReportSaved(true); // It should already be true, but safe to ensure
+  }, []);
 
   const tabs = useMemo(
     () => [
@@ -1101,26 +1265,83 @@ const YPivotQAInspection = () => {
         description: "Detailed Configuration",
         requiresSave: true
       },
-      {
-        id: "measurement",
-        label: "Measurement",
-        icon: <Ruler size={18} />,
-        component: (
-          <YPivotQAInspectionMeasurementDataSave
-            selectedOrders={sharedOrderState.selectedOrders}
-            orderData={sharedOrderState.orderData}
-            reportData={sharedReportState}
-            onUpdateMeasurementData={handleMeasurementDataUpdate}
-            activeGroup={activeGroup}
-            reportId={savedReportData?.reportId}
-            isReportSaved={isReportSaved}
-            onSaveSuccess={() => handleSectionSaveSuccess("measurementData")}
-          />
-        ),
-        gradient: "from-green-500 to-emerald-500",
-        description: "Measurement data",
-        requiresSave: true
-      },
+      // =================================================================
+      // 1. PRIMARY MEASUREMENT TAB (CONDITIONAL)
+      // =================================================================
+      ...(sharedReportState.selectedTemplate?.Measurement &&
+      sharedReportState.selectedTemplate.Measurement !== "No"
+        ? [
+            {
+              id: "measurement",
+              label:
+                sharedReportState.selectedTemplate.Measurement === "Before"
+                  ? "Meas. (B)"
+                  : "Meas. (A)",
+              icon: <Ruler size={18} />,
+              component: (
+                <YPivotQAInspectionMeasurementDataSave
+                  selectedOrders={sharedOrderState.selectedOrders}
+                  orderData={sharedOrderState.orderData}
+                  reportData={sharedReportState}
+                  onUpdateMeasurementData={handleMeasurementDataUpdate}
+                  activeGroup={activeGroup}
+                  reportId={savedReportData?.reportId}
+                  isReportSaved={isReportSaved}
+                  onSaveSuccess={() =>
+                    handleSectionSaveSuccess("measurementData")
+                  }
+                  // *** NEW PROPS ***
+                  targetStage={sharedReportState.selectedTemplate.Measurement}
+                  displayLabel={`${sharedReportState.selectedTemplate.Measurement} Wash`}
+                />
+              ),
+              gradient: "from-green-500 to-emerald-500",
+              description: "Primary Measurement",
+              requiresSave: true
+            }
+          ]
+        : []),
+
+      // =================================================================
+      // 2. ADDITIONAL MEASUREMENT TAB (CONDITIONAL)
+      // =================================================================
+      ...(sharedReportState.selectedTemplate?.MeasurementAdditional &&
+      sharedReportState.selectedTemplate.MeasurementAdditional !== "No"
+        ? [
+            {
+              id: "measurement_2",
+              label:
+                sharedReportState.selectedTemplate.MeasurementAdditional ===
+                "Before"
+                  ? "Meas. (B)"
+                  : "Meas. (A)",
+              icon: <Ruler size={18} />,
+              component: (
+                <YPivotQAInspectionMeasurementDataSave
+                  selectedOrders={sharedOrderState.selectedOrders}
+                  orderData={sharedOrderState.orderData}
+                  reportData={sharedReportState}
+                  onUpdateMeasurementData={handleMeasurementDataUpdate}
+                  activeGroup={activeGroup}
+                  reportId={savedReportData?.reportId}
+                  isReportSaved={isReportSaved}
+                  onSaveSuccess={() =>
+                    handleSectionSaveSuccess("measurementData")
+                  }
+                  // *** NEW PROPS ***
+                  targetStage={
+                    sharedReportState.selectedTemplate.MeasurementAdditional
+                  }
+                  displayLabel={`${sharedReportState.selectedTemplate.MeasurementAdditional} Wash`}
+                />
+              ),
+              // Use a slightly different gradient to distinguish visually
+              gradient: "from-teal-500 to-emerald-600",
+              description: "Additional Measurement",
+              requiresSave: true
+            }
+          ]
+        : []),
       {
         id: "defects",
         label: "Defects",
@@ -1153,12 +1374,13 @@ const YPivotQAInspection = () => {
             orderData={sharedOrderState}
             reportData={sharedReportState}
             qrData={qrData}
-            // NEW: Pass dirty state props
+            //  Pass dirty state props
             dirtySections={dirtySections}
             getDirtySectionsList={getDirtySectionsList}
             hasUnsavedChanges={hasUnsavedChanges}
             markAllSectionsClean={markAllSectionsClean}
             activeGroup={activeGroup}
+            onReportSubmitted={handleReportFinalized}
           />
         ),
         gradient: "from-indigo-500 to-violet-500",
@@ -1172,6 +1394,25 @@ const YPivotQAInspection = () => {
         component: <YPivotQAInspectionPreviousReport user={user} />,
         gradient: "from-slate-700 to-gray-800",
         description: "Search & Download Previous Reports",
+        requiresSave: false
+      },
+      {
+        id: "notifications",
+        label: "Notifications",
+        // Custom Icon with Badge
+        icon: (
+          <div className="relative">
+            <Bell size={18} />
+            {notificationCount > 0 && (
+              <span className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white border border-white">
+                {notificationCount}
+              </span>
+            )}
+          </div>
+        ),
+        component: <YPivotQAInspectionNotifications user={user} />,
+        gradient: "from-pink-500 to-rose-500", // Distinct color
+        description: "Leader Feedback & Decisions",
         requiresSave: false
       }
     ],
@@ -1210,7 +1451,7 @@ const YPivotQAInspection = () => {
     return tabs.find((tab) => tab.id === activeTab);
   }, [activeTab, tabs]);
 
-  // NEW: Function to reset everything
+  //  Function to reset everything
   const handleStartNewInspection = async () => {
     // 1. Clear IndexedDB
     await clearDB();
@@ -1276,351 +1517,361 @@ const YPivotQAInspection = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-72 h-72 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 left-0 w-72 h-72 bg-purple-400/10 dark:bg-purple-600/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      </div>
+    <PhotoUploadProvider reportId={savedReportData?.reportId}>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
+        {/* Animated Background Elements */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-0 w-72 h-72 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-0 left-0 w-72 h-72 bg-purple-400/10 dark:bg-purple-600/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        </div>
 
-      {/* FIXED Header with Integrated Tabs */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 shadow-xl">
-        <div className="absolute inset-0 bg-black/10"></div>
-        <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:16px_16px]"></div>
+        {/* FIXED Header with Integrated Tabs */}
+        <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 shadow-xl">
+          <div className="absolute inset-0 bg-black/10"></div>
+          <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:16px_16px]"></div>
 
-        <div className="relative max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 py-2 lg:py-3">
-          {/* MOBILE/TABLET LAYOUT */}
-          <div className="lg:hidden space-y-2">
-            {/* Top Row: Title + YQMS Button + User Info */}
-            <div className="flex items-center justify-between gap-2">
-              {/* Title Section with YQMS Button */}
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                {/* YQMS Home Button - Mobile */}
-                <button
-                  onClick={handleGoHome}
-                  className="flex-shrink-0 flex items-center justify-center w-9 h-9 bg-gradient-to-br from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 rounded-lg shadow-lg transition-all active:scale-95"
-                  title="Go to YQMS Home"
-                >
-                  <Home size={18} className="text-white" />
-                </button>
+          <div className="relative max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 py-2 lg:py-3">
+            {/* MOBILE/TABLET LAYOUT */}
+            <div className="lg:hidden space-y-2">
+              {/* Top Row: Title + YQMS Button + User Info */}
+              <div className="flex items-center justify-between gap-2">
+                {/* Title Section with YQMS Button */}
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {/* YQMS Home Button - Mobile */}
+                  <button
+                    onClick={handleGoHome}
+                    className="flex-shrink-0 flex items-center justify-center w-9 h-9 bg-gradient-to-br from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 rounded-lg shadow-lg transition-all active:scale-95"
+                    title="Go to YQMS Home"
+                  >
+                    <Home size={18} className="text-white" />
+                  </button>
 
-                <div className="flex items-center justify-center w-9 h-9 bg-white/20 backdrop-blur-sm rounded-lg shadow-lg flex-shrink-0">
-                  <Shield size={18} className="text-white" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <h1 className="text-sm font-black text-white tracking-tight truncate">
-                      Fin Check
-                    </h1>
-                    <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white/20 backdrop-blur-sm rounded-full flex-shrink-0">
-                      <Sparkles size={8} className="text-yellow-300" />
-                      <span className="text-[8px] font-bold text-white">
-                        PRO
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => setShowNewConfirm(true)}
-                      className="ml-10 flex items-center justify-center gap-1.5 h-7 px-3 bg-white text-indigo-600 rounded-lg shadow-md active:scale-95 transition-transform"
-                    >
-                      <Plus size={24} strokeWidth={3} />
-                      <span className="text-[12px] font-bold uppercase">
-                        New
-                      </span>
-                    </button>
+                  <div className="flex items-center justify-center w-9 h-9 bg-white/20 backdrop-blur-sm rounded-lg shadow-lg flex-shrink-0">
+                    <Shield size={18} className="text-white" />
                   </div>
-                  {/* Active Tab Indicator - Inline with title */}
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <div className="relative flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400"></span>
-                    </div>
-                    <p className="text-[10px] text-indigo-100 font-medium truncate">
-                      {activeTabData?.label} • Active
-                      {hasUnsavedChanges && (
-                        <span className="ml-1 text-amber-300">
-                          • Unsaved changes
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <h1 className="text-sm font-black text-white tracking-tight truncate">
+                        Fin Check
+                      </h1>
+                      <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white/20 backdrop-blur-sm rounded-full flex-shrink-0">
+                        <Sparkles size={8} className="text-yellow-300" />
+                        <span className="text-[8px] font-bold text-white">
+                          PRO
                         </span>
-                      )}
-                    </p>
+                      </div>
+                      <button
+                        onClick={() => setShowNewConfirm(true)}
+                        className="ml-10 flex items-center justify-center gap-1.5 h-7 px-3 bg-white text-indigo-600 rounded-lg shadow-md active:scale-95 transition-transform"
+                      >
+                        <Plus size={24} strokeWidth={3} />
+                        <span className="text-[12px] font-bold uppercase">
+                          New
+                        </span>
+                      </button>
+                    </div>
+                    {/* Active Tab Indicator - Inline with title */}
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400"></span>
+                      </div>
+                      <p className="text-[10px] text-indigo-100 font-medium truncate">
+                        {activeTabData?.label} • Active
+                        {hasUnsavedChanges && (
+                          <span className="ml-1 text-amber-300">
+                            • Unsaved changes
+                          </span>
+                        )}
+                      </p>
+                    </div>
                   </div>
+                </div>
+                {/* User Info */}
+                {user && (
+                  <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-2 py-1 shadow-lg flex-shrink-0">
+                    <div className="flex items-center justify-center w-7 h-7 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-md shadow">
+                      <User size={14} className="text-white" />
+                    </div>
+                    <div className="hidden sm:block">
+                      <p className="text-white font-bold text-[10px] leading-tight truncate max-w-[80px]">
+                        {user.job_title || "Operator"}
+                      </p>
+                      <p className="text-indigo-200 text-[9px] font-medium leading-tight">
+                        {user.emp_id}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Tabs - Scrollable */}
+              <div className="overflow-x-auto scrollbar-hide -mx-3 px-3">
+                <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1 min-w-max">
+                  {tabs.map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    const isLocked = tab.requiresSave && !isReportSaved;
+
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() =>
+                          !isLocked && handleTabChange(tab.id, tab.requiresSave)
+                        }
+                        disabled={isLocked}
+                        className={`group relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${
+                          isActive
+                            ? "bg-white shadow-lg scale-105"
+                            : isLocked
+                            ? "bg-transparent opacity-50 cursor-not-allowed"
+                            : "bg-transparent hover:bg-white/20"
+                        }`}
+                        title={
+                          isLocked
+                            ? "Save order data first to access this tab"
+                            : tab.description
+                        }
+                      >
+                        <div
+                          className={`transition-colors duration-300 ${
+                            isActive ? "text-indigo-600" : "text-white"
+                          }`}
+                        >
+                          {isLocked ? (
+                            <Lock className="w-4 h-4" />
+                          ) : (
+                            React.cloneElement(tab.icon, {
+                              className: "w-4 h-4"
+                            })
+                          )}
+                        </div>
+                        <span
+                          className={`text-[9px] font-bold transition-colors duration-300 whitespace-nowrap ${
+                            isActive ? "text-indigo-600" : "text-white"
+                          }`}
+                        >
+                          {tab.label}
+                        </span>
+                        {isActive && (
+                          <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow animate-pulse"></div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              {/* User Info */}
-              {user && (
-                <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-2 py-1 shadow-lg flex-shrink-0">
-                  <div className="flex items-center justify-center w-7 h-7 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-md shadow">
-                    <User size={14} className="text-white" />
+            </div>
+
+            {/* DESKTOP LAYOUT */}
+            <div className="hidden lg:flex lg:items-center lg:justify-between lg:gap-4">
+              {/* Left Side */}
+              <div className="flex items-center gap-4 flex-1">
+                {/* YQMS Home Button - Desktop */}
+                <button
+                  onClick={handleGoHome}
+                  className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 rounded-xl shadow-lg transition-all hover:shadow-xl hover:scale-105 active:scale-95"
+                  title="Go to YQMS Home"
+                >
+                  <ArrowLeft size={16} className="text-white" />
+                  <span className="text-sm font-bold text-white">YQMS</span>
+                </button>
+
+                {/* Title */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl shadow-lg">
+                    <Shield size={22} className="text-white" />
                   </div>
-                  <div className="hidden sm:block">
-                    <p className="text-white font-bold text-[10px] leading-tight truncate max-w-[80px]">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-xl font-black text-white tracking-tight">
+                        Fin Check | Inspection
+                      </h1>
+                      <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full">
+                        <Sparkles size={10} className="text-yellow-300" />
+                        <span className="text-[10px] font-bold text-white">
+                          PRO
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-indigo-100 font-medium">
+                      Quality Inspection Data Collection
+                    </p>
+                  </div>
+                </div>
+                {/* Tabs */}
+                <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1.5">
+                  {tabs.map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    const isLocked = tab.requiresSave && !isReportSaved;
+
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() =>
+                          !isLocked && handleTabChange(tab.id, tab.requiresSave)
+                        }
+                        disabled={isLocked}
+                        className={`group relative flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-300 ${
+                          isActive
+                            ? "bg-white shadow-lg scale-105"
+                            : isLocked
+                            ? "bg-transparent opacity-50 cursor-not-allowed"
+                            : "bg-transparent hover:bg-white/20"
+                        }`}
+                        title={
+                          isLocked
+                            ? "Save order data first to access this tab"
+                            : tab.description
+                        }
+                      >
+                        <div
+                          className={`transition-colors duration-300 ${
+                            isActive ? "text-indigo-600" : "text-white"
+                          }`}
+                        >
+                          {isLocked ? (
+                            <Lock className="w-4 h-4" />
+                          ) : (
+                            React.cloneElement(tab.icon, {
+                              className: "w-4 h-4"
+                            })
+                          )}
+                        </div>
+                        <span
+                          className={`text-[10px] font-bold transition-colors duration-300 ${
+                            isActive ? "text-indigo-600" : "text-white"
+                          }`}
+                        >
+                          {tab.label}
+                        </span>
+                        {isActive && (
+                          <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow animate-pulse"></div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Active Status */}
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3 py-2">
+                  <div className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-sm leading-tight">
+                      {activeTabData?.label}
+                    </p>
+                    <p className="text-indigo-200 text-[10px] font-medium leading-tight">
+                      {hasUnsavedChanges
+                        ? `Unsaved: ${getDirtySectionsList().length}`
+                        : "All Saved"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowNewConfirm(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-indigo-600 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 group"
+                  title="Start a new inspection report"
+                >
+                  <div className="p-1 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">
+                    <Plus
+                      size={16}
+                      strokeWidth={3}
+                      className="text-indigo-600"
+                    />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold uppercase tracking-wider leading-none">
+                      New Inspection
+                    </p>
+                  </div>
+                </button>
+              </div>
+              {/* Right Side - User Info */}
+              {user && (
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3 py-2 shadow-lg">
+                  <div className="flex items-center justify-center w-9 h-9 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow">
+                    <User size={18} className="text-white" />
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-sm leading-tight">
                       {user.job_title || "Operator"}
                     </p>
-                    <p className="text-indigo-200 text-[9px] font-medium leading-tight">
-                      {user.emp_id}
+                    <p className="text-indigo-200 text-xs font-medium leading-tight">
+                      ID: {user.emp_id}
                     </p>
                   </div>
                 </div>
               )}
             </div>
-            {/* Tabs - Scrollable */}
-            <div className="overflow-x-auto scrollbar-hide -mx-3 px-3">
-              <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1 min-w-max">
-                {tabs.map((tab) => {
-                  const isActive = activeTab === tab.id;
-                  const isLocked = tab.requiresSave && !isReportSaved;
-
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() =>
-                        !isLocked && handleTabChange(tab.id, tab.requiresSave)
-                      }
-                      disabled={isLocked}
-                      className={`group relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${
-                        isActive
-                          ? "bg-white shadow-lg scale-105"
-                          : isLocked
-                          ? "bg-transparent opacity-50 cursor-not-allowed"
-                          : "bg-transparent hover:bg-white/20"
-                      }`}
-                      title={
-                        isLocked
-                          ? "Save order data first to access this tab"
-                          : tab.description
-                      }
-                    >
-                      <div
-                        className={`transition-colors duration-300 ${
-                          isActive ? "text-indigo-600" : "text-white"
-                        }`}
-                      >
-                        {isLocked ? (
-                          <Lock className="w-4 h-4" />
-                        ) : (
-                          React.cloneElement(tab.icon, { className: "w-4 h-4" })
-                        )}
-                      </div>
-                      <span
-                        className={`text-[9px] font-bold transition-colors duration-300 whitespace-nowrap ${
-                          isActive ? "text-indigo-600" : "text-white"
-                        }`}
-                      >
-                        {tab.label}
-                      </span>
-                      {isActive && (
-                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow animate-pulse"></div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* DESKTOP LAYOUT */}
-          <div className="hidden lg:flex lg:items-center lg:justify-between lg:gap-4">
-            {/* Left Side */}
-            <div className="flex items-center gap-4 flex-1">
-              {/* YQMS Home Button - Desktop */}
-              <button
-                onClick={handleGoHome}
-                className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 rounded-xl shadow-lg transition-all hover:shadow-xl hover:scale-105 active:scale-95"
-                title="Go to YQMS Home"
-              >
-                <ArrowLeft size={16} className="text-white" />
-                <span className="text-sm font-bold text-white">YQMS</span>
-              </button>
-
-              {/* Title */}
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl shadow-lg">
-                  <Shield size={22} className="text-white" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-xl font-black text-white tracking-tight">
-                      Fin Check | Inspection
-                    </h1>
-                    <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full">
-                      <Sparkles size={10} className="text-yellow-300" />
-                      <span className="text-[10px] font-bold text-white">
-                        PRO
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-indigo-100 font-medium">
-                    Quality Inspection Data Collection
-                  </p>
-                </div>
-              </div>
-              {/* Tabs */}
-              <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1.5">
-                {tabs.map((tab) => {
-                  const isActive = activeTab === tab.id;
-                  const isLocked = tab.requiresSave && !isReportSaved;
-
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() =>
-                        !isLocked && handleTabChange(tab.id, tab.requiresSave)
-                      }
-                      disabled={isLocked}
-                      className={`group relative flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-300 ${
-                        isActive
-                          ? "bg-white shadow-lg scale-105"
-                          : isLocked
-                          ? "bg-transparent opacity-50 cursor-not-allowed"
-                          : "bg-transparent hover:bg-white/20"
-                      }`}
-                      title={
-                        isLocked
-                          ? "Save order data first to access this tab"
-                          : tab.description
-                      }
-                    >
-                      <div
-                        className={`transition-colors duration-300 ${
-                          isActive ? "text-indigo-600" : "text-white"
-                        }`}
-                      >
-                        {isLocked ? (
-                          <Lock className="w-4 h-4" />
-                        ) : (
-                          React.cloneElement(tab.icon, { className: "w-4 h-4" })
-                        )}
-                      </div>
-                      <span
-                        className={`text-[10px] font-bold transition-colors duration-300 ${
-                          isActive ? "text-indigo-600" : "text-white"
-                        }`}
-                      >
-                        {tab.label}
-                      </span>
-                      {isActive && (
-                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow animate-pulse"></div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              {/* Active Status */}
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3 py-2">
-                <div className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
-                </div>
-                <div>
-                  <p className="text-white font-bold text-sm leading-tight">
-                    {activeTabData?.label}
-                  </p>
-                  <p className="text-indigo-200 text-[10px] font-medium leading-tight">
-                    {hasUnsavedChanges
-                      ? `Unsaved: ${getDirtySectionsList().length}`
-                      : "All Saved"}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowNewConfirm(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-indigo-600 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 group"
-                title="Start a new inspection report"
-              >
-                <div className="p-1 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">
-                  <Plus size={16} strokeWidth={3} className="text-indigo-600" />
-                </div>
-                <div className="text-left">
-                  <p className="text-xs font-bold uppercase tracking-wider leading-none">
-                    New Inspection
-                  </p>
-                </div>
-              </button>
-            </div>
-            {/* Right Side - User Info */}
-            {user && (
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3 py-2 shadow-lg">
-                <div className="flex items-center justify-center w-9 h-9 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow">
-                  <User size={18} className="text-white" />
-                </div>
-                <div>
-                  <p className="text-white font-bold text-sm leading-tight">
-                    {user.job_title || "Operator"}
-                  </p>
-                  <p className="text-indigo-200 text-xs font-medium leading-tight">
-                    ID: {user.emp_id}
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
         </div>
-      </div>
 
-      {/* Content Container - Reduced padding-top */}
-      <div className="relative max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 pb-6 pt-[100px] lg:pt-[72px]">
-        <div className="animate-fadeIn">
-          <div className="transform transition-all duration-500 ease-out">
-            {activeComponent}
+        {/* Content Container - Reduced padding-top */}
+        <div className="relative max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 pb-6 pt-[100px] lg:pt-[72px]">
+          <div className="animate-fadeIn">
+            <div className="transform transition-all duration-500 ease-out">
+              {activeComponent}
+            </div>
           </div>
         </div>
+
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          subMessage={statusModal.subMessage}
+        />
+
+        <ConfirmationModal
+          isOpen={showNewConfirm}
+          onClose={() => setShowNewConfirm(false)}
+          onConfirm={handleStartNewInspection}
+          title="Start New Inspection?"
+          message="Are you sure you want to start a new report? Any unsaved changes in the current session will be lost. Please ensure you have saved your work."
+        />
+
+        {/* Styles */}
+        <style jsx>{`
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+          .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+              transform: translateY(10px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          .animate-fadeIn {
+            animation: fadeIn 0.4s ease-out;
+          }
+          .bg-grid-white {
+            background-image: linear-gradient(
+                to right,
+                rgba(255, 255, 255, 0.1) 1px,
+                transparent 1px
+              ),
+              linear-gradient(
+                to bottom,
+                rgba(255, 255, 255, 0.1) 1px,
+                transparent 1px
+              );
+          }
+          .delay-1000 {
+            animation-delay: 1s;
+          }
+        `}</style>
       </div>
-
-      <StatusModal
-        isOpen={statusModal.isOpen}
-        onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
-        type={statusModal.type}
-        title={statusModal.title}
-        message={statusModal.message}
-        subMessage={statusModal.subMessage}
-      />
-
-      <ConfirmationModal
-        isOpen={showNewConfirm}
-        onClose={() => setShowNewConfirm(false)}
-        onConfirm={handleStartNewInspection}
-        title="Start New Inspection?"
-        message="Are you sure you want to start a new report? Any unsaved changes in the current session will be lost. Please ensure you have saved your work."
-      />
-
-      {/* Styles */}
-      <style jsx>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.4s ease-out;
-        }
-        .bg-grid-white {
-          background-image: linear-gradient(
-              to right,
-              rgba(255, 255, 255, 0.1) 1px,
-              transparent 1px
-            ),
-            linear-gradient(
-              to bottom,
-              rgba(255, 255, 255, 0.1) 1px,
-              transparent 1px
-            );
-        }
-        .delay-1000 {
-          animation-delay: 1s;
-        }
-      `}</style>
-    </div>
+    </PhotoUploadProvider>
   );
 };
 

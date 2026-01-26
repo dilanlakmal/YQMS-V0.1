@@ -128,7 +128,11 @@ const YPivotQAInspectionConfigSave = ({
   }, [reportId]);
 
   // --- SAVE TO BACKEND ---
-  const saveToBackend = async (groupsToSave, showModal = true) => {
+  const saveToBackend = async (
+    groupsToSave,
+    showModal = true,
+    shouldLock = true
+  ) => {
     if (!isReportSaved || !reportId) return;
 
     const selectedTemplate = reportData.selectedTemplate;
@@ -162,10 +166,19 @@ const YPivotQAInspectionConfigSave = ({
 
       if (res.data.success) {
         setIsUpdateMode(true);
-        setLockTrigger((prev) => prev + 1);
+        // ONLY TRIGGER LOCK IF REQUESTED
+        if (shouldLock) {
+          setLockTrigger((prev) => prev + 1);
+        }
+
         if (onSaveSuccess) {
           onSaveSuccess();
         }
+
+        // setLockTrigger((prev) => prev + 1);
+        // if (onSaveSuccess) {
+        //   onSaveSuccess();
+        // }
         if (showModal) {
           setStatusModal({
             isOpen: true,
@@ -236,13 +249,52 @@ const YPivotQAInspectionConfigSave = ({
         return;
       }
     }
-
-    saveToBackend(groups);
+    // Manual Click = Lock the UI (Pass true)
+    saveToBackend(groups, true, true);
+    //saveToBackend(groups);
   };
 
   // --- IMMEDIATE SAVE HANDLER ---
   const handleImmediateSave = (updatedGroups) => {
-    saveToBackend(updatedGroups, true);
+    saveToBackend(updatedGroups, false, false);
+    //saveToBackend(updatedGroups, true);
+  };
+
+  // ✅ Handle Clear All Backend Call
+  const handleClearAllConfig = async () => {
+    if (!reportId) return;
+
+    setSaving(true);
+    try {
+      const res = await axios.post(
+        `${API_BASE_URL}/api/fincheck-inspection/clear-inspection-config`,
+        { reportId }
+      );
+
+      if (res.data.success) {
+        // Update local state to empty
+        onUpdate({ lineTableConfig: [] }, { isFromBackend: true });
+
+        // Show success modal
+        setStatusModal({
+          isOpen: true,
+          type: "success",
+          message: "All configurations removed successfully!"
+        });
+
+        // Update UI mode
+        setIsUpdateMode(false); // Reset to not saved/empty state if you prefer
+      }
+    } catch (error) {
+      console.error("Clear error:", error);
+      setStatusModal({
+        isOpen: true,
+        type: "error",
+        message: "Failed to clear configuration."
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loadingData) {
@@ -281,6 +333,7 @@ const YPivotQAInspectionConfigSave = ({
         onSetActiveGroup={onSetActiveGroup}
         activeGroup={activeGroup}
         onSaveWithData={handleImmediateSave}
+        onClearAll={handleClearAllConfig}
         lockTrigger={lockTrigger}
       />
 

@@ -1,3 +1,4 @@
+import { log } from "console";
 import {
   ymProdConnection,
   HumidityReport
@@ -84,12 +85,10 @@ export const getHumidityDataByMoNo = async (req, res) => {
         console.error("Error fetching yorksys_orders fallback:", errOrder);
       }
 
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "No humidity data found for this moNo"
-        });
+      return res.status(404).json({
+        success: false,
+        message: "No humidity data found for this moNo"
+      });
     }
 
     return res.json({ success: true, data: doc });
@@ -258,29 +257,193 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
     }
 
     if (!doc)
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "No reitmans_humidity record found for this moNo"
-        });
+      return res.status(404).json({
+        success: false,
+        message: "No reitmans_humidity record found for this moNo"
+      });
 
-    // return full doc and try to extract common primary/secondary
-    let primary = doc.primary || doc.primaryFabric || doc.fabricPrimary || null;
-    let secondary =
-      doc.secondary || doc.secondaryFabric || doc.fabricSecondary || null;
-    // if ReitmansName array exists, pick first entry that has primary/secondary
-    if ((!primary || !secondary) && Array.isArray(doc.ReitmansName)) {
-      const entry =
-        doc.ReitmansName.find((e) => e.primary && e.secondary) ||
-        doc.ReitmansName[0];
-      if (entry) {
-        primary = primary || entry.primary;
-        secondary = secondary || entry.secondary;
-      }
+    // Fetch order data for fabric composition
+    const order = await ordersCol.findOne({
+      $or: [{ moNo: moNo }, { style: moNo }, { factoryStyleNo: moNo }]
+    });
+
+    let finalPrimary = null;
+    let finalSecondary = null;
+    let finalValue = null;
+    let matchNote = "";
+
+    // 1. Get Actual Composition from Order Data (if available) or fallback
+    let orderFabrics = [];
+    if (order && Array.isArray(order.FabricContent)) {
+      orderFabrics = order.FabricContent;
+      console.log(
+        `[ReitmansMatch] Order found for ${moNo}. FabricContent:`,
+        JSON.stringify(order.FabricContent)
+      );
+    } else {
+      console.log(
+        `[ReitmansMatch] No FabricContent found in order for ${moNo}`
+      );
     }
 
-    return res.json({ success: true, data: { primary, secondary, doc } });
+    if (orderFabrics.length > 0) {
+      // Sort by percentage descending to find Primary/Secondary
+      const sorted = [...orderFabrics].sort(
+        (a, b) =>
+          (parseFloat(b.percentageValue) || 0) -
+          (parseFloat(a.percentageValue) || 0)
+      );
+
+      const pFab = sorted[0];
+      const sFab = sorted.length > 1 ? sorted[1] : null;
+
+      const pName = (pFab.fabricName || pFab.fabric || "").toUpperCase().trim();
+      const pPct = parseFloat(pFab.percentageValue) || 0;
+
+      const sName = sFab
+        ? (sFab.fabricName || sFab.fabric || "").toUpperCase().trim()
+        : "";
+
+      console.log(
+        `[ReitmansMatch] Target: Primary=${pName} (${pPct}%), Secondary=${sName}`
+      );
+
+      finalPrimary = { fabricName: pName, percentage: pPct };
+      if (sName)
+        finalSecondary = {
+          fabricName: sName,
+          percentage: parseFloat(sFab.percentageValue) || 0
+        };
+
+      // 2. Find matching rule in ReitmansName array
+      if (doc && Array.isArray(doc.ReitmansName)) {
+        // Helper to check range "81-100" or single value
+        const isPctMatch = (ruleRange, actualPct) => {
+          if (!ruleRange) return false;
+          const rangeStr = String(ruleRange).trim();
+          if (rangeStr.includes("-")) {
+            const [min, max] = rangeStr.split("-").map(Number);
+            return actualPct >= min && actualPct <= max;
+          }
+          // direct match (allow small variance? strictly equal for now)
+          return Number(rangeStr) === actualPct;
+        };
+
+        console.log(
+          `[ReitmansMatch] Checking ${doc.ReitmansName.length} rules...`
+        );
+        let bestMatch = doc.ReitmansName.find((rule) => {
+          const rPName = (rule.primary || "").toUpperCase().trim();
+          const rSName = (rule.secondary || "").toUpperCase().trim();
+
+          const pMatch = pName.includes(rPName) || rPName.includes(pName); // loose name match
+          const rangeMatch = isPctMatch(
+            rule["primary%"] || rule.primaryPercent,
+            pPct
+          );
+          let sMatch = false;
+          if (sName && rSName) {
+            sMatch = sName.includes(rSName) || rSName.includes(sName);
+          } else if (!sName && !rSName) {
+            sMatch = true;
+          }
+
+          return pMatch && rangeMatch && sMatch;
+        });
+
+        if (bestMatch)
+          console.log(
+            `[ReitmansMatch] Strict match found:`,
+            JSON.stringify(bestMatch)
+          );
+
+        // Fallback: Try match just Primary Name + Pct Range (ignoring secondary mismatch if strict failed)
+        if (!bestMatch) {
+          console.log(
+            `[ReitmansMatch] No strict match. Trying fallback 1 (Primary + Range + No Secondary)...`
+          );
+          bestMatch = doc.ReitmansName.find((rule) => {
+            const rPName = (rule.primary || "").toUpperCase().trim();
+            const pMatch = pName.includes(rPName) || rPName.includes(pName);
+            const rangeMatch = isPctMatch(
+              rule["primary%"] || rule.primaryPercent,
+              pPct
+            );
+            return pMatch && rangeMatch && !rule.secondary; // prefer rules without secondary
+          });
+        }
+
+        // Fallback 2: Try match just Primary Name (if percentage slightly off)
+        if (!bestMatch) {
+          console.log(
+            `[ReitmansMatch] No Match yet. Trying fallback 2 (Primary Name Only + No Secondary)...`
+          );
+          bestMatch = doc.ReitmansName.find((rule) => {
+            const rPName = (rule.primary || "").toUpperCase().trim();
+            return (
+              (pName.includes(rPName) || rPName.includes(pName)) &&
+              !rule.secondary
+            );
+          });
+        }
+
+        // Fallback 3: Loose Match - Match Primary + Range, ignoring secondary mismatch
+        if (!bestMatch) {
+          console.log(
+            `[ReitmansMatch] No Match yet. Trying fallback 3 (Loose Primary + Range)...`
+          );
+          bestMatch = doc.ReitmansName.find((rule) => {
+            const rPName = (rule.primary || "").toUpperCase().trim();
+            const pMatch = pName.includes(rPName) || rPName.includes(pName);
+            const rangeMatch = isPctMatch(
+              rule["primary%"] || rule.primaryPercent,
+              pPct
+            );
+            return pMatch && rangeMatch;
+          });
+        }
+
+        if (bestMatch) {
+          console.log(
+            `[ReitmansMatch] FINAL MATCH:`,
+            JSON.stringify(bestMatch)
+          );
+          finalValue = bestMatch.upperCentisimal || bestMatch.value;
+          matchNote = "Matched rule: " + JSON.stringify(bestMatch);
+        } else {
+          console.log(`[ReitmansMatch] NO MATCH FOUND after all attempts.`);
+        }
+      }
+    } else {
+      // No order fabrics found, fallback to doc defaults
+      finalPrimary = {
+        fabricName: doc.primary || doc.primaryFabric,
+        percentage: doc.primaryPercent || doc["primary%"]
+      };
+      finalValue = doc.upperCentisimalIndex || doc.value;
+    }
+
+    // fallback for value if still null
+    if (!finalValue)
+      finalValue = doc.upperCentisimalIndex || doc.value || doc.aquaboySpec;
+
+    return res.json({
+      success: true,
+      data: {
+        primary: finalPrimary?.fabricName, // Send string name to match frontend expectation
+        secondary: finalSecondary?.fabricName, // Send string name
+        primaryPercent: finalPrimary?.percentage,
+        secondaryPercent: finalSecondary?.percentage,
+
+        doc: {
+          ...doc, // include original doc fields
+          upperCentisimalIndex: finalValue, // OVERWRITE with calculated specific value
+          upperCentisimal: finalValue,
+          value: finalValue,
+          matchNote
+        }
+      }
+    });
   } catch (err) {
     console.error("Error fetching reitmans_humidity by moNo:", err);
     return res
@@ -683,6 +846,7 @@ export const exportHumidityReportsPaper = async (req, res) => {
 // POST /api/humidity-reports
 export const createHumidityReport = async (req, res) => {
   try {
+    console.log("createHumidityReport hehe");
     const payload = req.body;
     if (!payload || typeof payload !== "object") {
       return res
@@ -741,65 +905,35 @@ export const createHumidityReport = async (req, res) => {
     }
 
     const model = HumidityReport;
-    const existingDoc = await model
-      .findOne({
-        factoryStyleNo: payload.factoryStyleNo,
-        $or: [{ status: "in_progress" }, { status: { $exists: false } }]
-      })
-      .sort({ createdAt: -1 });
 
-    let doc;
-    const shouldCreateNew = !existingDoc || existingDoc.status === "completed";
-
-    if (shouldCreateNew) {
-      doc = new model({
-        ...payload,
-        status: "in_progress",
-        history: [historyEntry]
-      });
-      await doc.save();
-    } else {
-      doc = await model.findOneAndUpdate(
-        { _id: existingDoc._id },
-        {
-          $push: { history: historyEntry },
-          $set: {
-            buyerStyle: payload.buyerStyle || existingDoc.buyerStyle,
-            customer: payload.customer || existingDoc.customer,
-            fabrication: payload.fabrication || existingDoc.fabrication,
-            aquaboySpec: payload.aquaboySpec || existingDoc.aquaboySpec,
-            colorName: payload.colorName || existingDoc.colorName,
-            beforeDryRoom: payload.beforeDryRoom || existingDoc.beforeDryRoom,
-            afterDryRoom: payload.afterDryRoom || existingDoc.afterDryRoom,
-            date: payload.date || existingDoc.date,
-            inspectionType:
-              payload.inspectionType || existingDoc.inspectionType,
-            generalRemark: payload.generalRemark || existingDoc.generalRemark,
-            inspectorSignature:
-              payload.inspectorSignature || existingDoc.inspectorSignature,
-            qamSignature: payload.qamSignature || existingDoc.qamSignature
-          }
-        },
-        { new: true }
-      );
-
-      const latest = doc.history[doc.history.length - 1];
-      if (
-        latest.top?.status === "pass" &&
-        latest.middle?.status === "pass" &&
-        latest.bottom?.status === "pass"
-      ) {
-        doc.status = "completed";
-        await doc.save();
-      }
+    // Determine status: if all sections in the latest records are 'pass', set status to 'completed'
+    let finalStatus = "in_progress";
+    if (
+      historyEntry.top?.status === "pass" &&
+      historyEntry.middle?.status === "pass" &&
+      historyEntry.bottom?.status === "pass"
+    ) {
+      finalStatus = "completed";
     }
 
-    return res.status(201).json({ success: true, data: doc });
+    const doc = new model({
+      ...payload,
+      status: finalStatus,
+      history: [historyEntry]
+    });
+
+    await doc.save();
+
+    return res.json({
+      success: true,
+      message: "Report saved successfully!",
+      data: doc
+    });
   } catch (err) {
-    console.error("Error saving humidity report:", err);
+    console.error("Error creating humidity report:", err);
     return res
       .status(500)
-      .json({ success: false, message: "Failed to save humidity report" });
+      .json({ success: false, message: "Failed to create report" });
   }
 };
 
@@ -941,12 +1075,10 @@ export const getFabricValuesByBuyer = async (req, res) => {
       });
       fabricNames = [...new Set(fabricNames)];
     } else {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Provide either buyer or moNo query param"
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Provide either buyer or moNo query param"
+      });
     }
 
     // lowercase buyer for matching
@@ -1028,5 +1160,52 @@ export const approveHumidityReport = async (req, res) => {
     return res
       .status(500)
       .json({ success: false, message: "Failed to approve report" });
+  }
+};
+
+// PUT /api/humidity-reports/:id
+export const updateHumidityReport = async (req, res) => {
+  try {
+    console.log("updateHumidityReport hehe ah ng men bro");
+    const { id } = req.params;
+    const payload = req.body;
+
+    if (!id) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Report ID is required" });
+    }
+
+    const model = HumidityReport;
+
+    // Remove _id from payload to avoid immutable field error
+    delete payload._id;
+
+    // Remove immutable fields if present
+    delete payload.createdAt;
+    delete payload.updatedAt;
+
+    const updatedDoc = await model.findByIdAndUpdate(
+      id,
+      { $set: payload },
+      { new: true }
+    );
+
+    if (!updatedDoc) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found" });
+    }
+
+    return res.json({
+      success: true,
+      data: updatedDoc,
+      message: "Report updated successfully"
+    });
+  } catch (err) {
+    console.error("Error updating humidity report:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to update report" });
   }
 };

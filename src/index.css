@@ -34,8 +34,11 @@ body {
   z-index: 50 !important;
 }
 
-.pt-16 > .min-h-screen {
+.pt-16 .min-h-screen {
+  /* Fallback for older browsers */
   min-height: calc(100vh - 4rem) !important;
+  /* for Mobile (iOS Safari / Chrome Android) */
+  min-height: calc(100dvh - 4rem) !important;
 }
 
 /* --- ADD KEYFRAME ANIMATION FOR FOCUS INDICATOR --- */

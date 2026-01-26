@@ -10,7 +10,6 @@ import {
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import crypto from "crypto";
 
 // ============================================================
 // Helper: Extract base order number (common part)
@@ -971,9 +970,17 @@ export const createInspectionReport = async (req, res) => {
 // ============================================================
 // Get Inspection Report by ID
 // ============================================================
+
 export const getInspectionReportById = async (req, res) => {
   try {
     const { reportId } = req.params;
+
+    if (!reportId) {
+      return res.status(400).json({
+        success: false,
+        message: "Report ID is required."
+      });
+    }
 
     const report = await FincheckInspectionReports.findOne({ reportId }).lean();
 
@@ -997,9 +1004,29 @@ export const getInspectionReportById = async (req, res) => {
       }
     }
 
-    // Attach the photo to the response object (not saved to DB)
+    // Process measurement data - ensure stage is properly set for legacy data
+    let processedMeasurementData = report.measurementData;
+    if (report.measurementData && Array.isArray(report.measurementData)) {
+      processedMeasurementData = report.measurementData.map((measurement) => {
+        // If stage already exists, keep it as is
+        if (measurement.stage) {
+          return measurement;
+        }
+
+        // For legacy data without stage field:
+        // - If kValue has a value (not empty string) → "Before" wash
+        // - If kValue is empty string '' → "After" wash
+        return {
+          ...measurement,
+          stage: measurement.kValue ? "Before" : "After"
+        };
+      });
+    }
+
+    // Attach the photo and processed measurement data to the response object
     const reportData = {
       ...report,
+      measurementData: processedMeasurementData,
       inspectorPhoto: inspectorPhoto // Frontend can access this now
     };
 
@@ -1017,9 +1044,56 @@ export const getInspectionReportById = async (req, res) => {
   }
 };
 
+// export const getInspectionReportById = async (req, res) => {
+//   try {
+//     const { reportId } = req.params;
+
+//     const report = await FincheckInspectionReports.findOne({ reportId }).lean();
+
+//     if (!report) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Report not found."
+//       });
+//     }
+
+//     // DYNAMIC LOOKUP: Match empId in UserMain to get the photo
+//     let inspectorPhoto = null;
+//     if (report.empId) {
+//       const inspector = await UserMain.findOne(
+//         { emp_id: report.empId },
+//         "face_photo"
+//       ).lean();
+
+//       if (inspector && inspector.face_photo) {
+//         inspectorPhoto = inspector.face_photo;
+//       }
+//     }
+
+//     // Attach the photo to the response object (not saved to DB)
+//     const reportData = {
+//       ...report,
+//       inspectorPhoto: inspectorPhoto // Frontend can access this now
+//     };
+
+//     return res.status(200).json({
+//       success: true,
+//       data: reportData
+//     });
+//   } catch (error) {
+//     console.error("Error fetching report by ID:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal server error.",
+//       error: error.message
+//     });
+//   }
+// };
+
 // ============================================================
 // Check Existing Report (Matches Unique Index Logic)
 // ============================================================
+
 export const checkExistingReport = async (req, res) => {
   try {
     const {
@@ -1072,9 +1146,14 @@ export const checkExistingReport = async (req, res) => {
   }
 };
 
+// ============================================================
+// Upload Header Images (Multipart/FormData)
+// ============================================================
+
 // Define Storage Path
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 const uploadDirHeader = path.join(
   __dirname,
   "../../../storage/PivotY/Fincheck/HeaderData"
@@ -1085,32 +1164,43 @@ if (!fs.existsSync(uploadDirHeader)) {
   fs.mkdirSync(uploadDirHeader, { recursive: true });
 }
 
-// Helper: Save Base64 Image to Disk
-const saveBase64Image = (base64String, reportId, sectionId, index) => {
+export const uploadHeaderImages = async (req, res) => {
   try {
-    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) return null;
+    if (!req.files || req.files.length === 0) {
+      return res.status(200).json({ success: true, data: { paths: [] } });
+    }
 
-    const type = matches[1];
-    const data = Buffer.from(matches[2], "base64");
-    const ext = type.split("/")[1] || "jpg";
+    const savedPaths = [];
 
-    // Create unique filename
-    const filename = `header_${reportId}_${sectionId}_${index}_${Date.now()}.${ext}`;
-    const filepath = path.join(uploadDirHeader, filename);
+    for (const file of req.files) {
+      // Create a unique filename
+      const uniqueName = `header_img_${Date.now()}_${Math.round(
+        Math.random() * 1000
+      )}${path.extname(file.originalname)}`;
 
-    fs.writeFileSync(filepath, data);
+      const targetPath = path.join(uploadDirHeader, uniqueName);
 
-    // Return relative URL for frontend access
-    return `/storage/PivotY/Fincheck/HeaderData/${filename}`;
+      // Move file from temp to final folder
+      fs.renameSync(file.path, targetPath);
+
+      // Push relative path
+      savedPaths.push(`/storage/PivotY/Fincheck/HeaderData/${uniqueName}`);
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        paths: savedPaths
+      }
+    });
   } catch (error) {
-    console.error("Error saving base64 image:", error);
-    return null;
+    console.error("Header image upload error:", error);
+    return res.status(500).json({ success: false, message: "Upload failed" });
   }
 };
 
 // ============================================================
-// Update Header Data (Selections, Remarks, Images)
+// Update Header Data
 // ============================================================
 export const updateHeaderData = async (req, res) => {
   try {
@@ -1136,6 +1226,7 @@ export const updateHeaderData = async (req, res) => {
         .map((img, idx) => {
           let finalUrl = img.imageURL;
 
+          // Case 1: New Base64 (Legacy fallback)
           if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
             const savedPath = saveBase64Image(
               img.imgSrc,
@@ -1145,9 +1236,10 @@ export const updateHeaderData = async (req, res) => {
             );
             if (savedPath) finalUrl = savedPath;
           }
+          // Case 2: Already a server path (from uploadHeaderImages)
+          // We don't need to do anything, finalUrl is already set correctly by frontend
 
           return {
-            // FIX: Ensure imageId exists. Use provided ID or generate fallback.
             imageId:
               img.id ||
               img.imageId ||
@@ -1155,7 +1247,7 @@ export const updateHeaderData = async (req, res) => {
             imageURL: finalUrl
           };
         })
-        .filter((img) => img.imageURL);
+        .filter((img) => img.imageURL); // Filter out failed saves
 
       return {
         headerId: section.headerId,
@@ -1167,7 +1259,7 @@ export const updateHeaderData = async (req, res) => {
     });
 
     report.headerData = processedHeaderData;
-    await report.save(); // Mongoose validation will now pass because imageId is guaranteed
+    await report.save();
 
     return res.status(200).json({
       success: true,
@@ -1230,153 +1322,87 @@ const savePhotoBase64Image = (
 };
 
 // ============================================================
-// Helper: Process and Save Single Image (Async)
+// MODIFIED: Upload Photo Batch (Multipart Support)
 // ============================================================
-const processAndSaveImageAsync = (
-  imgData,
-  reportId,
-  sectionId,
-  itemNo,
-  index
-) => {
-  return new Promise((resolve) => {
-    try {
-      // If already a server URL, just return it
-      if (imgData.imageURL && !imgData.imgSrc) {
-        resolve({
-          imageId:
-            imgData.id || `${sectionId}_${itemNo}_${index}_${Date.now()}`,
-          imageURL: imgData.imageURL
-        });
-        return;
-      }
 
-      // Check if it's base64
-      const base64Data = imgData.imgSrc || imgData.url;
-      if (!base64Data || !base64Data.startsWith("data:image")) {
-        // Not base64, might be existing URL
-        if (base64Data && base64Data.includes("/storage/")) {
-          resolve({
-            imageId:
-              imgData.id || `${sectionId}_${itemNo}_${index}_${Date.now()}`,
-            imageURL: base64Data.replace(process.env.API_BASE_URL || "", "")
-          });
-        } else {
-          resolve(null);
-        }
-        return;
-      }
-
-      const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-      if (!matches || matches.length !== 3) {
-        resolve(null);
-        return;
-      }
-
-      const type = matches[1];
-      const data = Buffer.from(matches[2], "base64");
-      const ext = type.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
-
-      const filename = `photo_${reportId}_${sectionId}_${itemNo}_${index}_${Date.now()}.${ext}`;
-      const filepath = path.join(uploadDirPhoto, filename);
-
-      // Use async file write
-      fs.writeFile(filepath, data, (err) => {
-        if (err) {
-          console.error("Error writing file:", err);
-          resolve(null);
-          return;
-        }
-
-        resolve({
-          imageId:
-            imgData.id || `${sectionId}_${itemNo}_${index}_${Date.now()}`,
-          imageURL: `/storage/PivotY/Fincheck/PhotoData/${filename}`
-        });
-      });
-    } catch (error) {
-      console.error("Error processing image:", error);
-      resolve(null);
-    }
-  });
-};
-
-// ============================================================
-// NEW: Upload Photo Batch - Saves images for ONE item at a time
-// ============================================================
 export const uploadPhotoBatch = async (req, res) => {
   try {
-    const {
-      reportId,
-      sectionId,
-      sectionName,
-      itemNo,
-      itemName,
-      images, // Array of { id, imgSrc/url, index }
-      remarks // Optional item remark
-    } = req.body;
+    const { reportId, sectionId, sectionName, itemNo, itemName, remarks } =
+      req.body;
 
-    // Validation
     if (!reportId || !sectionId || itemNo === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields: reportId, sectionId, itemNo"
-      });
-    }
-
-    if (!images || !Array.isArray(images) || images.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "No images provided"
-      });
-    }
-
-    // Limit batch size (max 20 per item based on your Image Editor MAX_IMAGES)
-    if (images.length > 20) {
-      return res.status(400).json({
-        success: false,
-        message: "Maximum 20 images per batch"
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields" });
     }
 
     const report = await FincheckInspectionReports.findOne({
       reportId: parseInt(reportId)
     });
-
     if (!report) {
-      return res.status(404).json({
-        success: false,
-        message: "Report not found."
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
     }
 
-    // Process all images in parallel
-    const imagePromises = images.map((img, idx) =>
-      processAndSaveImageAsync(
-        img,
-        reportId,
-        sectionId,
-        itemNo,
-        img.index ?? idx
-      )
-    );
-
-    const processedImages = await Promise.all(imagePromises);
-    const savedImages = processedImages.filter((img) => img && img.imageURL);
-
-    if (savedImages.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "No images could be processed"
-      });
+    // 1. Parse Metadata Blueprint
+    let imageMetadata = [];
+    if (req.body.imageMetadata) {
+      try {
+        imageMetadata = JSON.parse(req.body.imageMetadata);
+      } catch (e) {
+        console.error("Error parsing metadata", e);
+      }
     }
 
-    // Initialize photoData if empty
-    if (!report.photoData) {
-      report.photoData = [];
+    // 2. Reconstruct the Image Array
+    const savedImages = [];
+    let fileIndex = 0; // Tracks which file from req.files we are using
+
+    // We iterate the metadata because it represents the desired final order
+    for (let i = 0; i < imageMetadata.length; i++) {
+      const meta = imageMetadata[i];
+
+      // A. It is a NEW/EDITED File
+      if (meta.type === "file") {
+        if (req.files && req.files[fileIndex]) {
+          const file = req.files[fileIndex];
+          fileIndex++;
+
+          const ext = path.extname(file.originalname) || ".jpg";
+          // Timestamp ensures browser cache busting
+          const filename = `photo_${reportId}_${sectionId}_${itemNo}_${i}_${Date.now()}${ext}`;
+          const targetPath = path.join(uploadDirPhoto, filename);
+
+          fs.writeFileSync(targetPath, fs.readFileSync(file.path));
+          fs.unlinkSync(file.path);
+
+          savedImages.push({
+            imageId: meta.id || `${sectionId}_${itemNo}_${i}_${Date.now()}`,
+            imageURL: `/storage/PivotY/Fincheck/PhotoData/${filename}`,
+            uploadedAt: new Date()
+          });
+        }
+      }
+      // B. It is an EXISTING URL (Unchanged)
+      else if (meta.type === "url") {
+        // Ensure we only store the relative path
+        let cleanUrl = meta.imageURL;
+        if (cleanUrl.includes("/storage/")) {
+          cleanUrl = cleanUrl.substring(cleanUrl.indexOf("/storage/"));
+        }
+
+        savedImages.push({
+          imageId: meta.id,
+          imageURL: cleanUrl,
+          uploadedAt: new Date()
+        });
+      }
     }
 
-    // Find or create section
+    // 3. Update Database
+    if (!report.photoData) report.photoData = [];
+
     let sectionIndex = report.photoData.findIndex(
       (sec) =>
         sec.sectionId && sec.sectionId.toString() === sectionId.toString()
@@ -1392,8 +1418,6 @@ export const uploadPhotoBatch = async (req, res) => {
     }
 
     const section = report.photoData[sectionIndex];
-
-    // Find or create item
     let itemIndex = section.items.findIndex(
       (item) => item.itemNo === parseInt(itemNo)
     );
@@ -1406,10 +1430,25 @@ export const uploadPhotoBatch = async (req, res) => {
         images: savedImages
       });
     } else {
-      // Replace all images for this item
-      section.items[itemIndex].images = savedImages;
+      // ✅ Delete old files that are no longer in savedImages
+      // Use this if you want to clean up disk space (prevents "Saved Twice" file clutter)
+      const oldImages = section.items[itemIndex].images;
+      oldImages.forEach((old) => {
+        const isKept = savedImages.find(
+          (newImg) => newImg.imageURL === old.imageURL
+        );
+        if (!isKept && old.imageURL) {
+          try {
+            const filePath = path.join(__dirname, "../../..", old.imageURL);
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+          } catch (e) {
+            /* ignore */
+          }
+        }
+      });
 
-      // Update remarks if provided
+      // ✅ Completely replace the array with the new reconstructed list
+      section.items[itemIndex].images = savedImages;
       if (remarks !== undefined) {
         section.items[itemIndex].remarks = remarks;
       }
@@ -1420,12 +1459,8 @@ export const uploadPhotoBatch = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `${savedImages.length} image(s) saved successfully.`,
-      data: {
-        sectionId,
-        itemNo,
-        savedImages
-      }
+      message: `${savedImages.length} image(s) synced successfully.`,
+      data: { sectionId, itemNo, savedImages }
     });
   } catch (error) {
     console.error("Error uploading photo batch:", error);
@@ -1437,9 +1472,7 @@ export const uploadPhotoBatch = async (req, res) => {
   }
 };
 
-// ============================================================
-// NEW: Delete Single Photo from Item
-// ============================================================
+// Delete Photo from Item
 export const deletePhotoFromItem = async (req, res) => {
   try {
     const { reportId, sectionId, itemNo, imageId } = req.body;
@@ -1578,6 +1611,7 @@ export const updatePhotoItemRemark = async (req, res) => {
   }
 };
 
+// Manual controller for updating photo data with blob URL safeguard
 export const updatePhotoData = async (req, res) => {
   try {
     const { reportId, photoData } = req.body;
@@ -1598,14 +1632,43 @@ export const updatePhotoData = async (req, res) => {
         .json({ success: false, message: "Report not found." });
     }
 
+    // --- HELPER: Find existing URL in the current DB document ---
+    // This recovers the valid /storage/... path if the frontend sent a blob: URL
+    const findExistingValidUrl = (imgId) => {
+      if (!report.photoData) return null;
+
+      for (const section of report.photoData) {
+        if (section.items) {
+          for (const item of section.items) {
+            if (item.images) {
+              const found = item.images.find((img) => img.imageId === imgId);
+              // Only return if it's a valid relative path, not a blob
+              if (
+                found &&
+                found.imageURL &&
+                !found.imageURL.startsWith("blob:")
+              ) {
+                return found.imageURL;
+              }
+            }
+          }
+        }
+      }
+      return null;
+    };
+
     // Process nested structure: Sections -> Items -> Images
     const processedPhotoData = photoData.map((section) => {
       const processedItems = (section.items || []).map((item) => {
         const processedImages = (item.images || [])
           .map((img, idx) => {
             let finalUrl = img.imageURL;
+            const imgId =
+              img.id ||
+              img.imageId ||
+              `${section.sectionId}_${item.itemNo}_${idx}_${Date.now()}`;
 
-            // If it's a new Base64 image, save it
+            // 1. Handle New Base64 (Data URI) - Legacy/Offline support
             if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
               const savedPath = savePhotoBase64Image(
                 img.imgSrc,
@@ -1617,14 +1680,36 @@ export const updatePhotoData = async (req, res) => {
               if (savedPath) finalUrl = savedPath;
             }
 
+            // 2. ✅ BLOB URL SAFEGUARD (The Fix)
+            // If the URL is a local blob (e.g., blob:https://...), it means
+            // the frontend state hasn't updated yet. DO NOT SAVE THIS.
+            // Instead, look for the file we already uploaded in the DB.
+            else if (finalUrl && finalUrl.startsWith("blob:")) {
+              const recoveredUrl = findExistingValidUrl(imgId);
+
+              if (recoveredUrl) {
+                finalUrl = recoveredUrl; // Use the valid /storage/ path
+              } else {
+                // If we can't find it in DB and it's a blob, it means
+                // the upload failed or is still in progress.
+                // We skip saving this image to prevent broken links.
+                console.warn(
+                  `Skipping image with blob URL (upload pending/failed): ${imgId}`
+                );
+                return null;
+              }
+            }
+
+            // 3. Ensure we have a valid URL before returning
+            if (!finalUrl) return null;
+
             return {
-              imageId:
-                img.id ||
-                `${section.sectionId}_${item.itemNo}_${idx}_${Date.now()}`,
-              imageURL: finalUrl
+              imageId: imgId,
+              imageURL: finalUrl,
+              uploadedAt: new Date() // Refreshed timestamp
             };
           })
-          .filter((img) => img.imageURL); // Remove invalid images
+          .filter((img) => img !== null); // Remove invalid/dropped images
 
         return {
           itemNo: item.itemNo,
@@ -1716,6 +1801,54 @@ export const updateInspectionConfig = async (req, res) => {
 };
 
 // ============================================================
+// NEW: Clear Inspection Configuration (Remove All Groups)
+// ============================================================
+export const clearInspectionConfig = async (req, res) => {
+  try {
+    const { reportId } = req.body;
+
+    if (!reportId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Report ID required." });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    // Reset configGroups to empty array and sampleSize to 0
+    if (report.inspectionConfig) {
+      report.inspectionConfig.configGroups = [];
+      report.inspectionConfig.sampleSize = 0;
+      report.inspectionConfig.updatedAt = new Date();
+
+      report.markModified("inspectionConfig");
+      await report.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "All configuration groups removed successfully.",
+      data: []
+    });
+  } catch (error) {
+    console.error("Error clearing inspection config:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
 // Update Measurement Data
 // ============================================================
 
@@ -1770,7 +1903,7 @@ export const updateMeasurementData = async (req, res) => {
         .json({ success: false, message: "Report not found." });
     }
 
-    // Process the incoming array. If an item has manualData with images, process them.
+    // Process the incoming array
     const processedMeasurementData = measurementData.map((item) => {
       let processedManualData = null;
 
@@ -1785,7 +1918,7 @@ export const updateMeasurementData = async (req, res) => {
               const savedPath = saveMeasManualBase64Image(
                 img.imgSrc,
                 reportId,
-                item.groupId, // Use Group ID for uniqueness scope
+                item.groupId,
                 idx
               );
               if (savedPath) finalUrl = savedPath;
@@ -1797,10 +1930,10 @@ export const updateMeasurementData = async (req, res) => {
                 img.imageId ||
                 `mm_${item.groupId}_${idx}_${Date.now()}`,
               imageURL: finalUrl,
-              remark: img.remark || "" // Persist the image remark
+              remark: img.remark || ""
             };
           })
-          .filter((img) => img.imageURL); // Remove failed saves
+          .filter((img) => img.imageURL);
 
         processedManualData = {
           remarks: item.manualData.remarks || "",
@@ -1809,14 +1942,56 @@ export const updateMeasurementData = async (req, res) => {
         };
       }
 
+      // Ensure stage is always saved
       return {
-        ...item,
-        manualData: processedManualData
+        groupId: item.groupId,
+        stage: item.stage || "Before", // Default to Before if not specified
+        line: item.line || "",
+        table: item.table || "",
+        color: item.color || "",
+        lineName: item.lineName || "",
+        tableName: item.tableName || "",
+        colorName: item.colorName || "",
+        qcUser: item.qcUser || null,
+        size: item.size,
+        kValue: item.kValue || "", // Preserve kValue
+        displayMode: item.displayMode || "all",
+        allMeasurements: item.allMeasurements || {},
+        criticalMeasurements: item.criticalMeasurements || {},
+        allQty: item.allQty || 1,
+        criticalQty: item.criticalQty || 2,
+        allEnabledPcs: item.allEnabledPcs || [],
+        criticalEnabledPcs: item.criticalEnabledPcs || [],
+        inspectorDecision: item.inspectorDecision || "pass",
+        systemDecision: item.systemDecision || "pending",
+        remark: item.remark || "",
+        manualData: processedManualData,
+        timestamp: item.timestamp || new Date()
       };
     });
 
-    // Replace existing data
-    report.measurementData = processedMeasurementData;
+    // Merge with existing data instead of replacing completely
+    // This preserves data from other stages that weren't in this save request
+    const existingMeasurements = report.measurementData || [];
+
+    // Get unique identifiers for new data
+    const newDataKeys = new Set(
+      processedMeasurementData.map(
+        (m) => `${m.groupId}_${m.stage}_${m.size}_${m.kValue}`
+      )
+    );
+
+    // Keep existing measurements that are NOT being updated
+    const preservedMeasurements = existingMeasurements.filter((m) => {
+      const key = `${m.groupId}_${m.stage}_${m.size}_${m.kValue}`;
+      return !newDataKeys.has(key);
+    });
+
+    // Merge preserved with new
+    report.measurementData = [
+      ...preservedMeasurements,
+      ...processedMeasurementData
+    ];
 
     await report.save();
 
@@ -1860,57 +2035,64 @@ if (!fs.existsSync(uploadDirDefectManual)) {
   fs.mkdirSync(uploadDirDefectManual, { recursive: true });
 }
 
-// Helper: Generic Base64 Image Saver
-const saveBase64ImageToPath = (base64String, directory, filenamePrefix) => {
+// Defect Image Upload Endpoint
+export const uploadDefectImages = async (req, res) => {
   try {
-    if (!base64String || typeof base64String !== "string") return null;
+    if (!req.files || req.files.length === 0) {
+      return res.status(200).json({ success: true, data: { paths: [] } });
+    }
 
-    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) return null;
+    const savedPaths = [];
 
-    const type = matches[1];
-    const data = Buffer.from(matches[2], "base64");
-    const ext = type.split("/")[1] || "jpg";
+    // Process uploaded files
+    for (const file of req.files) {
+      // Define final destination (Ensure uploadDirDefect is defined/created at top of file)
+      const targetDir = uploadDirDefect;
+      const uniqueName = `def_img_${Date.now()}_${Math.round(
+        Math.random() * 1000
+      )}${path.extname(file.originalname)}`;
+      const targetPath = path.join(targetDir, uniqueName);
 
-    const filename = `${filenamePrefix}_${Date.now()}.${ext}`;
-    const filepath = path.join(directory, filename);
+      // Move file from temp to final folder
+      fs.renameSync(file.path, targetPath);
 
-    fs.writeFileSync(filepath, data);
+      // Push the relative path that the frontend needs
+      savedPaths.push(`/storage/PivotY/Fincheck/DefectData/${uniqueName}`);
+    }
 
-    // Return relative URL based on directory
-    const relativePath = directory.includes("DefectManualData")
-      ? `/storage/PivotY/Fincheck/DefectManualData/${filename}`
-      : `/storage/PivotY/Fincheck/DefectData/${filename}`;
-
-    return relativePath;
+    return res.status(200).json({
+      success: true,
+      data: {
+        paths: savedPaths
+      }
+    });
   } catch (error) {
-    console.error("Error saving base64 image:", error);
-    return null;
+    console.error("Defect image upload error:", error);
+    return res.status(500).json({ success: false, message: "Upload failed" });
   }
 };
 
 // Helper: Process single image object from frontend
-const processImageObject = (imgObj, directory, filenamePrefix, index) => {
+const processImageObject = (imgObj, filenamePrefix, index) => {
   if (!imgObj) return null;
 
-  let finalUrl = imgObj.imageURL || null;
+  // Get the URL - check multiple possible sources
+  const finalUrl = imgObj.imageURL || imgObj.imgSrc;
 
-  // Check for base64 data in various possible fields
-  const base64Data =
-    imgObj.editedImgSrc || imgObj.imgSrc || imgObj.base64 || null;
-
-  if (base64Data && base64Data.startsWith("data:image")) {
-    const savedPath = saveBase64ImageToPath(
-      base64Data,
-      directory,
-      `${filenamePrefix}_${index}`
-    );
-    if (savedPath) {
-      finalUrl = savedPath;
-    }
+  // Validation: Skip blob URLs or missing URLs
+  if (
+    !finalUrl ||
+    finalUrl.startsWith("blob:") ||
+    finalUrl.startsWith("data:")
+  ) {
+    console.warn(`[processImageObject] Invalid/missing URL for image:`, {
+      id: imgObj.id || imgObj.imageId,
+      hasImageURL: !!imgObj.imageURL,
+      hasImgSrc: !!imgObj.imgSrc,
+      prefix: filenamePrefix
+    });
+    return null;
   }
-
-  if (!finalUrl) return null;
 
   return {
     imageId:
@@ -1929,28 +2111,21 @@ const processDefectPosition = (
   posIndex
 ) => {
   const filenameBase = `def_pos_${reportId}_${defectCode}_${locationId}_pcs${position.pcsNo}`;
-
-  // Process required image
+  // 1. Process required image
   let processedRequiredImage = null;
   if (position.requiredImage) {
     processedRequiredImage = processImageObject(
       position.requiredImage,
-      uploadDirDefect,
       `${filenameBase}_req`,
-      posIndex
+      0
     );
   }
 
-  // Process additional images (up to 5)
+  // 2. Process additional images (up to 5)
   const processedAdditionalImages = [];
   if (Array.isArray(position.additionalImages)) {
     position.additionalImages.slice(0, 5).forEach((img, imgIdx) => {
-      const processed = processImageObject(
-        img,
-        uploadDirDefect,
-        `${filenameBase}_add`,
-        imgIdx
-      );
+      const processed = processImageObject(img, `${filenameBase}_add`, imgIdx);
       if (processed) {
         processedAdditionalImages.push(processed);
       }
@@ -1963,7 +2138,6 @@ const processDefectPosition = (
     requiredImage: processedRequiredImage,
     additionalRemark: (position.additionalRemark || "").slice(0, 250),
     additionalImages: processedAdditionalImages,
-    // Legacy fields
     position: position.position || "Outside",
     comment: position.comment || "",
     qcUser: position.qcUser || null
@@ -1972,6 +2146,7 @@ const processDefectPosition = (
 
 // Helper: Process Location
 const processDefectLocation = (location, reportId, defectCode) => {
+  // Map over the positions array
   const processedPositions = (location.positions || []).map((pos, posIdx) =>
     processDefectPosition(
       pos,
@@ -1989,11 +2164,14 @@ const processDefectLocation = (location, reportId, defectCode) => {
     locationName: location.locationName,
     view: location.view,
     qty: location.qty || processedPositions.length || 1,
-    positions: processedPositions
+    positions: processedPositions // <--- The positions contain the images
   };
 };
 
-// Main Controller
+// ============================================================
+// Update Defect Data
+// ============================================================
+
 export const updateDefectData = async (req, res) => {
   try {
     const { reportId, defectData, defectManualData } = req.body;
@@ -2014,21 +2192,19 @@ export const updateDefectData = async (req, res) => {
         .json({ success: false, message: "Report not found." });
     }
 
-    // A. Process Standard Defects
+    // --- A. Process Standard Defects ---
     if (Array.isArray(defectData)) {
       const processedDefectData = defectData.map((defect) => {
         const defectCode = defect.defectCode || "unknown";
 
+        // CASE 1: NO-LOCATION MODE (Images at Root)
         if (defect.isNoLocation) {
-          // ========== NO-LOCATION MODE ==========
-          // Images are stored at defect level
           const processedImages = [];
 
           if (Array.isArray(defect.images)) {
             defect.images.forEach((img, imgIdx) => {
               const processed = processImageObject(
                 img,
-                uploadDirDefect,
                 `def_noloc_${reportId}_${defectCode}`,
                 imgIdx
               );
@@ -2057,8 +2233,10 @@ export const updateDefectData = async (req, res) => {
             qcUser: defect.qcUser || null,
             timestamp: defect.timestamp || new Date()
           };
-        } else {
-          // ========== LOCATION-BASED MODE ==========
+        }
+
+        // CASE 2: LOCATION-BASED MODE (Images inside Positions)
+        else {
           const processedLocations = (defect.locations || []).map((loc) =>
             processDefectLocation(loc, reportId, defectCode)
           );
@@ -2075,13 +2253,13 @@ export const updateDefectData = async (req, res) => {
             defectName: defect.defectName,
             defectCode: defectCode,
             categoryName: defect.categoryName || "",
-            status: null, // Status is per-position for location-based
+            status: null,
             qty: totalQty || defect.qty || 1,
             determinedBuyer: defect.determinedBuyer || "Unknown",
             additionalRemark: (defect.additionalRemark || "").slice(0, 250),
             isNoLocation: false,
             locations: processedLocations,
-            images: [], // No top-level images for location-based
+            images: [],
             lineName: defect.lineName || "",
             tableName: defect.tableName || "",
             colorName: defect.colorName || "",
@@ -2094,7 +2272,7 @@ export const updateDefectData = async (req, res) => {
       report.defectData = processedDefectData;
     }
 
-    // B. Process Manual Defect Data
+    // --- B. Process Manual Defect Data ---
     if (Array.isArray(defectManualData)) {
       const processedManualData = defectManualData.map((manualItem) => {
         const groupId = manualItem.groupId || 0;
@@ -2104,7 +2282,6 @@ export const updateDefectData = async (req, res) => {
           manualItem.images.forEach((img, idx) => {
             const processed = processImageObject(
               img,
-              uploadDirDefectManual,
               `def_man_${reportId}_${groupId}`,
               idx
             );
@@ -2166,30 +2343,42 @@ if (!fs.existsSync(uploadDirPPSheet)) {
   fs.mkdirSync(uploadDirPPSheet, { recursive: true });
 }
 
-// Helper: Save PP Sheet Base64 Image
-const savePPSheetBase64Image = (base64String, reportId, index) => {
+// ============================================================
+// NEW: Upload PP Sheet Images (Multipart/FormData)
+// ============================================================
+export const uploadPPSheetImages = async (req, res) => {
   try {
-    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) return null;
+    if (!req.files || req.files.length === 0) {
+      return res.status(200).json({ success: true, data: { paths: [] } });
+    }
 
-    const type = matches[1];
-    const data = Buffer.from(matches[2], "base64");
-    const ext = type.split("/")[1] || "jpg";
+    const savedPaths = [];
 
-    // Create unique filename
-    const filename = `ppsheet_${reportId}_${index}_${Date.now()}.${ext}`;
-    const filepath = path.join(uploadDirPPSheet, filename);
+    for (const file of req.files) {
+      // Unique filename
+      const uniqueName = `pp_img_${Date.now()}_${Math.round(
+        Math.random() * 1000
+      )}${path.extname(file.originalname)}`;
 
-    fs.writeFileSync(filepath, data);
+      const targetPath = path.join(uploadDirPPSheet, uniqueName);
 
-    // Return relative URL
-    return `/storage/PivotY/Fincheck/PPSheetData/${filename}`;
+      // Move file
+      fs.renameSync(file.path, targetPath);
+
+      // Push relative path
+      savedPaths.push(`/storage/PivotY/Fincheck/PPSheetData/${uniqueName}`);
+    }
+
+    return res.status(200).json({ success: true, data: { paths: savedPaths } });
   } catch (error) {
-    console.error("Error saving PP Sheet base64 image:", error);
-    return null;
+    console.error("PP Sheet image upload error:", error);
+    return res.status(500).json({ success: false, message: "Upload failed" });
   }
 };
 
+// ============================================================
+// MODIFIED: Update PP Sheet Data (No Base64)
+// ============================================================
 export const updatePPSheetData = async (req, res) => {
   try {
     const { reportId, ppSheetData } = req.body;
@@ -2210,23 +2399,18 @@ export const updatePPSheetData = async (req, res) => {
         .json({ success: false, message: "Report not found." });
     }
 
-    // Process Images
+    // Process Images - We only save valid server paths now
     const processedImages = (ppSheetData.images || [])
       .map((img, idx) => {
-        let finalUrl = img.imageURL;
-
-        // If new Base64 image, save to disk
-        if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
-          const savedPath = savePPSheetBase64Image(img.imgSrc, reportId, idx);
-          if (savedPath) finalUrl = savedPath;
-        }
+        // Frontend must have uploaded it and sent back the path in imageURL
+        if (!img.imageURL) return null;
 
         return {
           imageId: img.id || `pp_${idx}_${Date.now()}`,
-          imageURL: finalUrl
+          imageURL: img.imageURL
         };
       })
-      .filter((img) => img.imageURL); // Remove failed saves
+      .filter((img) => img !== null); // Remove failed saves
 
     // Construct the final object
     const finalData = {
@@ -2272,6 +2456,7 @@ const sanitizeNumberArray = (arr) => {
 // SUBMIT FULL REPORT (OPTIMIZED Version)
 // Only processes sections that have unsaved changes
 // ============================================================
+
 export const submitFullInspectionReport = async (req, res) => {
   try {
     const {
@@ -2284,8 +2469,8 @@ export const submitFullInspectionReport = async (req, res) => {
       defectData,
       defectManualData,
       ppSheetData,
-      // NEW: Frontend specifies which sections have unsaved changes
-      sectionsToUpdate = null // null = process all (backward compatible), [] = none, ['headerData', ...] = specific
+      // Frontend specifies which sections have unsaved changes
+      sectionsToUpdate = null
     } = req.body;
 
     if (!reportId) {
@@ -2304,21 +2489,17 @@ export const submitFullInspectionReport = async (req, res) => {
         .json({ success: false, message: "Report not found." });
     }
 
+    // Capture the status BEFORE applying current changes
+    const wasAlreadyCompleted = report.status === "completed";
+
     // ============================================================
     // HELPER: Determine if section should be processed
     // ============================================================
     const shouldProcessSection = (sectionName, data) => {
       // If data is undefined/null/empty, skip
       if (data === undefined || data === null) return false;
-      if (Array.isArray(data) && data.length === 0) return false;
-      if (
-        typeof data === "object" &&
-        !Array.isArray(data) &&
-        Object.keys(data).length === 0
-      )
-        return false;
 
-      // If sectionsToUpdate is null, process ALL provided sections (backward compatible / full save)
+      // If sectionsToUpdate is null, process ALL provided sections (backward compatible)
       if (sectionsToUpdate === null) return true;
 
       // If sectionsToUpdate is specified, only process those sections
@@ -2574,9 +2755,9 @@ export const submitFullInspectionReport = async (req, res) => {
         if (defect.isNoLocation) {
           const processedImages = (defect.images || [])
             .map((img, imgIdx) =>
+              // FIX: Removed uploadDirDefect argument to match processImageObject definition
               processImageObject(
                 img,
-                uploadDirDefect,
                 `def_noloc_${reportId}_${defectCode}`,
                 imgIdx
               )
@@ -2618,9 +2799,9 @@ export const submitFullInspectionReport = async (req, res) => {
         const groupId = manualItem.groupId || 0;
         const processedImages = (manualItem.images || [])
           .map((img, idx) => {
+            // Removed uploadDirDefectManual argument
             const processed = processImageObject(
               img,
-              uploadDirDefectManual,
               `def_man_${reportId}_${groupId}`,
               idx
             );
@@ -2674,26 +2855,46 @@ export const submitFullInspectionReport = async (req, res) => {
     // FINALIZATION
     // ============================================================
 
-    // Always mark as completed
-    const wasAlreadyCompleted = report.status === "completed";
+    //const wasAlreadyCompleted = report.status === "completed";
     report.status = "completed";
 
     if (hasChanges) {
+      // HANDLE RESUBMISSION HISTORY <<<
+      if (wasAlreadyCompleted) {
+        // Calculate the next number (Length + 1)
+        const currentCount = report.resubmissionHistory
+          ? report.resubmissionHistory.length
+          : 0;
+        const nextNo = currentCount + 1;
+
+        // Push new entry
+        report.resubmissionHistory.push({
+          resubmissionNo: nextNo,
+          resubmissionDate: new Date()
+        });
+      }
+
       // Save the document with all changes
       await report.save();
 
       return res.status(200).json({
         success: true,
-        message: `Report submitted successfully! Updated: ${updatedSections.join(
-          ", "
-        )}`,
+        message: wasAlreadyCompleted
+          ? `Resubmission #${
+              report.resubmissionHistory.length
+            } Successful! Updated: ${updatedSections.join(", ")}`
+          : `Report submitted successfully! Updated: ${updatedSections.join(
+              ", "
+            )}`,
         hasChanges: true,
+        isResubmission: wasAlreadyCompleted,
         updatedSections: updatedSections,
         skippedSections: skippedSections,
         data: {
           reportId: report.reportId,
           status: report.status,
-          updatedAt: report.updatedAt
+          updatedAt: report.updatedAt,
+          resubmissionHistory: report.resubmissionHistory
         }
       });
     } else {
