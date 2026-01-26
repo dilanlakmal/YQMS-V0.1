@@ -768,14 +768,6 @@ function Home() {
           },
           {
             path: "/humidity-report",
-            roles: ["Humidity"],
-            image: "assets/Home/Humidity.jpg",
-            title: "Humidity Report",
-            description: "View Humidity Report",
-            version: '0.1',
-          },
-          {
-            path: "/humidity-report",
             roles: ["Humidity QC"],
             image: "assets/Home/Humidity.jpg",
             title: "Humidity Report",

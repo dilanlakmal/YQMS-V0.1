@@ -576,8 +576,7 @@ export default function RoleManagement() {
     "Fincheck Reports",
     "P88",
     "QC Ironing",
-    "Humidity QC",
-    "Humidity"
+    "Humidity QC"
   ].sort();
 
   // User Roles tab data
