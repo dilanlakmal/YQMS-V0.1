@@ -7,7 +7,7 @@ import{
 const router = express.Router();
 
 router.get('/api/coverPage/orders/search', searchOrderSuggestions);
-router.get('/api/coverPage/:orderNo', getOrderDetails);
+router.get('/api/coverPage/orders/:orderNo', getOrderDetails);
 
 
 export default router;

@@ -7,6 +7,7 @@ const OrderDetails = () => {
   const [error, setError] = useState(null);
   const [uploadedImage, setUploadedImage] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [shipmentQty, setShipmentQty] = useState('');
   
   // New states for autocomplete
   const [suggestions, setSuggestions] = useState([]);
@@ -41,7 +42,7 @@ const OrderDetails = () => {
 
   try {
     setLoadingSuggestions(true);
-    const searchUrl = `${apiBaseUrl}/api/coverPage/orders/search?query=${encodeURIComponent(query)}`;
+    const searchUrl = `${apiBaseUrl}/api/coverPage/orders/search?term=${encodeURIComponent(query)}`;
     console.log('🔍 Searching with URL:', searchUrl);
     
     const response = await fetch(searchUrl);
@@ -50,19 +51,12 @@ const OrderDetails = () => {
     if (response.ok) {
       const result = await response.json();
       console.log('🔍 Full response:', result);
-      console.log('🔍 Response length:', result.length);
+      console.log('🔍 First suggestion details:', result[0]); // Add this line
       
-      // Handle direct array response
       if (Array.isArray(result)) {
         console.log('🔍 Setting suggestions:', result);
         setSuggestions(result);
         setShowSuggestions(result.length > 0);
-        setSelectedIndex(-1);
-      } else if (result && result.success && Array.isArray(result.data)) {
-        // Handle wrapped response
-        console.log('🔍 Setting suggestions from data:', result.data);
-        setSuggestions(result.data);
-        setShowSuggestions(result.data.length > 0);
         setSelectedIndex(-1);
       } else {
         console.log('🔍 Unexpected response format:', result);
@@ -71,8 +65,6 @@ const OrderDetails = () => {
       }
     } else {
       console.error('🔍 HTTP Error:', response.status);
-      const errorText = await response.text();
-      console.error('🔍 Error response:', errorText);
     }
   } catch (err) {
     console.error('🔍 Network/Parse Error:', err);
@@ -93,14 +85,16 @@ const OrderDetails = () => {
 
   // Handle suggestion selection
   const handleSuggestionClick = (suggestion) => {
-    setOrderNo(suggestion.orderNo);
-    setShowSuggestions(false);
-    setSuggestions([]);
-    setSelectedIndex(-1);
-    // Automatically fetch order data when suggestion is selected
-    fetchOrderData(suggestion.orderNo);
-  };
-
+  console.log('🔍 Suggestion clicked:', suggestion); // Add this debug line
+  
+  setOrderNo(suggestion.orderNo);
+  setShowSuggestions(false);
+  setSuggestions([]);
+  setSelectedIndex(-1);
+  
+  // Automatically fetch order data when suggestion is selected
+  fetchOrderData(suggestion.orderNo);
+};
   // Handle keyboard navigation
   const handleKeyDown = (e) => {
     if (!showSuggestions || suggestions.length === 0) return;
@@ -152,36 +146,120 @@ const OrderDetails = () => {
   }, []);
 
   const fetchOrderData = async (orderNumber) => {
-    try {
-      setLoading(true);
-      setError(null);
-      setOrderData(null);
-      
-      console.log('Fetching data for order:', orderNumber);
-      console.log('API URL:', `${apiBaseUrl}/api/coverPage/${orderNumber}`);
-      
-      const response = await fetch(`${apiBaseUrl}/api/coverPage/${orderNumber}`);
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      console.log('API Response:', result);
-      
-      if (result.success) {
-        setOrderData(result.data);
-      } else {
-        setError(result.message || 'Failed to fetch order data');
-      }
-    } catch (err) {
-      console.error('Fetch error:', err);
-      setError('Failed to fetch order data: ' + err.message);
-    } finally {
-      setLoading(false);
+  try {
+    setLoading(true);
+    setError(null);
+    setOrderData(null);
+    
+    console.log('Fetching data for order:', orderNumber);
+    console.log('API URL:', `${apiBaseUrl}/api/coverPage/orders/${orderNumber}`);
+    
+    const response = await fetch(`${apiBaseUrl}/api/coverPage/orders/${orderNumber}`);
+    console.log('Response status:', response.status);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  };
+    
+    const result = await response.json();
+    console.log('API Response:', result);
+    console.log('API Response keys:', Object.keys(result));
+    console.log('Has success property:', 'success' in result);
+    console.log('Has data property:', 'data' in result);
+    
+    // Handle the response format
+    if (result.success && result.data) {
+      // Wrapped response format
+      console.log('Using wrapped response format');
+      console.log('Color breakdown:', result.data.colorBreakdown);
+      console.log('Size list:', result.data.sizeList);
+      setOrderData(result.data);
+      setShipmentQty(result.data.totalQuantity || '');
+    } else if (result.orderNo || result.id || result.Order_No) {
+      // Direct response format - this shouldn't happen with the updated controller
+      console.log('Using direct response format (fallback)');
+      
+      // Helper to process colors
+      const processColors = (colorsData) => {
+        if (!colorsData || !Array.isArray(colorsData)) return [];
+        
+        return colorsData.map(color => {
+          let sizes = color.sizes || {};
+          // Handle OrderQty array from raw data
+          if ((!sizes || Object.keys(sizes).length === 0) && color.OrderQty && Array.isArray(color.OrderQty)) {
+             sizes = color.OrderQty.reduce((acc, item) => {
+                if (typeof item === 'object' && item !== null) {
+                    Object.keys(item).forEach(key => {
+                        const cleanKey = key.split(';')[0].trim();
+                        const val = Number(item[key]);
+                        if (!isNaN(val)) {
+                            acc[cleanKey] = val;
+                        }
+                    });
+                }
+                return acc;
+             }, {});
+          }
+          
+          const total = color.colorTotal || Object.values(sizes).reduce((sum, val) => sum + (Number(val) || 0), 0);
+
+          return {
+            colorCode: color.colorCode || color.ColorCode || 'N/A',
+            colorName: color.colorName || color.Color || color,
+            chineseColor: color.chineseColor || color.ChnColor || '',
+            sizes: sizes,
+            colorTotal: total
+          };
+        });
+      };
+
+      // Prioritize OrderColors if available and valid
+      const rawColors = (result.OrderColors && Array.isArray(result.OrderColors) && result.OrderColors.length > 0) 
+        ? result.OrderColors 
+        : (result.colors || []);
+
+      // Prioritize SizeList if available and valid
+      const rawSizes = (result.SizeList && Array.isArray(result.SizeList) && result.SizeList.length > 0)
+        ? result.SizeList
+        : (result.sizes || ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL']);
+
+      const transformedData = {
+        orderNo: result.orderNo || result.Order_No,
+        companyName: result.engName || result.EngName || 'Yorkmars (cambodia) Garment MFG. Co. Ltd.',
+        cust_Code: result.custCode || result.customerCode || result.Cust_Code || 'N/A',
+        customerCode: result.custCode || result.customerCode || result.Cust_Code || 'N/A',
+        customerStyle: result.customerStyle || result.CustStyle || 'N/A',
+        totalQuantity: result.quantity || result.TotalQty || 0,
+        orderDate: result.createdAt,
+        exFactoryDate: result.updatedAt,
+        customerPO: result.customerPO || result.CustPORef || '',
+        season: result.season || '',
+        countryOfOrigin: result.origin || result.country || result.Origin || '',
+        productDescription: result.style || result.Style || '',
+        colorBreakdown: processColors(rawColors),
+        sizeList: rawSizes,
+        currency: result.currency || result.Ccy || '',
+        country: result.country || result.Country || '',
+        factory: result.factory || result.Factory || '',
+        mode: result.mode || result.Mode || '',
+        shortName: result.shortName || result.ShortName || '',
+        shipmentDetails: result.shipmentDetails || []
+      };
+      
+      console.log('Transformed data:', transformedData);
+      setOrderData(transformedData);
+      setShipmentQty(transformedData.totalQuantity || '');
+    } else {
+      console.error('Invalid response format:', result);
+      setError('Invalid response format from server');
+    }
+  } catch (err) {
+    console.error('Fetch error:', err);
+    setError('Failed to fetch order data: ' + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -230,6 +308,21 @@ const OrderDetails = () => {
     setUploadedImage(null);
   };
 
+  const handleShipmentQtyChange = (e) => {
+    const value = e.target.value;
+    if (value === '') {
+      setShipmentQty('');
+      return;
+    }
+    
+    const numValue = parseInt(value, 10);
+    const maxQty = orderData?.totalQuantity || 0;
+
+    if (!isNaN(numValue) && numValue <= maxQty) {
+      setShipmentQty(numValue);
+    }
+  };
+
   if (!orderData && !loading) {
     return (
       <div className="max-w-7xl mx-auto p-4 sm:p-6 bg-gradient-to-br from-gray-50 to-white min-h-screen">
@@ -275,7 +368,7 @@ const OrderDetails = () => {
                   >
                     {suggestions.map((suggestion, index) => (
                       <div
-                        key={suggestion.orderNo}
+                        key={suggestion.orderNo || index}
                         className={`px-4 py-3 cursor-pointer border-b border-gray-100 last:border-b-0 hover:bg-blue-50 ${
                           index === selectedIndex ? 'bg-blue-50 border-blue-200' : ''
                         }`}
@@ -286,6 +379,9 @@ const OrderDetails = () => {
                             <div className="font-semibold text-gray-800">{suggestion.orderNo}</div>
                             <div className="text-sm text-gray-600">
                               {suggestion.customerCode} • {suggestion.customerStyle}
+                            </div>
+                            <div className="text-xs text-blue-600">
+                              Qty: {suggestion.quantity} | Colors: {suggestion.colors?.length || 0}
                             </div>
                           </div>
                           <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -368,7 +464,7 @@ const OrderDetails = () => {
     );
   }
 
-  if (!orderData || !orderData.colorBreakdown || !orderData.sizeList) {
+  if (!orderData ) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
@@ -402,6 +498,7 @@ const OrderDetails = () => {
             setError(null);
             setSuggestions([]);
             setShowSuggestions(false);
+            setShipmentQty('');
           }}
           className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors"
         >
@@ -720,8 +817,16 @@ const OrderDetails = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">QUANTITY</label>
-                <div className="bg-green-50 rounded-lg p-3 border border-green-200 min-h-[44px] flex items-center font-semibold text-green-700">
-                  {/* Quantity */}
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={shipmentQty}
+                    onChange={handleShipmentQtyChange}
+                    className="w-full bg-green-50 rounded-lg p-3 border border-green-200 min-h-[44px] flex items-center font-semibold text-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-500">
+                    Max: {orderData?.totalQuantity?.toLocaleString()}
+                  </div>
                 </div>
               </div>
             </div>

@@ -611,9 +611,14 @@ app.use(ceTargetMasterRoutes);
 app.use(huminityRoutes);
 
 /* -----------------------------
- Humidity Imports
+ Feed Imports
 ------------------------------ */
 app.use(Feedback);
+
+/* -----------------------------
+  QC Output Routes
+------------------------------ */
+app.use(QCOutputRoute);
 
 // process.on("SIGINT", async () => {
 //   try {
@@ -629,11 +634,6 @@ app.use(Feedback);
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 }); 
-
-/* -----------------------------
-  QC Output Routes
------------------------------- */
-app.use(QCOutputRoute);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {

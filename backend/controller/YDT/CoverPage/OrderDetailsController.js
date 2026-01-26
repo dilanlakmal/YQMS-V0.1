@@ -5,88 +5,81 @@ import {
 export const getOrderDetails = async (req, res) => {
   try {
     const { orderNo } = req.params;
-    
-    console.log('Searching for order:', orderNo); // Debug log
-    
+
     // Find order by Order_No
-    const order = await DtOrder.findOne({ Order_No: orderNo });
-    
+    const order = await DtOrder.findOne({ Order_No: orderNo }).lean();
+
     if (!order) {
-      console.log('Order not found:', orderNo);
       return res.status(404).json({
         success: false,
         message: 'Order not found'
       });
     }
 
-    console.log('Found order:', order.Order_No);
-    console.log('OrderColors:', order.OrderColors); // Debug log
+    // Ensure colorBreakdown is always an array (even if empty)
+    const colorBreakdown = order.OrderColors && Array.isArray(order.OrderColors)
+      ? order.OrderColors.map(color => {
+        const sizes = {};
+        let colorTotal = 0;
 
-    // Calculate total quantity from OrderColors with better error handling
-    let totalQty = 0;
-    if (order.OrderColors && Array.isArray(order.OrderColors)) {
-      totalQty = order.OrderColors.reduce((total, color) => {
         if (color.OrderQty && Array.isArray(color.OrderQty)) {
-          const colorTotal = color.OrderQty.reduce((colorSum, sizeObj) => {
-            const sizeValue = Object.values(sizeObj)[0];
-            return colorSum + (sizeValue || 0);
-          }, 0);
-          return total + colorTotal;
+          color.OrderQty.forEach(sizeObj => {
+            if (typeof sizeObj === 'object' && sizeObj !== null) {
+              Object.keys(sizeObj).forEach(key => {
+                const cleanKey = key.split(';')[0].trim();
+                const val = Number(sizeObj[key]);
+                if (!isNaN(val)) {
+                  sizes[cleanKey] = val;
+                  colorTotal += val;
+                }
+              });
+            }
+          });
         }
-        return total;
-      }, 0);
-    }
 
-    console.log('Calculated total quantity:', totalQty); // Debug log
+        return {
+          colorCode: color.ColorCode || 'N/A',
+          colorName: color.Color || 'Unknown Color',
+          chineseColor: color.ChnColor || '',
+          sizes: sizes,
+          colorTotal: colorTotal
+        };
+      })
+      : [];
+
+    // Ensure sizeList is always an array (even if empty)
+    const sizeList = order.SizeList && Array.isArray(order.SizeList) && order.SizeList.length > 0
+      ? order.SizeList
+      : ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL']; // Default sizes if none found
 
     // Format the response data
     const orderDetails = {
       orderNo: order.Order_No,
-      companyName: order.EngName,
-      cust_Code: order.Cust_Code, // Match your component property name
-      customerCode: order.Cust_Code, // Alternative property name
-      customerStyle: order.CustStyle,
-      totalQuantity: totalQty, // Make sure this is always a number
+      companyName: order.EngName || 'Yorkmars (cambodia) Garment MFG. Co. Ltd.',
+      cust_Code: order.Cust_Code || 'N/A',
+      customerCode: order.Cust_Code || 'N/A',
+      customerStyle: order.CustStyle || 'N/A',
+      totalQuantity: order.TotalQty || 0,
       orderDate: order.createdAt,
       exFactoryDate: order.updatedAt,
-      customerPO: order.CustPORef,
+      customerPO: order.CustPORef || '',
       season: order.Season || '',
-      countryOfOrigin: order.Origin,
+      countryOfOrigin: order.Origin || '',
       
       // Product details
-      productDescription: order.Style,
+      productDescription: order.Style || '',
       
-      // Colors and sizes breakdown
-      colorBreakdown: order.OrderColors && Array.isArray(order.OrderColors) 
-        ? order.OrderColors.map(color => ({
-            colorCode: color.ColorCode,
-            colorName: color.Color,
-            chineseColor: color.ChnColor,
-            sizes: color.OrderQty && Array.isArray(color.OrderQty) 
-              ? color.OrderQty.reduce((sizeObj, size) => {
-                  const sizeKey = Object.keys(size)[0];
-                  const sizeValue = Object.values(size)[0];
-                  sizeObj[sizeKey] = sizeValue || 0;
-                  return sizeObj;
-                }, {})
-              : {},
-            colorTotal: color.OrderQty && Array.isArray(color.OrderQty)
-              ? color.OrderQty.reduce((total, sizeObj) => {
-                  return total + (Object.values(sizeObj)[0] || 0);
-                }, 0)
-              : 0
-          }))
-        : [],
-      
-      // Size list for table headers
-      sizeList: order.SizeList || ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL'],
+      // Colors and sizes breakdown - ALWAYS arrays
+      colorBreakdown: colorBreakdown,
+      sizeList: sizeList,
+      sizeSpec: order.SizeSpec || [],
       
       // Additional order information
-      currency: order.Ccy,
-      country: order.Country,
-      factory: order.Factory,
-      mode: order.Mode,
-      shortName: order.ShortName,
+      currency: order.Ccy || '',
+      country: order.Country || '',
+      factory: order.Factory || '',
+      mode: order.Mode || '',
+      shortName: order.ShortName || '',
       
       // Shipment information (if available)
       shipmentDetails: order.OrderColorShip ? order.OrderColorShip.map(colorShip => ({
@@ -95,7 +88,7 @@ export const getOrderDetails = async (req, res) => {
           seqNo: ship.seqNo,
           shipId: ship.Ship_ID,
           sizes: ship.sizes.reduce((sizeObj, size) => {
-            const sizeKey = Object.keys(size)[0];
+            const sizeKey = Object.keys(size)[0].split(';')[0].trim();
             const sizeValue = Object.values(size)[0];
             sizeObj[sizeKey] = sizeValue || 0;
             return sizeObj;
@@ -103,8 +96,6 @@ export const getOrderDetails = async (req, res) => {
         }))
       })) : []
     };
-
-    console.log('Sending response:', orderDetails); // Debug log
 
     res.status(200).json({
       success: true,
@@ -122,48 +113,41 @@ export const getOrderDetails = async (req, res) => {
 };
 
 export const searchOrderSuggestions = async (req, res) => {
-  console.log('✅ searchOrderSuggestions called!');
-  
-  try {
-    const { query } = req.query;
+    try {
+    const { term } = req.query;
     
-    if (!query || query.length < 2) {
-      return res.status(400).json([]);
+    if (!term || term.length < 2) {
+      return res.json([]);
     }
 
-    console.log('✅ Searching for orders with query:', query);
-    
-    // Try multiple search patterns
     const searchPatterns = [
-      { Order_No: { $regex: query, $options: 'i' } },
-      { Order_No: { $regex: `.*${query}.*`, $options: 'i' } },
-      { Cust_Code: { $regex: query, $options: 'i' } },
-      { CustStyle: { $regex: query, $options: 'i' } }
+      { Order_No: { $regex: term, $options: 'i' } },
+      { Cust_Code: { $regex: term, $options: 'i' } },
+      { CustStyle: { $regex: term, $options: 'i' } }
     ];
 
-    // Search with OR condition for better matching
     const orders = await DtOrder.find({
       $or: searchPatterns
     })
-    .select('Order_No Cust_Code CustStyle')
     .limit(10)
-    .sort({ Order_No: 1 });
-
-    console.log('✅ Found orders count:', orders.length);
-    console.log('✅ Sample order data:', orders[0]); // Log first order to see structure
+    .lean();
 
     const suggestions = orders.map(order => ({
-      orderNo: order.Order_No,
-      customerCode: order.Cust_Code || 'N/A',
-      customerStyle: order.CustStyle || 'N/A'
+        orderNo: order.Order_No,
+        customerStyle: order.CustStyle,
+        customerCode: order.Cust_Code,
+        quantity: order.TotalQty,
+        colors: order.OrderColors ? order.OrderColors.map(c => c.Color) : []
     }));
 
-    // Return direct array format since your frontend expects it
-    res.status(200).json(suggestions);
+    res.json(suggestions);
 
   } catch (error) {
-    console.error('✅ Error in searchOrderSuggestions:', error);
-    res.status(500).json([]);
+    console.error('Error fetching order details:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
   }
 };
-
