@@ -85,12 +85,10 @@ export const getHumidityDataByMoNo = async (req, res) => {
         console.error("Error fetching yorksys_orders fallback:", errOrder);
       }
 
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "No humidity data found for this moNo",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "No humidity data found for this moNo",
+      });
     }
 
     return res.json({ success: true, data: doc });
@@ -763,21 +761,17 @@ export const createHumidityReport = async (req, res) => {
         "Validation Error Details:",
         JSON.stringify(err.errors, null, 2),
       );
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Validation failed",
-          errors: err.errors,
-        });
-    }
-    return res
-      .status(500)
-      .json({
+      return res.status(400).json({
         success: false,
-        message: "Failed to create report",
-        error: err.message,
+        message: "Validation failed",
+        errors: err.errors,
       });
+    }
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create report",
+      error: err.message,
+    });
   }
 };
 
@@ -900,12 +894,10 @@ export const getFabricValuesByBuyer = async (req, res) => {
       });
       fabricNames = [...new Set(fabricNames)];
     } else {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Provide either buyer or moNo query param",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Provide either buyer or moNo query param",
+      });
     }
 
     // lowercase buyer for matching

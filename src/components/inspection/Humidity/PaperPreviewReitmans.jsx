@@ -205,13 +205,20 @@ const PaperPreviewReitmans = ({ data }) => {
                 <td className="font-black text-rose-700 text-[16px]">
                   {formData.upperCentisimalIndex || "N/A"}%
                 </td>
-                <td className="relative p-0">
+                <td className="relative p-0 pt-2">
                   {formData.inspectorSignature && (
                     <img
                       src={formData.inspectorSignature}
                       className="max-h-10 mx-auto grayscale"
                       alt="sig"
                     />
+                  )}
+                  {(formData.updatedBy?.engName ||
+                    formData.createdBy?.engName) && (
+                    <div className="text-[10px] font-bold text-gray-800 mt-1 uppercase">
+                      {formData.updatedBy?.engName ||
+                        formData.createdBy?.engName}
+                    </div>
                   )}
                 </td>
               </tr>

@@ -4,7 +4,7 @@ import React, {
   useState,
   useCallback,
   useMemo,
-  useRef
+  useRef,
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -26,13 +26,13 @@ import {
   Loader2,
   AlertCircle,
   ChevronRight,
-  Home as HomeIcon
+  Home as HomeIcon,
 } from "lucide-react";
 
 // --- Theme Hook for Dark Mode ---
 const useTheme = () => {
   const [theme, setTheme] = useState(
-    () => localStorage.getItem("home-theme") || "light"
+    () => localStorage.getItem("home-theme") || "light",
   );
 
   useEffect(() => {
@@ -96,7 +96,7 @@ const SettingsModal = ({
   user,
   isMobile,
   theme,
-  toggleTheme
+  toggleTheme,
 }) => {
   const [permission, setPermission] = useState("default");
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -147,7 +147,7 @@ const SettingsModal = ({
 
       if (perm !== "granted") {
         throw new Error(
-          "Permission Denied. Please enable notifications in browser settings."
+          "Permission Denied. Please enable notifications in browser settings.",
         );
       }
 
@@ -162,7 +162,7 @@ const SettingsModal = ({
       let publicVapidKey;
       try {
         const keyRes = await axios.get(
-          `${API_BASE_URL}/api/fincheck-reports/push/vapid-key`
+          `${API_BASE_URL}/api/fincheck-reports/push/vapid-key`,
         );
         publicVapidKey = keyRes.data.publicKey;
       } catch (apiError) {
@@ -174,7 +174,7 @@ const SettingsModal = ({
         const convertedKey = urlBase64ToUint8Array(publicVapidKey);
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: convertedKey
+          applicationServerKey: convertedKey,
         });
       } catch (subError) {
         throw new Error(`PushManager Subscribe Error: ${subError.message}`);
@@ -186,8 +186,8 @@ const SettingsModal = ({
           {
             empId: user.emp_id,
             subscription: subscription,
-            userAgent: navigator.userAgent
-          }
+            userAgent: navigator.userAgent,
+          },
         );
       } catch (backendError) {
         throw new Error(`Backend Save Error: ${backendError.message}`);
@@ -391,7 +391,7 @@ const MobileBottomNav = ({
   sections,
   activeSection,
   onSectionChange,
-  onSettingsClick
+  onSettingsClick,
 }) => {
   const navRef = useRef(null);
   const activeButtonRef = useRef(null);
@@ -411,7 +411,7 @@ const MobileBottomNav = ({
         button.scrollIntoView({
           behavior: "smooth",
           inline: "center",
-          block: "nearest"
+          block: "nearest",
         });
       }
     }
@@ -444,7 +444,7 @@ const MobileBottomNav = ({
             >
               {React.cloneElement(section.icon, {
                 className: "w-5 h-5",
-                style: { margin: 0 }
+                style: { margin: 0 },
               })}
             </div>
             <span className="text-[9px] mt-1 font-medium leading-tight text-center max-w-[60px] truncate">
@@ -1058,7 +1058,7 @@ function Home() {
         ]
       }
     ],
-    [t]
+    [t],
   );
 
   // Persist active section to localStorage
@@ -1084,7 +1084,7 @@ function Home() {
         try {
           const [roleManagementRes, userRolesRes] = await Promise.all([
             axios.get(`${API_BASE_URL}/api/role-management`),
-            axios.get(`${API_BASE_URL}/api/user-roles/${user.emp_id}`)
+            axios.get(`${API_BASE_URL}/api/user-roles/${user.emp_id}`),
           ]);
 
           setRoleManagement(roleManagementRes.data);
@@ -1110,14 +1110,14 @@ function Home() {
               allSections
                 .flatMap((s) => s.items)
                 .filter((item) => item.pageId)
-                .map((item) => item.pageId)
-            )
+                .map((item) => item.pageId),
+            ),
           ];
 
           const accessPromises = pageIdsToCheck.map((pageId) =>
             axios.get(
-              `${API_BASE_URL}/api/ie/role-management/access-check?emp_id=${user.emp_id}&page=${pageId}`
-            )
+              `${API_BASE_URL}/api/ie/role-management/access-check?emp_id=${user.emp_id}&page=${pageId}`,
+            ),
           );
 
           const results = await Promise.all(accessPromises);
@@ -1156,13 +1156,13 @@ function Home() {
         return roleManagement.some(
           (role) =>
             item.roles.includes(role.role) &&
-            role.jobTitles.includes(user.job_title)
+            role.jobTitles.includes(user.job_title),
         );
       }
 
       return false;
     },
-    [user, userRoles, roleManagement, accessMap]
+    [user, userRoles, roleManagement, accessMap],
   );
 
   // Dynamic filtering logic
@@ -1172,7 +1172,7 @@ function Home() {
     return allSections
       .map((section) => ({
         ...section,
-        items: section.items.filter((item) => hasAccess(item))
+        items: section.items.filter((item) => hasAccess(item)),
       }))
       .filter((section) => section.items.length > 0);
   }, [allSections, hasAccess, pageLoading, userRoles]);
@@ -1183,13 +1183,13 @@ function Home() {
       const savedSection = localStorage.getItem("home-active-section");
       // Check if saved section exists in accessible sections
       const sectionExists = accessibleSections.some(
-        (s) => s.id === savedSection
+        (s) => s.id === savedSection,
       );
 
       if (!activeSection || !sectionExists) {
         // If no active section or saved section is not accessible, use first available
         setActiveSection(
-          sectionExists ? savedSection : accessibleSections[0].id
+          sectionExists ? savedSection : accessibleSections[0].id,
         );
       }
     }
@@ -1207,7 +1207,7 @@ function Home() {
   const handleTabClick = (sectionId) => {
     sectionRefs.current[sectionId]?.scrollIntoView({
       behavior: "smooth",
-      block: "start"
+      block: "start",
     });
   };
 
@@ -1278,7 +1278,7 @@ function Home() {
                     <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                       {React.cloneElement(currentSection.icon, {
                         className: "w-4 h-4 text-blue-600 dark:text-blue-400",
-                        style: { margin: 0 }
+                        style: { margin: 0 },
                       })}
                     </div>
                     <h1 className="text-sm font-bold text-slate-800 dark:text-white">
@@ -1364,7 +1364,7 @@ function Home() {
                     <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                       {React.cloneElement(currentSection.icon, {
                         className: "w-5 h-5 text-blue-600 dark:text-blue-400",
-                        style: { margin: 0 }
+                        style: { margin: 0 },
                       })}
                     </div>
                     <h1 className="text-base font-bold text-slate-800 dark:text-white">
@@ -1493,7 +1493,8 @@ function Home() {
                 <div
                   className="grid gap-4"
                   style={{
-                    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))"
+                    gridTemplateColumns:
+                      "repeat(auto-fill, minmax(160px, 1fr))",
                   }}
                 >
                   {section.items.map((item, itemIndex) => (

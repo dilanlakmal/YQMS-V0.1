@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
+import { CheckCircle2, AlertCircle, X } from "lucide-react";
 import { API_BASE_URL } from "../../../../config";
+import { useAuth } from "../../authentication/AuthContext";
 
 export default function UpdateModel({ open, onCancel, report, onUpdate }) {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     buyerStyle: "",
     factoryStyleNo: "",
@@ -23,6 +26,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
     inspectorSignature: "",
     qamSignature: "",
   });
+  const [message, setMessage] = useState({ type: "", text: "" });
 
   const [isSaving, setIsSaving] = useState(false);
   const [expandedRecordIndex, setExpandedRecordIndex] = useState(0);
@@ -42,7 +46,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
             ? report.history
             : [];
 
-      const specLimit = Number(report.aquaboySpec);
+      const specLimit = Number(report.aquaboySpecBody || report.aquaboySpec);
       const parseNumberInternal = (v) => {
         if (v === undefined || v === null) return NaN;
         const s = String(v).trim();
@@ -334,7 +338,11 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       const ribsVal = parseNumber(ribsStr);
 
       // Body Status
-      if (!Number.isNaN(bodyVal) && !Number.isNaN(specNumBody)) {
+      if (
+        bodyStr.length >= 2 &&
+        !Number.isNaN(bodyVal) &&
+        !Number.isNaN(specNumBody)
+      ) {
         updatedRecord[section].bodyPass = bodyVal <= specNumBody;
         updatedRecord[section].bodyFail = bodyVal > specNumBody;
         updatedRecord[section].bodyStatus =
@@ -346,7 +354,11 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       }
 
       // Ribs Status
-      if (!Number.isNaN(ribsVal) && !Number.isNaN(specNumRibs)) {
+      if (
+        ribsStr.length >= 2 &&
+        !Number.isNaN(ribsVal) &&
+        !Number.isNaN(specNumRibs)
+      ) {
         updatedRecord[section].ribsPass = ribsVal <= specNumRibs;
         updatedRecord[section].ribsFail = ribsVal > specNumRibs;
         updatedRecord[section].ribsStatus =
@@ -449,7 +461,11 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       const ribsVal = parseNumber(ribsStr);
 
       // Body Status
-      if (!Number.isNaN(bodyVal) && !Number.isNaN(specNumBody)) {
+      if (
+        bodyStr.length >= 2 &&
+        !Number.isNaN(bodyVal) &&
+        !Number.isNaN(specNumBody)
+      ) {
         newRecords[recordIndex].additional[section].bodyPass =
           bodyVal <= specNumBody;
         newRecords[recordIndex].additional[section].bodyFail =
@@ -463,7 +479,11 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       }
 
       // Ribs Status
-      if (!Number.isNaN(ribsVal) && !Number.isNaN(specNumRibs)) {
+      if (
+        ribsStr.length >= 2 &&
+        !Number.isNaN(ribsVal) &&
+        !Number.isNaN(specNumRibs)
+      ) {
         newRecords[recordIndex].additional[section].ribsPass =
           ribsVal <= specNumRibs;
         newRecords[recordIndex].additional[section].ribsFail =
@@ -669,6 +689,12 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       const payload = {
         ...formData,
         history: newHistory,
+        updatedBy: user
+          ? {
+              empId: user.emp_id,
+              engName: user.eng_name || user.name || user.username,
+            }
+          : null,
         ribsAvailable: ribsAvailable,
         inspectionRecords: [lastEditedRecord],
       };
@@ -683,31 +709,23 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       );
       const result = await response.json();
       if (response.ok) {
-        Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: "Report updated successfully!",
-          timer: 2000,
-          showConfirmButton: false,
-        });
+        setMessage({ type: "success", text: "Report updated successfully!" });
         onUpdate();
-        onCancel();
+        setTimeout(() => {
+          onCancel();
+        }, 2000);
       } else {
-        Swal.fire({
-          icon: "error",
-          title: "Error",
+        setMessage({
+          type: "error",
           text: result.message || "Failed to update report",
         });
       }
     } catch (err) {
       console.error(err);
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "Error updating report",
-      });
+      setMessage({ type: "error", text: "Error updating report" });
     } finally {
       setIsSaving(false);
+      setTimeout(() => setMessage({ type: "", text: "" }), 3000);
     }
   };
 
@@ -1434,6 +1452,75 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
           </button>
         </div>
       </div>
+
+      {/* Premium Message Banner */}
+      {message.text && (
+        <div
+          className={`fixed bottom-6 right-6 z-[200] flex items-center gap-4 p-4 pl-5 pr-6 rounded-2xl shadow-2xl border backdrop-blur-md transition-all duration-500 animate-in fade-in slide-in-from-right-8 ${
+            message.type === "success"
+              ? "text-emerald-900 bg-white/95 border-emerald-100 ring-8 ring-emerald-500/5"
+              : "text-rose-900 bg-white/95 border-rose-100 ring-8 ring-rose-500/5"
+          }`}
+          role="alert"
+        >
+          <div className="relative">
+            {message.type === "success" ? (
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-200 animate-bounce-slow">
+                <CheckCircle2 size={24} strokeWidth={3} />
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-200">
+                <AlertCircle size={24} strokeWidth={3} />
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col min-w-0 pr-4">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-0.5">
+              Notification
+            </span>
+            <div className="text-sm font-black tracking-tight leading-tight">
+              {message.text}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className={`p-1.5 rounded-lg transition-colors shrink-0 ${
+              message.type === "success"
+                ? "text-emerald-400 hover:bg-emerald-50 hover:text-emerald-600"
+                : "text-rose-400 hover:bg-rose-50 hover:text-rose-600"
+            }`}
+            onClick={() => setMessage({ type: "", text: "" })}
+            aria-label="Close"
+          >
+            <X size={18} strokeWidth={3} />
+          </button>
+
+          {/* Tiny Progress Bar */}
+          <div
+            className={`absolute bottom-0 left-0 h-1 rounded-full opacity-30 ${message.type === "success" ? "bg-emerald-500" : "bg-rose-500"}`}
+            style={{
+              width: "100%",
+              animation: "shrink-width 3s linear forwards",
+            }}
+          ></div>
+        </div>
+      )}
+
+      <style>{`
+                @keyframes shrink-width {
+                    from { width: 100%; }
+                    to { width: 0%; }
+                }
+                .animate-bounce-slow {
+                    animation: bounce-slow 2s infinite;
+                }
+                @keyframes bounce-slow {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-3px); }
+                }
+            `}</style>
     </div>
   );
 }
