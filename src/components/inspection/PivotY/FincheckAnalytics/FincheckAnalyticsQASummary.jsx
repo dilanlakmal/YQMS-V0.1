@@ -12,6 +12,8 @@ import {
   X,
 } from "lucide-react";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
+import FincheckAnalyticsStyleTable from "./FincheckAnalyticsStyleTable";
+import FincheckAnalyticsTrendChart from "./FincheckAnalyticsTrendChart";
 
 // --- Internal Helper: Async Search Input ---
 const QAInspectorSearch = ({ onSelect }) => {
@@ -353,7 +355,7 @@ const FincheckAnalyticsQASummary = () => {
                     <div className="flex justify-between gap-1">
                       <div className="flex-1 bg-green-50 dark:bg-green-900/10 rounded px-1 py-1 text-center border border-green-100 dark:border-green-800">
                         <p className="text-[8px] font-bold text-green-700 dark:text-green-400 uppercase">
-                          Min
+                          Minor
                         </p>
                         <p className="text-xs font-bold text-green-800 dark:text-green-300">
                           {data.stats.minor}
@@ -361,7 +363,7 @@ const FincheckAnalyticsQASummary = () => {
                       </div>
                       <div className="flex-1 bg-orange-50 dark:bg-orange-900/10 rounded px-1 py-1 text-center border border-orange-100 dark:border-orange-800">
                         <p className="text-[8px] font-bold text-orange-700 dark:text-orange-400 uppercase">
-                          Maj
+                          Major
                         </p>
                         <p className="text-xs font-bold text-orange-800 dark:text-orange-300">
                           {data.stats.major}
@@ -369,7 +371,7 @@ const FincheckAnalyticsQASummary = () => {
                       </div>
                       <div className="flex-1 bg-red-50 dark:bg-red-900/10 rounded px-1 py-1 text-center border border-red-100 dark:border-red-800">
                         <p className="text-[8px] font-bold text-red-700 dark:text-red-400 uppercase">
-                          Crit
+                          Critical
                         </p>
                         <p className="text-xs font-bold text-red-800 dark:text-red-300">
                           {data.stats.critical}
@@ -421,7 +423,7 @@ const FincheckAnalyticsQASummary = () => {
             </div>
 
             {/* Cards Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
               {data.tableRows.map((row) => {
                 const defectRate = calculateRate(
                   row.totalDefects,
@@ -450,22 +452,51 @@ const FincheckAnalyticsQASummary = () => {
                     </div>
 
                     {/* Key Metrics with Breakdown */}
-                    <div className="flex flex-col gap-3 mb-5">
-                      <div className="flex items-center gap-8">
-                        <div>
+                    <div className="flex flex-col gap-4 mb-5">
+                      {/* Row 1: Counts */}
+                      <div className="flex items-center gap-6 overflow-x-auto pb-1">
+                        {/* 1. Total Reports */}
+                        <div className="shrink-0">
                           <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">
-                            Sample Size
+                            Total Reports
                           </p>
-                          <p className="text-xl font-bold text-gray-700 dark:text-gray-200 font-mono mt-0.5">
+                          <p className="text-lg font-bold text-gray-700 dark:text-gray-200 font-mono mt-0.5">
+                            {row.reportCount}
+                          </p>
+                        </div>
+
+                        <div className="w-px h-8 bg-gray-100 dark:bg-gray-700 shrink-0"></div>
+
+                        {/* 2. Total Styles */}
+                        <div className="shrink-0">
+                          <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">
+                            Total Styles
+                          </p>
+                          <p className="text-lg font-bold text-gray-700 dark:text-gray-200 font-mono mt-0.5">
+                            {row.totalStyles}
+                          </p>
+                        </div>
+
+                        <div className="w-px h-8 bg-gray-100 dark:bg-gray-700 shrink-0"></div>
+
+                        {/* 3. Sample Size */}
+                        <div className="shrink-0">
+                          <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">
+                            Total Sample#
+                          </p>
+                          <p className="text-lg font-bold text-gray-700 dark:text-gray-200 font-mono mt-0.5">
                             {row.sampleSize.toLocaleString()}
                           </p>
                         </div>
-                        <div className="w-px h-8 bg-gray-100 dark:bg-gray-700"></div>
-                        <div>
+
+                        <div className="w-px h-8 bg-gray-100 dark:bg-gray-700 shrink-0"></div>
+
+                        {/* 4. Total Defects */}
+                        <div className="shrink-0">
                           <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">
-                            Total Defects
+                            Total Defects#
                           </p>
-                          <p className="text-xl font-bold text-gray-700 dark:text-gray-200 font-mono mt-0.5">
+                          <p className="text-lg font-bold text-gray-700 dark:text-gray-200 font-mono mt-0.5">
                             {row.totalDefects}
                           </p>
                         </div>
@@ -534,6 +565,10 @@ const FincheckAnalyticsQASummary = () => {
               })}
             </div>
           </div>
+          {/* --- 4. DEFECT FINDINGS BY STYLE TABLE --- */}
+          <FincheckAnalyticsStyleTable empId={selectedQA.emp_id} />
+          {/* --- 5. CHART COMPONENT --- */}
+          <FincheckAnalyticsTrendChart empId={selectedQA.emp_id} />
         </>
       )}
     </div>

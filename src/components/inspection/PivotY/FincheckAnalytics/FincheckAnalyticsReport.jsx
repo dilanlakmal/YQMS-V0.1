@@ -1,18 +1,27 @@
 import React, { useState } from "react";
 import {
-  BarChart3,
   Users,
   Layers,
   ChevronRight,
   LayoutDashboard,
+  PieChart,
 } from "lucide-react";
 import FincheckAnalyticsQASummary from "./FincheckAnalyticsQASummary";
 
-// Placeholder for Style Summary (can be implemented later)
+// Placeholder for Style Summary
 const StyleSummaryPlaceholder = () => (
-  <div className="flex flex-col items-center justify-center h-96 text-gray-400 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700">
+  <div className="flex flex-col items-center justify-center h-96 text-gray-400 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 animate-fadeIn">
     <Layers className="w-16 h-16 mb-4 opacity-20" />
     <h3 className="text-lg font-bold">Style Summary Analytics</h3>
+    <p className="text-sm">This module is under development.</p>
+  </div>
+);
+
+// Placeholder for Total Summary
+const TotalSummaryPlaceholder = () => (
+  <div className="flex flex-col items-center justify-center h-96 text-gray-400 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 animate-fadeIn">
+    <PieChart className="w-16 h-16 mb-4 opacity-20" />
+    <h3 className="text-lg font-bold">Total Operational Summary</h3>
     <p className="text-sm">This module is under development.</p>
   </div>
 );
@@ -35,11 +44,14 @@ const FincheckAnalyticsReport = () => {
       component: <StyleSummaryPlaceholder />,
       color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20",
     },
+    {
+      id: "total-summary",
+      label: "Total Summary",
+      icon: PieChart,
+      component: <TotalSummaryPlaceholder />,
+      color: "text-purple-600 bg-purple-50 dark:bg-purple-900/20",
+    },
   ];
-
-  const ActiveComponent = menuItems.find(
-    (item) => item.id === activeView,
-  )?.component;
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-100px)] animate-fadeIn">
@@ -103,8 +115,17 @@ const FincheckAnalyticsReport = () => {
         </div>
       </div>
 
-      {/* 2. Main Content Area */}
-      <div className="flex-1 min-w-0">{ActiveComponent}</div>
+      {/* 2. Main Content Area - Preserving State */}
+      <div className="flex-1 min-w-0">
+        {menuItems.map((item) => (
+          <div
+            key={item.id}
+            className={activeView === item.id ? "block" : "hidden"}
+          >
+            {item.component}
+          </div>
+        ))}
+      </div>
 
       <style jsx>{`
         @keyframes slideRight {
