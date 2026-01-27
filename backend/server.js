@@ -147,9 +147,9 @@ import qc2DefectPrint from "./routes/QC2System/QC2Inspection/QC2DefectPrintRoute
 import qc2Rework from "./routes/QC2System/QC2Inspection/QC2ReworkRoutes.js";
 
 /* -----------------------------
-  AI Import
+  ai Import
 ------------------------------ */
-import AIChatBot from "./routes/AI/AIChatBotRoutes.js";
+import aiRoutes from "./routes/ai/index.js";
 
 /* ------------------------------
   QC2 Data Upload
@@ -300,15 +300,11 @@ import QCOutputRoute from "./routes/QCOutput/QCOutputRoute.js";
 /* -----------------------------
   Chatbot Output Imports
 ------------------------------ */
-import conversationRoutes from "./routes/AI/conversation.route.js";
-import chatRoutes from "./routes/AI/chat.route.js";
+import InstructionRoutes from "./routes/instruction/index.js"
+app.use("/api/instruction/translation", InstructionRoutes);
 
-
-import productionInstructionRoutes from "./routes/production/instruction.route.js";
-import translationRoutes from "./routes/production/translation.route.js";
-
-app.use("/api/ai/production/instruction/extraction", productionInstructionRoutes);
-app.use("/api/ai/production/instruction", translationRoutes);
+import { connectDB } from "./Config/database.js";
+await connectDB();
 
 
 /* -----------------------------
@@ -441,9 +437,9 @@ app.use(qc2DefectPrint);
 app.use(qc2Rework);
 
 /* -----------------------------
-AI Routes
+ai Routes
 ------------------------------ */
-app.use(AIChatBot);
+app.use("/api/ai", aiRoutes);
 /* ------------------------------
   Cutting routes
 ------------------------------ */
@@ -624,8 +620,7 @@ app.use(QCOutputRoute);
 /* -----------------------------
   Chatbot Output Routes
 ------------------------------ */
-app.use("/api/ai/conversation", conversationRoutes);
-app.use("/api/ai/chat", chatRoutes);
+
 
 /* ------------------------------
   CE System Routes
@@ -667,7 +662,18 @@ app.use((req, res, next) => {
 //     process.exit(0);
 //   }
 // });
+export const requestLogger = (req, res, next) => {
+    const { method, originalUrl, params, query, body } = req;
+    const timestamp = new Date().toISOString();
 
+    console.log(`[${timestamp}] ${method} ${originalUrl}`);
+    console.log("Params:", params);
+    console.log("Query:", query);
+    console.log("Body:", body);
+
+    next(); // important to call next() so the request continues
+};
+app.use(requestLogger)
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
