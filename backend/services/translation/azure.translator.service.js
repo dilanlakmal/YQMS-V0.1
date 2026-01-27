@@ -179,12 +179,17 @@ const AzureTranslatorService = {
      */
     getSupportedLanguages: async () => {
         // In a real scenario, this could call Azure's languages API
-        // https://api.cognitive.microsofttranslator.com/languages?api-version=3.0
-        return [
-            { code: "zh-Hans", name: "Chinese (Simplified)", value: "chinese" },
-            { code: "en", name: "English", value: "english" },
-            { code: "km", name: "Khmer", value: "khmer" }
-        ];
+        const url = "https://api.cognitive.microsofttranslator.com/languages?api-version=3.0"
+        const response = await axios.get(url);
+        const Languages = response.data.translation;
+        let languages = [];
+        for (const code of Object.keys(Languages)) {
+            languages.push({
+                code: code, 
+                name: Languages[code].name
+            })
+        }
+        return languages;
     }
 };
 

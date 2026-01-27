@@ -1,4 +1,4 @@
-import { Conversation } from "../MongoDB/dbConnectionController.js";
+import { Conversation } from "../../MongoDB/dbConnectionController.js";
 
 // CREATE conversation
 export const createConversation = async (req, res) => {
@@ -18,10 +18,10 @@ export const createConversation = async (req, res) => {
                 acc[key] = error.errors[key].message;
                 return acc;
             }, {});
-            return res.status(400).json({error: "Validation failed", details: messages});
+            return res.status(400).json({ error: "Validation failed", details: messages });
         }
 
-        res.status(500).json({error: error.message, stack: error.stack});
+        res.status(500).json({ error: error.message, stack: error.stack });
     }
 };
 
@@ -31,7 +31,7 @@ export const getAllConversation = async (req, res) => {
         const conversations = await Conversation.find();
         res.json(conversations);
     } catch (error) {
-        res.status(500).json({error: error.message});
+        res.status(500).json({ error: error.message });
     }
 };
 
@@ -42,11 +42,11 @@ export const getUserConversation = async (req, res) => {
         // console.info("DB Name:", Conversation.db.name);
         // console.info("Collection Name", Conversation.collection.name);
 
-        const list = await Conversation.find({userID: req.params.userID}).sort({createdAt: -1});
+        const list = await Conversation.find({ userID: req.params.userID }).sort({ createdAt: -1 });
         res.json(list);
         console.log("📌 FOUND:", list.length);
     } catch (error) {
-        res.status(500).json({error: error.message});
+        res.status(500).json({ error: error.message });
     }
 };
 
@@ -55,10 +55,10 @@ export const getUserConversation = async (req, res) => {
 export const deleteConversation = async (req, res) => {
     try {
         await Conversation.findByIdAndDelete(req.params.id);
-        res.json({message: "Conversation deleted"});
+        res.json({ message: "Conversation deleted" });
         console.info("Deleted conversation successfully", req.params.id)
     } catch (err) {
-        res.status(500).json({error: err.message});
+        res.status(500).json({ error: err.message });
     }
 }
 
@@ -67,27 +67,27 @@ export const deleteConversation = async (req, res) => {
 export const updateConversationTitle = async (req, res) => {
     try {
         const conversationId = req.params.id;
-        const {title} = req.body;
+        const { title } = req.body;
 
         if (!title || title.trim() === "") {
-            return res.status(400).json({error: "Title is required"});
+            return res.status(400).json({ error: "Title is required" });
         }
 
         const updatedConversation = await Conversation.findByIdAndUpdate(
             conversationId,
-            {title: title.trim()},
-            {new: true}
+            { title: title.trim() },
+            { new: true }
         )
         if (!updatedConversation) {
             console.error("Conversation not found", updatedConversation)
-            return res.status(4004).json({error: "Conversation not found"})
+            return res.status(4004).json({ error: "Conversation not found" })
         }
 
         res.status(200).json(updatedConversation);
 
     } catch (err) {
         console.error("Error updating conversation title:", err.message);
-        res.status(500).json({error: "Internal server error"});
+        res.status(500).json({ error: "Internal server error" });
     }
 }
 
@@ -95,69 +95,69 @@ export const updateConversationTitle = async (req, res) => {
 export const updateConversationModel = async (req, res) => {
     try {
         const conversationId = req.params.id;
-        const {model} = req.body;
+        const { model } = req.body;
 
         if (!model || model.trim() === "") {
-            return res.status(400).json({error: "Model is required"});
+            return res.status(400).json({ error: "Model is required" });
         }
 
         const updatedConversation = await Conversation.findByIdAndUpdate(
             conversationId,
-            {model: model.trim()},
-            {new: true}
+            { model: model.trim() },
+            { new: true }
         )
         if (!updatedConversation) {
             console.error("Conversation not found", updatedConversation)
-            return res.status(4004).json({error: "Conversation not found"})
+            return res.status(4004).json({ error: "Conversation not found" })
         }
 
         res.status(200).json(updatedConversation);
-        console.info("Update model successfully!",  model);
+        console.info("Update model successfully!", model);
 
     } catch (err) {
         console.error("Error updating conversation title:", err.message);
-        res.status(500).json({error: "Internal server error"});
+        res.status(500).json({ error: "Internal server error" });
     }
 }
 
 // ADD message to conversation
 export const addMessage = async (req, res) => {
     try {
-        const {id} = req.params;
+        const { id } = req.params;
 
         const updated = await Conversation.findByIdAndUpdate(
-            id, 
-            {messages: req.body},
-            {new: true}
+            id,
+            { messages: req.body },
+            { new: true }
         );
 
         res.json(updated);
         console.info("Updated new message successfully!", req.body)
     } catch (error) {
-        res.status(500).json({error: error.message});
+        res.status(500).json({ error: error.message });
     }
 }
 
 export const updateActiveStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
+    try {
+        const { id } = req.params;
 
-    // Convert status to boolean (optional, if coming from string)
+        // Convert status to boolean (optional, if coming from string)
 
-    // 1️⃣ Set all other conversations to false
-    await Conversation.updateMany(
-      { _id: { $ne: id } }, // all except the one being updated
-      { active_status: false }
-    );
+        // 1️⃣ Set all other conversations to false
+        await Conversation.updateMany(
+            { _id: { $ne: id } }, // all except the one being updated
+            { active_status: false }
+        );
 
-    // 2️⃣ Update the selected conversation
-    const updated = await Conversation.findByIdAndUpdate(
-      id,
-      { active_status: true },
-    );
+        // 2️⃣ Update the selected conversation
+        const updated = await Conversation.findByIdAndUpdate(
+            id,
+            { active_status: true },
+        );
 
-    res.json(updated);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+        res.json(updated);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 };

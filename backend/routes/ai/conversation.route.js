@@ -1,6 +1,6 @@
 import express from "express";
 
-import { 
+import {
     createConversation,
     getAllConversation,
     getUserConversation,
@@ -9,7 +9,7 @@ import {
     updateConversationTitle,
     updateConversationModel,
     updateActiveStatus
-} from "../../controller/AI/conversation.controller.js";
+} from "../../controller/ai/chatbot/conversation.controller.js";
 
 const router = express.Router();
 
