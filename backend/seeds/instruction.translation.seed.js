@@ -8,10 +8,10 @@ if (process.env.NODE_ENV === "development") {
 }
 
 const steps = [
-  { title: 'Select Team', description: 'Choose your department', icon: "Users", status: "active" },
-  { title: 'Insert PDF', description: 'Upload instruction file', icon: "FileText", status: "inactive" },
-  { title: 'Configure', description: 'Language & Glossary', icon: "Globe", status: "inactive"},
-  { title: 'Finalize', description: 'Export PDF', icon: "Award", status: "inactive" },
+  { title: 'Select Team', description: 'Choose your department', icon: "Users", status: "active", order: 1},
+  { title: 'Insert PDF', description: 'Upload instruction file', icon: "FileText", status: "inactive", order: 2 },
+  { title: 'Configure', description: 'Language & Glossary', icon: "Globe", status: "inactive", order: 3},
+  { title: 'Finalize', description: 'Export PDF', icon: "Award", status: "inactive", order: 4},
 ];
 
 async function progressSeed() {
@@ -41,8 +41,8 @@ async function progressSeed() {
 
     for (const text of contents) {
       const doc = await Content.findOneAndUpdate(
-        {original: text, language_id: language._id},
-        {$setOnInsert: {original: text, language_id: language._id, translated: false}},
+        {original: text, language: language._id},
+        {$setOnInsert: {original: text, language: language._id, translated: false}},
         {upsert: true, new: true}
       );
       contentMap.set(text, doc._id);
@@ -63,9 +63,10 @@ async function progressSeed() {
             user_id: user._id,
             title: contentMap.get(step.title),
             description: contentMap.get(step.description),
+            order: contentMap.get(step.order)
           },
           update: {
-            $set: {status: step.status, icon: step.icon}
+            $set: {status: step.status, icon: step.icon, order: step.order}
           },
           upsert: true,
         }

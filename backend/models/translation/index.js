@@ -7,8 +7,8 @@ import Content from "./content.model.js";
 const translationSchema = Schema({
     code: String,
     translated: String,
-    content_id: {
-        type: Schema.ObjectId,
+    content: {
+        type: Schema.Types.ObjectId,
         ref: "content"
     }
 });
