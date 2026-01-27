@@ -15,7 +15,7 @@ import {
     listBlobs,
     downloadBlobToString
 } from "../../storage/azure.blob.storage.js";
-import logger from "../../Utils/translation/logger.js";
+import "../../Utils/logger.js";
 import { LANGUAGE_MAP } from "../../Utils/translation/language.validator.js";
 /**
  * Service to handle Azure Document Translation interactions.
@@ -190,6 +190,50 @@ const AzureTranslatorService = {
             })
         }
         return languages;
+    },
+
+    detectLanguage: async (text) => {
+        try {
+            const response = await axios.post(
+                "https://api.cognitive.microsofttranslator.com/detect?api-version=3.0",
+                [{text: text}],
+                {
+                    headers:HEADERS
+                }
+            );
+            const detection = response.data[0].language;
+            return detection;
+        } catch (err) {
+        logger.error("Azure language detection error:", err.response?.data || err.message);
+        return null;
+    }
+    },
+
+    translateText: async (text, fromLang, toLang) => {
+        let params = {
+            to: toLang
+        }
+        if (fromLang) {
+            params[from] = fromLang
+        }
+        try {
+            const response = await axios.post(
+                "https://api.cognitive.microsofttranslator.com/translate?api-version=3.0",
+                [{text: text}],
+                {
+                    headers:HEADERS,
+                    params: {
+                        from: fromLang,
+                        to: toLang
+                    }
+                }
+            );
+            const detection = response.data[0].translations[0].text;
+            return detection;
+        } catch (err) {
+        logger.error("Azure language detection error:", err.response?.data || err.message);
+        return null;
+    }
     }
 };
 
