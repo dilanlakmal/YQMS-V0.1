@@ -146,8 +146,17 @@ const YPivotQAReport = () => {
 
   const activeTabData = tabs.find((t) => t.id === activeTab);
 
+  // --- Helper to determine layout mode ---
+  const isAnalyticsMode = activeTab === "analytics";
+
+  //className="min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200 font-sans flex flex-col"
+
   return (
-    <div className="min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200 font-sans flex flex-col">
+    <div
+      className={`bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200 font-sans flex flex-col ${
+        isAnalyticsMode ? "h-screen overflow-hidden" : "min-h-screen"
+      }`}
+    >
       {/* Background Ambience */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse"></div>
@@ -326,14 +335,32 @@ const YPivotQAReport = () => {
       </div>
 
       {/* --- CONTENT AREA --- */}
-      <div className="flex-1 overflow-hidden pt-[90px] lg:pt-[70px] flex flex-col w-full max-w-full">
+      {/* 
+          Content Wrapper Logic
+      */}
+      <div
+        className={`flex-1 w-full max-w-full flex flex-col pt-[90px] lg:pt-[70px] ${
+          isAnalyticsMode ? "h-full overflow-hidden" : ""
+        }`}
+      >
         <div className="relative w-full max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 pb-4 h-full flex flex-col min-h-0">
-          {/* Render Active Component */}
+          {/* 
+             Component Wrapper 
+          */}
+          <div className="h-full w-full max-w-full animate-fadeIn flex flex-col min-h-0">
+            {activeTabData?.component}
+          </div>
+        </div>
+      </div>
+
+      {/* <div className="flex-1 overflow-hidden pt-[90px] lg:pt-[70px] flex flex-col w-full max-w-full">
+        <div className="relative w-full max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 pb-4 h-full flex flex-col min-h-0">
+
           <div className="h-full w-full max-w-full animate-fadeIn flex flex-col min-h-0">
             {tabs.find((tab) => tab.id === activeTab)?.component}
           </div>
         </div>
-      </div>
+      </div> */}
 
       <style jsx>{`
         .scrollbar-hide::-webkit-scrollbar {

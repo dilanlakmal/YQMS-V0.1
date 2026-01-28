@@ -11,7 +11,7 @@ import {
   Percent,
   X,
 } from "lucide-react";
-import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
+import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../../config";
 import FincheckAnalyticsStyleTable from "./FincheckAnalyticsStyleTable";
 import FincheckAnalyticsTrendChart from "./FincheckAnalyticsTrendChart";
 

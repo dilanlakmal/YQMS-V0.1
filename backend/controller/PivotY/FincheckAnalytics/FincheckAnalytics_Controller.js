@@ -496,3 +496,225 @@ export const getQATrendAnalytics = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// ============================================================
+// GET: Style Summary Analytics (Detailed)
+// ============================================================
+
+export const getStyleSummaryAnalytics = async (req, res) => {
+  try {
+    const { styleNo } = req.query;
+
+    const query = { status: { $ne: "cancelled" } };
+    if (styleNo) {
+      query.orderNos = styleNo;
+    }
+
+    const reports = await FincheckInspectionReports.find(query)
+      .select(
+        "orderNos reportType inspectionMethod inspectionDetails inspectionConfig defectData productType productTypeId",
+      )
+      .populate("productTypeId", "imageURL")
+      .lean();
+
+    const styleMap = {};
+
+    reports.forEach((report) => {
+      // Calculate Sample Size
+      let sampleSize = 0;
+      if (report.inspectionMethod === "AQL") {
+        sampleSize = report.inspectionDetails?.aqlSampleSize || 0;
+      } else {
+        sampleSize = report.inspectionConfig?.sampleSize || 0;
+      }
+
+      // Process Defects
+      let reportTotalDefects = 0;
+      let reportMinor = 0;
+      let reportMajor = 0;
+      let reportCritical = 0;
+      const defectBreakdown = {};
+
+      if (report.defectData && Array.isArray(report.defectData)) {
+        report.defectData.forEach((defect) => {
+          const name = defect.defectName;
+          const code = defect.defectCode || "";
+          const fullName = code ? `[${code}] ${name}` : name;
+
+          const processQty = (qty, status) => {
+            reportTotalDefects += qty;
+            if (status === "Minor") reportMinor += qty;
+            if (status === "Major") reportMajor += qty;
+            if (status === "Critical") reportCritical += qty;
+
+            if (!defectBreakdown[fullName]) {
+              defectBreakdown[fullName] = {
+                qty: 0,
+                minor: 0,
+                major: 0,
+                critical: 0,
+              };
+            }
+            defectBreakdown[fullName].qty += qty;
+            if (status === "Minor") defectBreakdown[fullName].minor += qty;
+            if (status === "Major") defectBreakdown[fullName].major += qty;
+            if (status === "Critical")
+              defectBreakdown[fullName].critical += qty;
+          };
+
+          if (defect.isNoLocation) {
+            processQty(defect.qty || 0, defect.status);
+          } else if (defect.locations) {
+            defect.locations.forEach((loc) => {
+              if (loc.positions) {
+                loc.positions.forEach((pos) => {
+                  processQty(1, pos.status);
+                });
+              }
+            });
+          }
+        });
+      }
+
+      // Distribute to Styles
+      if (report.orderNos && Array.isArray(report.orderNos)) {
+        report.orderNos.forEach((orderNo) => {
+          if (styleNo && orderNo !== styleNo) return;
+
+          if (!styleMap[orderNo]) {
+            styleMap[orderNo] = {
+              style: orderNo,
+              custStyle: report.inspectionDetails?.custStyle || "N/A",
+              buyer: report.buyer || "N/A",
+              orderQty: report.inspectionDetails?.totalOrderQty || 0,
+              productType: report.productType || "N/A",
+              productImage: report.productTypeId?.imageURL || null,
+
+              totalReports: 0,
+              totalSample: 0,
+              totalDefects: 0,
+              minor: 0,
+              major: 0,
+              critical: 0,
+
+              reportsByType: {},
+              defectsList: {},
+            };
+          }
+
+          const entry = styleMap[orderNo];
+
+          if (report.inspectionDetails?.custStyle)
+            entry.custStyle = report.inspectionDetails.custStyle;
+          if (report.buyer) entry.buyer = report.buyer;
+          if (report.inspectionDetails?.totalOrderQty)
+            entry.orderQty = report.inspectionDetails.totalOrderQty;
+          if (report.productType) entry.productType = report.productType;
+          if (report.productTypeId?.imageURL)
+            entry.productImage = report.productTypeId.imageURL;
+
+          entry.totalReports += 1;
+          entry.totalSample += sampleSize;
+          entry.totalDefects += reportTotalDefects;
+          entry.minor += reportMinor;
+          entry.major += reportMajor;
+          entry.critical += reportCritical;
+
+          const rType = report.reportType || "Unknown";
+          if (!entry.reportsByType[rType]) {
+            entry.reportsByType[rType] = {
+              type: rType,
+              count: 0,
+              sample: 0,
+              defects: 0,
+              minor: 0,
+              major: 0,
+              critical: 0,
+              defectsMap: {},
+            };
+          }
+          const typeEntry = entry.reportsByType[rType];
+          typeEntry.count += 1;
+          typeEntry.sample += sampleSize;
+          typeEntry.defects += reportTotalDefects;
+          typeEntry.minor += reportMinor;
+          typeEntry.major += reportMajor;
+          typeEntry.critical += reportCritical;
+
+          Object.entries(defectBreakdown).forEach(([key, val]) => {
+            // Global List
+            if (!entry.defectsList[key]) {
+              entry.defectsList[key] = {
+                name: key,
+                qty: 0,
+                minor: 0,
+                major: 0,
+                critical: 0,
+              };
+            }
+            entry.defectsList[key].qty += val.qty;
+            entry.defectsList[key].minor += val.minor;
+            entry.defectsList[key].major += val.major;
+            entry.defectsList[key].critical += val.critical;
+
+            // Report Type List (Updated to track breakdown)
+            if (!typeEntry.defectsMap[key]) {
+              typeEntry.defectsMap[key] = {
+                name: key,
+                qty: 0,
+                minor: 0,
+                major: 0,
+                critical: 0,
+              };
+            }
+            typeEntry.defectsMap[key].qty += val.qty;
+            typeEntry.defectsMap[key].minor += val.minor;
+            typeEntry.defectsMap[key].major += val.major;
+            typeEntry.defectsMap[key].critical += val.critical;
+          });
+        });
+      }
+    });
+
+    if (styleNo) {
+      const data = styleMap[styleNo];
+      if (!data)
+        return res
+          .status(404)
+          .json({ success: false, message: "Style not found" });
+
+      // Transform reportsByType map to array AND sort defects
+      data.reportsByType = Object.values(data.reportsByType).map((typeData) => {
+        const topDefects = Object.values(typeData.defectsMap) // Use values now, as it's an object
+          .sort((a, b) => b.qty - a.qty);
+
+        const { defectsMap, ...rest } = typeData;
+        return { ...rest, topDefects };
+      });
+
+      data.defectsList = Object.values(data.defectsList).sort(
+        (a, b) => b.qty - a.qty,
+      );
+
+      data.defectRate =
+        data.totalSample > 0
+          ? ((data.totalDefects / data.totalSample) * 100).toFixed(2)
+          : "0.00";
+
+      return res.status(200).json({ success: true, data });
+    } else {
+      const list = Object.values(styleMap)
+        .map((s) => ({
+          style: s.style,
+          custStyle: s.custStyle,
+          buyer: s.buyer,
+        }))
+        .sort((a, b) => a.style.localeCompare(b.style));
+
+      return res.status(200).json({ success: true, data: list });
+    }
+  } catch (error) {
+    console.error("Error fetching style summary:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};

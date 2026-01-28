@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { Loader2, Calendar, TrendingUp } from "lucide-react";
-import { API_BASE_URL } from "../../../../../config";
+import { API_BASE_URL } from "../../../../../../config";
 
 const FincheckAnalyticsTrendChart = ({ empId }) => {
   const [loading, setLoading] = useState(false);

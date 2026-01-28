@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { Search, Loader2, Package, AlertCircle, Filter } from "lucide-react";
-import { API_BASE_URL } from "../../../../../config";
+import { API_BASE_URL } from "../../../../../../config";
 
 const FincheckAnalyticsStyleTable = ({ empId }) => {
   const [loading, setLoading] = useState(false);
