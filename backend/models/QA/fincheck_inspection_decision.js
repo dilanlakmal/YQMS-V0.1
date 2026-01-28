@@ -1,51 +1,3 @@
-// import mongoose from "mongoose";
-
-// const FincheckInspectionDecisionSchema = new mongoose.Schema(
-//   {
-//     reportId: {
-//       type: Number,
-//       required: true,
-//       index: true
-//     },
-//     // Reference back to the original report
-//     reportRef: {
-//       type: mongoose.Schema.Types.ObjectId,
-//       ref: "FincheckInspectionReports"
-//     },
-
-//     // Approval Leader Details
-//     approvalEmpId: { type: String, required: true },
-//     approvalEmpName: { type: String, required: true },
-
-//     // Decision Details
-//     decisionStatus: {
-//       type: String,
-//       enum: ["Approved", "Rework", "Rejected"],
-//       required: true
-//     },
-
-//     // Comments
-//     systemGeneratedComment: { type: String, default: "" },
-//     additionalComment: { type: String, default: "" },
-
-//     // Audio Record
-//     hasAudio: { type: Boolean, default: false },
-//     audioUrl: { type: String, default: "" }, // Relative path: /storage/...
-
-//     approvalDate: { type: Date, default: Date.now }
-//   },
-//   {
-//     timestamps: true,
-//     collection: "fincheck_inspection_decision"
-//   }
-// );
-
-// export default (connection) =>
-//   connection.model(
-//     "FincheckInspectionDecision",
-//     FincheckInspectionDecisionSchema
-//   );
-
 import mongoose from "mongoose";
 
 // Sub-schema for individual history entries
@@ -56,7 +8,7 @@ const DecisionHistoryItemSchema = new mongoose.Schema(
     decisionStatus: {
       type: String,
       enum: ["Approved", "Rework", "Rejected"],
-      required: true
+      required: true,
     },
 
     approvalEmpId: { type: String, required: true },
@@ -68,9 +20,9 @@ const DecisionHistoryItemSchema = new mongoose.Schema(
     hasAudio: { type: Boolean, default: false },
     audioUrl: { type: String, default: "" },
 
-    approvalDate: { type: Date, default: Date.now }
+    approvalDate: { type: Date, default: Date.now },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const FincheckInspectionDecisionSchema = new mongoose.Schema(
@@ -79,11 +31,11 @@ const FincheckInspectionDecisionSchema = new mongoose.Schema(
       type: Number,
       required: true,
       unique: true, // Ensure one document per report
-      index: true
+      index: true,
     },
     reportRef: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "FincheckInspectionReports"
+      ref: "FincheckInspectionReports",
     },
 
     // --- LATEST DECISION INFO (Top Level) ---
@@ -94,7 +46,7 @@ const FincheckInspectionDecisionSchema = new mongoose.Schema(
     decisionStatus: {
       type: String,
       enum: ["Approved", "Rework", "Rejected"],
-      required: true
+      required: true,
     },
 
     // --- NEW FIELDS: Rework PO ---
@@ -104,16 +56,16 @@ const FincheckInspectionDecisionSchema = new mongoose.Schema(
     systemGeneratedComment: { type: String, default: "" }, // Current system message
 
     // --- HISTORY TRACKING ---
-    approvalHistory: [DecisionHistoryItemSchema]
+    approvalHistory: [DecisionHistoryItemSchema],
   },
   {
     timestamps: true, // Handles createdAt and updatedAt (Top Level)
-    collection: "fincheck_inspection_decision"
-  }
+    collection: "fincheck_inspection_decision",
+  },
 );
 
 export default (connection) =>
   connection.model(
     "FincheckInspectionDecision",
-    FincheckInspectionDecisionSchema
+    FincheckInspectionDecisionSchema,
   );

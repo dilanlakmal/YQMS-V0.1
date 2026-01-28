@@ -1,6 +1,7 @@
 import {
   FincheckInspectionReports,
   UserMain,
+  QASectionsProductLocation,
 } from "../../MongoDB/dbConnectionController.js";
 
 // ============================================================
@@ -715,6 +716,294 @@ export const getStyleSummaryAnalytics = async (req, res) => {
     }
   } catch (error) {
     console.error("Error fetching style summary:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// GET: Style Trend Analytics (Last 7 Days Logic)
+// ============================================================
+export const getStyleTrendAnalytics = async (req, res) => {
+  try {
+    const { styleNo, startDate, endDate } = req.query;
+
+    if (!styleNo) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Style No required" });
+    }
+
+    // 1. Determine Date Range
+    let start, end;
+
+    if (startDate && endDate) {
+      // User Provided Range
+      start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      // Default: Find Last Inspection Date for this Style
+      const lastReport = await FincheckInspectionReports.findOne({
+        orderNos: styleNo,
+        status: { $ne: "cancelled" },
+      })
+        .sort({ inspectionDate: -1 })
+        .select("inspectionDate");
+
+      if (!lastReport) {
+        return res.status(200).json({ success: true, data: [] }); // No data
+      }
+
+      end = new Date(lastReport.inspectionDate);
+      end.setHours(23, 59, 59, 999);
+
+      // Calculate Start (End - 7 days)
+      start = new Date(end);
+      start.setDate(start.getDate() - 7);
+      start.setHours(0, 0, 0, 0);
+    }
+
+    // 2. Aggregation Pipeline
+    const pipeline = [
+      {
+        $match: {
+          orderNos: styleNo,
+          status: { $ne: "cancelled" },
+          inspectionDate: { $gte: start, $lte: end },
+        },
+      },
+      // Normalize Defects (Same robust logic as before)
+      {
+        $addFields: {
+          normalizedDefects: {
+            $concatArrays: [
+              // Location-Based
+              {
+                $reduce: {
+                  input: {
+                    $filter: {
+                      input: { $ifNull: ["$defectData", []] },
+                      as: "d",
+                      cond: { $ne: ["$$d.isNoLocation", true] },
+                    },
+                  },
+                  initialValue: [],
+                  in: {
+                    $concatArrays: [
+                      "$$value",
+                      {
+                        $reduce: {
+                          input: { $ifNull: ["$$this.locations", []] },
+                          initialValue: [],
+                          in: {
+                            $concatArrays: [
+                              "$$value",
+                              {
+                                $map: {
+                                  input: { $ifNull: ["$$this.positions", []] },
+                                  as: "pos",
+                                  in: { qty: 1 },
+                                },
+                              },
+                            ],
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+              // No-Location
+              {
+                $map: {
+                  input: {
+                    $filter: {
+                      input: { $ifNull: ["$defectData", []] },
+                      as: "d",
+                      cond: { $eq: ["$$d.isNoLocation", true] },
+                    },
+                  },
+                  as: "noLoc",
+                  in: { qty: { $ifNull: ["$$noLoc.qty", 1] } },
+                },
+              },
+            ],
+          },
+          // Normalize Sample Size
+          calculatedSampleSize: {
+            $cond: [
+              { $eq: ["$inspectionMethod", "AQL"] },
+              { $ifNull: ["$inspectionDetails.aqlSampleSize", 0] },
+              { $ifNull: ["$inspectionConfig.sampleSize", 0] },
+            ],
+          },
+          // Format Date
+          dateKey: {
+            $dateToString: { format: "%Y-%m-%d", date: "$inspectionDate" },
+          },
+        },
+      },
+      {
+        $unwind: {
+          path: "$normalizedDefects",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $group: {
+          _id: "$dateKey",
+          uniqueReports: { $addToSet: "$_id" },
+          docs: {
+            $addToSet: {
+              id: "$_id",
+              sample: "$calculatedSampleSize",
+            },
+          },
+          totalDefects: { $sum: { $ifNull: ["$normalizedDefects.qty", 0] } },
+        },
+      },
+      {
+        $project: {
+          date: "$_id",
+          reportCount: { $size: "$uniqueReports" },
+          totalDefects: 1,
+          totalSample: { $sum: "$docs.sample" },
+        },
+      },
+      { $sort: { date: 1 } },
+    ];
+
+    const data = await FincheckInspectionReports.aggregate(pipeline);
+
+    // Filter out Sundays (JavaScript side)
+    const filteredData = data.filter((d) => {
+      const day = new Date(d.date).getDay();
+      return day !== 0; // 0 is Sunday
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: filteredData,
+      // Return the calculated range so frontend can update its state
+      range: {
+        start: start.toISOString().split("T")[0],
+        end: end.toISOString().split("T")[0],
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching style trend:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// GET: Style Summary Defect Location Map
+// ============================================================
+export const getStyleSummaryDefectMap = async (req, res) => {
+  try {
+    const { styleNo } = req.query;
+
+    if (!styleNo) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Style No required" });
+    }
+
+    // 1. Fetch Reports for this Style
+    // We need defectData and productTypeId to get the correct map image
+    const reports = await FincheckInspectionReports.find({
+      orderNos: styleNo,
+      status: { $ne: "cancelled" },
+    })
+      .select("defectData productTypeId")
+      .lean();
+
+    if (reports.length === 0) {
+      return res.status(200).json({ success: true, data: null });
+    }
+
+    // 2. Determine Product Type (Use the most frequent one if mixed, or just the first valid one)
+    const productTypeId = reports.find((r) => r.productTypeId)?.productTypeId;
+
+    if (!productTypeId) {
+      return res
+        .status(200)
+        .json({ success: true, data: null, message: "No product type found" });
+    }
+
+    // 3. Fetch Location Map Configuration
+    const locationMap = await QASectionsProductLocation.findOne({
+      productTypeId: productTypeId,
+      isActive: true,
+    }).lean();
+
+    if (!locationMap) {
+      return res
+        .status(200)
+        .json({ success: true, data: null, message: "No map config found" });
+    }
+
+    // 4. Aggregate Counts
+    const counts = {
+      Front: {},
+      Back: {},
+    };
+
+    reports.forEach((report) => {
+      if (report.defectData && Array.isArray(report.defectData)) {
+        report.defectData.forEach((defect) => {
+          if (!defect.isNoLocation && defect.locations) {
+            defect.locations.forEach((loc) => {
+              const locNo = loc.locationNo;
+              const viewKey =
+                loc.view && loc.view.toLowerCase() === "back"
+                  ? "Back"
+                  : "Front";
+
+              // Calculate qty for this location instance
+              // If positions array exists, sum them. Else use loc.qty
+              let qty = 0;
+              if (loc.positions && loc.positions.length > 0) {
+                qty = loc.positions.length;
+              } else {
+                qty = loc.qty || 0;
+              }
+
+              const defectName = defect.defectName;
+
+              // Initialize if not exists
+              if (!counts[viewKey][locNo]) {
+                counts[viewKey][locNo] = {
+                  total: 0,
+                  defects: {},
+                };
+              }
+
+              // Add to totals
+              counts[viewKey][locNo].total += qty;
+
+              // Add to breakdown
+              if (counts[viewKey][locNo].defects[defectName]) {
+                counts[viewKey][locNo].defects[defectName] += qty;
+              } else {
+                counts[viewKey][locNo].defects[defectName] = qty;
+              }
+            });
+          }
+        });
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        map: locationMap,
+        counts: counts,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching style location map:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };

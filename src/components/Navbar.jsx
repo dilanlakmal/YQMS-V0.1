@@ -235,7 +235,7 @@ export default function Navbar({ onLogout }) {
       {
         path: "/super-admin-assign",
         title: "Super Admin Assign",
-        requiredEmpIds: ["YM6702", "YM7903"],
+        requiredEmpIds: ["TL04", "TL09"],
         icon: <UserPlus size={16} />,
       },
     ],

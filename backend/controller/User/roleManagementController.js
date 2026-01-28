@@ -9,9 +9,9 @@ export const manageRole = async (req, res) => {
     const users = await UserMain.find(
       {
         emp_id: { $in: selectedUsers },
-        working_status: "Working"
+        working_status: "Working",
       },
-      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo phone_number working_status"
+      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo phone_number working_status",
     );
 
     let roleDoc = await RoleManagment.findOne({ role });
@@ -28,7 +28,7 @@ export const manageRole = async (req, res) => {
         sect_name: user.sect_name,
         working_status: user.working_status,
         phone_number: user.phone_number,
-        face_photo: user.face_photo
+        face_photo: user.face_photo,
       }));
     } else {
       roleDoc = new RoleManagment({
@@ -44,14 +44,14 @@ export const manageRole = async (req, res) => {
           sect_name: user.sect_name,
           working_status: user.working_status,
           phone_number: user.phone_number,
-          face_photo: user.face_photo
-        }))
+          face_photo: user.face_photo,
+        })),
       });
     }
 
     await roleDoc.save();
     res.json({
-      message: `Role ${roleDoc._id ? "updated" : "added"} successfully`
+      message: `Role ${roleDoc._id ? "updated" : "added"} successfully`,
     });
   } catch (error) {
     console.error("Error saving role:", error);
@@ -68,7 +68,7 @@ export const getUserRoles = async (req, res) => {
     // Check Super Admin role first
     const superAdminRole = await RoleManagment.findOne({
       role: "Super Admin",
-      "users.emp_id": empId
+      "users.emp_id": empId,
     });
 
     if (superAdminRole) {
@@ -79,7 +79,7 @@ export const getUserRoles = async (req, res) => {
     // Check Admin role
     const adminRole = await RoleManagment.findOne({
       role: "Admin",
-      "users.emp_id": empId
+      "users.emp_id": empId,
     });
 
     if (adminRole) {
@@ -90,7 +90,7 @@ export const getUserRoles = async (req, res) => {
     // Get other roles
     const otherRoles = await RoleManagment.find({
       role: { $nin: ["Super Admin", "Admin"] },
-      "users.emp_id": empId
+      "users.emp_id": empId,
     });
 
     otherRoles.forEach((roleDoc) => {
@@ -108,7 +108,7 @@ export const getUserRoles = async (req, res) => {
 export const getRoleManagement = async (req, res) => {
   try {
     const roles = await RoleManagment.find({}).sort({
-      role: 1 // Sort by role name
+      role: 1, // Sort by role name
     });
     res.json(roles);
   } catch (error) {
@@ -128,12 +128,12 @@ export const registerSuperAdmin = async (req, res) => {
       superAdminRole = new RoleManagment({
         role: "Super Admin",
         jobTitles: ["Developer"],
-        users: []
+        users: [],
       });
     }
 
     const userExists = superAdminRole.users.some(
-      (u) => u.emp_id === user.emp_id
+      (u) => u.emp_id === user.emp_id,
     );
 
     if (userExists) {
@@ -142,7 +142,7 @@ export const registerSuperAdmin = async (req, res) => {
 
     const userDetails = await UserMain.findOne(
       { emp_id: user.emp_id },
-      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo phone_number working_status"
+      "emp_id name eng_name kh_name job_title dept_name sect_name face_photo phone_number working_status",
     );
 
     if (!userDetails) {
@@ -159,7 +159,7 @@ export const registerSuperAdmin = async (req, res) => {
       sect_name: userDetails.sect_name,
       working_status: userDetails.working_status,
       phone_number: userDetails.phone_number,
-      face_photo: userDetails.face_photo
+      face_photo: userDetails.face_photo,
     });
 
     await superAdminRole.save();
@@ -183,21 +183,21 @@ export const deleteSuperAdmin = async (req, res) => {
     }
 
     // Check if the employee ID is in the protected list
-    const protectedEmpIds = ["YM6702", "YM7903"];
+    const protectedEmpIds = ["TL04", "TL09"];
     if (protectedEmpIds.includes(empId)) {
       return res.status(403).json({
-        message: "Cannot delete protected Super Admin users"
+        message: "Cannot delete protected Super Admin users",
       });
     }
 
     // Find the user index in the users array
     const userIndex = superAdminRole.users.findIndex(
-      (user) => user.emp_id === empId
+      (user) => user.emp_id === empId,
     );
 
     if (userIndex === -1) {
       return res.status(404).json({
-        message: "User not found in Super Admin role"
+        message: "User not found in Super Admin role",
       });
     }
 
@@ -206,14 +206,14 @@ export const deleteSuperAdmin = async (req, res) => {
       { role: "Super Admin" },
       {
         $pull: {
-          users: { emp_id: empId }
-        }
-      }
+          users: { emp_id: empId },
+        },
+      },
     );
 
     if (result.modifiedCount === 0) {
       return res.status(500).json({
-        message: "Failed to remove Super Admin"
+        message: "Failed to remove Super Admin",
       });
     }
 
@@ -222,7 +222,7 @@ export const deleteSuperAdmin = async (req, res) => {
 
     res.json({
       message: "Super Admin removed successfully",
-      updatedRole: updatedRole
+      updatedRole: updatedRole,
     });
   } catch (error) {
     console.error("Error removing super admin:", error);
@@ -237,7 +237,7 @@ export const updateUserRoles = async (req, res) => {
 
     // Find roles to remove (in currentRoles but not in newRoles)
     const rolesToRemove = currentRoles.filter(
-      (role) => !newRoles.includes(role)
+      (role) => !newRoles.includes(role),
     );
 
     // Find roles to add (in newRoles but not in currentRoles)
@@ -252,11 +252,11 @@ export const updateUserRoles = async (req, res) => {
 
         // Check if there are any other users with the same job title
         const otherUsersWithSameTitle = roleDoc.users.some(
-          (u) => u.job_title === userData.job_title
+          (u) => u.job_title === userData.job_title,
         );
         if (!otherUsersWithSameTitle) {
           roleDoc.jobTitles = roleDoc.jobTitles.filter(
-            (t) => t !== userData.job_title
+            (t) => t !== userData.job_title,
           );
         }
 
@@ -284,13 +284,13 @@ export const updateUserRoles = async (req, res) => {
 
     res.json({
       success: true,
-      message: "User roles updated successfully"
+      message: "User roles updated successfully",
     });
   } catch (error) {
     console.error("Error updating user roles:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to update user roles"
+      message: "Failed to update user roles",
     });
   }
 };
@@ -303,7 +303,7 @@ export const getUserRole = async (req, res) => {
 
     // Find all roles where this user exists
     const userRoles = await RoleManagment.find({
-      "users.emp_id": empId
+      "users.emp_id": empId,
     });
 
     userRoles.forEach((role) => {
@@ -332,19 +332,21 @@ export const searchRoles = async (req, res) => {
       switch (type) {
         case "role":
           roles = roles.filter((r) =>
-            r.role.toLowerCase().includes(searchQuery)
+            r.role.toLowerCase().includes(searchQuery),
           );
           break;
         case "emp_id":
           roles = roles
             .filter((r) =>
-              r.users.some((u) => u.emp_id?.toLowerCase().includes(searchQuery))
+              r.users.some((u) =>
+                u.emp_id?.toLowerCase().includes(searchQuery),
+              ),
             )
             .map((r) => ({
               ...r.toObject(),
               users: r.users.filter((u) =>
-                u.emp_id?.toLowerCase().includes(searchQuery)
-              )
+                u.emp_id?.toLowerCase().includes(searchQuery),
+              ),
             }));
           break;
         case "name":
@@ -353,30 +355,30 @@ export const searchRoles = async (req, res) => {
               r.users.some(
                 (u) =>
                   u.name?.toLowerCase().includes(searchQuery) ||
-                  u.eng_name?.toLowerCase().includes(searchQuery)
-              )
+                  u.eng_name?.toLowerCase().includes(searchQuery),
+              ),
             )
             .map((r) => ({
               ...r.toObject(),
               users: r.users.filter(
                 (u) =>
                   u.name?.toLowerCase().includes(searchQuery) ||
-                  u.eng_name?.toLowerCase().includes(searchQuery)
-              )
+                  u.eng_name?.toLowerCase().includes(searchQuery),
+              ),
             }));
           break;
         case "job_title":
           roles = roles
             .filter((r) =>
               r.users.some((u) =>
-                u.job_title?.toLowerCase().includes(searchQuery)
-              )
+                u.job_title?.toLowerCase().includes(searchQuery),
+              ),
             )
             .map((r) => ({
               ...r.toObject(),
               users: r.users.filter((u) =>
-                u.job_title?.toLowerCase().includes(searchQuery)
-              )
+                u.job_title?.toLowerCase().includes(searchQuery),
+              ),
             }));
           break;
         default:
@@ -397,12 +399,12 @@ export const getUserRoleDetails = async (req, res) => {
     const { empId } = req.params;
 
     const rolesWithUser = await RoleManagment.find({
-      "users.emp_id": empId
+      "users.emp_id": empId,
     });
 
     const result = rolesWithUser.map((role) => ({
       role: role.role,
-      user: role.users.find((u) => u.emp_id === empId)
+      user: role.users.find((u) => u.emp_id === empId),
     }));
 
     res.json(result);

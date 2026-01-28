@@ -7,6 +7,8 @@ import { API_BASE_URL } from "../../../../../../config";
 import StyleSummaryCards from "./StyleSummaryCards";
 import StyleSummaryTable from "./StyleSummaryTable";
 import StyleSummaryPieChart from "./StyleSummaryPieChart";
+import DailyInspectionStyleTrendChart from "./DailyInspectionStyleTrendChart";
+import StyleSummaryLocationDefectMap from "./StyleSummaryLocationDefectMap";
 
 const FincheckAnalyticsStyleSummary = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -182,6 +184,8 @@ const FincheckAnalyticsStyleSummary = () => {
             defectsList={data.defectsList}
           />
           <StyleSummaryPieChart defectsList={data.defectsList} />
+          <DailyInspectionStyleTrendChart styleNo={selectedStyle.style} />
+          <StyleSummaryLocationDefectMap styleNo={selectedStyle.style} />
         </div>
       )}
     </div>
