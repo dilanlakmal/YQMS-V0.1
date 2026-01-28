@@ -1,5 +1,6 @@
 import { Language } from "../models/translation/index.js";
 import AzureTranslatorService from "../services/translation/azure.translator.service.js";
+import logger from "../Utils/logger.js";
 
 async function languagesSeed() {
     logger.info("🌐 Starting language seeding...");
@@ -11,12 +12,11 @@ async function languagesSeed() {
 
     for (const lang of languages) {
         const result = await Language.updateOne(
-        { code: lang.code },                        // match by code
-        { $setOnInsert: { name: lang.name, code: lang.code } }, // insert if missing
-        { upsert: true }
+            { code: lang.code },
+            { $setOnInsert: { name: lang.name, code: lang.code } },
+            { upsert: true }
         );
 
-        // MongoDB returns 'upsertedCount' in result in modern Mongoose
         if (result.upsertedCount) insertedCount++;
     }
 

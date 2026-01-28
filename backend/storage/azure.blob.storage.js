@@ -1,15 +1,15 @@
 
-
 import { BlobServiceClient, ContainerSASPermissions, BlobSASPermissions } from "@azure/storage-blob";
 import { CONFIG } from "../Config/translation.config.js";
-import logger from "../Utils/translation/logger.js";
-
+import logger from "../Utils/logger.js";
 
 const blobServiceClient = BlobServiceClient.fromConnectionString(CONFIG.STORAGE.CONNECTION_STRING);
 
 /**
- * Ensures a container exists, creates if not.
- * @param {string} containerName 
+ * Ensures a container exists, creates it if it does not.
+ * @param {string} containerName - The name of the container.
+ * @returns {Promise<ContainerClient>} The container client instance.
+ * @throws {Error} If checking or creating the container fails.
  */
 const ensureContainerExists = async (containerName) => {
     try {
@@ -23,17 +23,25 @@ const ensureContainerExists = async (containerName) => {
 };
 
 /**
- * Uploads text content to a blob.
- * @param {string} containerName 
- * @param {string} blobName 
- * @param {string} content 
+ * Uploads content to a blob.
+ * @param {string} containerName - The name of the container.
+ * @param {string} blobName - The name of the blob.
+ * @param {string|Buffer} content - The content to upload.
+ * @param {Object} [metadata={}] - Optional metadata to store with the blob.
+ * @returns {Promise<string>} The URL of the uploaded blob.
+ * @throws {Error} If upload fails.
  */
-const uploadBlob = async (containerName, blobName, content) => {
+const uploadBlob = async (containerName, blobName, content, metadata = {}) => {
     try {
         const containerClient = await ensureContainerExists(containerName);
         const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-        await blockBlobClient.upload(content, Buffer.byteLength(content));
-        logger.info(`Uploaded blob: ${blobName}`);
+
+        // Upload with metadata
+        await blockBlobClient.upload(content, Buffer.byteLength(content), {
+            metadata: metadata // key-value object
+        });
+
+        logger.info(`Uploaded blob: ${blobName} with metadata: ${JSON.stringify(metadata)}`);
         return blockBlobClient.url;
     } catch (error) {
         logger.error(`Failed to upload blob ${blobName}`, { error: error.message });
@@ -42,14 +50,43 @@ const uploadBlob = async (containerName, blobName, content) => {
 };
 
 /**
+ * Deletes a specific blob from a container.
+ * @param {string} containerName - The name of the container.
+ * @param {string} blobName - The name of the blob to delete.
+ * @returns {Promise<boolean>} True if deleted successfully, false if not found.
+ * @throws {Error} If delete operation fails.
+ */
+const deleteBlob = async (containerName, blobName) => {
+    try {
+        const containerClient = await ensureContainerExists(containerName);
+        const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+
+        const response = await blockBlobClient.deleteIfExists();
+
+        if (response.succeeded) {
+            logger.info(`Deleted blob: ${blobName}`);
+            return true;
+        } else {
+            logger.warn(`Blob not found: ${blobName}`);
+            return false;
+        }
+    } catch (error) {
+        logger.error(`Failed to delete blob ${blobName}`, { error: error.message });
+        throw error;
+    }
+};
+
+/**
  * Generates a SAS URL for a specific blob (Read/Write).
- * @param {string} containerName 
- * @param {string} blobName 
- * @param {number} expiryMinutes 
+ * @param {string} containerName - The name of the container.
+ * @param {string} blobName - The name of the blob.
+ * @param {string} [permissions="r"] - SAS permissions (default: read).
+ * @param {number} [expiryMinutes=60] - Expiration time in minutes.
+ * @returns {Promise<string>} The SAS URL.
+ * @throws {Error} If generating SAS fails.
  */
 const getBlobSasUrl = async (containerName, blobName, permissions = "r", expiryMinutes = 60) => {
     try {
-        
         const containerClient = await ensureContainerExists(containerName);
         const blobClient = containerClient.getBlobClient(blobName);
 
@@ -68,9 +105,11 @@ const getBlobSasUrl = async (containerName, blobName, permissions = "r", expiryM
 };
 
 /**
- * Generates a SAS URL for a container (Write access for translator output).
- * @param {string} containerName 
- * @param {string} [folderName=""] Optional folder prefix to limit scope
+ * Generates a SAS URL for a container (Write access for output targets).
+ * @param {string} containerName - The container name.
+ * @param {string} [folderName=""] - Optional folder prefix.
+ * @returns {Promise<string>} The SAS URL.
+ * @throws {Error} If generating SAS fails.
  */
 const getContainerSasUrl = async (containerName, folderName = "") => {
     try {
@@ -99,27 +138,39 @@ const getContainerSasUrl = async (containerName, folderName = "") => {
 
 /**
  * Lists blobs in a container, optionally filtered by prefix/folder.
- * @param {string} containerName 
- * @param {string} prefix 
+ * @param {string} containerName - The container name.
+ * @param {string} [prefix=""] - Optional prefix for filtering.
+ * @returns {Promise<Array<Object>>} List of blob objects with name, url, metadata, properties.
+ * @throws {Error} If listing blobs fails.
  */
 const listBlobs = async (containerName, prefix = "") => {
     try {
         const containerClient = await ensureContainerExists(containerName);
         const blobs = [];
+
         for await (const blob of containerClient.listBlobsFlat({ prefix })) {
-            blobs.push(blob.name);
+            const blockBlobClient = containerClient.getBlockBlobClient(blob.name);
+            blobs.push({
+                name: blob.name,
+                url: blockBlobClient.url,
+                metadata: blob.metadata || {},
+                properties: blob.properties || {}
+            });
         }
+
         return blobs;
     } catch (error) {
-        logger.error(`Failed to list blobs in ${containerName}`, { prefix, error: error.message });
+        logger.error(`Failed to list blobs in container ${containerName}`, { prefix, error: error.message });
         throw error;
     }
 };
 
 /**
- * Downloads blob content as string.
- * @param {string} containerName 
- * @param {string} blobName 
+ * Downloads blob content as a string.
+ * @param {string} containerName - The container name.
+ * @param {string} blobName - The blob name.
+ * @returns {Promise<string>} The file content as a string.
+ * @throws {Error} If download fails.
  */
 const downloadBlobToString = async (containerName, blobName) => {
     try {
@@ -134,7 +185,11 @@ const downloadBlobToString = async (containerName, blobName) => {
     }
 };
 
-// Helper
+/**
+ * Helper: Converts a readable stream to a string.
+ * @param {ReadableStream} readableStream - The stream to read.
+ * @returns {Promise<Buffer>} The buffered content.
+ */
 const streamToString = async (readableStream) => {
     return new Promise((resolve, reject) => {
         const chunks = [];
@@ -153,5 +208,7 @@ export {
     getBlobSasUrl,
     getContainerSasUrl,
     listBlobs,
-    downloadBlobToString
+    downloadBlobToString,
+    ensureContainerExists,
+    deleteBlob
 };

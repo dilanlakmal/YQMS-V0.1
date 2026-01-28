@@ -1,10 +1,7 @@
 import languagesSeed from "./languages.seed.js";
 import progressSeed from "./instruction.translation.seed.js";
 import { connectDB, disconnectDB } from "../Config/database.js";
-import "../Utils/logger.js"
 
-// Make sure logger is initialized globally or imported
-// For example: import logger from "../utils/logger.js";
 async function runSeeds() {
     try {
         // 1️⃣ Connect to DB
@@ -21,9 +18,11 @@ async function runSeeds() {
         logger.info("✅ All seeds completed successfully!");
     } catch (err) {
         logger.error("❌ Seeding failed:", err);
+        process.exit(1);
     } finally {
         // 4️⃣ Disconnect DB
         await disconnectDB();
+        process.exit(0);
     }
 }
 
