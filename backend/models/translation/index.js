@@ -1,18 +1,10 @@
-import mongoose from "mongoose";
-import { Schema } from "mongoose";
 import Language from "./language.model.js";
 import Content from "./content.model.js";
+import Translation from "./translation.model.js";
 
-
-const translationSchema = Schema({
-    code: String,
-    translated: String,
-    content: {
-        type: Schema.Types.ObjectId,
-        ref: "content"
-    }
-});
-
-const Translation = mongoose.model("translation", translationSchema);
-
-export {Language, Content, Translation};
+// Export all models from a single entry point
+export {
+    Language,
+    Content,
+    Translation
+};
