@@ -1,4 +1,3 @@
-
 import axios from "axios";
 import {
     CONFIG,
@@ -15,19 +14,20 @@ import {
     listBlobs,
     downloadBlobToString
 } from "../../storage/azure.blob.storage.js";
-import "../../Utils/logger.js";
+import logger from "../../Utils/logger.js";
 import { LANGUAGE_MAP } from "../../Utils/translation/language.validator.js";
+
 /**
- * Service to handle Azure Document Translation interactions.
+ * Service to handle Azure Document and Text Translation interactions.
  */
 const AzureTranslatorService = {
 
     /**
      * Submits a batch translation job to Azure.
-     * @param {string} customerId - Used for folder organization
-     * @param {Array<{pageName: string, content: string}>} files - Array of files to translate
-     * @param {string[]} targetLanguages - List of target language codes (e.g., ['fr', 'de'])
-     * @returns {Promise<string>} - The Job ID
+     * @param {string} customerId - Used for folder organization.
+     * @param {Array<{pageName: string, content: string}>} files - Array of files to translate.
+     * @param {string[]} targetLanguages - List of target language codes (e.g., ['fr', 'de']).
+     * @returns {Promise<string>} - The Job ID.
      */
     submitTranslationJob: async (customerId, files, targetLanguages) => {
         logger.info("Starting translation job submission", { customerId, fileCount: files.length, targetLanguages });
@@ -46,13 +46,11 @@ const AzureTranslatorService = {
 
                 // Generate SAS for source (Read access for specific blob)
                 const sourceUrl = await getBlobSasUrl(sourceContainer, blobName);
-                const source = constructSource(sourceUrl, ""); // Assuming source is 'en', can be parameterized
+                const source = constructSource(sourceUrl, ""); // Source language auto-detection or param
 
                 // Generate SAS for target (Write access for container + specific output blob)
                 const targets = await Promise.all(targetLanguages.map(async (lang) => {
-                    // We define the specific output path: customerId/pageName-lang.html
                     const targetBlobName = `${customerId}/${file.pageName}-${lang}.html`;
-                    // Use Blob SAS with Write/Delete permissions for the specific target file
                     const targetUrl = await getContainerSasUrl(targetContainer, targetBlobName);
                     return constructTarget(targetUrl, lang);
                 }));
@@ -63,21 +61,14 @@ const AzureTranslatorService = {
             // 2. Submit to Azure
             const batchRequest = constructBatchRequest(inputs);
 
-            logger.info("Sending Batch Request to Azure", {
-                url: `${CONFIG.ENDPOINT}/translator/document/batches?api-version=${CONSTANTS.API_VERSION}`,
-                ...batchRequest
-            });
-
             const response = await axios.post(
                 `${CONFIG.ENDPOINT}/translator/document/batches?api-version=${CONSTANTS.API_VERSION}`,
                 batchRequest,
                 { headers: HEADERS }
             );
 
-            // 3. Extract Job ID
-            // Operation-Location: .../batches/JOB_ID
+            // 3. Extract Job ID (Operation-Location: .../batches/JOB_ID)
             const operationLocation = response.headers["operation-location"];
-            // Strip query params (like ?api-version) if present
             const operationUrlParts = operationLocation.split("?")[0];
             const jobId = operationUrlParts.split("/").pop();
 
@@ -92,8 +83,9 @@ const AzureTranslatorService = {
 
     /**
      * Polls the status of a translation job until it completes or times out.
-     * @param {string} jobId 
-     * @returns {Promise<Object>} Final job status
+     * @param {string} jobId - The Job ID to poll.
+     * @returns {Promise<Object>} Final job status.
+     * @throws {Error} If polling times out or job fails.
      */
     pollTranslationStatus: async (jobId) => {
         const startTime = Date.now();
@@ -106,18 +98,14 @@ const AzureTranslatorService = {
                 const response = await axios.get(pollUrl, { headers: HEADERS });
                 const { status, error } = response.data;
 
-                // If status is not active (Running/NotStarted), it's terminal.
+                // Terminal states
                 if (!["Running", "NotStarted"].includes(status)) {
-                    if (status === "Succeeded" ||
-                        error?.innerError?.code === "TargetFileAlreadyExists") {
+                    if (status === "Succeeded" || error?.innerError?.code === "TargetFileAlreadyExists") {
                         logger.info("Translation job finished successfully", { jobId });
                         return response.data;
-                    }
-                    else {
-                        // Log the full response to debug "undefined" error
+                    } else {
                         logger.error("Translation job ended with non-success status", { status, fullResponse: response.data });
-                        const errorDetails = response.data.error || response.data.errors || response.data;
-                        throw errorDetails;
+                        throw response.data.error || response.data.errors || response.data;
                     }
                 }
 
@@ -125,8 +113,7 @@ const AzureTranslatorService = {
                 await new Promise(resolve => setTimeout(resolve, CONSTANTS.POLL_INTERVAL));
 
             } catch (error) {
-                // If it's a known terminal status error, rethrow immediately
-                throw error;
+                throw error; // Propagate error immediately
             }
         }
 
@@ -135,9 +122,10 @@ const AzureTranslatorService = {
 
     /**
      * Retrieves the translated content from blob storage.
-     * @param {string} customerId 
-     * @param {Array<{pageName: string}>} originalFiles 
-     * @param {string[]} languages 
+     * @param {string} customerId - The customer ID used as folder name.
+     * @param {Array<{pageName: string}>} originalFiles - List of original files.
+     * @param {string[]} languages - List of languages to retrieve.
+     * @returns {Promise<Array<{name: string, content: string, toLang: string}>>} Translated contents.
      */
     getTranslatedContent: async (customerId, originalFiles, languages) => {
         logger.info("Retrieving translated content", { customerId });
@@ -148,7 +136,7 @@ const AzureTranslatorService = {
 
         for (const file of originalFiles) {
             for (const lang of languages) {
-                // Heuristic matching for the output file
+                // Heuristic matching: looking for filename that contains pageName, lang code, and ends in .html
                 const match = allBlobs.find(b =>
                     b.includes(file.pageName) &&
                     b.toLowerCase().includes(lang.toLowerCase()) &&
@@ -156,11 +144,11 @@ const AzureTranslatorService = {
                 );
 
                 if (match) {
-                    const content = await downloadBlobToString(targetContainer, match);
+                    const content = await downloadBlobToString(targetContainer, match.name);
                     results.push({
-                        name: match,
+                        name: match.name,
                         content: content,
-                        toLang: Object.keys(LANGUAGE_MAP).find(key => LANGUAGE_MAP[key] === lang)
+                        toLang: Object.keys(LANGUAGE_MAP).find(key => LANGUAGE_MAP[key] === lang) || lang
                     });
                 } else {
                     logger.warn("Translated file not found", { pageName: file.pageName, lang });
@@ -171,69 +159,80 @@ const AzureTranslatorService = {
         return results;
     },
 
-    formHtmlFile: (pageName, content) => ({ pageName, content }),
-
     /**
-     * Gets supported languages for translation.
-     * Currently returns hardcoded list as requested.
+     * Fetches supported languages from Azure Translator API.
+     * @returns {Promise<Array<{code: string, name: string}>>} List of supported languages.
      */
     getSupportedLanguages: async () => {
-        // In a real scenario, this could call Azure's languages API
-        const url = "https://api.cognitive.microsofttranslator.com/languages?api-version=3.0"
-        const response = await axios.get(url);
-        const Languages = response.data.translation;
-        let languages = [];
-        for (const code of Object.keys(Languages)) {
-            languages.push({
-                code: code, 
-                name: Languages[code].name
-            })
+        try {
+            const url = "https://api.cognitive.microsofttranslator.com/languages?api-version=3.0";
+            const response = await axios.get(url);
+            const languagesData = response.data.translation;
+
+            return Object.keys(languagesData).map(code => ({
+                code: code,
+                name: languagesData[code].name
+            }));
+        } catch (error) {
+            logger.error("Failed to fetch supported languages", { error: error.message });
+            return [];
         }
-        return languages;
     },
 
+    /**
+     * Detects the language of the provided text.
+     * @param {string} text - The text to analyze.
+     * @returns {Promise<string|null>} The detected language code or null.
+     */
     detectLanguage: async (text) => {
         try {
             const response = await axios.post(
                 "https://api.cognitive.microsofttranslator.com/detect?api-version=3.0",
-                [{text: text}],
-                {
-                    headers:HEADERS
-                }
+                [{ text }],
+                { headers: HEADERS }
             );
-            const detection = response.data[0].language;
-            return detection;
+            return response.data[0]?.language || null;
         } catch (err) {
-        logger.error("Azure language detection error:", err.response?.data || err.message);
-        return null;
-    }
+            logger.error("Azure language detection error:", err.response?.data || err.message);
+            return null;
+        }
     },
 
+    /**
+     * Translates a single text string.
+     * @param {string} text - Text to translate.
+     * @param {string} [fromLang] - Source language code.
+     * @param {string} toLang - Target language code.
+     * @returns {Promise<string>} The translated text.
+     * @throws {Error} If inputs are missing or translation fails.
+     */
     translateText: async (text, fromLang, toLang) => {
-        let params = {
-            to: toLang
+        if (!text || !toLang) {
+            throw new Error("Text and target language are required");
         }
+
+        const params = { to: toLang };
         if (fromLang) {
-            params[from] = fromLang
+            params.from = fromLang;
         }
+
         try {
             const response = await axios.post(
                 "https://api.cognitive.microsofttranslator.com/translate?api-version=3.0",
-                [{text: text}],
-                {
-                    headers:HEADERS,
-                    params: {
-                        from: fromLang,
-                        to: toLang
-                    }
-                }
+                [{ text }],
+                { headers: HEADERS, params }
             );
-            const detection = response.data[0].translations[0].text;
-            return detection;
+
+            return response.data[0]?.translations[0]?.text || "";
         } catch (err) {
-        logger.error("Azure language detection error:", err.response?.data || err.message);
-        return null;
-    }
+            logger.error("Azure translation error", {
+                fromLang,
+                toLang,
+                error: err.response?.data || err.message
+            });
+
+            throw new Error(err.response?.data?.error?.message || "Translation failed");
+        }
     }
 };
 
