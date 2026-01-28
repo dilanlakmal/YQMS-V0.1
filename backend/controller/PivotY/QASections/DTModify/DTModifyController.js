@@ -54,9 +54,29 @@ export const getDtOrderByOrderNo = async (req, res) => {
         message: 'Order not found'
       });
     }
+
+    const orderData = order.toObject();
+
+    // Sync SizeList with SizeSpec to ensure all sizes are displayed
+    if (orderData.SizeSpec && Array.isArray(orderData.SizeSpec) && orderData.SizeSpec.length > 0) {
+      const firstSpec = orderData.SizeSpec[0];
+      if (firstSpec.Specs && Array.isArray(firstSpec.Specs)) {
+        const specSizes = firstSpec.Specs.map(s => Object.keys(s)[0]);
+        
+        // Check if we have sizes in Spec that are missing in SizeList
+        const currentSizes = new Set(orderData.SizeList || []);
+        const hasMissingSizes = specSizes.some(s => !currentSizes.has(s));
+        
+        if (hasMissingSizes) {
+          orderData.SizeList = specSizes;
+          orderData.NoOfSize = specSizes.length;
+        }
+      }
+    }
+
     res.status(200).json({
       success: true,
-      data: order,
+      data: orderData,
       type: 'exact_match'
     });
 
@@ -342,7 +362,7 @@ export const getAllDtOrders = async (req, res) => {
 
     // Get orders with pagination
     const orders = await DtOrder.find(query)
-      .select('Order_No Style CustStyle Factory Cust_Code ShortName TotalQty isModify createdAt updatedAt')
+      .select('Order_No Style CustStyle Factory Cust_Code ShortName TotalQty isModify createdAt updatedAt SizeList SizeSpec OrderColors')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -510,10 +530,14 @@ export const deleteSizeFromOrder = async (req, res) => {
     updatedData.NoOfSize = updatedData.SizeList.length;
 
     if (updatedData.SizeSpec && Array.isArray(updatedData.SizeSpec)) {
-      updatedData.SizeSpec = updatedData.SizeSpec.map(spec => ({
-        ...spec,
-        Specs: spec.Specs.filter(specItem => !Object.prototype.hasOwnProperty.call(specItem, sizeToDelete))
-      }));
+      updatedData.SizeSpec.forEach(spec => {
+        if (spec.Specs && Array.isArray(spec.Specs)) {
+          // Filter out the size from the Specs array
+          spec.Specs = spec.Specs.filter(specItem => {
+            return !Object.prototype.hasOwnProperty.call(specItem, sizeToDelete);
+          });
+        }
+      });
     }
 
     if (updatedData.OrderColors && Array.isArray(updatedData.OrderColors)) {
