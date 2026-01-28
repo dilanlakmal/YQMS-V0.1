@@ -1445,6 +1445,8 @@ const handleDownloadPDF = async (record) => {
                       (sum, defect) => sum + (defect.qty || 0),
                       0
                     );
+
+                  const isNearBottom = index >= paginatedData.length - 4;
                   const defectRate = record.defectRate?.toFixed(1) ?? "0.0";
 
                   return (
@@ -1661,7 +1663,10 @@ const handleDownloadPDF = async (record) => {
                         </button>
 
                         {openDropdown === record._id && (
-                          <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-700 rounded-md shadow-lg border border-gray-200 dark:border-gray-600 z-10">
+                           <div 
+                            className={`absolute right-0 w-48 bg-white dark:bg-gray-700 rounded-md shadow-xl border border-gray-200 dark:border-gray-600 z-[100] 
+                              ${isNearBottom ? 'bottom-full mb-2' : 'top-full mt-1'}`} 
+                          >
                             <div className="py-1">
                               <button
                                 onClick={() => {

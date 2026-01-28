@@ -11,8 +11,9 @@ import imageCompression from "browser-image-compression";
 import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/SubmittedWashingData";
 import { useTranslation } from "react-i18next";
 import SubConEdit from "../components/inspection/qc2_washing/Home/SubConEdit";
+import WashingDashboard from "../components/inspection/qc2_washing/Dashboard/QCWashingDashboard";
 import { encodeColorForUrl } from "../utils/colorUtils";
-import { Shield, Sparkles, User, ClipboardList, Edit, BarChart3 } from 'lucide-react';
+import { Shield, Sparkles, User, ClipboardList, Edit, BarChart3, Monitor } from 'lucide-react';
 
 const normalizeImageSrc = (src) => {    
   if (!src) return "";
@@ -2444,6 +2445,12 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
       label: "Daily View",
       icon: <BarChart3 size={20} />,
       description: "View Daily Reports"
+    },
+    {
+      id: "washingDashboard",
+      label: "Dashboard",
+      icon: <Monitor size={20} />,
+      description: "Overall Summary"
     }
   ];
 
@@ -3023,6 +3030,8 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
 
         {activeTab === "submittedData" && <SubmittedWashingDataPage />}
         {activeTab === "subConEditQty" && <SubConEdit />}
+        {activeTab === "washingDashboard" && <WashingDashboard />}
+      
       </main>
      </div>
   </div>
