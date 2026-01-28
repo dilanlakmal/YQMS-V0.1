@@ -226,7 +226,7 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
 // GET /api/humidity-reports
 export const getHumidityReports = async (req, res) => {
   try {
-    const { limit, start, end, factoryStyleNo, customer, buyerStyle } = req.query;
+    const { limit = 50, start, end, factoryStyleNo, customer, buyerStyle } = req.query;
     const model = HumidityReport;
     const query = {};
 
@@ -257,8 +257,9 @@ export const getHumidityReports = async (req, res) => {
     }
 
     let humidityDocs = await HumidityReport.find(query)
+      .select('-history.images -inspectionRecords.images')
       .sort({ createdAt: -1 })
-      .limit(limit ? Number(limit) : 1000)
+      .limit(Number(limit))
       .exec();
     let reitmansDocs = await getReitmansReports(query, limit);
 

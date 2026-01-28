@@ -1,4 +1,4 @@
-import React from "react";
+import { useEffect } from "react";
 import { Modal, Image } from "antd";
 import { renderToStaticMarkup } from "react-dom/server";
 import PaperPreview from "./PaperPreview";
@@ -81,6 +81,18 @@ const HistoryModal = ({
     // Use print dialog where user can select "Save as PDF"
     printReport();
   };
+
+  useEffect(() => {
+  if (open && report?._id) {
+    // Fetch the FULL report WITH images only when user clicks view
+    const fetchFullDetails = async () => {
+      const res = await fetch(`${API_BASE_URL}/api/humidity-reports/${report._id}`);
+      const data = await res.json();
+      // Set local state with the data that includes images
+    };
+    fetchFullDetails();
+  }
+}, [open, report?._id]);
 
   return (
     <Modal
