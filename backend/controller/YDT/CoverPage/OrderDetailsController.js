@@ -1,5 +1,6 @@
 import {
-  DtOrder
+  DtOrder,
+  CoverPage
 } from "../../MongoDB/dbConnectionController.js";
 
 export const getOrderDetails = async (req, res) => {
@@ -130,6 +131,111 @@ export const searchOrderSuggestions = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+export const saveOrderDetails = async (req, res) => {
+  try {
+    const { orderNo } = req.params;
+    const orderDetailsData = req.body;
+
+    console.log('Saving order details for:', orderNo);
+    console.log('Data received:', orderDetailsData);
+
+    // Find existing CoverPage or create new one
+    let coverPage = await CoverPage.findOne({ orderNo });
+    
+    if (!coverPage) {
+      coverPage = new CoverPage({
+        orderNo,
+        coverPages: [],
+        sketchTechnical: [],
+        orderDetails: []
+      });
+    }
+
+    // Update or add order details
+    const existingIndex = coverPage.orderDetails.findIndex(
+      detail => detail.orderNo === orderNo
+    );
+
+    const orderDetailsEntry = {
+      ...orderDetailsData,
+      orderNo,
+      updatedAt: new Date()
+    };
+
+    if (existingIndex >= 0) {
+      // Update existing
+      coverPage.orderDetails[existingIndex] = orderDetailsEntry;
+    } else {
+      // Add new
+      coverPage.orderDetails.push(orderDetailsEntry);
+    }
+
+    // Update top-level image if provided
+    if (orderDetailsData.uploadedImage) {
+      coverPage.uploadedImage = orderDetailsData.uploadedImage;
+    }
+
+    coverPage.updatedAt = new Date();
+    await coverPage.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Order details saved successfully',
+      data: coverPage.orderDetails[existingIndex >= 0 ? existingIndex : coverPage.orderDetails.length - 1]
+    });
+
+  } catch (error) {
+    console.error('Error saving order details:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to save order details',
+      error: error.message
+    });
+  }
+};
+
+export const getSavedOrderDetails = async (req, res) => {
+  try {
+    const { orderNo } = req.params;
+
+    const coverPage = await CoverPage.findOne({ orderNo });
+    
+    if (!coverPage || !coverPage.orderDetails.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'No saved order details found'
+      });
+    }
+
+    const orderDetails = coverPage.orderDetails.find(
+      detail => detail.orderNo === orderNo
+    );
+
+    if (!orderDetails) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order details not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...orderDetails.toObject(),
+        uploadedImage: coverPage.uploadedImage // Include top-level image
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching saved order details:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch saved order details',
       error: error.message
     });
   }

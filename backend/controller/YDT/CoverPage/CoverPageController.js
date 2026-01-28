@@ -481,8 +481,6 @@ export const saveCoverPageData = async (req, res) => {
   }
 };
 
-
-
 export const getCoverPageData = async (req, res) => {
   try {
     const { orderNo, poNumber } = req.params;

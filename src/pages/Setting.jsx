@@ -528,7 +528,7 @@ import { useAuth } from "../components/authentication/AuthContext";
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "../../config";
 
-const allowedInitialEmpIds = ["YM6702", "YM7903"];
+const allowedInitialEmpIds = ["TL04", "TL09"];
 
 export default function Settings() {
   const { user } = useAuth();

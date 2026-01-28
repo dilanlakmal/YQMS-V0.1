@@ -149,6 +149,7 @@ import qcWashingInspection from "./routes/QCWashing/QCWashing Inspection/qcWashi
 import qcWashingAdmin from "./routes/QCWashing/QCWashing Admin/qcWashingAdminRoutes.js";
 import qcWashingReport from "./routes/QCWashing/QCWashing Report/qcWashingReportRoutes.js";
 import qcWashingOldQty from "./routes/QCWashing/oldQtyRoutes.js";
+import qcWashingDashboard from "./routes/QCWashing/QCWashing Dashboard/QCWashingDashboardRoutes.js";
 
 /* -----------------------------
 QA Random Inspection Imports
@@ -477,6 +478,7 @@ app.use(qcWashingInspection);
 app.use(qcWashingAdmin);
 app.use(qcWashingReport);
 app.use(qcWashingOldQty);
+app.use(qcWashingDashboard);
 
 /* -----------------------------
   QA Random Inspection Routes

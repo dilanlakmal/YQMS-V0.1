@@ -107,6 +107,77 @@ const QCWashingDashboard = ({ onBack }) => {
         <KpiCard title="Total Wash Batches" value={summary.numberOfWashings} icon={ClipboardList} color="purple" subtitle="Submitted QC positions" />
       </section>
 
+      <section className="max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+  
+  {/* Card: Pass Rate by Order No */}
+  <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-gray-800">
+    <div className="flex items-center justify-between mb-6">
+      <h3 className="text-lg font-black flex items-center gap-2 text-slate-800 dark:text-white">
+        <Package size={20} className="text-blue-500" /> PASS RATE BY ORDER
+      </h3>
+      <span className="text-[10px] font-bold bg-rose-50 text-rose-600 px-2 py-1 rounded-lg uppercase">Lowest 5</span>
+    </div>
+    <div className="space-y-4">
+      {dbData?.passRateByOrder?.map((item, idx) => (
+        <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800/50 rounded-2xl border border-slate-100 dark:border-gray-700">
+          <div>
+            <p className="text-sm font-black text-slate-700 dark:text-gray-200">{item._id}</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase">{item.totalBatches} Reports</p>
+          </div>
+          <div className={`text-lg font-black ${item.avgPassRate < 90 ? 'text-rose-500' : 'text-emerald-500'}`}>
+            {item.avgPassRate?.toFixed(1)}%
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+
+  {/* Card: Pass Rate by Report Type */}
+  <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-gray-800">
+    <h3 className="text-lg font-black mb-6 flex items-center gap-2 text-slate-800 dark:text-white">
+      <ClipboardList size={20} className="text-purple-500" /> BY REPORT TYPE
+    </h3>
+    <div className="grid grid-cols-2 gap-4">
+      {dbData?.passRateByReportType?.map((item, idx) => (
+        <div key={idx} className="p-4 border border-slate-100 dark:border-gray-700 rounded-3xl flex flex-col items-center justify-center text-center bg-white dark:bg-gray-900 shadow-sm">
+          <div className="relative w-16 h-16 flex items-center justify-center mb-3">
+            <svg className="w-full h-full -rotate-90">
+              <circle cx="32" cy="32" r="28" fill="transparent" stroke="currentColor" strokeWidth="4" className="text-slate-100 dark:text-gray-800" />
+              <circle cx="32" cy="32" r="28" fill="transparent" stroke="currentColor" strokeWidth="4" strokeDasharray={175} strokeDashoffset={175 - (175 * item.avgPassRate) / 100} className={item.avgPassRate > 95 ? 'text-emerald-500' : 'text-rose-500'} strokeLinecap="round" />
+            </svg>
+            <span className="absolute text-xs font-black text-slate-700 dark:text-white">{Math.round(item.avgPassRate)}%</span>
+          </div>
+          <p className="text-[10px] font-black text-slate-500 uppercase leading-tight">{item._id}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+
+  {/* Card: Pass Rate by Date (Recent Trends) */}
+  <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-gray-800">
+    <h3 className="text-lg font-black mb-6 flex items-center gap-2 text-slate-800 dark:text-white">
+      <TrendingUp size={20} className="text-emerald-500" /> DAILY QUALITY
+    </h3>
+    <div className="space-y-3">
+      {dbData?.passRateByDate?.map((item, idx) => (
+        <div key={idx} className="flex items-center gap-4">
+          <div className="text-[11px] font-black text-slate-400 w-24">{item._id}</div>
+          <div className="flex-1 h-2 bg-slate-100 dark:bg-gray-800 rounded-full overflow-hidden">
+            <div 
+              className={`h-full transition-all duration-1000 ${item.avgPassRate > 95 ? 'bg-emerald-500' : 'bg-amber-500'}`} 
+              style={{ width: `${item.avgPassRate}%` }} 
+            />
+          </div>
+          <div className="text-[11px] font-black text-slate-700 dark:text-gray-300 w-10 text-right">
+            {Math.round(item.avgPassRate)}%
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+
+</section>
+
       <div className="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {/* 4. VOLUME TREND CHART */}
@@ -140,7 +211,7 @@ const QCWashingDashboard = ({ onBack }) => {
         {/* 5. QUALITY YIELD CIRCLE */}
         <div className="lg:col-span-4 bg-gradient-to-br from-blue-600 to-indigo-800 p-8 rounded-[2.5rem] text-white shadow-xl flex flex-col justify-between">
            <div>
-             <h3 className="text-xl font-bold flex items-center gap-2 mb-2"><Percent size={20}/> Quality Yield</h3>
+             <h3 className="text-xl font-bold flex items-center gap-2 mb-2"><Percent size={20}/> Measurement Quality </h3>
              <p className="text-blue-100 text-sm">Overall Pass Rate for selected period</p>
            </div>
            <div className="flex flex-col items-center py-8">
@@ -253,7 +324,94 @@ const QCWashingDashboard = ({ onBack }) => {
           </div>
         </div>
       </div>
+      <div className="max-w-[1600px] mx-auto mt-8 grid grid-cols-1 xl:grid-cols-2 gap-8 pb-12">
+  
+      {/* Table: Style & Color Measurement Matrix */}
+      <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-gray-800">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-black flex items-center gap-3 text-slate-800 dark:text-white uppercase italic">
+            <Ruler className="text-blue-600" /> Measurement Accuracy Matrix
+          </h3>
+          <span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-3 py-1 rounded-full uppercase tracking-widest">Worst Performing SKUs</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 dark:border-gray-800">
+                <th className="pb-4">Style / Order No</th>
+                <th className="pb-4">Colorway</th>
+                <th className="pb-4 text-center">Reports</th>
+                <th className="pb-4 text-right">Precision</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50 dark:divide-gray-800">
+              {dbData?.styleColorMeasurement?.map((row, i) => (
+                <tr key={i} className="group hover:bg-slate-50/50 dark:hover:bg-gray-800/50 transition-colors">
+                  <td className="py-4 text-sm font-black text-slate-700 dark:text-gray-200">{row.style}</td>
+                  <td className="py-4 text-xs font-bold text-slate-500 uppercase tracking-tighter">{row.color}</td>
+                  <td className="py-4 text-center">
+                    <span className="bg-slate-100 dark:bg-gray-800 px-2 py-1 rounded-lg text-[10px] font-black">{row.reports}</span>
+                  </td>
+                  <td className="py-4">
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`text-sm font-black ${row.accuracy < 90 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                        {row.accuracy.toFixed(1)}%
+                      </span>
+                      <div className="w-20 h-1 bg-slate-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                        <div className={`h-full ${row.accuracy < 90 ? 'bg-rose-500' : 'bg-emerald-500'}`} style={{ width: `${row.accuracy}%` }} />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Table: Style & Color Defect Matrix */}
+      <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-gray-800">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-black flex items-center gap-3 text-slate-800 dark:text-white uppercase italic">
+            <AlertTriangle className="text-rose-600" /> Defect Severity Matrix
+          </h3>
+          <span className="text-[10px] font-bold bg-rose-50 text-rose-600 px-3 py-1 rounded-full uppercase tracking-widest">Highest Reject Rates</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 dark:border-gray-800">
+                <th className="pb-4">Style / Order No</th>
+                <th className="pb-4">Colorway</th>
+                <th className="pb-4 text-center">Total Def</th>
+                <th className="pb-4 text-right">Defect Rate</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50 dark:divide-gray-800">
+              {dbData?.styleColorDefects?.map((row, i) => (
+                <tr key={i} className="group hover:bg-rose-50/10 dark:hover:bg-gray-800/50 transition-colors">
+                  <td className="py-4 text-sm font-black text-slate-700 dark:text-gray-200">{row.style}</td>
+                  <td className="py-4 text-xs font-bold text-slate-500 uppercase tracking-tighter">{row.color}</td>
+                  <td className="py-4 text-center">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black text-slate-800 dark:text-gray-300">{row.defectQty}</span>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase">In {row.washQty} Pcs</span>
+                    </div>
+                  </td>
+                  <td className="py-4 text-right">
+                    <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs ${row.defectRate > 5 ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
+                      <TrendingUp size={12} /> {row.defectRate.toFixed(2)}%
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
+    </div>
+    
   );
 };
 

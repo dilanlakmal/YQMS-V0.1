@@ -183,7 +183,7 @@ export const deleteSuperAdmin = async (req, res) => {
     }
 
     // Check if the employee ID is in the protected list
-    const protectedEmpIds = ["YM6702", "YM7903"];
+    const protectedEmpIds = ["TL04", "TL09"];
     if (protectedEmpIds.includes(empId)) {
       return res.status(403).json({
         message: "Cannot delete protected Super Admin users"

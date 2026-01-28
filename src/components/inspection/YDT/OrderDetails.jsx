@@ -9,11 +9,15 @@ const OrderDetails = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [shipmentQty, setShipmentQty] = useState('');
   
+  const [savedData, setSavedData] = useState({});
   // New states for autocomplete
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editableData, setEditableData] = useState({});
+  const [saving, setSaving] = useState(false);
   
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
   const inputRef = useRef(null);
@@ -146,85 +150,92 @@ const OrderDetails = () => {
   }, []);
 
   const fetchOrderData = async (orderNumber) => {
-    try {
-      setLoading(true);
-      setError(null);
-      setOrderData(null);
-      
-      const response = await fetch(`${apiBaseUrl}/api/coverPage/orders/${orderNumber}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      let processedData = null;
-
-      // 1. Handle Wrapped Format (from OrderDetailsController.js)
-      if (result.success && result.data) {
-        processedData = result.data;
-      } 
-      // 2. Handle Direct Format (from CoverPageController.js)
-      else if (result.orderNo || result.Order_No) {
-        console.log('Direct data received, processing sizes locally...');
-        
-        // Use result.originalData if available (MongoDB raw record), else use result
-        const raw = result.originalData || result;
-        
-        // Manually calculate color breakdown for the table
-        const colorBreakdown = (raw.OrderColors || []).map(color => {
-          const sizes = {};
-          let colorTotal = 0;
-          
-          if (Array.isArray(color.OrderQty)) {
-            color.OrderQty.forEach(sizeObj => {
-              Object.keys(sizeObj).forEach(key => {
-                const cleanKey = key.split(';')[0].trim();
-                const val = Number(sizeObj[key]);
-                if (!isNaN(val)) {
-                  sizes[cleanKey] = (sizes[cleanKey] || 0) + val;
-                  colorTotal += val;
-                }
-              });
-            });
-          }
-
-          return {
-            ColorCode: color.ColorCode || 'N/A',
-            colorName: color.Color || color.colorName || 'Unknown',
-            sizes: sizes,
-            colorTotal: colorTotal
-          };
-        });
-
-        processedData = {
-          orderNo: result.orderNo || result.Order_No,
-          cust_Code: result.custCode || result.Cust_Code || 'N/A',
-          customerStyle: result.customerStyle || result.CustStyle || 'N/A',
-          totalQuantity: result.quantity || result.TotalQty || 0,
-          countryOfOrigin: result.origin || result.Origin || '',
-          colorBreakdown: colorBreakdown,
-          sizeList: result.sizes || result.SizeList || ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL'],
-          // Add other fields needed for your header
-          companyName: result.engName || 'Yorkmars (cambodia) Garment MFG. Co. Ltd.',
-        };
-      }
-
-      if (processedData) {
-        setOrderData(processedData);
-        setShipmentQty(processedData.totalQuantity || '');
-      } else {
-        throw new Error('Could not parse order data structure');
-      }
-
-    } catch (err) {
-      console.error('Fetch error:', err);
-      setError('Failed to fetch order data: ' + err.message);
-    } finally {
-      setLoading(false);
+  try {
+    setLoading(true);
+    setError(null);
+    setOrderData(null);
+    
+    const response = await fetch(`${apiBaseUrl}/api/coverPage/orders/${orderNumber}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  };
-  
+    
+    const result = await response.json(); // Move this BEFORE using result
+    let processedData = null;
+    
+    // 1. Handle Wrapped Format (from OrderDetailsController.js)
+    if (result.success && result.data) {
+      processedData = result.data;
+    } 
+    // 2. Handle Direct Format (from CoverPageController.js)
+    else if (result.orderNo || result.Order_No) {
+      console.log('Direct data received, processing sizes locally...');
+      
+      // Use result.originalData if available (MongoDB raw record), else use result
+      const raw = result.originalData || result;
+      
+      // Manually calculate color breakdown for the table
+      const colorBreakdown = (raw.OrderColors || []).map(color => {
+        const sizes = {};
+        let colorTotal = 0;
+        
+        if (Array.isArray(color.OrderQty)) {
+          color.OrderQty.forEach(sizeObj => {
+            Object.keys(sizeObj).forEach(key => {
+              const cleanKey = key.split(';')[0].trim();
+              const val = Number(sizeObj[key]);
+              if (!isNaN(val)) {
+                sizes[cleanKey] = (sizes[cleanKey] || 0) + val;
+                colorTotal += val;
+              }
+            });
+          });
+        }
+        return {
+          ColorCode: color.ColorCode || 'N/A',
+          colorName: color.Color || color.colorName || 'Unknown',
+          sizes: sizes,
+          colorTotal: colorTotal
+        };
+      });
+
+      processedData = {
+        orderNo: result.orderNo || result.Order_No,
+        cust_Code: result.custCode || result.Cust_Code || 'N/A',
+        customerStyle: result.customerStyle || result.CustStyle || 'N/A',
+        totalQuantity: result.quantity || result.TotalQty || 0,
+        countryOfOrigin: result.origin || result.Origin || '',
+        colorBreakdown: colorBreakdown,
+        sizeList: result.sizes || result.SizeList || ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL'],
+        // Add other fields needed for your header
+        companyName: result.engName || 'Yorkmars (cambodia) Garment MFG. Co. Ltd.',
+      };
+    }
+
+    if (processedData) {
+      setOrderData(processedData);
+      setShipmentQty(processedData.totalQuantity || '');
+      
+      // Load saved data AFTER successfully processing order data
+      try {
+        await loadSavedData(orderNumber);
+      } catch (savedDataError) {
+        console.log('No saved data found:', savedDataError);
+        // Don't throw error here, just log it since saved data is optional
+      }
+    } else {
+      throw new Error('Could not parse order data structure');
+    }
+
+  } catch (err) {
+    console.error('Fetch error:', err);
+    setError('Failed to fetch order data: ' + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
   const handleSearch = (e) => {
     e.preventDefault();
     if (orderNo.trim()) {
@@ -234,6 +245,110 @@ const OrderDetails = () => {
       setError('Please enter an order number');
     }
   };
+
+  // Add this function to handle field changes
+const handleFieldChange = (field, value) => {
+  setEditableData(prev => ({
+    ...prev,
+    [field]: value
+  }));
+};
+
+const handleEdit = () => {
+  const currentViewData = {
+    // Customer Info
+    cust_Code: editableData.cust_Code ?? orderData.cust_Code,
+    customerStyle: editableData.customerStyle ?? orderData.customerStyle,
+    // Order Timeline
+    orderDate: editableData.orderDate ?? '',
+    exFactoryDate: editableData.exFactoryDate ?? '',
+    // Additional Info
+    customerPO: editableData.customerPO ?? '',
+    customerSty2: editableData.customerSty2 ?? '',
+    season: editableData.season ?? '',
+    countryOfOrigin: editableData.countryOfOrigin ?? orderData.countryOfOrigin,
+    // Product Specs
+    description: editableData.description ?? '',
+    // Shipment
+    shipmentLot: editableData.shipmentLot ?? '',
+    shipmentExFactoryDate: editableData.shipmentExFactoryDate ?? '',
+    // Processing
+    print: editableData.print ?? '',
+    embroidery: editableData.embroidery ?? '',
+    washing: editableData.washing ?? '',
+    heatTransfer: editableData.heatTransfer ?? '',
+    // Remarks
+    remarks: editableData.remarks ?? ''
+  };
+  setEditableData(currentViewData);
+  setIsEditing(true);
+};
+
+const handleCancelEdit = () => {
+  setIsEditing(false);
+  setEditableData(savedData); // Restore from backup
+};
+
+// Add save functionality
+const saveOrderDetails = async () => {
+  try {
+    setSaving(true);
+    
+    const dataToSave = {
+      ...editableData,
+      orderNo: orderData.orderNo, // The orderNo is the key
+      uploadedImage: uploadedImage, // Include the uploaded image
+    };
+
+    const response = await fetch(`${apiBaseUrl}/api/coverPage/orders/${orderData.orderNo}/save`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(dataToSave)
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      alert('Order details saved successfully!');
+      setIsEditing(false);
+      setSavedData(editableData);
+    } else {
+      alert('Failed to save: ' + result.message);
+    }
+
+  } catch (error) {
+    console.error('Save error:', error);
+    alert('Failed to save order details');
+  } finally {
+    setSaving(false);
+  }
+};
+
+// Load saved data when component mounts
+const loadSavedData = async (orderNumber) => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/coverPage/orders/${orderNumber}/saved`);
+    
+    if (response.ok) {
+      const result = await response.json();
+      if (result.success) {
+        setEditableData(result.data);
+        setSavedData(result.data);
+        if (result.data.uploadedImage) {
+          setUploadedImage(result.data.uploadedImage);
+        }
+      }
+    }
+  } catch (error) {
+    // Reset states if no saved data
+    setEditableData({});
+    setSavedData({});
+    console.log('No saved data found:', error);
+  }
+};
+
 
   // Your existing image upload functions...
   const handleImageUpload = (file) => {
@@ -568,14 +683,34 @@ const OrderDetails = () => {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">CUSTOMER CODE</label>
-                    <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center">
-                       {orderData.cust_Code}
+                    <div className="bg-white rounded-md p-2 border-gray-200 min-h-[36px] flex items-center text-sm">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editableData.cust_Code || ''}
+                          onChange={(e) => handleFieldChange('cust_Code', e.target.value)}
+                          className="w-full bg-transparent border-none outline-none p-0"
+                          placeholder="Enter Customer Code"
+                        />
+                      ) : (
+                        editableData.cust_Code ?? orderData.cust_Code
+                      )}
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">CUSTOMER STYLE</label>
-                    <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center">
-                      {orderData.customerStyle}
+                    <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center text-sm">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editableData.customerStyle || ''}
+                          onChange={(e) => handleFieldChange('customerStyle', e.target.value)}
+                          className="w-full bg-transparent border-none outline-none p-0"
+                          placeholder="Enter Customer Style"
+                        />
+                      ) : (
+                        editableData.customerStyle ?? orderData.customerStyle
+                      )}
                     </div>
                   </div>
                   <div>
@@ -601,14 +736,32 @@ const OrderDetails = () => {
                   
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">ORDER DATE</label>
-                    <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center">
-                      {/* Order date */}
+                    <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center text-sm">
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          value={editableData.orderDate || ''}
+                          onChange={(e) => handleFieldChange('orderDate', e.target.value)}
+                          className="w-full bg-transparent border-none outline-none p-0"
+                        />
+                      ) : (
+                        editableData.orderDate || 'N/A'
+                      )}
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">EX FACTORY DATE</label>
-                    <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center font-semibold text-red-600">
-                      {/* Ex factory date */}
+                    <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center font-semibold text-red-600 text-sm">
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          value={editableData.exFactoryDate || ''}
+                          onChange={(e) => handleFieldChange('exFactoryDate', e.target.value)}
+                          className="w-full bg-transparent border-none outline-none p-0 text-red-600"
+                        />
+                      ) : (
+                        editableData.exFactoryDate || 'N/A'
+                      )}
                     </div>
                   </div>
                 </div>
@@ -627,26 +780,66 @@ const OrderDetails = () => {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">CUSTOMER PO</label>
-                <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center">
-                  {/* Customer PO */}
+                <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center text-sm">
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editableData.customerPO || ''}
+                      onChange={(e) => handleFieldChange('customerPO', e.target.value)}
+                      className="w-full bg-transparent border-none outline-none p-0"
+                      placeholder="Enter Customer PO"
+                    />
+                  ) : (
+                    editableData.customerPO || 'N/A'
+                  )}
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">CUSTOMER STY</label>
-                <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center">
-                  {/* Customer style 2 */}
+                <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center text-sm">
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editableData.customerSty2 || ''}
+                      onChange={(e) => handleFieldChange('customerSty2', e.target.value)}
+                      className="w-full bg-transparent border-none outline-none p-0"
+                      placeholder="Enter Customer Sty"
+                    />
+                  ) : (
+                    editableData.customerSty2 || 'N/A'
+                  )}
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">SEASON</label>
-                <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center">
-                  {/* Season */}
+                <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center text-sm">
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editableData.season || ''}
+                      onChange={(e) => handleFieldChange('season', e.target.value)}
+                      className="w-full bg-transparent border-none outline-none p-0"
+                      placeholder="Enter Season"
+                    />
+                  ) : (
+                    editableData.season || 'N/A'
+                  )}
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">C.O.O.</label>
-                <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center">
-                  {orderData.countryOfOrigin}
+                <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center text-sm">
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editableData.countryOfOrigin || ''}
+                      onChange={(e) => handleFieldChange('countryOfOrigin', e.target.value)}
+                      className="w-full bg-transparent border-none outline-none p-0"
+                      placeholder="Enter C.O.O."
+                    />
+                  ) : (
+                    editableData.countryOfOrigin ?? orderData.countryOfOrigin
+                  )}
                 </div>
               </div>
             </div>
@@ -668,19 +861,29 @@ const OrderDetails = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">DESCRIPTION</label>
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 min-h-[80px] flex items-start">
-                {/* Product description */}
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 min-h-[80px] flex items-start text-sm">
+                {isEditing ? (
+                  <textarea
+                    value={editableData.description || ''}
+                    onChange={(e) => handleFieldChange('description', e.target.value)}
+                    className="w-full h-full bg-transparent border-none outline-none resize-none"
+                    placeholder="Enter product description..."
+                    rows={3}
+                  />
+                ) : (
+                  editableData.description || 'No description provided'
+                )}
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">COLOUR</label>
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 min-h-[80px] flex items-start">
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 min-h-[80px] flex items-start text-sm">
                 {orderData?.colorBreakdown?.map(color => color.colorName).join(', ') || 'No colors available'}
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">QUANTITY</label>
-              <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center font-semibold">
+              <div className="bg-white rounded-md p-2 border border-gray-200 min-h-[36px] flex items-center font-semibold text-sm">
                 {orderData?.totalQuantity?.toLocaleString() || '0'}
               </div>
             </div>
@@ -766,14 +969,33 @@ const OrderDetails = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">SHIPMENT LOT #</label>
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 min-h-[44px] flex items-center">
-                  {/* Shipment lot */}
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 min-h-[44px] flex items-center text-sm">
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editableData.shipmentLot || ''}
+                      onChange={(e) => handleFieldChange('shipmentLot', e.target.value)}
+                      className="w-full bg-transparent border-none outline-none p-0"
+                      placeholder="Enter Shipment Lot #"
+                    />
+                  ) : (
+                    editableData.shipmentLot || 'N/A'
+                  )}
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">EX FACTORY DATE</label>
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 min-h-[44px] flex items-center">
-                  {/* Ex factory date */}
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 min-h-[44px] flex items-center text-sm">
+                  {isEditing ? (
+                    <input
+                      type="date"
+                      value={editableData.shipmentExFactoryDate || ''}
+                      onChange={(e) => handleFieldChange('shipmentExFactoryDate', e.target.value)}
+                      className="w-full bg-transparent border-none outline-none p-0"
+                    />
+                  ) : (
+                    editableData.shipmentExFactoryDate || 'N/A'
+                  )}
                 </div>
               </div>
               <div>
@@ -808,18 +1030,28 @@ const OrderDetails = () => {
           <div className="p-6">
             <div className="space-y-4">
               {[
-                { label: "PRINT", icon: "🖨️" },
-                { label: "EMBROIDERY", icon: "🧵" },
-                { label: "WASHING", icon: "🧼" },
-                { label: "HEAT TRANSFER", icon: "🔥" }
+                { label: "PRINT", icon: "🖨️", field: "print" },
+                { label: "EMBROIDERY", icon: "🧵", field: "embroidery" },
+                { label: "WASHING", icon: "🧼", field: "washing" },
+                { label: "HEAT TRANSFER", icon: "🔥", field: "heatTransfer" }
               ].map((item) => (
                 <div key={item.label}>
                   <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                     <span className="mr-2">{item.icon}</span>
                     {item.label}
                   </label>
-                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 min-h-[44px] flex items-center">
-                    {/* Processing details */}
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 min-h-[44px] flex items-center text-sm">
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editableData[item.field] || ''}
+                        onChange={(e) => handleFieldChange(item.field, e.target.value)}
+                        className="w-full bg-transparent border-none outline-none p-0"
+                        placeholder={`Enter ${item.label} details`}
+                      />
+                    ) : (
+                      editableData[item.field] || 'N/A'
+                    )}
                   </div>
                 </div>
               ))}
@@ -839,10 +1071,47 @@ const OrderDetails = () => {
           </h2>
         </div>
         <div className="p-6">
-          <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200 min-h-[120px]">
-            {/* Remarks content */}
+          <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200 min-h-[120px] text-sm">
+            {isEditing ? (
+              <textarea
+                value={editableData.remarks || ''}
+                onChange={(e) => handleFieldChange('remarks', e.target.value)}
+                className="w-full h-full bg-transparent border-none outline-none resize-none"
+                placeholder="Enter remarks..."
+                rows={5}
+              />
+            ) : (
+              editableData.remarks || 'No remarks provided.'
+            )}
           </div>
         </div>
+      </div>
+
+      <div className="mt-6 flex justify-end space-x-4">
+        {!isEditing ? (
+          <button
+            onClick={handleEdit}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Edit Details
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={handleCancelEdit}
+              className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={saveOrderDetails}
+              disabled={saving}
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save Details'}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

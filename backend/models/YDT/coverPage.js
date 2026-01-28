@@ -165,14 +165,61 @@ const createCoverPageSchema = (connection) => {
     _id: true
   });
 
+   const OrderDetailsSchema = new mongoose.Schema({
+    // Basic order info (auto-populated from DtOrder)
+    orderNo: { type: String, required: true },
+    companyName: { type: String, default: '' },
+    customerCode: { type: String, default: '' },
+    customerStyle: { type: String, default: '' },
+    totalQuantity: { type: Number, default: 0 },
+    countryOfOrigin: { type: String, default: '' },
+    
+    // User-editable fields
+    customerPO: { type: String, default: '' },
+    season: { type: String, default: '' },
+    orderDate: { type: Date, default: null },
+    exFactoryDate: { type: Date, default: null },
+    productDescription: { type: String, default: '' },
+    
+    // Shipment information
+    shipmentLot: { type: String, default: '' },
+    shipmentQty: { type: Number, default: 0 },
+    
+    // Processing details
+    printDetails: { type: String, default: '' },
+    embroideryDetails: { type: String, default: '' },
+    washingDetails: { type: String, default: '' },
+    heatTransferDetails: { type: String, default: '' },
+    
+    // Remarks
+    remarks: { type: String, default: '' },
+    
+    // Status and metadata
+    status: {
+      type: String,
+      enum: ['draft', 'submitted', 'approved', 'rejected'],
+      default: 'draft'
+    },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+    createdBy: { type: String, default: 'system' }
+  });
+
   const CoverPageSchema = new mongoose.Schema({
     orderNo: {
       type: String,
       required: true,
       unique: true
     },
+
+     uploadedImage: {
+      type: String,
+      default: null
+    },
+    
     coverPages: [CoverPageItemSchema],
     sketchTechnical: [SketchTechnicalSchema], 
+    orderDetails: [OrderDetailsSchema],
     createdAt: {
       type: Date,
       default: Date.now

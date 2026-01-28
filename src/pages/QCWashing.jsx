@@ -2669,7 +2669,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
           {/* Tab Content */}
             <main
               className={`mx-auto py-6 space-y-6 dark:bg-slate-900 ${
-                activeTab === "submittedData" || activeTab === "subConEditQty"
+                activeTab === "submittedData" || activeTab === "subConEditQty" || activeTab === "washingDashboard"
                   ? "max-w-none px-2 sm:px-4 lg:px-6"
                   : "max-w-7xl px-4 sm:px-6 lg:px-8"
               }`}
