@@ -11,6 +11,7 @@ import {
   Sparkles,
   ShieldCheck,
   Bell,
+  FileCog,
 } from "lucide-react";
 import axios from "axios";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -21,6 +22,7 @@ import YPivotQAReportMain from "../components/inspection/PivotY/QAReports/YPivot
 import FincheckApprovalAssignee from "../components/inspection/PivotY/QAReports/FincheckApprovalAssignee";
 import FincheckNotificationGroup from "../components/inspection/PivotY/QAReports/FincheckNotificationGroup";
 import FincheckAnalyticsReport from "../components/inspection/PivotY/FincheckAnalytics/FincheckAnalyticsReport";
+import FincheckInspectionReportModify from "../components/inspection/PivotY/QAReports/FincheckInspectionReportModify";
 
 // --- Placeholder Components for Future Tabs ---
 const AnalyticsPlaceholder = () => (
@@ -139,6 +141,14 @@ const YPivotQAReport = () => {
         icon: <Bell size={18} />,
         component: <FincheckNotificationGroup />,
         color: "text-pink-600",
+      });
+      // Modify Tab
+      baseTabs.push({
+        id: "modify",
+        label: "Modify",
+        icon: <FileCog size={18} />,
+        component: <FincheckInspectionReportModify />,
+        color: "text-red-600", // Distinct red color for admin action
       });
     }
     return baseTabs;

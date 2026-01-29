@@ -1993,3 +1993,267 @@ export const getShippingStageBreakdown = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// ============================================================
+// Get Report for Modification (Debug View)
+// ============================================================
+export const getReportForModification = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    if (!reportId) {
+      return res.status(400).json({
+        success: false,
+        message: "Report ID is required.",
+      });
+    }
+
+    // Using .lean() is critical here to return fields that might exist
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId),
+    })
+      .select(
+        "reportId inspectionDate orderNosString inspectionConfig measurementData empId empName",
+      )
+      .lean();
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: report,
+    });
+  } catch (error) {
+    console.error("Error fetching report for modification:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================================
+// Copy Measurement Data from Source Group to Target Group
+// ============================================================
+export const copyMeasurementDataToGroup = async (req, res) => {
+  try {
+    const {
+      reportId,
+      sourceGroupId, // The ID (likely index or unique ID) of the source
+      targetGroupId, // The Index of the target group in the array
+      targetConfigId, // The Unique ID of the target group (for verification)
+      selectedSizes,
+    } = req.body;
+
+    if (
+      !reportId ||
+      sourceGroupId === undefined ||
+      targetGroupId === undefined ||
+      !selectedSizes
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields." });
+    }
+
+    // 1. Fetch Report (Not lean, so we can save)
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId),
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    // 2. Get the Target Configuration Group using the Index
+    const targetConfigGroup =
+      report.inspectionConfig?.configGroups?.[targetGroupId];
+
+    if (!targetConfigGroup) {
+      return res.status(400).json({
+        success: false,
+        message: "Target config group not found at index.",
+      });
+    }
+
+    // Safety Check: Ensure the ID matches what the frontend sent
+    // We treat IDs as strings for comparison to be safe
+    if (String(targetConfigGroup.id) !== String(targetConfigId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Config Group index mismatch. Please refresh the report.",
+      });
+    }
+
+    // 3. Extract Target Scope Names & The Correct Unique ID
+    const correctTargetId = targetConfigGroup.id; // <--- THIS IS THE FIX
+    const targetLine = targetConfigGroup.line || "";
+    const targetLineName = targetConfigGroup.lineName || "";
+    const targetTable = targetConfigGroup.table || "";
+    const targetTableName = targetConfigGroup.tableName || "";
+    const targetColor = targetConfigGroup.color || "";
+    const targetColorName = targetConfigGroup.colorName || "";
+
+    // 4. Find Source Measurement Data
+    // We filter by the source Group ID and the sizes selected by the user
+    const sourceMeasurements = report.measurementData.filter(
+      (m) =>
+        String(m.groupId) === String(sourceGroupId) &&
+        selectedSizes.includes(m.size),
+    );
+
+    if (sourceMeasurements.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No source measurement data found for selected sizes.",
+      });
+    }
+
+    // 5. Create New Measurement Records
+    const newRecords = sourceMeasurements.map((sourceItem) => {
+      // Calculate Timestamp: Source Timestamp + 4 Hours
+      const originalTime = new Date(sourceItem.timestamp).getTime();
+      const newTime = new Date(originalTime + 4 * 60 * 60 * 1000);
+
+      return {
+        // --- FIXED: Use the Unique Config ID, not the array index ---
+        groupId: correctTargetId,
+
+        // Scope Names from Target Config
+        line: targetLine,
+        lineName: targetLineName,
+        table: targetTable,
+        tableName: targetTableName,
+        color: targetColor,
+        colorName: targetColorName,
+
+        // Reset Decisions
+        inspectorDecision: "pass",
+        systemDecision: "pass",
+        timestamp: newTime,
+
+        // --- Keys to Copy Exactly ---
+        size: sourceItem.size,
+        kValue: sourceItem.kValue,
+        stage: sourceItem.stage,
+        displayMode: sourceItem.displayMode,
+
+        // Deep copy nested objects
+        allMeasurements: JSON.parse(
+          JSON.stringify(sourceItem.allMeasurements || {}),
+        ),
+        criticalMeasurements: JSON.parse(
+          JSON.stringify(sourceItem.criticalMeasurements || {}),
+        ),
+
+        allQty: sourceItem.allQty,
+        criticalQty: sourceItem.criticalQty,
+        allEnabledPcs: [...(sourceItem.allEnabledPcs || [])],
+        criticalEnabledPcs: [...(sourceItem.criticalEnabledPcs || [])],
+
+        remark: sourceItem.remark || "",
+        manualData: sourceItem.manualData, // Copy existing manual data
+      };
+    });
+
+    // 6. Append to Measurement Data Array
+    report.measurementData.push(...newRecords);
+
+    // 7. Save
+    await report.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully copied ${newRecords.length} records to Group ID ${correctTargetId}.`,
+      data: report, // Return updated report to refresh frontend
+    });
+  } catch (error) {
+    console.error("Error copying measurement data:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================================
+// Fix/Sync Group ID based on Name Matching
+// ============================================================
+export const fixMeasurementGroupId = async (req, res) => {
+  try {
+    const {
+      reportId,
+      correctConfigId, // The ID from the Config Group (Source of Truth)
+      line,
+      table,
+      color,
+    } = req.body;
+
+    if (!reportId || !correctConfigId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields." });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId),
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    let updatedCount = 0;
+
+    // Iterate through measurement data
+    // If names match the provided scope, update the groupId to the correctConfigId
+    report.measurementData.forEach((item) => {
+      const mLine = item.lineName || item.line || "";
+      const mTable = item.tableName || item.table || "";
+      const mColor = item.colorName || item.color || "";
+
+      // Check strict name equality
+      if (mLine === line && mTable === table && mColor === color) {
+        // Only update if the ID is actually different
+        if (String(item.groupId) !== String(correctConfigId)) {
+          item.groupId = correctConfigId;
+          updatedCount++;
+        }
+      }
+    });
+
+    if (updatedCount === 0) {
+      return res.status(200).json({
+        success: true,
+        message:
+          "No records needed fixing (IDs already matched or no name match found).",
+        data: report,
+      });
+    }
+
+    // Save changes
+    await report.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully fixed IDs for ${updatedCount} records.`,
+      data: report,
+    });
+  } catch (error) {
+    console.error("Error fixing group IDs:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Server Error", error: error.message });
+  }
+};

@@ -21,6 +21,9 @@ import {
   getQANotifications,
   getActionRequiredCount,
   getShippingStageBreakdown,
+  getReportForModification,
+  copyMeasurementDataToGroup,
+  fixMeasurementGroupId,
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Report_Controller.js";
 
 import {
@@ -125,5 +128,16 @@ router.get(
 router.get("/api/fincheck-reports/push/vapid-key", getVapidPublicKey);
 router.post("/api/fincheck-reports/push/subscribe", subscribeUser);
 router.post("/api/fincheck-reports/push/verify", verifySubscription);
+
+// Get Report Details specifically for the Modify Tab
+router.get("/api/fincheck-modify/report/:reportId", getReportForModification);
+
+// Copy Measurement Data
+router.post(
+  "/api/fincheck-modify/copy-measurement",
+  copyMeasurementDataToGroup,
+);
+
+router.post("/api/fincheck-modify/fix-group-id", fixMeasurementGroupId);
 
 export default router;
