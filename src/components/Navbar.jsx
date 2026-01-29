@@ -13,7 +13,7 @@ import { useTheme } from "./context/ThemeContext";
 import { API_BASE_URL } from "../../config";
 import LanguageSwitcher from "../components/layout/LangSwitch";
 import YQMSAIChatBox from "../pages/YQMSAIChatBox";
-import ChatGuide from "./chatbot/components/StepIntro";
+import ChatGuide from "./ai/chatbot/components/StepIntro";
 
 import NormalNotifications from "./NormalNotifications";
 import SpecialNotifications from "./SpecialNotifications";
@@ -714,8 +714,8 @@ export default function Navbar({ onLogout, isChatOpen, setIsChatOpen }) {
                     setIsProfileOpen(false);
                   }}
                   className={`p-2 rounded-full transition-colors ${isAdminMenuOpen
-                      ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                      : "text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-800"
+                    ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                    : "text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-800"
                     }`}
                   title="Admin Panel"
                 >

@@ -4,6 +4,7 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import mongoose from "mongoose";
+import "../../Utils/logger.js";
 
 /**
  * Storage Controller Sub-Module
@@ -94,16 +95,21 @@ const documentController = {
      */
     upload: async (req, res) => {
         try {
-            const user_id = req.params.userId;
+            const user_id = req.body.userId;
             const file = req.file;
 
             if (!user_id) {
+                logger.warn("Upload failed: user_id is missing");
                 return res.status(400).json({ message: "user_id is required" });
             }
 
             if (!file) {
+                logger.warn("Upload failed: file is missing");
                 return res.status(400).json({ message: "File is required" });
             }
+
+            logger.info(`Starting document upload for user: ${user_id}`);
+            logger.info(`File details: Name=${file.originalname}, Size=${file.size}, MimeType=${file.mimetype}`);
 
             const docType = "instruction";
             const status = "uploaded";
@@ -122,6 +128,7 @@ const documentController = {
             });
 
             if (existingDoc) {
+                logger.info(`File duplicate detected for user ${user_id}. Hash: ${hash}`);
                 return res.status(409).json({
                     message: "This file was already uploaded",
                     document: existingDoc
@@ -149,6 +156,8 @@ const documentController = {
             doc.file_name = file.originalname;
             await doc.save();
 
+            logger.info(`Document uploaded successfully: ID=${doc._id}, Source=${blob}`);
+
             return res.status(201).json({
                 message: "Document uploaded successfully",
                 document: doc
@@ -172,7 +181,10 @@ const documentController = {
         try {
             const { userId } = req.params;
 
+            logger.info(`Fetching documents for user: ${userId}`);
+
             if (!mongoose.Types.ObjectId.isValid(userId)) {
+                logger.warn(`Invalid userId provided: ${userId}`);
                 return res.status(400).json({
                     message: "Invalid userId"
                 });
@@ -182,6 +194,8 @@ const documentController = {
                 .find({ user_id: userId })
                 .sort({ createdAt: -1 })
                 .lean();
+
+            logger.info(`Successfully fetched ${docs.length} documents for user: ${userId}`);
 
             return res.status(200).json({
                 count: docs.length,
@@ -281,6 +295,94 @@ const documentController = {
         } catch (error) {
             logger.error("Failed to delete all user documents and blobs", { error: error.message });
             res.status(500).json({ message: "Internal server error", error: error.message });
+        }
+    },
+
+    /**
+     * Deletes a specific document and its associated blob.
+     * @param {Object} req 
+     * @param {Object} res 
+     */
+    deleteOneByUser: async (req, res) => {
+        const { userId, docId } = req.params;
+
+        try {
+            if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(docId)) {
+                return res.status(400).json({ message: "Invalid userId or docId" });
+            }
+
+            // 1. Fetch document to get metadata
+            const doc = await Document.findOne({ _id: docId, user_id: userId });
+
+            if (!doc) {
+                logger.warn(`Document deletion failed: Not found. ID=${docId}, User=${userId}`);
+                return res.status(404).json({ message: "Document not found." });
+            }
+
+            // 2. Delete from Azure Storage
+            if (doc.source) {
+                try {
+                    // Extract blob name from URL (doc.source is the full URL)
+                    const blobName = doc.source.split('/').pop();
+                    await deleteBlob(userId, blobName);
+                    logger.info(`Deleted blob ${blobName} for user ${userId}`);
+                } catch (blobError) {
+                    // Log error but continue to DB deletion in case storage is already out of sync
+                    logger.error(`Blob deletion failed for doc ${docId}, continuing to DB:`, { error: blobError.message });
+                }
+            }
+
+            // 3. Delete from MongoDB
+            await Document.deleteOne({ _id: docId, user_id: userId });
+            logger.info(`Document ${docId} deleted from DB for user ${userId}`);
+
+            return res.status(200).json({ message: "Document deleted successfully." });
+
+        } catch (error) {
+            logger.error("deleteOneByUser error:", { error: error.message, userId, docId });
+            return res.status(500).json({
+                message: "Internal server error",
+                error: error.message
+            });
+        }
+    },
+
+    /**
+     * Sets a specific document as active for the user and deactivates others.
+     * @param {Object} req 
+     * @param {Object} res 
+     */
+    setActiveDocument: async (req, res) => {
+        try {
+            const { userId, docId } = req.params;
+
+            if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(docId)) {
+                return res.status(400).json({ message: "Invalid userId or docId" });
+            }
+
+            // 1️⃣ Deactivate all other documents for this user
+            await Document.updateMany(
+                { user_id: userId, _id: { $ne: docId } },
+                { $set: { active: false } }
+            );
+
+            // 2️⃣ Activate the selected one
+            const updatedDoc = await Document.findOneAndUpdate(
+                { _id: docId, user_id: userId },
+                { $set: { active: true } },
+                { new: true }
+            );
+
+            if (!updatedDoc) {
+                return res.status(404).json({ message: "Document not found" });
+            }
+
+            logger.info(`Document ${docId} set as active for user ${userId}`);
+            res.status(200).json({ message: "Document set as active", document: updatedDoc });
+
+        } catch (error) {
+            logger.error("Set active document error:", { error: error.message });
+            res.status(500).json({ message: "Failed to set active document" });
         }
     },
 

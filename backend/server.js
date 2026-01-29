@@ -300,7 +300,7 @@ import QCOutputRoute from "./routes/QCOutput/QCOutputRoute.js";
 /* -----------------------------
   Chatbot Output Imports
 ------------------------------ */
-import InstructionRoutes from "./routes/instruction/index.js"
+import InstructionRoutes from "./routes/instruction/index.route.js"
 app.use("/api/instruction/translation", InstructionRoutes);
 
 import { connectDB } from "./Config/database.js";

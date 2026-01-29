@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import Chatbot from "@/components/chatbot";
+import Chatbot from "@/components/ai/chatbot";
 // import {
 //   fetchUserData,
 //   fetchUserConversation,
@@ -9,8 +9,8 @@ import {
   fetchUserConversation,
   fetchUserProfile,
   createConversation,
-} from "../components/chatbot/services/conversation";
-import { getModels } from "../components/chatbot/services/chat";
+} from "../components/ai/chatbot/services/conversation";
+import { getModels } from "../components/ai/chatbot/services/chat";
 export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
   const [userData, setUserData] = useState({
     emp_id: "",

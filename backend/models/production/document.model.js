@@ -37,6 +37,6 @@ const documentSchema = new mongoose.Schema({
     }
 })
 
-export default function documentModel(connection){
+export default function documentModel(connection) {
     return connection.model("pt_document", documentSchema);
 }

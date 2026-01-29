@@ -1,7 +1,6 @@
 
 import { BlobServiceClient, ContainerSASPermissions, BlobSASPermissions } from "@azure/storage-blob";
 import { CONFIG } from "../Config/translation.config.js";
-import logger from "../Utils/logger.js";
 
 const blobServiceClient = BlobServiceClient.fromConnectionString(CONFIG.STORAGE.CONNECTION_STRING);
 

@@ -1,6 +1,5 @@
-const isDev = process.env.NODE_ENV === "development";
+const isDev = import.meta.env.NODE_ENV === "development";
 
-const originalLog = console.log;
 const getTimestamp = () => {
     const date = new Date();
     return (
@@ -13,24 +12,31 @@ const getTimestamp = () => {
     );
 };
 
-global.logger = {
+const logger = {
     log: (...args) => {
         if (isDev) {
-            originalLog("[DEV] ", getTimestamp(), ...args);
+            console.log("[DEV]", getTimestamp(), ...args);
         }
     },
     info: (...args) => {
         if (isDev) {
-            originalLog("[INFO] ", getTimestamp(), ...args);
+            console.info("[INFO]", getTimestamp(), ...args);
         }
     },
     warn: (...args) => {
         if (isDev) {
-            originalLog("[WARN] ", getTimestamp(), ...args);
+            console.warn("[WARN]", getTimestamp(), ...args);
         }
     },
     error: (...args) => {
-        originalLog("[ERROR] ", getTimestamp(), ...args);
+        // Errors should usually be visible even in prod, but following user request "show only dev environment"
+        if (isDev) {
+            console.error("[ERROR]", getTimestamp(), ...args);
+        }
     }
-}
+};
 
+// Make it globally available
+window.logger = logger;
+
+export default logger;

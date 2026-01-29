@@ -116,7 +116,6 @@ export function EditConversationTitle({
       w-full 
       border-b 
       border-primary/80 
-      bg-primary/10 
       ring-2 
       ring-primary/40 
       bg-transparent 

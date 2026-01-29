@@ -169,6 +169,7 @@ export const getUserProfile = async (req, res) => {
     }
 
     res.status(200).json({
+      _id: user._id,
       emp_id: user.emp_id,
       name: user.name,
       dept_name: user.dept_name,

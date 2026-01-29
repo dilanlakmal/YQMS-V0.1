@@ -1,7 +1,7 @@
 import { Progress } from "../models/instruction/index.js";
 import { UserProd, UserMain } from "../controller/MongoDB/dbConnectionController.js";
 import { Content, Language } from "../models/translation/index.js";
-import logger from "../Utils/logger.js";
+import   "../Utils/logger.js";
 
 // Select User Model based on Environment
 const User = process.env.NODE_ENV === "development" ? UserMain : UserProd;

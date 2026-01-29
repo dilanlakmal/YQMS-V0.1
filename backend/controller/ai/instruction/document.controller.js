@@ -31,8 +31,8 @@ const createDocument = async (filename, filePath, type, customer) => {
         filename: filename,
         filePath: filePath,
         pageCount: pageCount,
-        pages: Array.from({length: pageCount}, (_, i) => ({
-            pageNumber: i+1,
+        pages: Array.from({ length: pageCount }, (_, i) => ({
+            pageNumber: i + 1,
             pdfPath: "",
             imageCount: 0,
             imagePaths: [
@@ -69,4 +69,4 @@ const documentController = async (req, res) => {
 }
 
 export default documentController;
-export {createDocument};
+export { createDocument };

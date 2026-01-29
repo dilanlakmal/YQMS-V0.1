@@ -1,19 +1,15 @@
 import Header from "./components/Header";
-import Input from "./components/Input";
 import { ChatSidebar as Sidebar } from "./components/Sidebar";
 import { useState } from "react";
-import { ChatMessage as Message } from "./components/Message";
 import { useRef, useEffect } from "react";
 import "./styles/main.css";
 import {
-  addMessages,
   createConversation,
-  editConversationTitle,
   updateConversationStatus
 } from "./services/conversation";
 import { getOllamaResponse } from "./services/chat";
-import { BsRobot } from "react-icons/bs";
 import AzureTranslator from "./features/Translator/AzureTranslator";
+import ChatContent from "./components/ChatContent";
 
 
 function strictThreeWords(text) {
@@ -51,6 +47,9 @@ export default function ChatInterface({
   const [lastMessage, setLastMessage] = useState(false);
   const [generateTopic, setGenerateTopic] = useState(false);
   const [thinking, setThinking] = useState("");
+
+  // Language State
+  const [language, setLanguage] = useState("en"); // Default English
 
   const messagesEndRef = useRef(null);
 
@@ -120,98 +119,110 @@ export default function ChatInterface({
     }
 
     // 3️⃣ Update UI immediately
-    setConversations(updatedConversations);
-    setInput("");
-
     try {
-      const activeConversation = updatedConversations.find(
-        (conv) => conv._id === activeID
-      );
+      // 3️⃣ Update UI immediately
+      setConversations(updatedConversations);
+      setInput("");
 
-      const messages = activeConversation.messages.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }));
+      // Streaming Handling
+      let fullContent = "";
+      let fullThought = "";
 
-      const data = await getOllamaResponse(model, messages, true);
+      const activeConversation = updatedConversations.find(c => c._id === activeID);
+      const payloadMessages = activeConversation ? activeConversation.messages.map(m => ({
+        role: m.role,
+        content: m.content
+      })) : [];
 
-      // Determine topic
-      let topicText = activeConversation.title;
-      if (!activeConversation.title || activeConversation.title === "New conversation") {
-        const topic = await getOllamaResponse(model, [
-          {
-            role: "user",
-            content: `
-            You must output EXACTLY three words.
-            No punctuation. No explanations. No line breaks.
-            If unsure, still output exactly three words.
-            Text:
-            ${input}
-          `,
-          },
-        ], false);
-
-        topicText = strictThreeWords(topic.message.content.trim());
+      if (language !== "en") {
+        const langMap = { km: "Khmer", zh: "Chinese", fr: "French" };
+        payloadMessages.unshift({
+          role: "system",
+          content: `Please response in ${langMap[language] || "English"} language.`
+        });
       }
 
-      // Assistant message
-      const assistantMessage = data?.message
-        ? {
-          _id: data.created_at.toString(),
-          role: data.message.role,
-          content: data.message.content,
-          timestamp: new Date(),
-        }
-        : {
-          _id: Date.now().toString(),
-          role: "assistant",
-          content: "No response available right now.",
-          timestamp: new Date(),
-        };
+      await getOllamaResponse(model, payloadMessages, true, (chunk) => {
+        let shouldUpdate = false;
 
-      // 4️⃣ Update conversation with assistant message
-      updatedConversations = updatedConversations.map((conv) => {
-        if (conv._id !== activeID) return conv;
-
-        const updatedConv = {
-          ...conv,
-          messages: [...conv.messages, assistantMessage],
-        };
-
-        // Update title if new
-        if (conv.title === "New conversation") {
-          setGenerateTopic(true);
-          updatedConv.title = topicText;
-          editConversationTitle(activeID, topicText); // persist to backend
+        if (chunk.type === "thought") {
+          fullThought += (fullThought ? "\n" : "") + chunk.data;
+          setThinking(fullThought);
+          shouldUpdate = true;
+        } else if (chunk.type === "chunk") {
+          fullContent += chunk.data;
+          shouldUpdate = true;
         }
 
-        return updatedConv;
+        if (shouldUpdate) {
+          setConversations(prevConvs => {
+            return prevConvs.map(conv => {
+              if (conv._id !== activeID) return conv;
+
+              const msgs = [...conv.messages];
+              const lastMsg = msgs[msgs.length - 1];
+
+              if (lastMsg && lastMsg.role === "assistant") {
+                msgs[msgs.length - 1] = {
+                  ...lastMsg,
+                  content: fullContent,
+                  thought: fullThought
+                };
+              } else {
+                msgs.push({
+                  _id: Date.now().toString(),
+                  role: "assistant",
+                  content: fullContent,
+                  thought: fullThought,
+                  timestamp: new Date()
+                });
+              }
+              return { ...conv, messages: msgs };
+            });
+          });
+        }
       });
 
-      // Save messages to backend
-      const activeAssistant = updatedConversations.find((conv) => conv._id === activeID);
-      if (activeAssistant) {
-        await addMessages(activeID, activeAssistant.messages);
-      }
+      // Final save handled by state update above mostly, but could persist here
+      // const finalConvs = [...updatedConversations]; 
+      // Ideally we sync back to backend after stream ends.
 
-      setConversations(updatedConversations);
     } catch (error) {
       console.error("Error:", error);
 
-      const errorMessage = {
+      // Create a user-friendly error message
+      let errorMessage = "I apologize, but I encountered an error while processing your request.";
+      let errorDetails = "";
+
+      if (error.message.includes("Network")) {
+        errorMessage = "Unable to connect to the AI service. Please check your internet connection.";
+        errorDetails = "Network error";
+      } else if (error.message.includes("Token")) {
+        errorMessage = "Your session has expired. Please refresh the page and try again.";
+        errorDetails = "Authentication error";
+      } else if (error.message.includes("ReadableStream")) {
+        errorMessage = "Your browser doesn't support streaming. Please try a different browser.";
+        errorDetails = "Browser compatibility issue";
+      } else {
+        errorDetails = error.message || "Unknown error";
+      }
+
+      // Add error message to conversation
+      const errorMsg = {
         _id: Date.now().toString(),
         role: "assistant",
-        content: "Unable to reach the server.",
-        timestamp: new Date(),
+        content: errorMessage,
+        error: true,
+        errorDetails: errorDetails,
+        timestamp: new Date()
       };
 
-      updatedConversations = addMessageToConversation(activeID, errorMessage);
-      setConversations(updatedConversations);
-
-      const activeErr = updatedConversations.find((conv) => conv._id === activeID);
-      if (activeErr) await addMessages(activeID, activeErr.messages);
-
-      setLastMessage(false);
+      setConversations(prevConvs => {
+        return prevConvs.map(conv => {
+          if (conv._id !== activeID) return conv;
+          return { ...conv, messages: [...conv.messages, errorMsg] };
+        });
+      });
     } finally {
       setIsLoading(false);
       setLastMessage(true);
@@ -239,12 +250,12 @@ export default function ChatInterface({
 
       <div className="flex flex-1 flex-col sm:w-1/2">
         <div>
-          <Header onClose={onClose} />
+          <Header onClose={onClose} language={language} setLanguage={setLanguage} />
         </div>
         <div className="relative flex-1 flex flex-col items-center">
           <div className="absolute top-[0%] bottom-1 left-[0%] right-[0%] flex justify-center flex-col bg-background text-foreground">
             {currentService === "" && (
-              <ChatService
+              <ChatContent
                 setConversations={setConversations}
                 conversations={conversations}
                 thinking={thinking}
@@ -269,87 +280,5 @@ export default function ChatInterface({
         </div>
       </div>
     </div>
-  );
-}
-
-function ChatService({
-  setConversations,
-  conversations,
-  setInput,
-  input,
-  model,
-  setModel,
-  thinking,
-  setThinking,
-  userData,
-  messages,
-  lastMessage,
-  setLastMessage,
-  activeConversationId,
-  isLoading,
-  handleSubmit,
-  messagesEndRef,
-  models
-}) {
-  return (
-    <>
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-5xl px-4 py-8">
-          {messages.map((message, index) => (
-            <Message
-              thinking={
-                lastMessage && index === messages.length - 1 ? thinking : ""
-              }
-              setThinking={setThinking}
-              userData={userData}
-              key={message._id}
-              message={message}
-              lastMessage={lastMessage && index === messages.length - 1}
-              setLastMessage={setLastMessage}
-            />
-          ))}
-          {isLoading && (
-            <div className="flex gap-4 py-6">
-              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                <span className="text-primary-foreground text-sm font-semibold">
-                  <BsRobot className="w-8 h-8" />
-                </span>
-              </div>
-              <div className="flex items-center gap-1 pt-1">
-                <div
-                  className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce"
-                  style={{ animationDelay: "0s" }}
-                />
-                <div
-                  className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce"
-                  style={{ animationDelay: "0.2s" }}
-                />
-                <div
-                  className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce"
-                  style={{ animationDelay: "0.4s" }}
-                />
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-      </div>
-      <div className="mt-1">
-        <Input
-          setConversations={setConversations}
-          conversations={conversations}
-          activeConversationId={activeConversationId}
-          lastMessage={lastMessage}
-          setLastMessage={setLastMessage}
-          model={model}
-          setModel={setModel}
-          input={input}
-          setInput={setInput}
-          handleSubmit={handleSubmit}
-          isLoading={isLoading}
-          models={models}
-        />
-      </div>
-    </>
   );
 }

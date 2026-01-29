@@ -14,7 +14,6 @@ import {
     listBlobs,
     downloadBlobToString
 } from "../../storage/azure.blob.storage.js";
-import logger from "../../Utils/logger.js";
 import { LANGUAGE_MAP } from "../../Utils/translation/language.validator.js";
 
 /**

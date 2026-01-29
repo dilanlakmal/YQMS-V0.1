@@ -1,6 +1,6 @@
 import { Language } from "../models/translation/index.js";
 import AzureTranslatorService from "../services/translation/azure.translator.service.js";
-import logger from "../Utils/logger.js";
+import "../Utils/logger.js";
 
 async function languagesSeed() {
     logger.info("🌐 Starting language seeding...");

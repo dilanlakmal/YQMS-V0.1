@@ -20,6 +20,10 @@ api.interceptors.request.use(
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+
+        // Debug logging
+        logger.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, config);
+
         return config;
     },
     (error) => Promise.reject(error)
@@ -31,7 +35,7 @@ api.interceptors.response.use(
     (error) => {
         // Handle 401 Unauthorized globally if needed (e.g., redirect to login)
         if (error.response?.status === 401) {
-            console.warn("Unauthorized access - redirecting to login...");
+            logger.warn("Unauthorized access - redirecting to login...");
             // Logic to clear token or redirect could go here
         }
         return Promise.reject(error);

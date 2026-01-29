@@ -17,7 +17,7 @@ const TeamSelection = ({
             {
                 teams.map((team, index) => (
                     <motion.div
-                        key={team.id}
+                        key={index}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}

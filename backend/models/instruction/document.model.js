@@ -13,11 +13,9 @@ const documentSchema = new Schema({
     // Using snake_case for DB consistency
     file_name: {
         type: String,
-        required: true
     },
     source: {
         type: String,
-        required: true
     },
     status: {
         type: String,

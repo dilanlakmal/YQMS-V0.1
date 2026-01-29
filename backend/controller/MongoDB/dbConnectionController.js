@@ -140,11 +140,11 @@ import createPTExtractionModel from "../../models/production/instruction/extract
 import createProductionModel from "../../models/production/production.model.js";
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
-  process.env.MongoDB_URI_ym_prod
+  process.env.MongoDB_URI_ym_prod || "mongodb://yaidev:Yai%40Dev2025@192.167.4.7:28425/ym_prod?authSource=admin&retryWrites=true&w=majority"
 );
 
 export const ymEcoConnection = mongoose.createConnection(
-  process.env.MongoDB_URI_ym_eco_board
+  process.env.MongoDB_URI_ym_eco_board || "mongodb://yaidev:Yai%40Dev2025@192.167.4.7:28425/ym_prod?authSource=admin&retryWrites=true&w=majority"
 );
 
 //Connection status
