@@ -17,10 +17,10 @@ import TranslationReview from "../components/ai/instruction-translation/Translat
 import Sidebar from "../components/ai/instruction-translation/Sidebar";
 import Header from "../components/ai/instruction-translation/Header";
 import TranslationOverlay from "../components/ai/instruction-translation/TranslationOverlay";
-import processTranslate from "../components/ai/instruction-translation/api/translation";
-import { getProduction } from "../components/ai/instruction-translation/api/extraction";
 import { customer, progress, document } from "@/services/instructionService";
 import { useAuth } from "@/components/authentication/AuthContext";
+
+import { useTranslate } from "@/hooks/useTranslate";
 
 const InstructionTranslation = () => {
     const [steps, setSteps] = useState(null);
@@ -37,12 +37,10 @@ const InstructionTranslation = () => {
     const [glossaryCount, setGlossaryCount] = useState(0);
     const [isTranslating, setIsTranslating] = useState(false);
     const { user } = useAuth();
+    const { translate, translateBatch } = useTranslate();
 
-    const [sourceLang, setSourceLang] = useState({ value: "english", label: "English" });
-    const [targetLangs, setTargetLangs] = useState([
-        { value: "khmer", label: "Khmer" },
-        { value: "english", label: "English" }
-    ]);
+    const [sourceLang, setSourceLang] = useState(null);
+    const [targetLangs, setTargetLangs] = useState([]);
 
     const iconMapping = {
         "Users": Users,
@@ -62,7 +60,7 @@ const InstructionTranslation = () => {
                 const customerData = await customer.getCustomer();
                 setTeams(customerData);
                 // Map the API response to the format expected by the UI
-                const formattedSteps = data.map(step => ({
+                let formattedSteps = data.map(step => ({
                     ...step,
                     // Use 'order' as the ID for internal UI logic (1, 2, 3...)
                     id: step.order,
@@ -71,6 +69,15 @@ const InstructionTranslation = () => {
                     // Map the string icon name to the actual component
                     icon: iconMapping[step.icon] || Circle
                 })).sort((a, b) => a.order - b.order);
+
+                // Translate static text using the new static route
+                // Logic: Backend might have returned English if translation missing, so we force a check via our static route
+                if (translateBatch) {
+                    formattedSteps = await translateBatch(formattedSteps, 'title');
+                    formattedSteps = await translateBatch(formattedSteps, 'instruct_title');
+                    formattedSteps = await translateBatch(formattedSteps, 'instruct_description');
+                    formattedSteps = await translateBatch(formattedSteps, 'description');
+                }
 
                 setSteps(formattedSteps);
                 const activeStep = data.find(step => step.status === "active");
@@ -90,7 +97,8 @@ const InstructionTranslation = () => {
                 if (activeDoc) {
                     // Fetch extraction data
                     try {
-                        const instructionData = await getProduction(activeDoc._id);
+                        const response = await document.getInstruction(activeDoc._id);
+                        const instructionData = response.data || response;
                         setinstruction(instructionData);
                         // If the instruction data has customer info, restore selectedTeam
                         if (instructionData?.customer?.customer_info?.name) {
@@ -109,9 +117,10 @@ const InstructionTranslation = () => {
             }
         };
 
-        fetchData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        if (user) {
+            fetchData();
+        }
+    }, [user, translateBatch]);
 
     const activeSteps = steps;
 
@@ -124,13 +133,15 @@ const InstructionTranslation = () => {
                 targetValues.push(sourceLang.value);
                 logger.log("targetValues", targetValues);
                 // Ensure documentId exists before calling API
-                if (!instruction?.documentId) {
-                    logger.error("Missing documentId for translation");
+                if (!instruction?.instructionId) {
+                    logger.error("Missing instructionId for translation");
                     setIsTranslating(false);
                     return;
                 }
-                const translatedData = await processTranslate(instruction.documentId, targetValues);
-                setinstruction(prev => ({ ...prev, ...translatedData }));
+                await document.translate(instruction.instructionId, targetValues);
+                // After translation is done on server, fetch the updated instruction data
+                const updatedResponse = await document.getInstruction(instruction.documentId);
+                setinstruction(updatedResponse.data || updatedResponse);
                 setTimeout(async () => {
                     setIsTranslating(false);
                     setCurrentStep(prev => prev + 1);
@@ -208,9 +219,9 @@ const InstructionTranslation = () => {
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: -10, scale: 0.98 }}
                                 transition={{ duration: 0.3, ease: "easeOut" }}
-                                className="h-full w-full overflow-y-auto p-6 md:p-10"
+                                className="h-full w-full overflow-y-auto p-4 md:p-6 lg:p-8"
                             >
-                                <div className="max-w-6xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-100 min-h-[500px] p-8">
+                                <div className="max-w-[1600px] w-full mx-auto bg-white rounded-2xl shadow-sm border border-slate-100 min-h-[500px] p-6 md:p-8 lg:p-10">
                                     {currentStep === 1 && (
                                         <div className="space-y-6">
                                             <div className="text-center">

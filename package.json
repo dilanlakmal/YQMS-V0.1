@@ -97,6 +97,7 @@
     "ollama": "^0.6.3",
     "papaparse": "^5.5.3",
     "pdf-lib": "^1.17.1",
+    "pdf-poppler": "^0.2.3",
     "pdf2html": "^4.4.0",
     "pdf2json": "^4.0.2",
     "postcss": "^8.4.35",

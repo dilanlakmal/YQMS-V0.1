@@ -78,6 +78,20 @@ class OrchestratorService {
     }
 
     /**
+     * Gets available models from the provider
+     */
+    async getModels(req, res) {
+        try {
+            await this.aiProvider.initialize();
+            const result = await this.aiProvider.listModels();
+            res.json(result);
+        } catch (error) {
+            console.error("Orchestrator getModels Error:", error);
+            res.status(500).json({ message: "Failed to fetch models", error: error.message });
+        }
+    }
+
+    /**
      * step 1: Classify provided text
      */
     async classifyIntent(text, model) {
@@ -184,17 +198,12 @@ class OrchestratorService {
         }
     }
 
-    /**
-     * Flow for Translation
-     */
     async handleTranslationFlow(text, model, sendEvent) {
         sendEvent("thought", "Identifying source and target languages...");
-        // Simple extraction for now, could use AI to extract "translate X to Y"
 
-        // Check if Azure Service is configured (it might need parameters)
-        // For now, let's ask the LLM to extract the data for the service
         const extractPrompt = `
-        Extract the text to translate and the target language code (e.g., 'en', 'fr', 'km' for Khmer).
+        Extract the text the user wants to translate and the target language code.
+        Example target codes: 'en' (English), 'zh-Hans' (Chinese Simplified), 'km' (Khmer), 'vi' (Vietnamese).
         User Input: "${text}"
         
         Return JSON: { "text": "...", "to": "..." }
@@ -205,30 +214,24 @@ class OrchestratorService {
         try {
             data = JSON.parse(extraction);
         } catch (e) {
-            // fallback
             sendEvent("chunk", "I understood you want a translation, but I couldn't parse the details.");
             return;
         }
 
         sendEvent("thought", `Translating to ${data.to} via Azure...`);
 
-        // We need to implement a single text translation method in AzureService or use the batch one?
-        // The existing service is for Documents (Batch). We might need a real-time text endpoint.
-        // Assuming we might need to use the LLM as a fallback if Azure Realtime isn't set up.
+        try {
+            const translatedText = await AzureTranslatorService.translateText(data.text, null, data.to);
+            sendEvent("chunk", translatedText);
+        } catch (error) {
+            sendEvent("thought", "Azure translation failed, falling back to AI...");
+            const transRes = await this.aiProvider.chat([
+                { role: "user", content: `Translate this to ${data.to}: ${data.text}` }
+            ], { model, stream: true });
 
-        // Mocking Azure Realtime call or fall back to LLM for now if Azure service only supports Documents
-        // User requested "connect to azure translator to work properly"
-        // Let's assume we use LLM for now or add a method to AzureService later.
-
-        // FALLBACK TO LLM for now as Azure Service file shows Batch Document Translation only.
-        sendEvent("thought", "Using AI Translation (Real-time Azure endpoint not found in service file)...");
-
-        const transRes = await this.aiProvider.chat([
-            { role: "user", content: `Translate this to ${data.to}: ${data.text}` }
-        ], { model, stream: true });
-
-        for await (const part of transRes) {
-            sendEvent("chunk", part.message.content);
+            for await (const part of transRes) {
+                sendEvent("chunk", part.message.content);
+            }
         }
     }
 }

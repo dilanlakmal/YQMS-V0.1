@@ -147,7 +147,7 @@ const AzureTranslatorService = {
                     results.push({
                         name: match.name,
                         content: content,
-                        toLang: Object.keys(LANGUAGE_MAP).find(key => LANGUAGE_MAP[key] === lang) || lang
+                        toLang: lang
                     });
                 } else {
                     logger.warn("Translated file not found", { pageName: file.pageName, lang });

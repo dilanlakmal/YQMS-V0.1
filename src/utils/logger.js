@@ -1,4 +1,5 @@
 const isDev = import.meta.env.NODE_ENV === "development";
+const timers = new Map();
 
 const getTimestamp = () => {
     const date = new Date();
@@ -32,6 +33,19 @@ const logger = {
         // Errors should usually be visible even in prod, but following user request "show only dev environment"
         if (isDev) {
             console.error("[ERROR]", getTimestamp(), ...args);
+        }
+    },
+    time: (label) => {
+        if (isDev) {
+            timers.set(label, performance.now());
+            console.log("[TIME] ", getTimestamp(), `${label} started`);
+        }
+    },
+    timeEnd: (label) => {
+        if (isDev && timers.has(label)) {
+            const duration = performance.now() - timers.get(label);
+            timers.delete(label);
+            console.log("[TIME] ", getTimestamp(), `${label}: ${duration.toFixed(2)}ms`);
         }
     }
 };

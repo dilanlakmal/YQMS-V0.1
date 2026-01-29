@@ -1,10 +1,10 @@
 import { useState } from "react";
 import GprtTranslationTemplate from "./templates/gprt/GprtTranslationTemplate";
-import { AlertCircle, FileCheck, Download, Save, BookPlus, Info, Maximize2, Minimize2, Globe, Loader2 } from "lucide-react";
+import { AlertCircle, Download, Maximize2, Minimize2, Globe, Loader2 } from "lucide-react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 
-const TranslationReview = ({ team, mode = "final", production, setProduction, onNext, sourceLang, targetLangs = [] }) => {
+const TranslationReview = ({ team, mode = "final", instruction, setinstruction, onNext, sourceLang, targetLangs = [] }) => {
     const allLangs = [sourceLang, ...targetLangs];
 
     const initialLang = targetLangs[0]?.value || sourceLang?.value || "english";
@@ -28,11 +28,6 @@ const TranslationReview = ({ team, mode = "final", production, setProduction, on
                 useCORS: true,
                 logging: false,
                 backgroundColor: "#ffffff",
-                // windowWidth: element.scrollWidth, // Removed
-                // windowHeight: element.scrollHeight, // Removed
-                // // Ensure we capture everything even if scrolled
-                // scrollX: 0, // Removed
-                // scrollY: -window.scrollY // Removed
             });
 
             const imgData = canvas.toDataURL('image/jpeg', 1.0);
@@ -59,10 +54,9 @@ const TranslationReview = ({ team, mode = "final", production, setProduction, on
 
             pdf.addImage(imgData, 'JPEG', xOffset, yOffset, finalWidth, finalHeight);
 
-            pdf.save(`Order_${production?.documentId || 'Instruction'}_${currentViewLang.toUpperCase()}.pdf`);
+            pdf.save(`Order_${instruction?.documentId || 'Instruction'}_${currentViewLang.toUpperCase()}.pdf`);
         } catch (error) {
             console.error("PDF Export Error:", error);
-            // alert("Failed to export PDF. Please ensure all images are loaded and try again."); // Removed
         } finally {
             setIsExporting(false);
         }
@@ -118,8 +112,8 @@ const TranslationReview = ({ team, mode = "final", production, setProduction, on
                             editable={false}
                             step="complete"
                             currentLanguage={currentViewLang}
-                            production={production}
-                            setProduction={setProduction}
+                            instruction={instruction}
+                            setinstruction={setinstruction}
                         />
                     </div>
                 </div>

@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+import { useTranslate } from "@/hooks/useTranslate";
 import { motion } from "framer-motion";
 import {
     ChevronsRight,
@@ -21,31 +23,77 @@ import {
  * @param {Function} props.setShowDoc - Function to toggle documentation view
  */
 const Sidebar = ({ isCollapsed, setIsCollapsed, steps, currentStep, showDoc, setShowDoc }) => {
+    const { translateBatch, userLang } = useTranslate();
+    const [uiText, setUiText] = useState({
+        viewDoc: "View Documentation",
+        closeDoc: "Close Documentation"
+    });
+
+    useEffect(() => {
+        const translateContent = async () => {
+            const values = Object.values(uiText);
+            const translated = await translateBatch(values);
+            const newUiText = {};
+            Object.keys(uiText).forEach((key, i) => {
+                newUiText[key] = translated[i];
+            });
+            setUiText(prev => ({ ...prev, ...newUiText }));
+        };
+
+        if (userLang && userLang !== 'en') {
+            translateContent();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userLang]);
+
     return (
         <aside className={`${isCollapsed ? "w-20 px-2" : "w-80"} bg-white border-r border-slate-200 flex flex-col z-20 shadow-sm relative h-full max-h-screen overflow-hidden transition-all duration-300`}>
-            <div className={`py-6 flex items-center ${isCollapsed ? "justify-center" : "justify-between px-6"} flex-shrink-0`}>
-                {isCollapsed ? (
-                    <button
-                        onClick={() => setIsCollapsed(false)}
-                        className="p-2 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg shadow-lg shadow-blue-200 hover:scale-110 transition-transform duration-300 text-white"
-                        title="Expand Sidebar"
-                    >
-                        <ChevronsRight size={24} />
-                    </button>
-                ) : (
-                    <>
-                        <div className="p-2 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg shadow-lg shadow-blue-200 group-hover:scale-110 transition-transform duration-500">
-                            <Sparkles size={24} className="text-white" />
-                        </div>
-
-                        <button
-                            onClick={() => setIsCollapsed(true)}
-                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Collapse Sidebar"
+            <div className={`pt-8 pb-6 flex flex-col ${isCollapsed ? "items-center px-2" : "px-6"} flex-shrink-0 transition-all duration-300`}>
+                <div className={`flex items-center ${isCollapsed ? "justify-center" : "justify-between"} w-full mb-6`}>
+                    {isCollapsed ? (
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setIsCollapsed(false)}
+                            className="relative w-12 h-12 flex items-center justify-center bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 rounded-xl shadow-lg shadow-blue-500/20 group overflow-hidden"
+                            title="Expand Sidebar"
                         >
-                            <ChevronsLeft size={20} />
-                        </button>
-                    </>
+                            <div className="absolute inset-0 bg-white/10 group-hover:bg-transparent transition-colors"></div>
+                            <span className="text-xl font-black text-white tracking-tighter">Y</span>
+                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full"></div>
+                        </motion.button>
+                    ) : (
+                        <>
+                            <div className="flex items-center gap-3 group">
+                                <div className="relative w-10 h-10 flex items-center justify-center bg-gradient-to-tr from-blue-600 to-violet-600 rounded-lg shadow-md shadow-blue-500/20 rotate-3 group-hover:rotate-0 transition-transform duration-500">
+                                    <Sparkles size={20} className="text-white animate-pulse" />
+                                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></div>
+                                </div>
+                                <div className="flex flex-col">
+                                    <h1 className="text-2xl font-black tracking-tighter leading-none bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+                                        YAI
+                                    </h1>
+                                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-[0.2em] mt-1 opacity-80">
+                                        Intelligence
+                                    </span>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => setIsCollapsed(true)}
+                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-300"
+                                title="Collapse Sidebar"
+                            >
+                                <ChevronsLeft size={20} />
+                            </button>
+                        </>
+                    )}
+                </div>
+
+                {!isCollapsed && (
+                    <div className="px-1">
+                        <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
+                    </div>
                 )}
             </div>
 
@@ -59,8 +107,8 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, steps, currentStep, showDoc, set
                         <div
                             key={step.id}
                             className={`relative flex items-center ${isCollapsed ? "justify-center p-2" : "p-3"} rounded-xl transition-all duration-300 ${isActive
-                                    ? "bg-blue-50 border border-blue-100 shadow-sm"
-                                    : "hover:bg-slate-50"
+                                ? "bg-blue-50 border border-blue-100 shadow-sm"
+                                : "hover:bg-slate-50"
                                 }`}
                         >
                             <div
@@ -78,10 +126,10 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, steps, currentStep, showDoc, set
                                 <div className="flex-1">
                                     <h3
                                         className={`text-sm font-semibold ${isActive
-                                                ? "text-blue-900"
-                                                : isCompleted
-                                                    ? "text-slate-700"
-                                                    : "text-slate-500"
+                                            ? "text-blue-900"
+                                            : isCompleted
+                                                ? "text-slate-700"
+                                                : "text-slate-500"
                                             }`}
                                     >
                                         {step.title}
@@ -113,14 +161,14 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, steps, currentStep, showDoc, set
                     title={
                         isCollapsed
                             ? showDoc
-                                ? "Close Documentation"
-                                : "View Documentation"
+                                ? uiText.closeDoc
+                                : uiText.viewDoc
                             : ""
                     }
                 >
                     {showDoc ? <X size={16} /> : <BookOpen size={16} />}
                     {!isCollapsed &&
-                        (showDoc ? "Close Documentation" : "View Documentation")}
+                        (showDoc ? uiText.closeDoc : uiText.viewDoc)}
                 </button>
             </div>
         </aside>

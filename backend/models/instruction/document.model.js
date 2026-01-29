@@ -14,6 +14,11 @@ const documentSchema = new Schema({
     file_name: {
         type: String,
     },
+    imageExtracted: [
+        {
+            type: String
+        }
+    ],
     source: {
         type: String,
     },

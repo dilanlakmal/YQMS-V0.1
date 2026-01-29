@@ -111,6 +111,74 @@ const instructionService = {
         deleteAllDocs: async () => {
             const userId = await getUserId();
             return api.delete(`${BASE_PATH}/document/${userId}`);
+        },
+
+        /**
+         * Convert PDF to Image.
+         * @param {string} docId 
+         */
+        convertPdfToImage: async (docId) => {
+            const userId = await getUserId();
+            return api.post(`${BASE_PATH}/document/${userId}/convert/${docId}`);
+        },
+
+        /**
+         * Extract fields from an image-extracted document.
+         * @param {string} docId 
+         * @param {number} pageNumber 
+         */
+        extractFields: async (docId, pageNumber = 1) => {
+            const userId = await getUserId();
+            return api.post(`${BASE_PATH}/document/extract/${docId}`, { userId, pageNumber });
+        },
+
+        /**
+         * Get the processed instruction data for a document.
+         * @param {string} docId 
+         */
+        getInstruction: async (docId) => {
+            const userId = await getUserId();
+            return api.get(`${BASE_PATH}/document/${userId}/instruction/${docId}`);
+        },
+
+        /**
+         * Translate document content to target languages.
+         * @param {string} instructionId 
+         * @param {string[]} targetLanguages 
+         */
+        translate: async (instructionId, targetLanguages) => {
+            const userId = await getUserId();
+            return api.post(`${BASE_PATH}/document/translate`, { userId, instructionId, targetLanguages });
+        },
+
+        /**
+         * Get supported languages for translation.
+         */
+        getSupportedLanguages: async () => {
+            return api.get(`${BASE_PATH}/document/languages`);
+        },
+
+        detectLanguage: async (text) => {
+            return api.post(`${BASE_PATH}/document/detect`, { text });
+        },
+
+        /**
+         * Translates a static string.
+         * @param {string} text - The text to translate
+         * @param {string} toLanguage - Target language code
+         */
+        translateStatic: async (text, toLanguage) => {
+            return api.post(`${BASE_PATH}/document/translate/static`, { text, toLanguage });
+        },
+
+        /**
+         * Update instruction data.
+         * @param {string} docId 
+         * @param {Object} data 
+         */
+        updateInstruction: async (docId, data) => {
+            const userId = await getUserId();
+            return api.patch(`${BASE_PATH}/document/instruction/${docId}`, { userId, data });
         }
     }
 };

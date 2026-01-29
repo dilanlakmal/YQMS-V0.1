@@ -1,6 +1,7 @@
 import PDFParser from "pdf2json";
 import { franc } from "franc";
 import pdf2html from "pdf2html";
+import AzureTranslatorService from "../../../services/translation/azure.translator.service.js";
 
 class PDFExtractor {
   constructor(filePath, requiredFields = null) {
@@ -13,7 +14,7 @@ class PDFExtractor {
   }
 
   safeDecode(text) {
-    try { return decodeURIComponent(text); } 
+    try { return decodeURIComponent(text); }
     catch { return text; }
   }
 
@@ -38,8 +39,8 @@ class PDFExtractor {
   }
 
   sortRows(rows) {
-    rows.forEach(r => r.items.sort((a,b) => a.x - b.x));
-    return rows.sort((a,b) => a.y - b.y);
+    rows.forEach(r => r.items.sort((a, b) => a.x - b.x));
+    return rows.sort((a, b) => a.y - b.y);
   }
 
   mergeRowText(items) {
@@ -47,7 +48,7 @@ class PDFExtractor {
     for (const item of items) {
       const t = item.text?.trim();
       if (!t) continue;
-      if (merged.length > 0 && /^[：:)]$/.test(t)) merged[merged.length-1] += t;
+      if (merged.length > 0 && /^[：:)]$/.test(t)) merged[merged.length - 1] += t;
       else merged.push(t);
     }
     return merged.join(" ");
@@ -60,59 +61,27 @@ class PDFExtractor {
   }
 
 
-    detectLanguage() {
+  async detectLanguage() {
     const text = this.lines.map(l => l.text).join(" ").trim();
 
     if (!text) {
-        this.language = "unknown";
-        return this.language;
+      this.language = "unknown";
+      return this.language;
     }
-
-    // 1️⃣ Unicode-based detection (FAST & RELIABLE)
-    const hasKhmer = /[\u1780-\u17FF]/.test(text);
-    const hasChinese = /[\u4E00-\u9FFF]/.test(text);
-    const hasEnglish = /[A-Za-z]/.test(text);
-
-    if (hasKhmer) {
-        this.language = "khmer";
-        return this.language;
-    }
-
-    if (hasChinese) {
-        this.language = "chinese";
-        return this.language;
-    }
-
-    if (hasEnglish) {
-        this.language = "english";
-        return this.language;
-    }
-
-    // 2️⃣ Fallback to franc (edge cases only)
-    const langCode = franc(text);
-
-    if (["cmn", "yue", "wuu", "hak", "nan"].includes(langCode)) {
-        this.language = "chinese";
-    } else if (langCode === "eng") {
-        this.language = "english";
-    } else if (langCode === "khm") {
-        this.language = "khmer";
-    } else {
-        this.language = "english";
-    }
-
+    const response = await AzureTranslatorService.detectLanguage(text);
+    this.language = response.language;
     return this.language;
-    }
+  }
 
 
   parse() {
     return new Promise((resolve, reject) => {
       const pdfParser = new PDFParser();
       pdfParser.on("pdfParser_dataError", err => reject(err.parserError));
-      pdfParser.on("pdfParser_dataReady", pdfData => {
+      pdfParser.on("pdfParser_dataReady", async pdfData => {
         this.extractTexts(pdfData);
         this.rebuildLines();
-        this.detectLanguage();
+        await this.detectLanguage();
         resolve({
           items: this.items,
           lines: this.lines,
@@ -121,6 +90,34 @@ class PDFExtractor {
       });
       pdfParser.loadPDF(this.filePath);
     });
+  }
+
+  /**
+   * Converts the first page (or all pages) of the PDF to an image file.
+   * Useful for VLM processing.
+   * @param {string} outputDir - Directory to save instruction images.
+   * @param {string} outputName - Base name for the output image.
+   * @returns {Promise<string>} - Path to the generated image.
+   */
+  async convert(outputDir, outputName) {
+    try {
+      const pdf = await import("pdf-poppler");
+      const opts = {
+        format: "png",
+        out_dir: outputDir,
+        out_prefix: outputName,
+        page: 1 // Only convert the first page for now (Cover page extraction)
+      };
+
+      await pdf.default.convert(this.filePath, opts);
+
+      // pdf-poppler appends -1.png to the prefix for the first page
+      const imagePath = `${outputDir}/${outputName}-1.png`;
+      return imagePath;
+    } catch (err) {
+      logger.error("PDF to Image conversion failed:", err);
+      throw err;
+    }
   }
 }
 

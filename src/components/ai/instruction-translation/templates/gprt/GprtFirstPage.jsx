@@ -1,28 +1,45 @@
 import EditWord from "../../../utils/EditWord";
 import { splitChineseWords } from "../../../../../utils/segmenter";
-import { getOriginLangByPage } from "../../api/extraction.js";
 import { useState, useEffect } from "react";
-import { updateProductionData } from "../../api/extraction.js";
 import ReactDOMServer from "react-dom/server";
+import { document as docService } from "@/services/instructionService";
 
 const GprtFirstPage = ({
-    production,
-    setProduction,
+    instruction,
+    setinstruction,
     editable,
     step,
-    currentLanguage // Receives "en", "zh", etc.
+    currentLanguage, // Receives "en", "zh", etc.
+    ...props
 }) => {
     const [fetchedLang, setFetchedLang] = useState("");
 
+    // Handle legacy prop names
+    const data = instruction || props.production;
+    const setData = setinstruction || props.setProduction;
+
     useEffect(() => {
         const fetchLang = async () => {
-            if (production?.documentId && !currentLanguage) {
-                const lang = await getOriginLangByPage(production.documentId, 1);
-                setFetchedLang(lang.OrigenLang);
+            if (data?.documentId && !currentLanguage && !fetchedLang) {
+                try {
+                    // Try to use the detectLanguage API if possible
+                    if (data?.title?.text?.english) {
+                        const result = await docService.detectLanguage(data.title.text.english);
+                        if (result && result.code) {
+                            setFetchedLang(result.code.toLowerCase());
+                            return;
+                        }
+                    }
+
+                    // Fallback to extraction service getOriginLangByPage if needed, 
+                    // but we are cleaning up extraction.js, so we assumes the detectLanguage works.
+                } catch (error) {
+                    console.error("Failed to fetch origin language", error);
+                }
             }
         };
         fetchLang();
-    }, [production, currentLanguage]);
+    }, [data, currentLanguage, fetchedLang]);
 
     // Use passed language prop (for Review/Translation mode) or fetched origin lang (for Edit mode)
     const displayLang = currentLanguage || fetchedLang;
@@ -54,9 +71,9 @@ const GprtFirstPage = ({
         return "";
     };
 
-    const title = getLocalizedText(production?.title?.text, originLang);
-    const customer = production?.customer;
-    const factory = production?.factory;
+    const title = getLocalizedText(data?.title?.text, originLang);
+    const customer = data?.customer;
+    const factory = data?.factory;
     const productionSpecifications = customer?.purchase?.specs || [];
     const sample = customer?.style?.sample || {};
     const notes = customer?.manufacturingNote || [];
@@ -86,10 +103,8 @@ const GprtFirstPage = ({
                 case "preview":
                     return <EditWord word={input} onChange={onChange} />
                 case "glossary":
-                // Fallback or specific logic if needed
-                // return (splitChineseWords(input).map((w, i) => (<EditWord key={i} word={w} />)))
-
                 case "complete":
+                case "final":
                     return input;
                 case "review": // Using review mode for clean text or specialized edit if implemented
                     return <span className="text-slate-900">{input}</span>
@@ -102,10 +117,10 @@ const GprtFirstPage = ({
         return <p className="text-slate-400 font-mono text-xs">-</p>
     };
 
-    function updateProduction(production, updater) {
-        const copy = structuredClone(production);
+    function updateLocalData(currentData, updater) {
+        const copy = structuredClone(currentData);
         updater(copy);
-        setProduction(copy);
+        setData(copy);
         return copy;
     }
 
@@ -113,15 +128,15 @@ const GprtFirstPage = ({
     const labelClass = "font-semibold text-slate-500 text-xs uppercase tracking-wide mb-1 block";
 
     return (
-        <div className="w-full bg-white shadow-sm p-4 md:p-6 mx-auto max-w-5xl rounded-sm">
+        <div className="w-full bg-white shadow-sm p-4 md:p-6 mx-auto rounded-sm">
             {/* Header Section */}
             <header className="mb-4 border-b border-slate-200 pb-3">
                 <h1 className="text-3xl font-bold text-slate-900 text-center">
                     {renderContentByStep(title, async (newValue) => {
-                        const updatedProduction = updateProduction(production, (prod) => {
+                        const updatedData = updateLocalData(data, (prod) => {
                             prod.title.text[originLang] = newValue;
                         });
-                        await updateProductionData(production.documentId, updatedProduction);
+                        await docService.updateInstruction(data.documentId, updatedData);
                     })}
                 </h1>
             </header>
@@ -147,255 +162,201 @@ const GprtFirstPage = ({
                     <div>
                         {renderContentByStep(getLocalizedText(customer?.style.code.label, originLang),
                             async (newValue) => {
-                                const updatedProduction = updateProduction(production, (prod) => {
+                                const updatedData = updateLocalData(data, (prod) => {
                                     prod.customer.style.code.label[originLang] = newValue;
                                 });
-                                await updateProductionData(production.documentId, updatedProduction);
-                            }
-                        )}
+                                await docService.updateInstruction(data.documentId, updatedData);
+                            })}
+                        <span className="font-bold text-slate-900 ml-1">
+                            {renderContentByStep(getLocalizedText(customer?.style.code.value, originLang),
+                                async (newValue) => {
+                                    const updatedData = updateLocalData(data, (prod) => {
+                                        prod.customer.style.code.value[originLang] = newValue;
+                                    });
+                                    await docService.updateInstruction(data.documentId, updatedData);
+                                })}
+                        </span>
                     </div>
                 </div>
+
                 <div className="col-span-6 md:col-span-4 p-2 border-b border-slate-300">
-                    {/* <span className={labelClass}>Style Code Value</span> */}
-                    <div className="font-medium text-slate-900">
-                        {renderContentByStep(getLocalizedText(customer?.style.code.value, originLang),
-                            async (newValue) => {
-                                const updatedProduction = updateProduction(production, (prod) => {
-                                    prod.customer.style.code.value[originLang] = newValue;
-                                });
-                                await updateProductionData(production.documentId, updatedProduction);
-                            }
-                        )}
-                    </div>
-                </div>
-
-                <div className="col-span-6 md:col-span-4 p-2 border-r border-b border-slate-300">
-                    {/* <span className={labelClass}>Factory ID Label</span> */}
                     <div>
-                        {renderContentByStep(getLocalizedText(factory?.factoryID.label, originLang),
+                        {renderContentByStep(getLocalizedText(customer?.style.name.label, originLang),
                             async (newValue) => {
-                                const updatedProduction = updateProduction(production, (prod) => {
-                                    prod.factory.factoryID.label[originLang] = newValue;
+                                const updatedData = updateLocalData(data, (prod) => {
+                                    prod.customer.style.name.label[originLang] = newValue;
                                 });
-                                await updateProductionData(production.documentId, updatedProduction);
-                            }
-                        )}
-                    </div>
-                </div>
-                <div className="col-span-6 md:col-span-4 p-2 border-b border-slate-300">
-                    {/* <span className={labelClass}>Factory ID Value</span> */}
-                    <div className="font-medium text-slate-900">
-                        {renderContentByStep(getLocalizedText(factory?.factoryID.value, originLang),
-                            async (newValue) => {
-                                const updatedProduction = updateProduction(production, (prod) => {
-                                    prod.factory.factoryID.value[originLang] = newValue;
-                                });
-                                await updateProductionData(production.documentId, updatedProduction);
-                            }
-                        )}
+                                await docService.updateInstruction(data.documentId, updatedData);
+                            })}
+                        <span className="font-bold text-slate-900 ml-1">
+                            {renderContentByStep(getLocalizedText(customer?.style.name.value, originLang),
+                                async (newValue) => {
+                                    const updatedData = updateLocalData(data, (prod) => {
+                                        prod.customer.style.name.value[originLang] = newValue;
+                                    });
+                                    await docService.updateInstruction(data.documentId, updatedData);
+                                })}
+                        </span>
                     </div>
                 </div>
 
-                <div className="col-span-6 md:col-span-4 p-2  border-slate-300 border-r-0 md:border-r">
-                    {/* <span className={labelClass}>Order No. Label</span> */}
+                <div className="col-span-6 md:col-span-4 p-2 border-r border-slate-300">
                     <div>
-                        {renderContentByStep(getLocalizedText(customer?.purchase.order.orderNumber.label, originLang),
+                        {renderContentByStep(getLocalizedText(customer?.purchase.order.label, originLang),
                             async (newValue) => {
-                                const updatedProduction = updateProduction(production, (prod) => {
-                                    prod.customer.purchase.order.orderNumber.label[originLang] = newValue;
+                                const updatedData = updateLocalData(data, (prod) => {
+                                    prod.customer.purchase.order.label[originLang] = newValue;
                                 });
-                                await updateProductionData(production.documentId, updatedProduction);
-                            }
-                        )}
-                    </div>
-                </div>
-                {/* Note: In original code, image spanned 4 rows. Here I'm simplifying grid for responsiveness. Adjusting cols to match logic roughly. */}
-
-                <div className="col-span-6 md:col-span-4 p-2 md:border-r border-slate-300">
-                    {/* <span className={labelClass}>Order Number</span> */}
-                    <div className="font-medium text-slate-900">
-                        {renderContentByStep(getLocalizedText(customer?.purchase.order.orderNumber.value, originLang),
-                            async (newValue) => {
-                                const updatedProduction = updateProduction(production, (prod) => {
-                                    prod.customer.purchase.order.orderNumber.value[originLang] = newValue;
-                                });
-                                await updateProductionData(production.documentId, updatedProduction);
-                            }
-                        )}
+                                await docService.updateInstruction(data.documentId, updatedData);
+                            })}
+                        <span className="font-bold text-slate-900 ml-1">
+                            {renderContentByStep(getLocalizedText(customer?.purchase.order.value, originLang),
+                                async (newValue) => {
+                                    const updatedData = updateLocalData(data, (prod) => {
+                                        prod.customer.purchase.order.value[originLang] = newValue;
+                                    });
+                                    await docService.updateInstruction(data.documentId, updatedData);
+                                })}
+                        </span>
                     </div>
                 </div>
 
-                <div className="col-span-6 md:col-span-4 p-2 border-slate-300">
-                    {/* Empty or additional info could go here to balance grid */}
-                </div>
-
-                {/* Quantity Row */}
-                <div className="col-span-6 md:col-span-4 p-2 border-r border-t border-slate-300">
-                    {/* <span className={labelClass}>Quantity Label</span> */}
-                    {renderContentByStep(getLocalizedText(customer?.purchase.quantity.label, originLang),
-                        async (newValue) => {
-                            const updatedProduction = updateProduction(production, (prod) => {
-                                prod.customer.purchase.quantity.label[originLang] = newValue;
-                            });
-                            await updateProductionData(production.documentId, updatedProduction);
-                        }
-                    )}
-                </div>
-                <div className="col-span-6 md:col-span-8 p-2 border-t border-slate-300 flex items-center gap-2">
-                    {/* <span className={labelClass}>Quantity:</span> */}
-                    <span className="font-medium text-slate-900 mr-1">
-                        {renderContentByStep(getLocalizedText(customer?.purchase.quantity.value, originLang),
+                <div className="col-span-6 md:col-span-4 p-2">
+                    <div>
+                        {renderContentByStep(getLocalizedText(customer?.purchase.contract.label, originLang),
                             async (newValue) => {
-                                const updatedProduction = updateProduction(production, (prod) => {
-                                    prod.customer.purchase.quantity.value[originLang] = newValue;
+                                const updatedData = updateLocalData(data, (prod) => {
+                                    prod.customer.purchase.contract.label[originLang] = newValue;
                                 });
-                                await updateProductionData(production.documentId, updatedProduction);
-                            }
-                        )}
-                    </span>
-                    <span className="text-slate-600">
-                        {renderContentByStep(getLocalizedText(customer?.purchase.quantity.unit, originLang),
-                            async (newValue) => {
-                                const updatedProduction = updateProduction(production, (prod) => {
-                                    prod.customer.purchase.quantity.unit[originLang] = newValue;
-                                });
-                                await updateProductionData(production.documentId, updatedProduction);
-                            }
-                        )}
-                    </span>
-                </div>
-
-                {/* Packing & Order Type */}
-                <div className="col-span-4 p-4 border-r border-t border-slate-300">
-                    {/* <span className={labelClass}>Packing Main</span> */}
-                    {renderContentByStep(getLocalizedText(customer?.packing.main.label, originLang),
-                        async (newValue) => {
-                            const updatedProduction = updateProduction(production, (prod) => {
-                                prod.customer.packing.main.label[originLang] = newValue;
-                            });
-                            await updateProductionData(production.documentId, updatedProduction);
-                        }
-                    )}
-                </div>
-                <div className="col-span-4 p-4 border-r border-t border-slate-300">
-                    {/* <span className={labelClass}>Order Type Label</span> */}
-                    {renderContentByStep(getLocalizedText(customer?.purchase.order.orderType.label, originLang),
-                        async (newValue) => {
-                            const updatedProduction = updateProduction(production, (prod) => {
-                                prod.customer.purchase.order.orderType.label[originLang] = newValue;
-                            });
-                            await updateProductionData(production.documentId, updatedProduction);
-                        }
-                    )}
-                </div>
-                <div className="col-span-4 p-4 border-t border-slate-300">
-                    {/* <span className={labelClass}>Order Type Value</span> */}
-                    {renderContentByStep(getLocalizedText(customer?.purchase.order.orderType.value, originLang),
-                        async (newValue) => {
-                            const updatedProduction = updateProduction(production, (prod) => {
-                                prod.customer.purchase.order.orderType.value[originLang] = newValue;
-                            });
-                            await updateProductionData(production.documentId, updatedProduction);
-                        }
-                    )}
+                                await docService.updateInstruction(data.documentId, updatedData);
+                            })}
+                        <span className="font-bold text-slate-900 ml-1">
+                            {renderContentByStep(getLocalizedText(customer?.purchase.contract.value, originLang),
+                                async (newValue) => {
+                                    const updatedData = updateLocalData(data, (prod) => {
+                                        prod.customer.purchase.contract.value[originLang] = newValue;
+                                    });
+                                    await docService.updateInstruction(data.documentId, updatedData);
+                                })}
+                        </span>
+                    </div>
                 </div>
             </div>
 
-            {/* Notes Section */}
+            {/* Specifications Table */}
             <div className="mb-4">
-                <h3 className="text-xs font-bold text-slate-800 uppercase border-b border-slate-200 pb-1 mb-2">Manufacturing Notes</h3>
-                <div className="bg-yellow-50/50 p-2 rounded-sm border border-yellow-100 text-slate-700 space-y-1">
-                    {notes.map((note, idx) => (
-                        <div key={idx} className="flex gap-2">
-                            <span className="font-bold text-yellow-600">•</span>
-                            <div className="flex-1">
-                                {renderContentByStep(getLocalizedText(note, originLang),
+                <table className="w-full border-collapse border border-slate-300">
+                    <thead>
+                        <tr className="bg-slate-50">
+                            {productionSpecifications.map((spec, idx) => (
+                                <th key={idx} className="border border-slate-300 p-2 text-xs font-bold text-slate-600 uppercase text-center">
+                                    {renderContentByStep(getLocalizedText(spec.label, originLang),
+                                        async (newValue) => {
+                                            const updatedData = updateLocalData(data, (prod) => {
+                                                prod.customer.purchase.specs[idx].label[originLang] = newValue;
+                                            });
+                                            await docService.updateInstruction(data.documentId, updatedData);
+                                        })}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            {productionSpecifications.map((spec, idx) => (
+                                <td key={idx} className="border border-slate-300 p-2 text-center font-bold text-slate-900">
+                                    {renderContentByStep(getLocalizedText(spec.value, originLang),
+                                        async (newValue) => {
+                                            const updatedData = updateLocalData(data, (prod) => {
+                                                prod.customer.purchase.specs[idx].value[originLang] = newValue;
+                                            });
+                                            await docService.updateInstruction(data.documentId, updatedData);
+                                        })}
+                                </td>
+                            ))}
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Manufacturing Notes & Factory Stamp */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                {/* Notes */}
+                <div className="md:col-span-8 border border-slate-300 rounded-sm p-4">
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <div className="w-1 h-3 bg-blue-500 rounded-full" />
+                        Manufacturing Notes
+                    </h3>
+                    <div className="space-y-4">
+                        {notes.map((note, idx) => (
+                            <div key={idx} className="border-b border-slate-100 pb-3 last:border-0">
+                                <span className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                                    {renderContentByStep(getLocalizedText(note.label, originLang),
+                                        async (newValue) => {
+                                            const updatedData = updateLocalData(data, (prod) => {
+                                                prod.customer.manufacturingNote[idx].label[originLang] = newValue;
+                                            });
+                                            await docService.updateInstruction(data.documentId, updatedData);
+                                        })}
+                                </span>
+                                <div className="text-slate-700 leading-relaxed">
+                                    {renderContentByStep(getLocalizedText(note.value, originLang),
+                                        async (newValue) => {
+                                            const updatedData = updateLocalData(data, (prod) => {
+                                                prod.customer.manufacturingNote[idx].value[originLang] = newValue;
+                                            });
+                                            await docService.updateInstruction(data.documentId, updatedData);
+                                        })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Factory Stamp */}
+                <div className="md:col-span-4 border border-slate-300 rounded-sm p-4 bg-slate-50/30 flex flex-col items-center justify-center text-center">
+                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.2em] mb-4">Quality Validation</span>
+                    {stamp?.img?.src ? (
+                        <div className="relative group">
+                            <img
+                                alt={stamp.img.id}
+                                src={stamp.img.src}
+                                className="max-w-[140px] opacity-80 mix-blend-multiply grayscale-[0.2] rotate-[-5deg]"
+                            />
+                            <div className="mt-2 text-[10px] font-bold text-slate-400 italic">
+                                {renderContentByStep(getLocalizedText(stamp?.label, originLang),
                                     async (newValue) => {
-                                        const updatedProduction = updateProduction(production, (prod) => {
-                                            const noteRef = prod.customer.manufacturingNote.find(n => getLocalizedText(n, originLang) === getLocalizedText(note, originLang));
-                                            if (noteRef) {
-                                                noteRef[originLang] = newValue;
-                                            }
+                                        const updatedData = updateLocalData(data, (prod) => {
+                                            prod.factory.factoryStamp.label[originLang] = newValue;
                                         });
-                                        await updateProductionData(production.documentId, updatedProduction);
-                                    }
-                                )}
+                                        await docService.updateInstruction(data.documentId, updatedData);
+                                    })}
                             </div>
                         </div>
-                    ))}
-                    {notes.length === 0 && <span className="text-slate-400 italic">No notes available.</span>}
-                </div>
-            </div>
-
-            {/* Production Specifications */}
-            <div className="mb-4 overflow-hidden rounded-sm border border-slate-200">
-                {productionSpecifications.map((prod, i) => (
-                    <div key={i} className="mb-4 last:mb-0">
-                        <ProductionSpecific
-                            table={prod}
-                            originLang={originLang}
-                            renderContentByStep={renderContentByStep}
-                            getLocalizedText={getLocalizedText} // Pass helper down
-                        />
-                    </div>
-                ))}
-            </div>
-
-            {/* Stamp Section */}
-            <div className="flex justify-end mt-6">
-                <div className="text-right flex flex-col items-center">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Approved Stamp</span>
-                    {stamp?.img?.src ? (
-                        <div className="relative">
-                            <img src={stamp.img.src} alt="Stamp" className="w-24 h-24 object-contain opacity-90 rotate-[-5deg]" />
-                        </div>
                     ) : (
-                        <div className="w-24 h-24 border border-dashed border-slate-300 rounded flex items-center justify-center text-slate-300 text-[10px]">
-                            OFFICIAL STAMP
+                        <div className="w-24 h-24 rounded-full border-4 border-dashed border-slate-200 flex items-center justify-center text-slate-200 font-black text-xs uppercase -rotate-12">
+                            Pending
                         </div>
                     )}
                 </div>
             </div>
+
+            {/* Footer / Meta */}
+            <footer className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-end text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                <div className="space-y-1">
+                    <p>Document ID: {data?.documentId || "---"}</p>
+                    <p>YAI Synthesis Engine v2.04</p>
+                </div>
+                <div className="text-right">
+                    <p>© {new Date().getFullYear()} YAI KH Manufacturing</p>
+                </div>
+            </footer>
         </div>
     );
 };
 
-const ProductionSpecific = ({ table, originLang, renderContentByStep, getLocalizedText }) => {
-    if (!table || table.length === 0) return null;
-    const header = table[0];
-    const rows = table.slice(1);
-
-    return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-left text-slate-600">
-                <thead className="bg-slate-50 text-slate-700 font-semibold uppercase text-xs tracking-wider">
-                    <tr>
-                        {header.map((h, i) => (
-                            <th key={i} className="px-4 py-3 border-b border-slate-200">
-                                {renderContentByStep(getLocalizedText(h, originLang))}
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                    {rows.map((cols, rowIndex) => (
-                        <tr key={rowIndex} className="hover:bg-slate-50/50 transition-colors">
-                            {cols.map((cell, cellIndex) => (
-                                <td key={cellIndex} colSpan={cell.colSpan} className="px-4 py-3 border-r last:border-r-0 border-slate-100 align-top">
-                                    {renderContentByStep(getLocalizedText(cell, originLang))}
-                                </td>
-                            ))}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    )
-}
-
-const html = (reactElement) => {
-    return ReactDOMServer.renderToStaticMarkup(reactElement);
-};
-
 export default GprtFirstPage;
-export { html };
+
+export function html(component) {
+    return ReactDOMServer.renderToString(component);
+}

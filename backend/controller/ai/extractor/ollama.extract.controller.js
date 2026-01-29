@@ -10,7 +10,7 @@ const ollamaClient = new Ollama({
   },
 });
 
-const LLMTextExtractor = async(text, formatJson) => {
+const LLMTextExtractor = async (text, formatJson) => {
   try {
     const response = await ollamaClient.chat({
       model: "gpt-oss:20b",
@@ -25,7 +25,7 @@ const LLMTextExtractor = async(text, formatJson) => {
     });
     const jsonResponse = JSON.parse(response.message.content);
     console.log(JSON.stringify(jsonResponse, null, 2));
-    return jsonResponse;    
+    return jsonResponse;
   } catch (err) {
     console.log("Error extraction process", err)
     throw err
@@ -35,61 +35,31 @@ const LLMTextExtractor = async(text, formatJson) => {
 
 
 
-const LLMImageExtractor =  async (imagePath) => {
+const LLMImageExtractor = async (imagePath, schema = null, systemPrompt = null) => {
+  // Default system prompt if none provided
+  const efficientPrompt = systemPrompt || "You are an expert AI assistant. Analyze the provided image and extract the data exactly according to the JSON schema.";
 
   const messages = [
     {
       role: "system",
-      content: "You are an assistant in a garment factory. Your task is to analyze customer-provided images, classify them correctly, and extract relevant information.\n\nIMPORTANT RULES:\n1. If the image contains a readable or partially readable table (rows and columns), you MUST classify it as 'table' and extract the table data.\n2. If the image contains a stamp, seal, or official marking (e.g., approval stamp, inspection stamp, company seal) and does NOT contain a table, classify it as 'stamp' and describe the stamp content.\n3. Use 'sample' ONLY if the image shows a garment or product (e.g., T-shirt, clothing) and does NOT contain any table or stamp.\n4. Use 'unknown' ONLY if the image content cannot be determined.\n5. Never classify an image as 'sample' if any table or stamp is visible.\n6. When the type is not 'table', the table field must be an empty array.\n\nFollow the provided output format exactly."
+      content: efficientPrompt
     },
     {
       role: "user",
-      content: "Analyze the image and extract the required data according to the rules.",
+      content: "Analyze this image and extract the data.",
       images: [
         imagePath
       ]
     }
   ];
-  const format =  {
-    type: "object",
-    properties: {
-      type: {
-        type: "string",
-        enum: [
-          "table",
-          "sample",
-          "stamp",
-          "unknown"
-        ],
-        description: "Classify the image. If a readable table is present, ALWAYS choose 'table'. Use 'sample' ONLY for garment or product images with no table. Use 'unknown' if the content cannot be determined."
-      },
-      description: {
-        type: "string",
-        description: "Brief description of the image. If type is 'table', describe the table content. Otherwise, describe what is visible or why it is unknown."
-      },
-      table: {
-        type: "array",
-        description: "Extracted table data. MUST contain rows and cells ONLY when type is 'table'. MUST be an empty array when type is 'sample' or 'unknown'.",
-        items: {
-          type: "array",
-          description: "A single table row.",
-          items: {
-            type: "string",
-            description: "Cell content."
-          }
-        }
-      }
-    },
-    required: [
-      "type",
-      "description",
-      "table"
-    ]
-  };
+
+  // If no schema provided, use a default loose schema or null (depending on model support)
+  // But for our use case, we will always provide the schema from Instruction.getDynamicSchema()
+  const format = schema || { type: "object", additionalProperties: true };
 
   try {
     const response = await ollamaClient.chat({
-      model: "devstral-small-2:latest",
+      model: "devstral-small-2:latest", // Ensure this model supports VLM (e.g. LLaVA based)
       messages,
       format,
       stream: false,
@@ -99,12 +69,11 @@ const LLMImageExtractor =  async (imagePath) => {
         temperature: 0
       }
     });
-    // console.log("Model response", JSON.stringify(response.message.content, null, 2))
     return JSON.parse(response.message.content);
   } catch (err) {
-    console.error(JSON.stringify(err, null, 2));
+    logger.error("VLM Extraction Error:", err);
     throw err;
   }
 }
 
-export {LLMTextExtractor, LLMImageExtractor};
+export { LLMTextExtractor, LLMImageExtractor };

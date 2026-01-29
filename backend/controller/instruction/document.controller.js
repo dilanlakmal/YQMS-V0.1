@@ -1,10 +1,17 @@
 import { Document } from "../../models/instruction/index.js";
-import { ensureContainerExists, uploadBlob, deleteBlob, listBlobs } from "../../storage/azure.blob.storage.js";
+import { ensureContainerExists, uploadBlob, deleteBlob, listBlobs, downloadBlob } from "../../storage/azure.blob.storage.js";
 import fs from "fs/promises";
 import path from "path";
+import os from "os";
+import pdf from "pdf-poppler";
 import crypto from "crypto";
 import mongoose from "mongoose";
 import "../../Utils/logger.js";
+import { Instruction } from "../../models/instruction/index.js";
+import { LLMImageExtractor } from "../ai/extractor/ollama.extract.controller.js";
+import AzureTranslatorService from "../../services/translation/azure.translator.service.js";
+import { Translation, Content, Language } from "../../models/translation/index.js";
+import { load } from "cheerio";
 
 /**
  * Storage Controller Sub-Module
@@ -81,6 +88,489 @@ const storageController = {
     }
 };
 
+const extractController = {
+
+    convertPdfToImage: async (req, res) => {
+        let tempDir = null;
+        try {
+            const { userId, docId } = req.params;
+            const doc = await Document.findOne({ _id: docId, user_id: userId, type: "instruction" });
+            if (!doc) {
+                return res.status(404).json({ message: "Document not found" });
+            }
+            const urlObj = new URL(doc.source);
+            const pathParts = urlObj.pathname.split('/').filter(p => p.length > 0);
+
+            // pathParts[0] is container (likely user_id), pathParts[1] is blob name
+            const containerName = pathParts[0];
+            const blobName = pathParts.slice(1).join('/'); // In case blob name has slashes
+
+            logger.info(`Container: ${containerName}`);
+            logger.info(`Blob Name: ${blobName}`);
+
+            // 3. Download PDF
+            logger.info("Downloading PDF from Azure...");
+            const pdfBuffer = await downloadBlob(containerName, blobName);
+            logger.info(`Downloaded ${pdfBuffer.length} bytes.`);
+
+            // Create temp directory
+            tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "pdf_conv_"));
+            const tempPdfPath = path.join(tempDir, "input.pdf");
+            await fs.writeFile(tempPdfPath, pdfBuffer);
+
+            // 5. Convert to Image
+            logger.info("Converting to image...");
+
+            const opts = {
+                format: "jpeg",
+                out_dir: tempDir,
+                out_prefix: "page",
+                page: null // Convert all pages
+            };
+
+            await pdf.convert(tempPdfPath, opts);
+
+            // List generated files
+            const files = await fs.readdir(tempDir);
+            const imageFiles = files.filter(f => f.endsWith(".jpg") || f.endsWith(".jpeg"));
+
+            // Sort to ensure order if needed, but we rely on file names 
+            // pdf-poppler names them page-1.jpg, page-2.jpg etc.
+
+            const uploadedUrls = [];
+            // "folder as blob name" -> Remove extension from blob name to get folder name
+            const baseBlobName = path.parse(blobName).name;
+
+            logger.info(`Uploading ${imageFiles.length} images...`);
+
+            for (const file of imageFiles) {
+                const filePath = path.join(tempDir, file);
+                const fileBuffer = await fs.readFile(filePath);
+
+                // Extract page number from filename (page-1.jpg -> 1)
+                const pageNumMatch = file.match(/-(\d+)\.jpg$/);
+                const pageNum = pageNumMatch ? pageNumMatch[1] : "1";
+
+                // New blob name: sourceBlobName/pageNumber.jpg
+                const newBlobName = `${baseBlobName}/${pageNum}.jpg`;
+
+                logger.info(`Uploading image to: ${newBlobName}`);
+                const url = await uploadBlob(containerName, newBlobName, fileBuffer, {
+                    originalDocId: docId.toString(),
+                    page: pageNum,
+                    sourceBlob: blobName
+                });
+                uploadedUrls.push(url);
+            }
+
+            // Update Document
+            doc.imageExtracted = uploadedUrls;
+            doc.status = "imageExtracted";
+            await doc.save();
+
+            // Cleanup: Delete original PDF blob after conversion
+            // try {
+            //     await deleteBlob(containerName, blobName);
+            //     logger.info(`Source PDF blob ${blobName} deleted after conversion.`);
+            // } catch (cleanupError) {
+            //     logger.warn(`Failed to delete source PDF blob: ${cleanupError.message}`);
+            // }
+
+            logger.info(`PDF conversion complete. ${uploadedUrls.length} images processed.`);
+            res.json({ message: "Conversion successful", images: uploadedUrls });
+
+        } catch (error) {
+            logger.error("convertPdfToImage error:", { error: error.message });
+            res.status(500).json({ message: "Failed to convert PDF to image", error: error.message });
+        } finally {
+            // Cleanup temp dir
+            if (tempDir) {
+                try {
+                    await fs.rm(tempDir, { recursive: true, force: true });
+                } catch (e) {
+                    logger.warn("Failed to cleanup temp dir", e);
+                }
+            }
+        }
+    },
+    extractFields: async (req, res) => {
+        try {
+            const { docId } = req.params;
+            const userId = req.body.userId;
+            const pageNumber = req.body.pageNumber;
+
+
+            const doc = await Document.findOne({ _id: docId, status: "imageExtracted", user_id: userId });
+            if (!doc) {
+                logger.warn(`Document not found for extraction: ID=${docId}, User=${userId}`);
+                return res.status(404).json({ message: "Document not found or not in 'imageExtracted' status" });
+            }
+
+            const instruction = await Instruction.findOne({ document_id: docId });
+            if (!instruction) {
+                logger.warn(`Instruction not found for document: ID=${docId}`);
+                return res.status(404).json({ message: "Associated instruction record not found" });
+            }
+
+            // 1. Get Image and convert to Base64
+            const imageUrl = doc.imageExtracted[pageNumber - 1];
+            if (!imageUrl) {
+                return res.status(400).json({ message: `Image for page ${pageNumber} not found` });
+            }
+
+            logger.info(`Extracting fields from page ${pageNumber}...`);
+            const urlObj = new URL(imageUrl);
+            const pathParts = urlObj.pathname.split('/').filter(p => p.length > 0);
+            const containerName = pathParts[0];
+            const blobName = pathParts.slice(1).join('/');
+
+            const imageBuffer = await downloadBlob(containerName, blobName);
+            const imageBase64 = imageBuffer.toString('base64');
+
+            // 2. Get dynamic schema for VLM
+            const schema = await instruction.getDynamicSchema();
+
+            // 3. Extract using VLM
+            logger.time(`Extraction-Page-${pageNumber}`);
+            const result = await LLMImageExtractor(imageBase64, schema);
+            logger.timeEnd(`Extraction-Page-${pageNumber}`);
+
+            if (!result) {
+                throw new Error("No data returned from AI extractor");
+            }
+
+            // 4. Update the instruction model and its annotations
+            logger.info("Updating instruction fields from AI result...");
+            const updatedInstruction = await instruction.updateFromExtractedData(result);
+
+            // 5. Update Document Status
+            doc.status = "fieldExtracted";
+            await doc.save();
+
+            logger.info(`Fields extracted successfully for document: ${docId}`);
+            res.json({
+                message: "Fields extracted and saved successfully",
+                data: result,
+                instructionId: updatedInstruction._id,
+            });
+
+        } catch (error) {
+            logger.error("extractFields error:", { error: error.message, stack: error.stack });
+            res.status(500).json({ message: "Failed to extract fields", error: error.message });
+        }
+    },
+
+    getInstruction: async (req, res) => {
+        try {
+            const { docId } = req.params;
+
+            // 1. Find the instruction for this document
+            const instruction = await Instruction.findOne({ document_id: docId });
+
+            if (!instruction) {
+                return res.status(404).json({ message: "Instruction data not found for this document" });
+            }
+
+            // 2. Populate all annotations and their content
+            // We need a deep populate to get content and translations
+            await instruction.populate([
+                {
+                    path: "header.title header.model_id details.style_no.label details.style_no.value details.factory_code.label details.factory_code.value details.po_no.label details.po_no.value details.quantity.label details.quantity.value requirements.order_type.label requirements.order_type.value requirements.label_instruction.value visuals.sample_image visuals.approval_stamp product_info.style product_info.color product_info.usage product_info.special_note product_info.sizes notes",
+                    populate: {
+                        path: "content",
+                        populate: {
+                            path: "translations"
+                        }
+                    }
+                }
+            ]);
+
+            // Helper to format an annotation into the { english, chinese, khmer } format the UI expects
+            const formatAnnot = (annot) => {
+                if (!annot || !annot.content) return { english: "", chinese: "", khmer: "" };
+
+                const content = annot.content;
+                const result = {
+                    english: content.original || "",
+                    chinese: "",
+                    khmer: ""
+                };
+
+                // Fill in translations
+                if (content.translations && Array.isArray(content.translations)) {
+                    content.translations.forEach(t => {
+                        if (t.code === "zh-Hans" || t.code === "zh") result.chinese = t.translated;
+                        if (t.code === "km") result.khmer = t.translated;
+                    });
+                }
+
+                // If original language was not English, we should probably set that correctly.
+                // But the UI seems to expect fixed keys.
+                return result;
+            };
+
+            // 3. Map to the "Legacy" structure expected by GprtTranslationTemplate
+            // This ensures we can use the new model with the existing UI without a massive rewrite.
+            const legacyData = {
+                documentId: docId,
+                instructionId: instruction._id,
+                title: { text: formatAnnot(instruction.header.title) },
+                customer: {
+                    customer_info: { name: "GPRT0007C" }, // HARDCODED for now as requested by user's team check
+                    style: {
+                        code: {
+                            label: formatAnnot(instruction.details.style_no.label),
+                            value: formatAnnot(instruction.details.style_no.value)
+                        },
+                        sample: {
+                            description: "Sample Image",
+                            img: { data: null } // We might need to handle actual image data here if we have it
+                        }
+                    },
+                    purchase: {
+                        order: {
+                            orderNumber: {
+                                label: formatAnnot(instruction.details.po_no.label),
+                                value: formatAnnot(instruction.details.po_no.value)
+                            },
+                            orderType: {
+                                label: formatAnnot(instruction.requirements.order_type.label),
+                                value: formatAnnot(instruction.requirements.order_type.value)
+                            }
+                        },
+                        quantity: {
+                            label: formatAnnot(instruction.details.quantity.label),
+                            value: formatAnnot(instruction.details.quantity.value),
+                            unit: ""
+                        },
+                        specs: [] // Placeholder for specs table
+                    },
+                    packing: {
+                        main: {
+                            label: formatAnnot(instruction.requirements.label_instruction.value),
+                            value: ""
+                        }
+                    },
+                    manufacturingNote: instruction.notes.map(n => formatAnnot(n))
+                },
+                factory: {
+                    factoryID: {
+                        label: formatAnnot(instruction.details.factory_code.label),
+                        value: formatAnnot(instruction.details.factory_code.value)
+                    },
+                    factoryStamp: {
+                        description: "Stamp",
+                        img: { data: null }
+                    }
+                }
+            };
+
+            res.json(legacyData);
+
+        } catch (error) {
+            logger.error("getInstruction error:", { error: error.message, stack: error.stack });
+            res.status(500).json({ message: "Failed to fetch instruction data", error: error.message });
+        }
+    },
+
+
+}
+
+const translationController = {
+    generateHtmlFromEntries: (contents) => {
+        const contentHtml = contents
+            .map(({ _id, original }) => `
+            <section class="content-block">
+                <p id="${_id}">${original}</p>
+            </section>`)
+            .join('\n');
+
+        return `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+        <meta charset="UTF-8">
+        <title>Exported Content</title>
+        </head>
+        <body>
+        ${contentHtml}
+        </body>
+        </html>
+        `;
+    },
+    translate: async (req, res) => {
+        try {
+            const { userId, instructionId, targetLanguages } = req.body;
+
+            if (!instructionId || !targetLanguages || !Array.isArray(targetLanguages)) {
+                return res.status(400).json({ message: "instructionId and targetLanguages (array) are required" });
+            }
+
+            // 1. Get Instruction and all associated contents
+            const instruction = await Instruction.findById(instructionId);
+            if (!instruction) {
+                return res.status(404).json({ message: "Instruction not found" });
+            }
+
+            const contents = await instruction.getAllContents();
+            if (!contents || contents.length === 0) {
+                return res.status(400).json({ message: "No content found in this instruction to translate" });
+            }
+
+            logger.info(`Starting translation workflow for Instruction: ${instructionId} (User: ${userId})`);
+
+            // 2. Generate HTML for Azure Document Translation
+            const htmlContent = translationController.generateHtmlFromEntries(contents);
+            const files = [{
+                pageName: `instruction_${instructionId}`,
+                content: htmlContent
+            }];
+
+            // 3. Submit Batch Translation Job to Azure
+            logger.info("Submitting translation job to Azure...");
+            const jobId = await AzureTranslatorService.submitTranslationJob(userId, files, targetLanguages);
+
+            // 4. Poll for Completion
+            logger.info(`Job submitted. ID: ${jobId}. Polling for status...`);
+            await AzureTranslatorService.pollTranslationStatus(jobId);
+
+            // 5. Retrieve Translated Content
+            logger.info("Retrieving translated HTML files from storage...");
+            const results = await AzureTranslatorService.getTranslatedContent(userId, files, targetLanguages);
+
+            // 6. Parse HTML Results and Update Database
+            logger.info(`Processing ${results.length} translation result(s)...`);
+
+            for (const result of results) {
+                const $ = load(result.content);
+                const toLang = result.toLang;
+
+                for (const contentDoc of contents) {
+                    const translatedText = $(`p[id="${contentDoc._id}"]`).text().trim();
+
+                    if (translatedText) {
+                        await Translation.updateOne(
+                            { content: contentDoc._id, code: toLang },
+                            {
+                                $set: {
+                                    content: contentDoc._id,
+                                    code: toLang,
+                                    translated: translatedText
+                                }
+                            },
+                            { upsert: true }
+                        );
+                    }
+                }
+            }
+
+            logger.info(`Translation workflow completed for Instruction: ${instructionId}`);
+
+            res.json({
+                message: "Translation completed and database updated successfully",
+                jobId: jobId,
+                filesProcessed: results.length,
+                targetLanguages
+            });
+
+        } catch (error) {
+            logger.error("translate error:", { error: error.message, stack: error.stack });
+            res.status(500).json({ message: "Failed to translate instruction contents", error: error.message });
+        }
+    },
+    getSupportedLanguages: async (req, res) => {
+        try {
+            const languages = await AzureTranslatorService.getSupportedLanguages();
+            res.json(languages);
+        } catch (error) {
+            logger.error("getSupportedLanguages error:", error);
+            res.status(500).json({ message: "Failed to fetch supported languages" });
+        }
+    },
+    detectLanguage: async (req, res) => {
+        try {
+            const { text } = req.body;
+            if (!text) return res.status(400).json({ message: "Text is required for detection" });
+
+            const code = await AzureTranslatorService.detectLanguage(text);
+            res.json({ code });
+        } catch (error) {
+            logger.error("detectLanguage error:", error);
+            res.status(500).json({ message: "Failed to detect language" });
+        }
+    },
+    translateStaticContent: async (req, res) => {
+        try {
+            const { text, toLanguage } = req.body;
+            if (!text || !toLanguage) {
+                return res.status(400).json({ message: "Text and toLanguage are required" });
+            }
+
+            // 1. Find if Content exists by original text
+            let contentDoc = await Content.findOne({ original: text }).populate("language");
+
+            if (!contentDoc) {
+                // 2. If not exist, create it (will auto-detect language)
+                contentDoc = await Content.createWithText({ originalText: text });
+                // Populate language to get the code
+                await contentDoc.populate("language");
+            }
+
+            const sourceCode = contentDoc.language?.code || "en";
+
+            // 3. Check if default/source language is same as toLanguage
+            if (sourceCode === toLanguage) {
+                return res.json({
+                    original: text,
+                    translated: text,
+                    language: toLanguage,
+                    source: sourceCode
+                });
+            }
+
+            // 4. Translate it (this method has internal caching for translations)
+            const translatedText = await contentDoc.translateText(toLanguage);
+
+            res.json({
+                original: text,
+                translated: translatedText,
+                language: toLanguage,
+                source: sourceCode
+            });
+
+        } catch (error) {
+            logger.error("translateStaticContent error:", error);
+            res.status(500).json({ message: "Failed to translate static content", error: error.message });
+        }
+    },
+    updateInstruction: async (req, res) => {
+        try {
+            const { docId } = req.params;
+            const { userId, data } = req.body;
+
+            const instruction = await Instruction.findOne({ document_id: docId });
+            if (!instruction) {
+                return res.status(404).json({ message: "Instruction not found" });
+            }
+
+            // Simple implementation: for now, we only update the fields that are passed
+            // In a real scenario, we might want to update nested contents/annotations
+            // For GprtTemplate, it mostly updates top-level fields like title, customer, factory
+            if (data.title) instruction.title = { ...instruction.title.toObject(), ...data.title };
+            if (data.customer) instruction.customer = { ...instruction.customer.toObject(), ...data.customer };
+            if (data.factory) instruction.factory = { ...instruction.factory.toObject(), ...data.factory };
+
+            await instruction.save();
+
+            logger.info(`Instruction updated for document: ${docId}`);
+            res.json({ message: "Instruction updated successfully", data: instruction });
+
+        } catch (error) {
+            logger.error("updateInstruction error:", error);
+            res.status(500).json({ message: "Failed to update instruction" });
+        }
+    }
+};
 
 /**
  * Document Controller
@@ -218,82 +708,53 @@ const documentController = {
      * @param {Object} res 
      */
     deleteAllByUser: async (req, res) => {
+        const { userId } = req.params;
+
         try {
-            const userId = req.params.userId;
-
-            // 1️⃣ Fetch all documents for this user
-            const userDocs = await Document.find({ user_id: userId });
-
-            if (!userDocs.length) {
-                return res.status(404).json({ message: "No documents found for this user." });
+            if (!mongoose.Types.ObjectId.isValid(userId)) {
+                return res.status(400).json({ message: "Invalid userId" });
             }
 
-            // 2️⃣ Delete documents from DB
-            await Document.deleteMany({ user_id: userId });
-
-            // 3️⃣ Delete blobs from their respective containers
-            for (const doc of userDocs) {
-                // Based on upload: ensureContainerExists(user_id) -> so container is mostly likely 'user_id' or mapped to it.
-                // However, line 116 says doc.type = "instruction".
-                // Line 121 ensureContainerExists(user_id).
-                // So the container is likely the user_id. 
-                // BUT the deletion logic at line 193 uses `doc.type`. This looks like a BUG in the original code.
-                // Assuming "instruction" is a container? Or user_id is the container?
-                // `ensureContainerExists` usually takes a name. 
-                // Given the original code had `const containerName = doc.type;`, I will keep it but add a TODO comment if it looks suspicious.
-                // Wait, if line 121 creates container `user_id`, then line 193 using `doc.type` ("instruction") is definitely wrong.
-                // However, without seeing `azure.blob.storage.js`, I can't be 100% sure. 
-                // I will improve the safety here.
-
-                try {
-                    // Attempting to delete from 'user_id' container as well since that's where upload went
-                    await deleteBlob(userId, doc.source.split('/').pop());
-                } catch (e) {
-                    // ignore if already deleted or logic differs
+            // 1. Delete all blobs in user's container (PDFs and image folders)
+            try {
+                const blobs = await listBlobs(userId);
+                if (blobs && blobs.length > 0) {
+                    await Promise.allSettled(blobs.map(b => deleteBlob(userId, b.name)));
+                    logger.info(`Bulk deleted ${blobs.length} blobs for user ${userId}`);
                 }
+            } catch (blobError) {
+                logger.error("Bulk blob deletion error:", { error: blobError.message });
             }
 
-            // To respect the original potentially-buggy logic but clean it up:
-            // The original loop over doc.type seems useless if they are all "instruction".
-            // I will clean this up to just delete blobs based on what we know.
+            // 2. Find all documents for this user
+            const userDocs = await Document.find({ user_id: userId }).select("_id");
+            const docIds = userDocs.map(d => d._id);
 
-            // Reverting to original logic structure to be safe, but cleaner:
-            for (const doc of userDocs) {
-                // We know upload uses user_id as container
-                if (doc.source) {
-                    // Extract blob name from source URL if needed, or assume we know it
-                    // doc.source might be a full URL.
-                    // The upload returns `blob` which is assigned to `doc.source`.
+            if (docIds.length > 0) {
+                // 3. Find all instructions for these documents
+                const instructions = await Instruction.find({ document_id: { $in: docIds } });
+
+                // 4. Recursively delete AI data for each instruction
+                for (const inst of instructions) {
+                    try {
+                        await inst.deleteRelated();
+                    } catch (instError) {
+                        logger.error(`Recursive delete failed for instruction ${inst._id}:`, instError);
+                    }
                 }
+
+                // 5. Cleanup remaining documents and progress
+                const { Progress } = await import("../../models/instruction/index.js");
+                await Progress.deleteMany({ document_id: { $in: docIds } });
+                await Document.deleteMany({ user_id: userId });
+
+                logger.info(`Bulk cleanup complete for user ${userId}. ${docIds.length} documents removed.`);
             }
 
-            // Since I cannot verify the blob logic without seeing the storage service, 
-            // I will keep the original logic roughly as is but standardized.
+            res.json({ message: "All documents and related sources deleted successfully." });
 
-            // ORIGINAL LOGIC RE-IMPLEMENTED CLEANLY:
-            /*
-            for (const doc of userDocs) {
-                const containerName = doc.type;
-                const blobs = await listBlobs(containerName);
-                await Promise.allSettled(blobs.map(b => deleteBlob(containerName, b.name)));
-            }
-            */
-            // This logic deletes ALL blobs in the "instruction" container for that user? 
-            // If 'instruction' container is shared, this deletes EVERYONE'S text.
-            // That sounds dangerous. 
-            // BUT, `upload` uses `ensureContainerExists(user_id)`.
-            // So the container IS the user_id.
-            // So `doc.type` (="instruction") at line 193 is almost certainly a bug in the old code.
-            // I will change it to `userId` to match the upload logic.
-
-            const blobs = await listBlobs(userId);
-            if (blobs && blobs.length > 0) {
-                await Promise.allSettled(blobs.map(b => deleteBlob(userId, b.name)));
-            }
-
-            res.json({ message: "All documents and blobs for user deleted successfully." });
         } catch (error) {
-            logger.error("Failed to delete all user documents and blobs", { error: error.message });
+            logger.error("deleteAllByUser error:", { error: error.message });
             res.status(500).json({ message: "Internal server error", error: error.message });
         }
     },
@@ -319,23 +780,32 @@ const documentController = {
                 return res.status(404).json({ message: "Document not found." });
             }
 
-            // 2. Delete from Azure Storage
-            if (doc.source) {
-                try {
-                    // Extract blob name from URL (doc.source is the full URL)
-                    const blobName = doc.source.split('/').pop();
-                    await deleteBlob(userId, blobName);
-                    logger.info(`Deleted blob ${blobName} for user ${userId}`);
-                } catch (blobError) {
-                    // Log error but continue to DB deletion in case storage is already out of sync
-                    logger.error(`Blob deletion failed for doc ${docId}, continuing to DB:`, { error: blobError.message });
+            // 2. Delete all blobs related to this document (PDF and images)
+            // PDF is docId.pdf, images are in folder docId/
+            const basePrefix = docId.toString();
+            try {
+                const relatedBlobs = await listBlobs(userId, basePrefix);
+                if (relatedBlobs && relatedBlobs.length > 0) {
+                    await Promise.allSettled(relatedBlobs.map(b => deleteBlob(userId, b.name)));
+                    logger.info(`Deleted ${relatedBlobs.length} related blobs for document ${docId}`);
                 }
+            } catch (blobError) {
+                logger.error(`Blob cleanup failed for doc ${docId}, continuing:`, { error: blobError.message });
             }
 
-            // 3. Delete from MongoDB
-            await Document.deleteOne({ _id: docId, user_id: userId });
-            logger.info(`Document ${docId} deleted from DB for user ${userId}`);
+            // 3. Delete Instruction and all its recursive dependencies (Annotations, Content, Translations)
+            const instruction = await Instruction.findOne({ document_id: docId });
+            if (instruction) {
+                await instruction.deleteRelated();
+                logger.info(`Recursively deleted instruction and AI data for document ${docId}`);
+            }
 
+            // 4. Delete Progress and Document from MongoDB
+            const { Progress } = await import("../../models/instruction/index.js");
+            await Progress.deleteOne({ document_id: docId });
+            await Document.deleteOne({ _id: docId, user_id: userId });
+
+            logger.info(`Document ${docId} and associations deleted for user ${userId}`);
             return res.status(200).json({ message: "Document deleted successfully." });
 
         } catch (error) {
@@ -386,7 +856,9 @@ const documentController = {
         }
     },
 
-    storage: storageController
+    storage: storageController,
+    extract: extractController,
+    translate: translationController
 
 };
 

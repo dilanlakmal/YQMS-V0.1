@@ -209,5 +209,26 @@ export {
     listBlobs,
     downloadBlobToString,
     ensureContainerExists,
-    deleteBlob
+    deleteBlob,
+    downloadBlob
+};
+
+/**
+ * Downloads blob content as a Buffer.
+ * @param {string} containerName - The container name.
+ * @param {string} blobName - The blob name.
+ * @returns {Promise<Buffer>} The file content as a Buffer.
+ * @throws {Error} If download fails.
+ */
+const downloadBlob = async (containerName, blobName) => {
+    try {
+        const containerClient = blobServiceClient.getContainerClient(containerName);
+        const blobClient = containerClient.getBlobClient(blobName);
+        const downloadBlockBlobResponse = await blobClient.download();
+        const downloaded = await streamToString(downloadBlockBlobResponse.readableStreamBody);
+        return downloaded;
+    } catch (error) {
+        logger.error(`Failed to download blob ${blobName}`, { error: error.message });
+        throw error;
+    }
 };

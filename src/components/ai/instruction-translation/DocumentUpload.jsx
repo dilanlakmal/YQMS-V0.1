@@ -5,7 +5,7 @@ import { Maximize2, Minimize2, Sparkles, Cpu, BrainCircuit, Loader2, CheckCircle
 import { motion, AnimatePresence } from "framer-motion";
 import GprtTranslationTemplate from "./templates/gprt/GprtTranslationTemplate";
 import instructionService from "@/services/instructionService";
-import { getProduction as getInstruction } from "./api/extraction";
+import { useTranslate } from "@/hooks/useTranslate";
 
 
 /**
@@ -49,6 +49,66 @@ const DocumentUpload = ({
         onConfirm: null,
         variant: "danger" // 'danger' | 'warning'
     });
+
+    // Translation Hook
+    const { translate, translateBatch, userLang } = useTranslate();
+
+    // UI Text State
+    const [uiText, setUiText] = useState({
+        docInsertion: "Document Insertion",
+        uploadBtn: "Upload New PDF",
+        uploading: "Uploading...",
+        uploadHelp: "Supported format: PDF. Max size: 25MB.",
+        uploadWait: "Please wait while we process your file...",
+        files: "Files",
+        noFiles: "No documents uploaded yet",
+        recentUploads: "Recent Uploads",
+        deleteTitle: "Delete Document",
+        deleteMsg: "Are you sure you want to delete this document? This action cannot be undone.",
+        clearTitle: "Clear All History",
+        clearMsg: "This will permanently delete all uploaded documents from your history. Are you absolutely sure?",
+        extractTitle: "Analyzing Document",
+        extractMsg: "Our YAI Engine is processing your document structure...",
+        extractErrorTitle: "Extraction Failed",
+        extractErrorMsg: "Failed to extract data from the document. Please ensure it is a valid instruction PDF.",
+        uploadErrorTitle: "Upload Failed",
+        uploadErrorMsg: "Failed to upload file. Please try again.",
+        previewTemplate: "Preview Template",
+        aiExtraction: "AI Extraction",
+        tryAgain: "Try Again",
+        dismiss: "Dismiss",
+        next: "Next",
+        completed: "Completed",
+        active: "Active",
+        aiInitializing: "Initializing AI engine...",
+        aiRendering: "Rendering document pages...",
+        aiAnalyzing: "Analyzing document layout...",
+        aiExtracting: "Extracting structured data...",
+        aiFinalizing: "Finalizing results..."
+    });
+
+    // Translate UI Text
+    useEffect(() => {
+        const translateUI = async () => {
+            const keys = Object.keys(uiText);
+            const values = Object.values(uiText);
+
+            // We can treat values as a list and translate them
+            const translatedValues = await translateBatch(values);
+
+            const newUiText = {};
+            keys.forEach((key, index) => {
+                newUiText[key] = translatedValues[index];
+            });
+
+            setUiText(prev => ({ ...prev, ...newUiText }));
+        };
+
+        if (userLang && userLang !== 'en') {
+            translateUI();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userLang]);
 
     // Refs for safe timer management
     const timersRef = {
@@ -109,8 +169,8 @@ const DocumentUpload = ({
 
         setConfirmModal({
             show: true,
-            title: "Delete Document",
-            message: "Are you sure you want to delete this document? This action cannot be undone.",
+            title: uiText.deleteTitle,
+            message: uiText.deleteMsg,
             variant: "danger",
             onConfirm: async () => {
                 setDeletingDocId(docId);
@@ -139,8 +199,8 @@ const DocumentUpload = ({
     const handleDeleteAll = () => {
         setConfirmModal({
             show: true,
-            title: "Clear All History",
-            message: "This will permanently delete all uploaded documents from your history. Are you absolutely sure?",
+            title: uiText.clearTitle,
+            message: uiText.clearMsg,
             variant: "danger",
             onConfirm: async () => {
                 setDeletingDocId('all');
@@ -177,35 +237,42 @@ const DocumentUpload = ({
         setExtractionError(null);
 
         try {
-            // Persist active document selection to backend
+            // Step 1: Initialize & Set Active
+            setExtractionStep(1);
             await instructionService.document.setActive(docId);
 
-            // Simulate steps for UI feel
-            timersRef.scan = setTimeout(() => setExtractionStep(2), 500);
+            // Artificial delay for smooth transition
+            await new Promise(resolve => setTimeout(resolve, 600));
 
-            // Artificial delay to show "Extraction" process even if fast
-            timersRef.process = setTimeout(async () => {
-                setExtractionStep(3);
-                try {
-                    const instructionData = await getInstruction(docId);
-                    setinstruction(instructionData);
-                    setExtractionStep(4);
+            // Step 2: Rendering document pages (PDF to Image)
+            // This is the new part requested by the user
+            setExtractionStep(2);
+            await instructionService.document.convertPdfToImage(docId);
 
-                    timersRef.complete = setTimeout(() => {
-                        setPreview("Preview");
-                        setIsExtracting(false);
-                        setExtractionStep(0);
-                    }, 500);
-                } catch (err) {
-                    logger.error("Failed to fetch instruction data:", err);
-                    setExtractionError("Failed to extract data from the document. Please ensure it is a valid instruction PDF.");
-                    setIsExtracting(false);
-                }
-            }, 1500);
+            // Step 3: Analyze Document Layout & VLM Extraction
+            setExtractionStep(3);
+            await instructionService.document.extractFields(docId, 1);
+            await new Promise(resolve => setTimeout(resolve, 800));
 
-        } catch (error) {
-            logger.error("Error activating file:", error);
+            // Step 4: Extract Structured Data using AI
+            setExtractionStep(4);
+            const response = await instructionService.document.getInstruction(docId);
+            setinstruction(response.data || response); // Handle both wrapped and direct response
+
+            // Step 5: Finalizing & Intelligent Mapping
+            setExtractionStep(5);
+
+            timersRef.complete = setTimeout(() => {
+                setPreview("Preview");
+                setIsExtracting(false);
+                setExtractionStep(0);
+            }, 800);
+
+        } catch (err) {
+            logger.error("Failed to extract data:", err);
+            setExtractionError("Failed to extract data from the document. Please ensure it is a valid instruction PDF.");
             setIsExtracting(false);
+            setExtractionStep(0);
         }
     };
 
@@ -265,7 +332,7 @@ const DocumentUpload = ({
                         }
                     } else {
                         logger.error(`Error uploading file ${file.name}:`, err);
-                        setUploadError("Failed to upload file. Please try again.");
+                        setUploadError(uiText.uploadErrorMsg);
                     }
                 }
             }
@@ -281,10 +348,10 @@ const DocumentUpload = ({
                 <header className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                     <h1 className="text-slate-700 font-semibold flex items-center gap-2">
                         <FaFilePdf className="text-blue-500" />
-                        Document Insertion
+                        {uiText.docInsertion}
                     </h1>
                     <span className="text-xs font-medium px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
-                        {files.length} Files
+                        {files.length} {uiText.files}
                     </span>
                 </header>
                 <div className="flex-1 flex flex-col p-6 overflow-hidden">
@@ -302,7 +369,7 @@ const DocumentUpload = ({
                             className={`cursor-pointer text-sm font-medium text-white bg-blue-600 px-6 py-2.5 rounded-lg transition-all hover:-translate-y-0.5 shadow-sm shadow-blue-200 ${isUploading ? 'opacity-50 cursor-not-allowed bg-blue-400' : 'hover:bg-blue-700'}`}
                             aria-label="Upload PDF files"
                         >
-                            {isUploading ? "Uploading..." : "Upload New PDF"}
+                            {isUploading ? uiText.uploading : uiText.uploadBtn}
                         </label>
                         <input
                             id="pdfInput"
@@ -315,39 +382,33 @@ const DocumentUpload = ({
                             aria-describedby="file-upload-help"
                         />
                         <p id="file-upload-help" className="text-xs text-slate-400 mt-3 text-center">
-                            {isUploading ? "Please wait while we process your file..." : "Supported format: PDF. Max size: 25MB."}
+                            {isUploading ? uiText.uploadWait : uiText.uploadHelp}
                         </p>
                     </div>
 
-                    {/* Error Messages */}
+                    {/* Error Messages (Upload only) */}
                     <AnimatePresence>
-                        {(uploadError || extractionError) && (
+                        {uploadError && (
                             <motion.div
                                 initial={{ opacity: 0, height: 0, mb: 0 }}
                                 animate={{ opacity: 1, height: "auto", mb: 16 }}
                                 exit={{ opacity: 0, height: 0, mb: 0 }}
-                                className={`mt-4 p-4 border rounded-xl flex items-start gap-3 overflow-hidden ${uploadError ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"
-                                    }`}
+                                className="mt-4 p-4 border rounded-xl flex items-start gap-3 overflow-hidden bg-red-50 border-red-100"
                             >
-                                <div className={`p-1.5 rounded-lg shrink-0 ${uploadError ? "bg-red-100" : "bg-amber-100"
-                                    }`}>
-                                    <AlertCircle className={uploadError ? "text-red-600" : "text-amber-600"} size={16} />
+                                <div className="p-1.5 rounded-lg shrink-0 bg-red-100">
+                                    <AlertCircle className="text-red-600" size={16} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className={`text-sm font-bold ${uploadError ? "text-red-900" : "text-amber-900"}`}>
-                                        {uploadError ? "Upload Failed" : "Extraction Error"}
+                                    <p className="text-sm font-bold text-red-900">
+                                        {uiText.uploadErrorTitle}
                                     </p>
-                                    <p className={`text-xs mt-0.5 leading-relaxed ${uploadError ? "text-red-600" : "text-amber-700"}`}>
-                                        {uploadError || extractionError}
+                                    <p className="text-xs mt-0.5 leading-relaxed text-red-600">
+                                        {uploadError}
                                     </p>
                                 </div>
                                 <button
-                                    onClick={() => {
-                                        setUploadError(null);
-                                        setExtractionError(null);
-                                    }}
-                                    className={`p-1 rounded transition-colors shrink-0 ${uploadError ? "text-red-400 hover:text-red-600 hover:bg-red-100/50" : "text-amber-400 hover:text-amber-600 hover:bg-amber-100/50"
-                                        }`}
+                                    onClick={() => setUploadError(null)}
+                                    className="p-1 rounded transition-colors shrink-0 text-red-400 hover:text-red-600 hover:bg-red-100/50"
                                 >
                                     <X size={14} />
                                 </button>
@@ -359,7 +420,7 @@ const DocumentUpload = ({
                     <div className="flex-1 mt-6 flex flex-col min-h-0">
                         <div className="flex items-center justify-between mb-3">
                             <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                File History
+                                {uiText.recentUploads}
                             </h2>
                             {files.length > 0 && (
                                 <button
@@ -368,7 +429,7 @@ const DocumentUpload = ({
                                     className="text-[10px] font-bold text-red-500 hover:text-red-700 transition-colors uppercase tracking-tight flex items-center gap-1 disabled:opacity-50"
                                 >
                                     {deletingDocId === 'all' ? <Loader2 size={10} className="animate-spin" /> : <RiDeleteBin5Line size={10} />}
-                                    Clear History
+                                    {uiText.clearTitle}
                                 </button>
                             )}
                         </div>
@@ -404,7 +465,7 @@ const DocumentUpload = ({
                                                     </span>
                                                     {isActive && (
                                                         <span className="text-[10px] font-bold text-blue-500 uppercase tracking-tighter flex items-center gap-1">
-                                                            <CheckCircle size={10} /> Active
+                                                            <CheckCircle size={10} /> {uiText.active}
                                                         </span>
                                                     )}
                                                 </div>
@@ -432,7 +493,7 @@ const DocumentUpload = ({
                             </ul>
                         ) : (
                             <div className="text-center py-8 text-slate-400 text-sm italic">
-                                No files uploaded yet.
+                                {uiText.noFiles}
                             </div>
                         )}
                     </div>
@@ -443,7 +504,7 @@ const DocumentUpload = ({
             <aside className={`flex flex-col bg-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'w-full' : 'w-full md:w-1/2'}`}>
                 <header className="px-6 py-4 bg-slate-900 border-b border-slate-700 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
-                        <h1 className="text-slate-200 font-semibold text-sm">Preview Template</h1>
+                        <h1 className="text-slate-200 font-semibold text-sm">{uiText.previewTemplate}</h1>
                         <button
                             onClick={() => !isExtracting && setIsExpanded(!isExpanded)}
                             disabled={isExtracting || !activeDocId}
@@ -463,7 +524,7 @@ const DocumentUpload = ({
                                 : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
                                 }`}
                         >
-                            {preview === "Preview" ? "Completed" : "Next"}
+                            {preview === "Preview" ? uiText.completed : uiText.next}
                         </button>
                     )}
                 </header>
@@ -471,7 +532,37 @@ const DocumentUpload = ({
                     {/* Only show content if we have an active document */}
                     {activeDocId ? (
                         <>
-                            {isExtracting ? (
+                            {extractionError ? (
+                                <div className="absolute inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center p-12 text-center animate-in fade-in zoom-in duration-300">
+                                    <div className="relative mb-6">
+                                        <div className="absolute inset-0 bg-red-500 blur-2xl opacity-20 animate-pulse"></div>
+                                        <div className="relative w-20 h-20 rounded-3xl bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20">
+                                            <AlertCircle size={40} />
+                                        </div>
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-white mb-3">{uiText.extractErrorTitle || "Extraction Failed"}</h3>
+                                    <p className="text-slate-400 max-w-sm mb-10 leading-relaxed text-sm">
+                                        {extractionError}
+                                    </p>
+                                    <div className="flex flex-col sm:flex-row gap-4 w-full max-w-xs">
+                                        <button
+                                            onClick={() => {
+                                                const activeFile = files.find(f => (f._id || f.id) === activeDocId);
+                                                if (activeFile) handleFileSelect(activeFile);
+                                            }}
+                                            className="flex-1 px-8 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-500/20"
+                                        >
+                                            {uiText.tryAgain}
+                                        </button>
+                                        <button
+                                            onClick={() => setExtractionError(null)}
+                                            className="flex-1 px-8 py-3 bg-slate-800 text-slate-300 border border-slate-700 rounded-xl font-bold text-sm hover:bg-slate-700 transition-all"
+                                        >
+                                            {uiText.dismiss}
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : isExtracting ? (
                                 <div className="absolute inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center p-8 overflow-hidden">
                                     {/* AI Extraction Animation Elements */}
                                     <div className="ai-neural-glow top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
@@ -498,7 +589,7 @@ const DocumentUpload = ({
                                             <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
                                                 <div
                                                     className="h-full bg-blue-500 transition-all duration-500"
-                                                    style={{ width: `${(extractionStep / 4) * 100}%` }}
+                                                    style={{ width: `${(extractionStep / 5) * 100}%` }}
                                                 ></div>
                                             </div>
                                         </div>
@@ -517,12 +608,13 @@ const DocumentUpload = ({
                                                 <BrainCircuit size={18} className="text-blue-400 animate-pulse" />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">AI Extraction</p>
+                                                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">{uiText.aiExtraction}</p>
                                                 <p className="text-xs text-slate-300 font-medium leading-none">
-                                                    {extractionStep === 1 && "Initializing AI engine..."}
-                                                    {extractionStep === 2 && "Analyzing document layout..."}
-                                                    {extractionStep === 3 && "Extracting structured data..."}
-                                                    {extractionStep === 4 && "Applying intelligent mapping..."}
+                                                    {extractionStep === 1 && uiText.aiInitializing}
+                                                    {extractionStep === 2 && uiText.aiRendering}
+                                                    {extractionStep === 3 && uiText.aiAnalyzing}
+                                                    {extractionStep === 4 && uiText.aiExtracting}
+                                                    {extractionStep === 5 && uiText.aiFinalizing}
                                                 </p>
                                             </div>
                                         </div>

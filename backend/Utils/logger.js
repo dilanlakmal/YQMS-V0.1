@@ -1,4 +1,5 @@
 const isDev = process.env.NODE_ENV === "development";
+const timers = new Map();
 
 const originalLog = console.log;
 const getTimestamp = () => {
@@ -31,6 +32,19 @@ global.logger = {
     },
     error: (...args) => {
         originalLog("[ERROR] ", getTimestamp(), ...args);
+    },
+    time: (label) => {
+        if (isDev) {
+            timers.set(label, performance.now());
+            originalLog("[TIME]  ", getTimestamp(), `${label} started`);
+        }
+    },
+    timeEnd: (label) => {
+        if (isDev && timers.has(label)) {
+            const duration = performance.now() - timers.get(label);
+            timers.delete(label);
+            originalLog("[TIME]  ", getTimestamp(), `${label}: ${duration.toFixed(2)}ms`);
+        }
     }
 }
 
