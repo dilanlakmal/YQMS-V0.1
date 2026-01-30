@@ -10,7 +10,8 @@ import {
   LayoutGrid,
   Sparkles,
   ShieldCheck,
-  Bell
+  Bell,
+  FileCog,
 } from "lucide-react";
 import axios from "axios";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -20,6 +21,8 @@ import { API_BASE_URL } from "../../config";
 import YPivotQAReportMain from "../components/inspection/PivotY/QAReports/YPivotQAReportMain";
 import FincheckApprovalAssignee from "../components/inspection/PivotY/QAReports/FincheckApprovalAssignee";
 import FincheckNotificationGroup from "../components/inspection/PivotY/QAReports/FincheckNotificationGroup";
+import FincheckAnalyticsReport from "../components/inspection/PivotY/FincheckAnalytics/FincheckAnalyticsReport";
+import FincheckInspectionReportModify from "../components/inspection/PivotY/QAReports/FincheckInspectionReportModify";
 
 // --- Placeholder Components for Future Tabs ---
 const AnalyticsPlaceholder = () => (
@@ -71,8 +74,8 @@ const YPivotQAReport = () => {
           `${API_BASE_URL}/api/fincheck-reports/check-permission`,
           {
             params: { empId: user.emp_id },
-            timeout: 10000 // 10 second timeout
-          }
+            timeout: 10000, // 10 second timeout
+          },
         );
 
         // VERY STRICT boolean check
@@ -106,22 +109,22 @@ const YPivotQAReport = () => {
         label: "Reports",
         icon: <FileText size={18} />,
         component: <YPivotQAReportMain />, // The actual content component
-        color: "text-indigo-600"
+        color: "text-indigo-600",
       },
       {
         id: "analytics",
         label: "Analytics",
         icon: <BarChart3 size={18} />,
-        component: <AnalyticsPlaceholder />,
-        color: "text-emerald-600"
+        component: <FincheckAnalyticsReport />,
+        color: "text-emerald-600",
       },
       {
         id: "export",
         label: "Export",
         icon: <Download size={18} />,
         component: <ExportPlaceholder />,
-        color: "text-orange-600"
-      }
+        color: "text-orange-600",
+      },
     ];
     if (!isLoadingPermission && isAdmin === true) {
       baseTabs.push({
@@ -129,7 +132,7 @@ const YPivotQAReport = () => {
         label: "Assignees",
         icon: <ShieldCheck size={18} />,
         component: <FincheckApprovalAssignee />,
-        color: "text-purple-600"
+        color: "text-purple-600",
       });
       //  Notify Group Tab
       baseTabs.push({
@@ -137,7 +140,15 @@ const YPivotQAReport = () => {
         label: "Notify Group",
         icon: <Bell size={18} />,
         component: <FincheckNotificationGroup />,
-        color: "text-pink-600"
+        color: "text-pink-600",
+      });
+      // Modify Tab
+      baseTabs.push({
+        id: "modify",
+        label: "Modify",
+        icon: <FileCog size={18} />,
+        component: <FincheckInspectionReportModify />,
+        color: "text-red-600", // Distinct red color for admin action
       });
     }
     return baseTabs;
@@ -145,8 +156,17 @@ const YPivotQAReport = () => {
 
   const activeTabData = tabs.find((t) => t.id === activeTab);
 
+  // --- Helper to determine layout mode ---
+  const isAnalyticsMode = activeTab === "analytics";
+
+  //className="min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200 font-sans flex flex-col"
+
   return (
-    <div className="min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200 font-sans flex flex-col">
+    <div
+      className={`bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200 font-sans flex flex-col ${
+        isAnalyticsMode ? "h-screen overflow-hidden" : "min-h-screen"
+      }`}
+    >
       {/* Background Ambience */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse"></div>
@@ -325,14 +345,32 @@ const YPivotQAReport = () => {
       </div>
 
       {/* --- CONTENT AREA --- */}
-      <div className="flex-1 overflow-hidden pt-[90px] lg:pt-[70px] flex flex-col w-full max-w-full">
+      {/* 
+          Content Wrapper Logic
+      */}
+      <div
+        className={`flex-1 w-full max-w-full flex flex-col pt-[90px] lg:pt-[70px] ${
+          isAnalyticsMode ? "h-full overflow-hidden" : ""
+        }`}
+      >
         <div className="relative w-full max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 pb-4 h-full flex flex-col min-h-0">
-          {/* Render Active Component */}
+          {/* 
+             Component Wrapper 
+          */}
+          <div className="h-full w-full max-w-full animate-fadeIn flex flex-col min-h-0">
+            {activeTabData?.component}
+          </div>
+        </div>
+      </div>
+
+      {/* <div className="flex-1 overflow-hidden pt-[90px] lg:pt-[70px] flex flex-col w-full max-w-full">
+        <div className="relative w-full max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 pb-4 h-full flex flex-col min-h-0">
+
           <div className="h-full w-full max-w-full animate-fadeIn flex flex-col min-h-0">
             {tabs.find((tab) => tab.id === activeTab)?.component}
           </div>
         </div>
-      </div>
+      </div> */}
 
       <style jsx>{`
         .scrollbar-hide::-webkit-scrollbar {
@@ -356,7 +394,8 @@ const YPivotQAReport = () => {
           animation: fadeIn 0.4s ease-out;
         }
         .bg-grid-white {
-          background-image: linear-gradient(
+          background-image:
+            linear-gradient(
               to right,
               rgba(255, 255, 255, 0.1) 1px,
               transparent 1px

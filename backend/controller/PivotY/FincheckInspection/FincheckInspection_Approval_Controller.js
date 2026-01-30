@@ -1,7 +1,7 @@
 import {
   FincheckApprovalAssignees,
   QASectionsBuyer,
-  RoleManagment
+  RoleManagment,
 } from "../../MongoDB/dbConnectionController.js";
 
 // ============================================================
@@ -10,7 +10,7 @@ import {
 export const getApprovalAssignees = async (req, res) => {
   try {
     const assignees = await FincheckApprovalAssignees.find().sort({
-      updatedAt: -1
+      updatedAt: -1,
     });
     return res.status(200).json({ success: true, data: assignees });
   } catch (error) {
@@ -36,7 +36,7 @@ export const addApprovalAssignee = async (req, res) => {
     if (existing) {
       return res.status(400).json({
         success: false,
-        message: "User already exists in approval list."
+        message: "User already exists in approval list.",
       });
     }
 
@@ -44,7 +44,7 @@ export const addApprovalAssignee = async (req, res) => {
       empId,
       empName,
       facePhoto,
-      allowedCustomers
+      allowedCustomers,
     });
 
     await newAssignee.save();
@@ -67,9 +67,9 @@ export const updateApprovalAssignee = async (req, res) => {
       {
         allowedCustomers,
         ...(empName && { empName }),
-        ...(facePhoto && { facePhoto })
+        ...(facePhoto && { facePhoto }),
       },
-      { new: true }
+      { new: true },
     );
 
     if (!updated) {

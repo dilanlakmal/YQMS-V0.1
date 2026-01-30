@@ -191,14 +191,14 @@ export default function Dashboard() {
           API_BASE_URL && API_BASE_URL !== ""
             ? API_BASE_URL.replace(/\/$/, "")
             : "";
-        const url = `${base}/api/humidity-reports?limit=0`;
+        const url = `${base}/api/humidity-reports?limit=100`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
         const json = await res.json();
         const docs = json?.data || [];
         if (mounted) setDocsRaw(docs);
         try {
-          const ordersUrl = `${base}/api/yorksys-orders?limit=0`;
+          const ordersUrl = `${base}/api/yorksys-orders?limit=500`;
           const ordRes = await fetch(ordersUrl);
           if (ordRes.ok) {
             const ordJson = await ordRes.json();
