@@ -1026,23 +1026,25 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Aquaboy Reading Spec (Ribs)
-                </label>
-                <input
-                  type="text"
-                  value={formData.aquaboySpecRibs}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      aquaboySpecRibs: e.target.value,
-                    })
-                  }
-                  readOnly
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
-                />
-              </div>
+              {ribsAvailable && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Aquaboy Reading Spec (Ribs)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.aquaboySpecRibs}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        aquaboySpecRibs: e.target.value,
+                      })
+                    }
+                    readOnly
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   After Dry Room Time <span className="text-red-500">*</span>

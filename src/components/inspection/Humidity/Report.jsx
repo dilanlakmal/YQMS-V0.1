@@ -2146,7 +2146,7 @@ const FormPage = () => {
 
                 {activeTab === 'Qc-daily-report' && (
                     <div className="p-6">
-                        <ExportPanel />
+                        <ExportPanel setActiveTab={setActiveTab} />
                     </div>
                 )}
                 {activeTab === 'Dashboard' && (
@@ -2157,8 +2157,8 @@ const FormPage = () => {
                 {message.text && (
                     <div
                         className={`fixed bottom-6 right-6 z-[9999] flex items-center gap-4 p-4 rounded-2xl shadow-2xl border backdrop-blur-xl transition-all duration-500 animate-in fade-in slide-in-from-bottom-5 ${message.type === "success"
-                                ? "text-emerald-900 bg-white/95 border-emerald-100 ring-8 ring-emerald-500/5"
-                                : "text-rose-900 bg-white/95 border-rose-100 ring-8 ring-rose-500/5"
+                            ? "text-emerald-900 bg-white/95 border-emerald-100 ring-8 ring-emerald-500/5"
+                            : "text-rose-900 bg-white/95 border-rose-100 ring-8 ring-rose-500/5"
                             }`}
                         role="alert"
                     >
@@ -2186,8 +2186,8 @@ const FormPage = () => {
                         <button
                             type="button"
                             className={`p-1.5 rounded-lg transition-colors shrink-0 ${message.type === "success"
-                                    ? "text-emerald-400 hover:bg-emerald-50 hover:text-emerald-600"
-                                    : "text-rose-400 hover:bg-rose-50 hover:text-rose-600"
+                                ? "text-emerald-400 hover:bg-emerald-50 hover:text-emerald-600"
+                                : "text-rose-400 hover:bg-rose-50 hover:text-rose-600"
                                 }`}
                             onClick={() => setMessage({ type: "", text: "" })}
                             aria-label="Close"

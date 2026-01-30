@@ -163,7 +163,7 @@ const ReitmansForm = ({
               }
             }
           }
-        } catch (rhErr) {}
+        } catch (rhErr) { }
       } catch (err) {
         console.warn("Could not fetch fabric summary for Reitmans style:", err);
         if (mounted) {
@@ -237,18 +237,18 @@ const ReitmansForm = ({
                     <div className="text-sm font-bold text-gray-800 flex items-baseline gap-1.5 leading-tight">
                       {primaryFabric
                         ? primaryFabric.fabricName ||
-                          primaryFabric.name ||
-                          primaryFabric.fabricName
+                        primaryFabric.name ||
+                        primaryFabric.fabricName
                         : "N/A"}
                       {primaryFabric && (
                         <span className="text-xs bg-rose-500 text-white px-2 py-0.5 rounded-full font-black">
                           {formData.matchedRule &&
-                          (formData.matchedRule["primary%"] ||
-                            formData.matchedRule.primaryPercent)
+                            (formData.matchedRule["primary%"] ||
+                              formData.matchedRule.primaryPercent)
                             ? formData.matchedRule["primary%"] ||
-                              formData.matchedRule.primaryPercent
+                            formData.matchedRule.primaryPercent
                             : primaryFabric.percentage ||
-                                primaryFabric.percentage === 0
+                              primaryFabric.percentage === 0
                               ? primaryFabric.percentage + "%"
                               : ""}
                         </span>
@@ -269,18 +269,18 @@ const ReitmansForm = ({
                     <div className="text-sm font-bold text-gray-800 flex items-baseline gap-1.5 leading-tight">
                       {secondaryFabric
                         ? secondaryFabric.fabricName ||
-                          secondaryFabric.name ||
-                          secondaryFabric.fabricName
+                        secondaryFabric.name ||
+                        secondaryFabric.fabricName
                         : "N/A"}
                       {secondaryFabric && (
                         <span className="text-xs bg-rose-300 text-rose-700 px-2 py-0.5 rounded-full font-bold">
                           {formData.matchedRule &&
-                          (formData.matchedRule["secondary%"] ||
-                            formData.matchedRule.secondaryPercent)
+                            (formData.matchedRule["secondary%"] ||
+                              formData.matchedRule.secondaryPercent)
                             ? formData.matchedRule["secondary%"] ||
-                              formData.matchedRule.secondaryPercent
+                            formData.matchedRule.secondaryPercent
                             : secondaryFabric.percentage ||
-                                secondaryFabric.percentage === 0
+                              secondaryFabric.percentage === 0
                               ? secondaryFabric.percentage + "%"
                               : ""}
                         </span>
@@ -300,12 +300,12 @@ const ReitmansForm = ({
                     </div>
                     <div className="text-lg font-black text-gray-800 leading-tight">
                       {formData.upperCentisimalIndex !== undefined &&
-                      formData.upperCentisimalIndex !== null &&
-                      formData.upperCentisimalIndex !== "" &&
-                      String(formData.upperCentisimalIndex) !== "0"
+                        formData.upperCentisimalIndex !== null &&
+                        formData.upperCentisimalIndex !== "" &&
+                        String(formData.upperCentisimalIndex) !== "0"
                         ? formData.upperCentisimalIndex
                         : formData.aquaboySpec &&
-                            String(formData.aquaboySpec) !== "0"
+                          String(formData.aquaboySpec) !== "0"
                           ? formData.aquaboySpec
                           : "N/A"}
                     </div>
@@ -332,9 +332,8 @@ const ReitmansForm = ({
                     setShowOrderNoDropdown && setShowOrderNoDropdown(true);
                   }
                 }}
-                className={`w-full rounded-lg border px-4 py-2 bg-white outline-none transition-all ${
-                  errors?.factoryStyleNo ? "border-red-500" : "border-gray-300"
-                }`}
+                className={`w-full rounded-lg border px-4 py-2 bg-white outline-none transition-all ${errors?.factoryStyleNo ? "border-red-500" : "border-gray-300"
+                  }`}
                 placeholder="Search style..."
               />
 
@@ -422,9 +421,8 @@ const ReitmansForm = ({
                       ),
                     }));
                   }}
-                  className={`w-full px-4 py-2 pr-8 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors appearance-none ${
-                    errors.colorName ? "border-red-500" : "border-gray-300"
-                  }`}
+                  className={`w-full px-4 py-2 pr-8 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors appearance-none ${errors.colorName ? "border-red-500" : "border-gray-300"
+                    }`}
                   required
                   aria-required="true"
                   disabled={!formData.factoryStyleNo}
@@ -466,9 +464,8 @@ const ReitmansForm = ({
                     colorName: e.target.value,
                   }))
                 }
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                  errors.colorName ? "border-red-500" : "border-gray-300"
-                }`}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${errors.colorName ? "border-red-500" : "border-gray-300"
+                  }`}
                 placeholder=""
                 required
                 aria-required="true"
@@ -624,69 +621,51 @@ const ReitmansForm = ({
                     </div>
 
                     <div className="space-y-4">
-                      {["top", "middle", "bottom"].map((section) => (
-                        <div
-                          key={section}
-                          className={`p-4 rounded-3xl border transition-all duration-300 ${record[section].pass ? "bg-emerald-50/50 border-emerald-100" : "bg-rose-50/50 border-rose-100"}`}
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="text-sm font-black text-gray-600 uppercase">
-                              {section}
-                            </span>
-                            <div>
-                              {record[section].pass ? (
-                                <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500 text-white text-[10px] font-black rounded-full shadow-lg shadow-emerald-200 uppercase tracking-wider">
-                                  <Check size={10} strokeWidth={4} /> Pass
-                                </span>
-                              ) : record[section].fail ? (
-                                <span className="flex items-center gap-1.5 px-3 py-1 bg-rose-500 text-white text-[10px] font-black rounded-full shadow-lg shadow-rose-200 uppercase tracking-wider">
-                                  <X size={10} strokeWidth={4} /> Fail
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                  Pending
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <span className="text-[10px] font-bold text-gray-400 uppercase ml-1">
-                                Body
+                      <div
+                        className={`p-6 rounded-3xl border transition-all duration-300 ${record.top.pass ? "bg-emerald-50/50 border-emerald-100" : "bg-rose-50/50 border-rose-100"}`}
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-sm font-black text-gray-600 uppercase tracking-widest">
+                            Moisture Reading
+                          </span>
+                          <div>
+                            {record.top.pass ? (
+                              <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500 text-white text-[10px] font-black rounded-full shadow-lg shadow-emerald-200 uppercase tracking-wider">
+                                <Check size={10} strokeWidth={4} /> Pass
                               </span>
-                              <input
-                                type="number"
-                                value={record[section].body}
-                                onChange={(e) =>
-                                  updateSectionData(
-                                    index,
-                                    section,
-                                    "body",
-                                    e.target.value,
-                                  )
-                                }
-                                className={`w-full bg-white border-2 border-transparent rounded-2xl px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-50 transition-all ${!formData.factoryStyleNo ? "cursor-not-allowed opacity-50" : ""}`}
-                                placeholder="0.0"
-                                disabled={!formData.factoryStyleNo}
-                              />
-                            </div>
-                            {/* {ribsAvailable && (
-                              <div className="space-y-1">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase ml-1">Ribs</span>
-                                <input
-                                  type="number"
-                                  value={record[section].ribs}
-                                  onChange={(e) => updateSectionData(index, section, 'ribs', e.target.value)}
-                                  className={`w-full bg-white border-2 border-transparent rounded-2xl px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-50 transition-all ${!formData.factoryStyleNo ? 'cursor-not-allowed opacity-50' : ''}`}
-                                  placeholder="0.0"
-                                  disabled={!formData.factoryStyleNo}
-                                />
-                              </div>
-                            )} */}
+                            ) : record.top.fail ? (
+                              <span className="flex items-center gap-1.5 px-3 py-1 bg-rose-500 text-white text-[10px] font-black rounded-full shadow-lg shadow-rose-200 uppercase tracking-wider">
+                                <X size={10} strokeWidth={4} /> Fail
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                Pending
+                              </span>
+                            )}
                           </div>
                         </div>
-                      ))}
+
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase ml-1">
+                            Reading Value (%)
+                          </span>
+                          <input
+                            type="number"
+                            value={record.top.body}
+                            onChange={(e) =>
+                              updateSectionData(
+                                index,
+                                "top",
+                                "body",
+                                e.target.value,
+                              )
+                            }
+                            className={`w-full bg-white border-2 border-transparent rounded-2xl px-5 py-3 text-lg font-bold text-gray-700 shadow-sm focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-50 transition-all ${!formData.factoryStyleNo ? "cursor-not-allowed opacity-50" : ""}`}
+                            placeholder="0.0"
+                            disabled={!formData.factoryStyleNo}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 

@@ -17,7 +17,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 
-export default function ExportPanel() {
+export default function ExportPanel({ setActiveTab }) {
   const { user } = useAuth();
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -53,15 +53,32 @@ export default function ExportPanel() {
   const itemsPerPage = 10;
 
   useEffect(() => {
-    const today = new Date();
-    setStartDate(today.toISOString().split("T")[0]);
-    setEndDate(today.toISOString().split("T")[0]);
+    // We already set defaults in useState for startDate/endDate in some components, 
+    // but here we initialize them if empty
+    if (!startDate || !endDate) {
+      const today = new Date();
+      const isoToday = today.toISOString().split("T")[0];
+      setStartDate(isoToday);
+      setEndDate(isoToday);
+    }
 
     const fetchData = async () => {
       try {
+        setIsLoading(true);
         const base = API_BASE_URL && API_BASE_URL !== "" ? API_BASE_URL : "";
         const prefix = base.endsWith("/") ? base.slice(0, -1) : base;
-        const res = await fetch(`${prefix}/api/humidity-reports?limit=0`);
+
+        let url = `${prefix}/api/humidity-reports?limit=0`;
+
+        if (startDate && endDate) {
+          const s = new Date(startDate);
+          s.setHours(0, 0, 0, 0);
+          const e = new Date(endDate);
+          e.setHours(23, 59, 59, 999);
+          url += `&start=${encodeURIComponent(s.toISOString())}&end=${encodeURIComponent(e.toISOString())}`;
+        }
+
+        const res = await fetch(url);
         if (res.ok) {
           const json = await res.json();
           if (json.data && Array.isArray(json.data)) {
@@ -71,6 +88,8 @@ export default function ExportPanel() {
         }
       } catch (e) {
         console.error(e);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchData();
@@ -84,7 +103,7 @@ export default function ExportPanel() {
     return () => {
       window.removeEventListener("humidityReportsUpdated", handleReportUpdate);
     };
-  }, []);
+  }, [startDate, endDate]);
 
   useEffect(() => {
     if (!factoryStyleFilter) {
@@ -207,7 +226,7 @@ export default function ExportPanel() {
       console.log("Reports fetched:", docs.length);
 
       if (!Array.isArray(docs) || docs.length === 0) {
-        alert("No reports found for the selected period.");
+        setMessage({ type: "error", text: "No reports found for the selected period." });
         setIsLoading(false);
         return;
       }
@@ -250,7 +269,7 @@ export default function ExportPanel() {
 
       const w = window.open("", "_blank");
       if (!w) {
-        alert("Popup blocked. Please allow popups.");
+        setMessage({ type: "error", text: "Popup blocked. Please allow popups." });
         setIsLoading(false);
         return;
       }
@@ -259,7 +278,7 @@ export default function ExportPanel() {
       w.document.close();
     } catch (err) {
       console.error("Export error", err);
-      alert("Export failed. See console for details.");
+      setMessage({ type: "error", text: "Export failed. See console for details." });
     } finally {
       setIsLoading(false);
     }
@@ -416,9 +435,9 @@ export default function ExportPanel() {
     if (!dateStr) return "N/A";
     try {
       const d = new Date(dateStr);
-      return d.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "2-digit",
+      return d.toLocaleDateString("en-US", {
+        day: "numeric",
+        month: "numeric",
         year: "numeric",
       });
     } catch (e) {
@@ -568,7 +587,7 @@ export default function ExportPanel() {
               d="M5 13l4 4L19 7"
             />
           </svg>
-          Pass
+          Passed
         </span>
       );
     } else {
@@ -587,7 +606,7 @@ export default function ExportPanel() {
               d="M6 18L18 6M6 6l12 12"
             />
           </svg>
-          Fail
+          Failed
         </span>
       );
     }
@@ -948,10 +967,31 @@ export default function ExportPanel() {
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              <p className="text-lg font-medium">No reports found</p>
-              <p className="text-sm mt-1">
-                Save a humidity inspection report to see it here
+              <p className="text-lg font-medium text-gray-900">No reports found</p>
+              <p className="text-sm mt-1 text-gray-500 mb-6">
+                No humidity inspection records match your current filters.
               </p>
+              {/* {setActiveTab && (
+                <button
+                  onClick={() => setActiveTab("Inspection")}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-200"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Create New Report
+                </button>
+              )} */}
             </div>
           ) : (
             <table className="w-full">
@@ -967,7 +1007,7 @@ export default function ExportPanel() {
                     Customer
                   </th>
                   <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                    Latest Check
+                    Date
                   </th>
                   <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
                     Checks
@@ -1060,7 +1100,7 @@ export default function ExportPanel() {
                               Approve
                             </button>
                           ) : (
-                            <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-500 font-medium border border-gray-200">
+                            <span className="px-2 py-1 text-xs rounded-full bg-orange-100 text-orange-500 font-medium border border-orange-200">
                               Pending
                             </span>
                           )}

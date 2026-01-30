@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../../../config";
 import { Modal, Image } from "antd";
 import { renderToStaticMarkup } from "react-dom/server";
 import PaperPreviewReitmans from "./PaperPreviewReitmans";
@@ -28,11 +29,41 @@ const HistoryModelReitmans = ({
   formatDate,
   formatTime,
 }) => {
-  if (!report) return null;
+  const [fullReport, setFullReport] = useState(null);
 
-  const rawHistory = (report.history && (Array.isArray(report.history) ? report.history.length > 0 : Object.keys(report.history).length > 0))
-    ? report.history
-    : report.inspectionRecords || [];
+  useEffect(() => {
+    if (open && report?._id) {
+      const fetchFullDetails = async () => {
+        try {
+          const res = await fetch(
+            `${API_BASE_URL}/api/humidity-reports/${report._id}`,
+          );
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success) {
+              setFullReport(json.data);
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching full Reitmans report details:", err);
+        }
+      };
+      fetchFullDetails();
+    }
+  }, [open, report?._id]);
+
+  useEffect(() => {
+    if (!open) {
+      setFullReport(null);
+    }
+  }, [open]);
+
+  const activeReport = fullReport || report;
+  if (!activeReport) return null;
+
+  const rawHistory = (activeReport.history && (Array.isArray(activeReport.history) ? activeReport.history.length > 0 : Object.keys(activeReport.history).length > 0))
+    ? activeReport.history
+    : activeReport.inspectionRecords || [];
 
   // Helper to group nested history by Session (Check 1, Check 2, etc.)
   const getGroupedHistory = (history) => {
@@ -87,11 +118,7 @@ const HistoryModelReitmans = ({
   const history = groupedHistory.flatMap(s => s.items);
 
   const getItemStatus = (record) => {
-    return (
-      (record.top?.status === "pass" || !record.top?.status) &&
-      (record.middle?.status === "pass" || !record.middle?.status) &&
-      (record.bottom?.status === "pass" || !record.bottom?.status)
-    ) ? "pass" : "fail";
+    return (record.top?.status === "pass" || !record.top?.status) ? "pass" : "fail";
   };
 
   const getSessionStatus = (session) => {
@@ -107,7 +134,7 @@ const HistoryModelReitmans = ({
   };
 
   const reportStatus = getReportStatus(rawHistory);
-  const specLimit = Number(report.upperCentisimalIndex || 0);
+  const specLimit = Number(activeReport.upperCentisimalIndex || 0);
 
   const renderStatusBadge = (status) => {
     const isPass = status === "pass" || status === "Optimal";
@@ -131,13 +158,13 @@ const HistoryModelReitmans = ({
   const handlePrint = () => {
     try {
       const reportHtml = renderToStaticMarkup(
-        <PaperPreviewReitmans data={report} />,
+        <PaperPreviewReitmans data={activeReport} />,
       );
       const fullHtml = `
                 <!DOCTYPE html>
                 <html>
                 <head>
-                <title>Reitmans Humidity Report - ${report.factoryStyleNo || ""}</title>
+                <title>Reitmans Humidity Report - ${activeReport.factoryStyleNo || ""}</title>
                 <script src="https://cdn.tailwindcss.com"></script>
                 <style>
                     @media print {
@@ -209,16 +236,16 @@ const HistoryModelReitmans = ({
             </h3>
             <p className="text-white text-xs opacity-95 mt-1 flex flex-wrap gap-2 items-center">
               <span className="inline-block px-2 py-1 bg-white/10 rounded text-white text-[12px] font-semibold">
-                {report.factoryStyleNo || "N/A"}
+                {activeReport.factoryStyleNo || "N/A"}
               </span>
               <span className="inline-block px-2 py-1 bg-white/10 rounded text-white text-[12px] font-semibold">
-                {report.buyerStyle || "N/A"}
+                {activeReport.buyerStyle || "N/A"}
               </span>
               <span className="inline-block px-2 py-1 bg-white/10 rounded text-white text-[12px] font-semibold">
                 Upper Centisimal Index:{" "}
-                {report.upperCentisimalIndex ||
-                  report.aquaboySpecBody ||
-                  report.aquaboySpec ||
+                {activeReport.upperCentisimalIndex ||
+                  activeReport.aquaboySpecBody ||
+                  activeReport.aquaboySpec ||
                   "N/A"}
                 %
               </span>
@@ -339,7 +366,7 @@ const HistoryModelReitmans = ({
                               {record.moistureRateBeforeDehumidify ||
                                 record.moistureRateBeforeDry ||
                                 (isLatest
-                                  ? report.moistureRateBeforeDehumidify
+                                  ? activeReport.moistureRateBeforeDehumidify
                                   : "---")}
                               %
                             </span>
@@ -353,7 +380,7 @@ const HistoryModelReitmans = ({
                             >
                               {record.moistureRateAfter ||
                                 record.moistureRateAfterDry ||
-                                (isLatest ? report.moistureRateAfter : "---")}
+                                (isLatest ? activeReport.moistureRateAfter : "---")}
                               %
                             </span>
                           </div>
@@ -425,32 +452,29 @@ const HistoryModelReitmans = ({
                               )}
                             </span>
                           </div>
-                          {["top", "middle", "bottom"].map((section) => (
-                            <div
-                              key={section}
-                              className="flex justify-between items-center py-1 border-b border-slate-50 last:border-0"
-                            >
-                              <div className="flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                <span className="text-sm text-slate-500 font-medium capitalize">
-                                  {section} Section Body:
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <div className="flex flex-col items-end">
-                                  <span className="text-sm font-bold text-slate-800">
-                                    {record[section]?.body || "0"}%
-                                  </span>
-                                  {record[section]?.status && (
-                                    <span className={`text-[9px] font-black uppercase ${record[section].status === 'pass' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                      {record[section].status}
-                                    </span>
-                                  )}
-                                </div>
-                                {renderStatusBadge(record[section]?.status)}
-                              </div>
+                          <div
+                            className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                              <span className="text-sm text-slate-500 font-bold uppercase tracking-tight">
+                                Moisture Reading:
+                              </span>
                             </div>
-                          ))}
+                            <div className="flex items-center gap-4">
+                              <div className="flex flex-col items-end">
+                                <span className="text-base font-black text-slate-800">
+                                  {record.top?.body || "0"}%
+                                </span>
+                                {record.top?.status && (
+                                  <span className={`text-[10px] font-black uppercase tracking-widest ${record.top.status === 'pass' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                    {record.top.status}
+                                  </span>
+                                )}
+                              </div>
+                              {renderStatusBadge(record.top?.status)}
+                            </div>
+                          </div>
 
                           <div className="space-y-3 pt-2">
                             <div className="flex items-center gap-3 text-emerald-600 border-b border-gray-100 pb-3">

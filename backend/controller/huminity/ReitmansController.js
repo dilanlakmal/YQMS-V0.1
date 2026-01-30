@@ -110,11 +110,8 @@ export const updateReitmansReport = async (id, payload) => {
           return numB - numA;
         });
         const latestCheck = checksObj[checkKeys[0]];
-        return (
-          latestCheck?.top?.status === "pass" &&
-          latestCheck?.middle?.status === "pass" &&
-          latestCheck?.bottom?.status === "pass"
-        );
+        // Only require the 'top' section to pass in the simplified flow
+        return latestCheck?.top?.status === "pass";
       });
       payload.status = allPassed ? "Passed" : "Failed";
     }

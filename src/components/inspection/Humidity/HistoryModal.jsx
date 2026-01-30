@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../../../config";
 import { Modal, Image } from "antd";
 import { renderToStaticMarkup } from "react-dom/server";
 import PaperPreview from "./PaperPreview";
@@ -20,13 +21,36 @@ const HistoryModal = ({
   onApprove,
 }) => {
   const { user: currentUser } = useAuth();
-  const [approvalRemark, setApprovalRemark] = React.useState("");
+  const [approvalRemark, setApprovalRemark] = useState("");
+  const [fullReport, setFullReport] = useState(null);
 
-  if (!report) return null;
+  useEffect(() => {
+    if (open && report?._id) {
+      const fetchFullDetails = async () => {
+        try {
+          const res = await fetch(
+            `${API_BASE_URL}/api/humidity-reports/${report._id}`,
+          );
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success) {
+              setFullReport(json.data);
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching full report details:", err);
+        }
+      };
+      fetchFullDetails();
+    }
+  }, [open, report?._id]);
 
-  const rawHistory = (report.history && (Array.isArray(report.history) ? report.history.length > 0 : Object.keys(report.history).length > 0))
-    ? report.history
-    : report.inspectionRecords || [];
+  const activeReport = fullReport || report;
+  if (!activeReport) return null;
+
+  const rawHistory = (activeReport.history && (Array.isArray(activeReport.history) ? activeReport.history.length > 0 : Object.keys(activeReport.history).length > 0))
+    ? activeReport.history
+    : activeReport.inspectionRecords || [];
 
   // Helper to group nested history by Session (Check 1, Check 2, etc.)
   const getGroupedHistory = (history) => {
@@ -104,7 +128,7 @@ const HistoryModal = ({
   const reportStatus = getReportStatus(rawHistory);
 
   const ribsVisible =
-    report.ribsAvailable ??
+    activeReport.ribsAvailable ??
     history.some((h) => h.top?.ribs || h.middle?.ribs || h.bottom?.ribs);
 
   const openPrintableWindow = (contentHtml) => {
@@ -146,7 +170,7 @@ const HistoryModal = ({
 
   const printReport = () => {
     try {
-      const content = renderToStaticMarkup(<PaperPreview data={report} />);
+      const content = renderToStaticMarkup(<PaperPreview data={activeReport} />);
       const w = openPrintableWindow(content);
       if (w) setTimeout(() => w.print(), 400);
     } catch (err) {
@@ -160,19 +184,12 @@ const HistoryModal = ({
     printReport();
   };
 
+  // Clear full report when modal closes or report changes
   useEffect(() => {
-    if (open && report?._id) {
-      // Fetch the FULL report WITH images only when user clicks view
-      const fetchFullDetails = async () => {
-        const res = await fetch(
-          `${API_BASE_URL}/api/humidity-reports/${report._id}`,
-        );
-        const data = await res.json();
-        // Set local state with the data that includes images
-      };
-      fetchFullDetails();
+    if (!open) {
+      setFullReport(null);
     }
-  }, [open, report?._id]);
+  }, [open]);
 
   return (
     <Modal
@@ -270,9 +287,9 @@ const HistoryModal = ({
             </div>
 
             <div className="flex items-center gap-2">
-              {report.approvalStatus !== "approved" && onApprove && (
+              {activeReport.approvalStatus !== "approved" && onApprove && (
                 <button
-                  onClick={() => onApprove(report._id)}
+                  onClick={() => onApprove(activeReport._id)}
                   className="px-3 py-2.5 bg-white border-2 border-green-500 text-green-600 font-bold rounded-lg shadow-sm hover:bg-green-50 transition-all hover:scale-105 active:scale-95 text-xs uppercase tracking-widest flex items-center gap-2"
                 >
                   <CheckCircle2 size={16} strokeWidth={3} />
@@ -506,15 +523,15 @@ const HistoryModal = ({
                           {formatDate(item.date)}
                         </td>
                         <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
-                          {item.customer || report.customer || "N/A"}
+                          {activeReport.customer || "N/A"}
                         </td>
                         <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
-                          {item.fabrication || report.fabrication || "N/A"}
+                          {activeReport.fabrication || "N/A"}
                         </td>
                         <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
                           {item.colorName ||
                             item.color ||
-                            report.colorName ||
+                            activeReport.colorName ||
                             "N/A"}
                         </td>
                         <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
@@ -674,7 +691,7 @@ const HistoryModal = ({
                 </div>
               )}
 
-            {report.approvalStatus === "approved" && (
+            {activeReport.approvalStatus === "approved" && (
               <div className="p-5 bg-emerald-50/50 border border-emerald-200 rounded-2xl shadow-sm backdrop-blur-sm flex flex-col h-full transition-all hover:shadow-md group/approve">
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
@@ -699,8 +716,8 @@ const HistoryModal = ({
                     <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center border-2 border-emerald-100 shrink-0 select-none">
                       <span className="text-lg font-black text-emerald-600">
                         {(
-                          report.approvedBy?.engName ||
-                          report.approvedBy?.empId ||
+                          activeReport.approvedBy?.engName ||
+                          activeReport.approvedBy?.empId ||
                           "A"
                         )
                           .charAt(0)
@@ -709,12 +726,12 @@ const HistoryModal = ({
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="text-sm font-black text-slate-800 truncate tracking-tight">
-                        {report.approvedBy?.engName || report.approvedBy?.empId}
+                        {activeReport.approvedBy?.engName || activeReport.approvedBy?.empId}
                       </span>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider tabular-nums">
-                          {report.approvedAt
-                            ? formatDate(report.approvedAt)
+                          {activeReport.approvedAt
+                            ? formatDate(activeReport.approvedAt)
                             : ""}
                         </span>
                         <span className="text-[10px] text-slate-300">•</span>
@@ -725,12 +742,12 @@ const HistoryModal = ({
                     </div>
                   </div>
 
-                  {report.approvedRemark ? (
+                  {activeReport.approvedRemark ? (
                     <div className="relative z-10 text-[13px] text-slate-600 leading-relaxed bg-emerald-50/30 p-3 rounded-xl border border-emerald-100/50 italic">
                       <span className="text-emerald-300 mr-2 font-serif text-lg leading-none">
                         "
                       </span>
-                      {report.approvedRemark}
+                      {activeReport.approvedRemark}
                       <span className="text-emerald-300 ml-2 font-serif text-lg leading-none">
                         "
                       </span>
