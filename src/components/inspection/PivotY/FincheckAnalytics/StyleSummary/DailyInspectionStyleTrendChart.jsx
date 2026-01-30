@@ -14,29 +14,25 @@ const DailyInspectionStyleTrendChart = ({ styleNo }) => {
     end: "",
   });
 
-  // Flag to check if we have initialized the default range from backend
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     if (styleNo) {
-      // Reset when style changes
       setInitialized(false);
       setData([]);
       fetchData();
     }
   }, [styleNo]);
 
-  // Refetch when user manually changes dates (after initialization)
   useEffect(() => {
     if (initialized && styleNo && dateRange.start && dateRange.end) {
-      fetchData(true); // isManualFetch = true
+      fetchData(true);
     }
   }, [dateRange.start, dateRange.end]);
 
   const fetchData = async (isManualFetch = false) => {
     setLoading(true);
     try {
-      // If manual fetch, send dates. If initial, send nothing (backend calculates).
       const params = { styleNo };
       if (isManualFetch) {
         params.startDate = dateRange.start;
@@ -50,8 +46,6 @@ const DailyInspectionStyleTrendChart = ({ styleNo }) => {
 
       if (res.data.success) {
         setData(res.data.data);
-
-        // If this was the initial load, update the date pickers to match backend's calculated range
         if (!isManualFetch && res.data.range) {
           setDateRange(res.data.range);
           setInitialized(true);
@@ -67,7 +61,7 @@ const DailyInspectionStyleTrendChart = ({ styleNo }) => {
   // --- CHART RENDERING LOGIC ---
   const SVG_WIDTH = 1000;
   const SVG_HEIGHT = 350;
-  const PADDING = { top: 40, right: 60, bottom: 50, left: 60 };
+  const PADDING = { top: 50, right: 60, bottom: 50, left: 60 }; // Increased top padding for labels
 
   const processedChart = useMemo(() => {
     if (!data || data.length === 0) return null;
@@ -134,34 +128,34 @@ const DailyInspectionStyleTrendChart = ({ styleNo }) => {
           </h3>
         </div>
 
-        <div className="w-full md:w-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl p-1.5 shadow-sm">
-          <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center justify-center pl-2 text-gray-400">
-              <Calendar className="w-4 h-4" />
+        {/* Date Filter - Improved UI */}
+        <div className="w-full md:w-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl p-2 shadow-sm">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-700 px-2 py-1 rounded-lg">
+              <span className="text-[10px] font-bold text-gray-400 uppercase">
+                Start
+              </span>
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => handleDateChange("start", e.target.value)}
+                className="text-xs font-bold text-gray-700 dark:text-gray-200 bg-transparent outline-none cursor-pointer"
+              />
             </div>
-            <div className="grid grid-cols-2 gap-2 w-full">
-              <div className="relative">
-                <label className="text-[9px] font-bold text-gray-400 absolute top-0.5 left-1">
-                  START
-                </label>
-                <input
-                  type="date"
-                  value={dateRange.start}
-                  onChange={(e) => handleDateChange("start", e.target.value)}
-                  className="w-full pt-3 pb-0.5 px-1 text-xs font-bold text-gray-700 dark:text-gray-200 bg-transparent outline-none border-b border-transparent focus:border-purple-500"
-                />
-              </div>
-              <div className="relative">
-                <label className="text-[9px] font-bold text-gray-400 absolute top-0.5 left-1">
-                  END
-                </label>
-                <input
-                  type="date"
-                  value={dateRange.end}
-                  onChange={(e) => handleDateChange("end", e.target.value)}
-                  className="w-full pt-3 pb-0.5 px-1 text-xs font-bold text-gray-700 dark:text-gray-200 bg-transparent outline-none border-b border-transparent focus:border-purple-500"
-                />
-              </div>
+            <span className="text-gray-400 font-bold">-</span>
+            <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-700 px-2 py-1 rounded-lg">
+              <span className="text-[10px] font-bold text-gray-400 uppercase">
+                End
+              </span>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => handleDateChange("end", e.target.value)}
+                className="text-xs font-bold text-gray-700 dark:text-gray-200 bg-transparent outline-none cursor-pointer"
+              />
+            </div>
+            <div className="hidden sm:block text-gray-300">
+              <Calendar className="w-4 h-4" />
             </div>
           </div>
         </div>
@@ -190,7 +184,7 @@ const DailyInspectionStyleTrendChart = ({ styleNo }) => {
                 preserveAspectRatio="none"
                 className="w-full h-full"
               >
-                {/* Grid Lines */}
+                {/* --- Grid Lines --- */}
                 <line
                   x1={PADDING.left}
                   y1={PADDING.top}
@@ -209,7 +203,7 @@ const DailyInspectionStyleTrendChart = ({ styleNo }) => {
                   strokeWidth="2"
                 />
 
-                {/* Y-Axis Labels (Left: Sample) */}
+                {/* --- Y-Axis Labels (Left: Sample) --- */}
                 <text
                   x={PADDING.left - 10}
                   y={PADDING.top + 5}
@@ -238,7 +232,7 @@ const DailyInspectionStyleTrendChart = ({ styleNo }) => {
                   0
                 </text>
 
-                {/* Y-Axis Labels (Right: Defects) */}
+                {/* --- Y-Axis Labels (Right: Defects) --- */}
                 <text
                   x={SVG_WIDTH - PADDING.right + 10}
                   y={PADDING.top + 5}
@@ -267,10 +261,10 @@ const DailyInspectionStyleTrendChart = ({ styleNo }) => {
                   0
                 </text>
 
-                {/* Bars (Sample Size) */}
+                {/* --- Chart Content --- */}
                 {processedChart.items.map((d, i) => (
-                  <g key={`bar-${i}`}>
-                    {/* The Bar */}
+                  <g key={`group-${i}`}>
+                    {/* 1. Bar (Sample Size) */}
                     <rect
                       x={d.x - d.colWidth / 2}
                       y={d.barY}
@@ -280,19 +274,21 @@ const DailyInspectionStyleTrendChart = ({ styleNo }) => {
                       opacity={hoveredIndex === i ? "0.6" : "0.3"}
                       className="transition-all duration-300"
                       rx="4"
+                      onMouseEnter={() => setHoveredIndex(i)}
+                      onMouseLeave={() => setHoveredIndex(null)}
                     />
 
-                    {/* Sample Size Label On Top of Bar */}
+                    {/* Sample Size Label (Green) */}
                     <text
                       x={d.x}
-                      y={d.barY - 6} // Position slightly above bar
+                      y={d.barY - 8}
                       textAnchor="middle"
                       className="fill-emerald-600 dark:fill-emerald-400 font-bold text-[10px]"
                     >
                       {d.totalSample.toLocaleString()}
                     </text>
 
-                    {/* Report Count Badge (Blue Bubble at bottom of bar) */}
+                    {/* 2. Report Count Badge (Blue Bubble) */}
                     <g
                       transform={`translate(${d.x}, ${SVG_HEIGHT - PADDING.bottom - 15})`}
                     >
@@ -318,7 +314,7 @@ const DailyInspectionStyleTrendChart = ({ styleNo }) => {
                   </g>
                 ))}
 
-                {/* Line (Defects) */}
+                {/* 3. Line (Defects) */}
                 <polyline
                   points={processedChart.items
                     .map((d) => `${d.x},${d.lineY}`)
@@ -328,12 +324,12 @@ const DailyInspectionStyleTrendChart = ({ styleNo }) => {
                   strokeWidth="3"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="drop-shadow-md"
+                  className="drop-shadow-md pointer-events-none"
                 />
 
-                {/* Points & Labels (Defects) */}
+                {/* Points & Defect Labels */}
                 {processedChart.items.map((d, i) => (
-                  <g key={`point-${i}`}>
+                  <g key={`point-${i}`} className="pointer-events-none">
                     <circle
                       cx={d.x}
                       cy={d.lineY}
@@ -343,18 +339,18 @@ const DailyInspectionStyleTrendChart = ({ styleNo }) => {
                       strokeWidth="2.5"
                       className="transition-all duration-300"
                     />
-                    {/* Defect Qty Label */}
+                    {/* Defect Qty Label (Red, large) */}
                     <text
                       x={d.x}
-                      y={d.lineY - 12}
+                      y={d.lineY - 15}
                       textAnchor="middle"
-                      className="fill-red-600 font-bold text-[12px]"
-                      fontWeight="800"
+                      className="fill-red-600 font-bold text-[13px] drop-shadow-sm"
+                      fontWeight="900"
                     >
                       {d.totalDefects}
                     </text>
 
-                    {/* Date Label */}
+                    {/* Date Label (X-Axis) */}
                     <text
                       x={d.x}
                       y={SVG_HEIGHT - 15}
@@ -363,18 +359,6 @@ const DailyInspectionStyleTrendChart = ({ styleNo }) => {
                     >
                       {d.dateLabel}
                     </text>
-
-                    {/* Hover Hitbox */}
-                    <rect
-                      x={d.x - d.colWidth / 2 - 10}
-                      y={PADDING.top}
-                      width={d.colWidth + 20}
-                      height={SVG_HEIGHT - PADDING.top - PADDING.bottom}
-                      fill="transparent"
-                      onMouseEnter={() => setHoveredIndex(i)}
-                      onMouseLeave={() => setHoveredIndex(null)}
-                      className="cursor-crosshair"
-                    />
                   </g>
                 ))}
               </svg>

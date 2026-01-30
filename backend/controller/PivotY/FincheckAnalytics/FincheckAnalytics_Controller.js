@@ -513,7 +513,7 @@ export const getStyleSummaryAnalytics = async (req, res) => {
 
     const reports = await FincheckInspectionReports.find(query)
       .select(
-        "orderNos reportType inspectionMethod inspectionDetails inspectionConfig defectData productType productTypeId",
+        "orderNos reportType inspectionMethod inspectionDetails inspectionConfig defectData productType productTypeId buyer",
       )
       .populate("productTypeId", "imageURL")
       .lean();
@@ -723,6 +723,7 @@ export const getStyleSummaryAnalytics = async (req, res) => {
 // ============================================================
 // GET: Style Trend Analytics (Last 7 Days Logic)
 // ============================================================
+
 export const getStyleTrendAnalytics = async (req, res) => {
   try {
     const { styleNo, startDate, endDate } = req.query;
@@ -737,13 +738,11 @@ export const getStyleTrendAnalytics = async (req, res) => {
     let start, end;
 
     if (startDate && endDate) {
-      // User Provided Range
       start = new Date(startDate);
       start.setHours(0, 0, 0, 0);
       end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
     } else {
-      // Default: Find Last Inspection Date for this Style
       const lastReport = await FincheckInspectionReports.findOne({
         orderNos: styleNo,
         status: { $ne: "cancelled" },
@@ -752,19 +751,18 @@ export const getStyleTrendAnalytics = async (req, res) => {
         .select("inspectionDate");
 
       if (!lastReport) {
-        return res.status(200).json({ success: true, data: [] }); // No data
+        return res.status(200).json({ success: true, data: [] });
       }
 
       end = new Date(lastReport.inspectionDate);
       end.setHours(23, 59, 59, 999);
 
-      // Calculate Start (End - 7 days)
       start = new Date(end);
       start.setDate(start.getDate() - 7);
       start.setHours(0, 0, 0, 0);
     }
 
-    // 2. Aggregation Pipeline
+    // 2. Aggregation Pipeline (Optimized: No Unwind)
     const pipeline = [
       {
         $match: {
@@ -773,12 +771,26 @@ export const getStyleTrendAnalytics = async (req, res) => {
           inspectionDate: { $gte: start, $lte: end },
         },
       },
-      // Normalize Defects (Same robust logic as before)
       {
         $addFields: {
-          normalizedDefects: {
+          // 1. Format Date
+          dateKey: {
+            $dateToString: { format: "%Y-%m-%d", date: "$inspectionDate" },
+          },
+
+          // 2. Calculate Sample Size for this specific report
+          reportSampleSize: {
+            $cond: [
+              { $eq: ["$inspectionMethod", "AQL"] },
+              { $ifNull: ["$inspectionDetails.aqlSampleSize", 0] },
+              { $ifNull: ["$inspectionConfig.sampleSize", 0] },
+            ],
+          },
+
+          // 3. Construct Flat Defect Array for this report (Internal use)
+          _tempDefects: {
             $concatArrays: [
-              // Location-Based
+              // Location Defects
               {
                 $reduce: {
                   input: {
@@ -803,7 +815,7 @@ export const getStyleTrendAnalytics = async (req, res) => {
                                 $map: {
                                   input: { $ifNull: ["$$this.positions", []] },
                                   as: "pos",
-                                  in: { qty: 1 },
+                                  in: 1, // Just count 1 for each position
                                 },
                               },
                             ],
@@ -814,7 +826,7 @@ export const getStyleTrendAnalytics = async (req, res) => {
                   },
                 },
               },
-              // No-Location
+              // No-Location Defects
               {
                 $map: {
                   input: {
@@ -825,50 +837,35 @@ export const getStyleTrendAnalytics = async (req, res) => {
                     },
                   },
                   as: "noLoc",
-                  in: { qty: { $ifNull: ["$$noLoc.qty", 1] } },
+                  in: { $ifNull: ["$$noLoc.qty", 1] },
                 },
               },
             ],
           },
-          // Normalize Sample Size
-          calculatedSampleSize: {
-            $cond: [
-              { $eq: ["$inspectionMethod", "AQL"] },
-              { $ifNull: ["$inspectionDetails.aqlSampleSize", 0] },
-              { $ifNull: ["$inspectionConfig.sampleSize", 0] },
-            ],
-          },
-          // Format Date
-          dateKey: {
-            $dateToString: { format: "%Y-%m-%d", date: "$inspectionDate" },
-          },
         },
       },
+      // 4. Calculate Total Defects PER REPORT (Sum the array)
       {
-        $unwind: {
-          path: "$normalizedDefects",
-          preserveNullAndEmptyArrays: true,
+        $addFields: {
+          reportDefectTotal: { $sum: "$_tempDefects" },
         },
       },
+      // 5. Group By Date (Summing up report-level totals)
       {
         $group: {
           _id: "$dateKey",
-          uniqueReports: { $addToSet: "$_id" },
-          docs: {
-            $addToSet: {
-              id: "$_id",
-              sample: "$calculatedSampleSize",
-            },
-          },
-          totalDefects: { $sum: { $ifNull: ["$normalizedDefects.qty", 0] } },
+          reportCount: { $sum: 1 }, // Simple count of documents
+          totalDefects: { $sum: "$reportDefectTotal" },
+          totalSample: { $sum: "$reportSampleSize" },
         },
       },
+      // 6. Project Final Shape
       {
         $project: {
           date: "$_id",
-          reportCount: { $size: "$uniqueReports" },
+          reportCount: 1,
           totalDefects: 1,
-          totalSample: { $sum: "$docs.sample" },
+          totalSample: 1,
         },
       },
       { $sort: { date: 1 } },
@@ -876,16 +873,15 @@ export const getStyleTrendAnalytics = async (req, res) => {
 
     const data = await FincheckInspectionReports.aggregate(pipeline);
 
-    // Filter out Sundays (JavaScript side)
+    // Filter out Sundays
     const filteredData = data.filter((d) => {
       const day = new Date(d.date).getDay();
-      return day !== 0; // 0 is Sunday
+      return day !== 0;
     });
 
     return res.status(200).json({
       success: true,
       data: filteredData,
-      // Return the calculated range so frontend can update its state
       range: {
         start: start.toISOString().split("T")[0],
         end: end.toISOString().split("T")[0],
