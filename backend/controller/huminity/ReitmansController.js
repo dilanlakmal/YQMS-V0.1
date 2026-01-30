@@ -8,59 +8,66 @@ export const transformReitmansHistory = (payload) => {
   const records = Array.isArray(payload.inspectionRecords)
     ? payload.inspectionRecords
     : [];
-  return records.map((record) => ({
-    date: payload.date || new Date().toISOString(),
-    generalRemark: payload.generalRemark || payload.remark || "",
+  const historyObj = {};
+  records.forEach((record, index) => {
+    const itemName = `Item ${index + 1}`;
+    const entry = {
+      date: payload.date || new Date().toISOString(),
+      generalRemark: payload.generalRemark || payload.remark || "",
 
-    top: {
-      body: record.top?.body || "",
-      bodyStatus:
-        record.top?.bodyStatus ||
-        (record.top?.pass ? "pass" : record.top?.fail ? "fail" : ""),
-      ribs: record.top?.ribs || "",
-      ribsStatus:
-        record.top?.ribsStatus ||
-        (record.top?.pass ? "pass" : record.top?.fail ? "fail" : ""),
-      status:
-        record.top?.status ||
-        (record.top?.pass ? "pass" : record.top?.fail ? "fail" : ""),
-    },
-    middle: {
-      body: record.middle?.body || "",
-      bodyStatus:
-        record.middle?.bodyStatus ||
-        (record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""),
-      ribs: record.middle?.ribs || "",
-      ribsStatus:
-        record.middle?.ribsStatus ||
-        (record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""),
-      status:
-        record.middle?.status ||
-        (record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""),
-    },
-    bottom: {
-      body: record.bottom?.body || "",
-      bodyStatus:
-        record.bottom?.bodyStatus ||
-        (record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""),
-      ribs: record.bottom?.ribs || "",
-      ribsStatus:
-        record.bottom?.ribsStatus ||
-        (record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""),
-      status:
-        record.bottom?.status ||
-        (record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""),
-    },
+      top: {
+        body: record.top?.body || "",
+        bodyStatus:
+          record.top?.bodyStatus ||
+          (record.top?.pass ? "pass" : record.top?.fail ? "fail" : ""),
+        ribs: record.top?.ribs || "",
+        ribsStatus:
+          record.top?.ribsStatus ||
+          (record.top?.pass ? "pass" : record.top?.fail ? "fail" : ""),
+        status:
+          record.top?.status ||
+          (record.top?.pass ? "pass" : record.top?.fail ? "fail" : ""),
+      },
+      middle: {
+        body: record.middle?.body || "",
+        bodyStatus:
+          record.middle?.bodyStatus ||
+          (record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""),
+        ribs: record.middle?.ribs || "",
+        ribsStatus:
+          record.middle?.ribsStatus ||
+          (record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""),
+        status:
+          record.middle?.status ||
+          (record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""),
+      },
+      bottom: {
+        body: record.bottom?.body || "",
+        bodyStatus:
+          record.bottom?.bodyStatus ||
+          (record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""),
+        ribs: record.bottom?.ribs || "",
+        ribsStatus:
+          record.bottom?.ribsStatus ||
+          (record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""),
+        status:
+          record.bottom?.status ||
+          (record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""),
+      },
 
-    images: Array.isArray(record.images) ? record.images : [],
+      images: Array.isArray(record.images) ? record.images : [],
 
-    saveTime: new Date().toLocaleTimeString("en-US", {
-      hour12: true,
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    }),
-  }));
+      saveTime: new Date().toLocaleTimeString("en-US", {
+        hour12: true,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }),
+    };
+    historyObj[itemName] = { "Check 1": entry };
+  });
+
+  return historyObj;
 };
 
 // Helper to get Reitmans reports based on query
@@ -71,13 +78,18 @@ export const getReitmansReports = async (query, limit = 1000) => {
 };
 
 export const createReitmansReport = async (payload, history, status) => {
-  const doc = new ReitmansReport({
-    ...payload,
-    status: status,
-    history: history,
-  });
-  await doc.save();
-  return doc;
+  try {
+    const doc = new ReitmansReport({
+      ...payload,
+      status: status,
+      history: history,
+    });
+    await doc.save();
+    return doc;
+  } catch (error) {
+    console.error("Error creating Reitmans report:", error);
+    throw error;
+  }
 };
 
 export const updateReitmansReport = async (id, payload) => {
@@ -86,17 +98,21 @@ export const updateReitmansReport = async (id, payload) => {
   delete payload.createdAt;
   delete payload.updatedAt;
 
-  // Recalculate top-level status based on the latest history entry
-  if (Array.isArray(payload.history) && payload.history.length > 0) {
-    const latest = payload.history[payload.history.length - 1];
-    if (
-      latest.top?.status === "pass" &&
-      latest.middle?.status === "pass" &&
-      latest.bottom?.status === "pass"
-    ) {
-      payload.status = "Passed";
-    } else {
-      payload.status = "Failed";
+  // Recalculate top-level status based on the latest check for every item
+  if (payload.history && typeof payload.history === "object") {
+    const items = Object.values(payload.history);
+    if (items.length > 0) {
+      const allPassed = items.every((checksObj) => {
+        const checkKeys = Object.keys(checksObj || {}).sort((a, b) => {
+          const numA = parseInt(a.replace("Check ", ""));
+          const numB = parseInt(b.replace("Check ", ""));
+          return numB - numA;
+        });
+        const latestCheck = checksObj[checkKeys[0]];
+        // Only require the 'top' section to pass in the simplified flow
+        return latestCheck?.top?.status === "pass";
+      });
+      payload.status = allPassed ? "Passed" : "Failed";
     }
   }
 
@@ -135,10 +151,6 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
       });
     }
 
-    console.log(
-      `[ReitmansMatch] Found rulesDoc: ${rulesDoc?._id}, Found style doc: ${doc?._id}`,
-    );
-
     // Fetch order data for fabric composition
     const ordersCol = ymProdConnection.db.collection("yorksys_orders");
     const order = await ordersCol.findOne({
@@ -159,10 +171,6 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
     let orderFabrics = [];
     if (order && Array.isArray(order.FabricContent)) {
       orderFabrics = order.FabricContent;
-      console.log(
-        `[ReitmansMatch] Order found for ${moNo}. FabricContent:`,
-        JSON.stringify(order.FabricContent),
-      );
     } else {
       console.log(
         `[ReitmansMatch] No FabricContent found in order for ${moNo}`,
@@ -186,10 +194,6 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
       const sName = sFab
         ? (sFab.fabricName || sFab.fabric || "").toUpperCase().trim()
         : "";
-
-      console.log(
-        `[ReitmansMatch] Target: Primary=${pName} (${pPct}%), Secondary=${sName}`,
-      );
 
       finalPrimary = { fabricName: pName, percentage: pPct };
       if (sName)
@@ -219,7 +223,6 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
           return Number(rangeStr) === actualPct;
         };
 
-        console.log(`[ReitmansMatch] Checking ${targetRules.length} rules...`);
         let bestMatch = targetRules.find((rule) => {
           const rPName = (rule.primary || "").toUpperCase().trim();
           const rSName = (rule.secondary || "").toUpperCase().trim();
@@ -239,16 +242,7 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
           return pMatch && rangeMatch && sMatch;
         });
 
-        if (bestMatch)
-          console.log(
-            `[ReitmansMatch] Strict match found:`,
-            JSON.stringify(bestMatch),
-          );
-
         if (!bestMatch) {
-          console.log(
-            `[ReitmansMatch] No strict match. Trying fallback 1 (Primary + Range + No Secondary)...`,
-          );
           bestMatch = targetRules.find((rule) => {
             const rPName = (rule.primary || "").toUpperCase().trim();
             const pMatch = pName.includes(rPName) || rPName.includes(pName);
@@ -261,9 +255,6 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
         }
 
         if (!bestMatch) {
-          console.log(
-            `[ReitmansMatch] No Match yet. Trying fallback 2 (Primary Name Only + No Secondary)...`,
-          );
           bestMatch = targetRules.find((rule) => {
             const rPName = (rule.primary || "").toUpperCase().trim();
             return (
@@ -274,9 +265,6 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
         }
 
         if (!bestMatch) {
-          console.log(
-            `[ReitmansMatch] No Match yet. Trying fallback 3 (Loose Primary + Range)...`,
-          );
           bestMatch = targetRules.find((rule) => {
             const rPName = (rule.primary || "").toUpperCase().trim();
             const pMatch = pName.includes(rPName) || rPName.includes(pName);
@@ -289,10 +277,6 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
         }
 
         if (bestMatch) {
-          console.log(
-            `[ReitmansMatch] FINAL MATCH:`,
-            JSON.stringify(bestMatch),
-          );
           finalValue =
             bestMatch.upperCentisimal ||
             bestMatch.upperCentisimalIndex ||

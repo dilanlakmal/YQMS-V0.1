@@ -43,12 +43,38 @@ export default function UpdateModelReimans({
 
   useEffect(() => {
     if (open && report) {
-      const sourceRecords =
-        report.inspectionRecords && report.inspectionRecords.length > 0
-          ? report.inspectionRecords
-          : report.history && report.history.length > 0
-            ? report.history
-            : [];
+      let sourceRecords = [];
+      if (report.inspectionRecords && report.inspectionRecords.length > 0) {
+        sourceRecords = report.inspectionRecords;
+      } else if (
+        report.history &&
+        typeof report.history === "object" &&
+        !Array.isArray(report.history)
+      ) {
+        // Convert nested Map history (Item -> Check) to latest records for editing
+        const historyMap = report.history;
+        sourceRecords = Object.keys(historyMap)
+          .sort((a, b) => {
+            const numA = parseInt(a.replace("Item ", ""));
+            const numB = parseInt(b.replace("Item ", ""));
+            return numA - numB;
+          })
+          .map((itemKey) => {
+            const checks = historyMap[itemKey] || {};
+            const checkKeys = Object.keys(checks).sort((a, b) => {
+              const numA = parseInt(a.replace("Check ", ""));
+              const numB = parseInt(b.replace("Check ", ""));
+              return numB - numA; // Sort descending to get latest
+            });
+            return {
+              ...checks[checkKeys[0]],
+              itemName: itemKey, // Store the item name to identify it during save
+              checkCount: checkKeys.length,
+            };
+          });
+      } else if (Array.isArray(report.history)) {
+        sourceRecords = report.history;
+      }
 
       const specLimit = Number(report.upperCentisimalIndex);
       const parseNumberInternal = (v) => {
@@ -230,18 +256,14 @@ export default function UpdateModelReimans({
 
       newRecords[recordIndex] = updatedRecord;
 
-      // Sync with moistureRateAfter (take the maximum of the latest check)
+      // Sync with moistureRateAfter (take the reading of the latest check)
       if (recordIndex === newRecords.length - 1) {
-        const maxReading = Math.max(
-          parseNumber(updatedRecord.top.body) || 0,
-          parseNumber(updatedRecord.middle.body) || 0,
-          parseNumber(updatedRecord.bottom.body) || 0,
-        );
-        if (maxReading > 0) {
+        const moistureValue = parseNumber(updatedRecord.top.body) || 0;
+        if (moistureValue > 0) {
           return {
             ...prev,
             inspectionRecords: newRecords,
-            moistureRateAfter: maxReading.toString(),
+            moistureRateAfter: moistureValue.toString(),
           };
         }
       }
@@ -324,60 +346,84 @@ export default function UpdateModelReimans({
           : "http://localhost:5001";
       const prefix = base.endsWith("/") ? base.slice(0, -1) : base;
 
-      const currentEditRecords = formData.inspectionRecords.map((rec) => ({
-        top: {
-          body: rec.top.body,
-          ribs: "",
-          status: rec.top.pass ? "pass" : rec.top.fail ? "fail" : "",
-        },
-        middle: {
-          body: rec.middle.body,
-          ribs: "",
-          status: rec.middle.pass ? "pass" : rec.middle.fail ? "fail" : "",
-        },
-        bottom: {
-          body: rec.bottom.body,
-          ribs: "",
-          status: rec.bottom.pass ? "pass" : rec.bottom.fail ? "fail" : "",
-        },
-        images: rec.images || [],
-        date: formData.date || rec.date,
-        generalRemark: formData.generalRemark || rec.remark || "",
-        // Capture full Reitmans snapshot in history
-        factoryStyleNo: formData.factoryStyleNo,
-        buyerStyle: formData.buyerStyle,
-        customer: formData.customer,
-        colorName: formData.colorName,
-        poLine: formData.poLine,
-        composition: formData.composition,
-        primaryFabric: formData.primaryFabric,
-        primaryPercentage: formData.primaryPercentage,
-        upperCentisimalIndex: formData.upperCentisimalIndex,
-        secondaryFabric: formData.secondaryFabric,
-        secondaryPercentage: formData.secondaryPercentage,
-        timeChecked: formData.timeChecked,
-        moistureRateBeforeDehumidify: formData.moistureRateBeforeDehumidify,
-        noPcChecked: formData.noPcChecked,
-        timeIn: formData.timeIn,
-        timeOut: formData.timeOut,
-        moistureRateAfter: formData.moistureRateAfter,
-        matchedRule: formData.matchedRule,
-        saveTime: new Date().toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true,
+      const currentEditRecords = formData.inspectionRecords.map(
+        (rec, index) => ({
+          top: {
+            body: rec.top.body,
+            ribs: "",
+            status: rec.top.pass ? "pass" : rec.top.fail ? "fail" : "",
+          },
+          middle: { body: "", ribs: "", status: "" },
+          bottom: { body: "", ribs: "", status: "" },
+          images: rec.images || [],
+          date: formData.date || rec.date,
+          generalRemark: formData.generalRemark || rec.remark || "",
+          // Capture full Reitmans snapshot in history
+          factoryStyleNo: formData.factoryStyleNo,
+          buyerStyle: formData.buyerStyle,
+          customer: formData.customer,
+          colorName: formData.colorName,
+          poLine: formData.poLine,
+          composition: formData.composition,
+          primaryFabric: formData.primaryFabric,
+          primaryPercentage: formData.primaryPercentage,
+          upperCentisimalIndex: formData.upperCentisimalIndex,
+          secondaryFabric: formData.secondaryFabric,
+          secondaryPercentage: formData.secondaryPercentage,
+          timeChecked: formData.timeChecked,
+          moistureRateBeforeDehumidify: formData.moistureRateBeforeDehumidify,
+          noPcChecked: formData.noPcChecked,
+          timeIn: formData.timeIn,
+          timeOut: formData.timeOut,
+          moistureRateAfter: formData.moistureRateAfter,
+          matchedRule: formData.matchedRule,
+          itemName: rec.itemName || `Item ${index + 1}`,
         }),
-      }));
+      );
 
-      const previousHistory = report.history || [];
-      const lastEditedRecord =
-        currentEditRecords[currentEditRecords.length - 1];
-      const newHistory = [...previousHistory, lastEditedRecord];
+      const previousHistory = { ...(report.history || {}) };
+
+      currentEditRecords.forEach((rec) => {
+        const itemKey = rec.itemName;
+        const previousChecks =
+          previousHistory[itemKey] &&
+          typeof previousHistory[itemKey] === "object"
+            ? previousHistory[itemKey]
+            : {};
+        const checkKeys = Object.keys(previousChecks).sort((a, b) => {
+          const numA = parseInt(a.replace("Check ", ""));
+          const numB = parseInt(b.replace("Check ", ""));
+          return numB - numA;
+        });
+
+        const latestCheck = previousChecks[checkKeys[0]];
+        const newCheckNumber = checkKeys.length + 1;
+        const newCheckKey = `Check ${newCheckNumber}`;
+
+        // Detection: checking if readings changed
+        const isChanged =
+          !latestCheck ||
+          String(rec.top?.body) !== String(latestCheck.top?.body);
+
+        if (isChanged) {
+          previousHistory[itemKey] = {
+            ...previousChecks,
+            [newCheckKey]: {
+              ...rec,
+              saveTime: new Date().toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true,
+              }),
+            },
+          };
+        }
+      });
 
       const payload = {
         ...formData,
-        history: newHistory,
-        inspectionRecords: [lastEditedRecord],
+        history: previousHistory,
+        inspectionRecords: currentEditRecords,
       };
 
       const response = await fetch(
@@ -728,8 +774,7 @@ export default function UpdateModelReimans({
                   if (index !== formData.inspectionRecords.length - 1)
                     return null;
                   const isExpanded = index === expandedRecordIndex;
-                  const isPassed =
-                    record.top.pass && record.middle.pass && record.bottom.pass;
+                  const isPassed = record.top.pass;
 
                   return (
                     <div
@@ -750,74 +795,70 @@ export default function UpdateModelReimans({
 
                       {isExpanded && (
                         <div className="space-y-4">
-                          {["top", "middle", "bottom"].map((section) => (
-                            <div
-                              key={section}
-                              className="flex flex-col md:flex-row gap-4 w-full items-center p-3 rounded-xl shadow-sm bg-white border border-gray-100 mb-2"
-                            >
-                              <div className="w-20 font-bold capitalize text-gray-700">
-                                {section}
-                              </div>
-
-                              <div className="flex flex-1 items-center gap-2 w-full">
-                                <div className="flex-1">
-                                  <input
-                                    type="number"
-                                    placeholder="Reading"
-                                    value={record[section].body}
-                                    onChange={(e) =>
-                                      updateSectionData(
-                                        index,
-                                        section,
-                                        "body",
-                                        e.target.value,
-                                      )
-                                    }
-                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                  />
-                                </div>
-                                {record[section].pass ? (
-                                  <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
-                                    <svg
-                                      className="w-3.5 h-3.5 mr-1.5"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2.5}
-                                        d="M5 13l4 4L19 7"
-                                      />
-                                    </svg>
-                                    Pass
-                                  </span>
-                                ) : record[section].fail ? (
-                                  <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
-                                    <svg
-                                      className="w-3.5 h-3.5 mr-1.5"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2.5}
-                                        d="M6 18L18 6M6 6l12 12"
-                                      />
-                                    </svg>
-                                    Fail
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-400 text-xs px-2 italic">
-                                    N/A
-                                  </span>
-                                )}
-                              </div>
+                          <div className="flex flex-col md:flex-row gap-4 w-full items-center p-4 rounded-2xl shadow-sm bg-white border border-blue-100 mb-2 transition-all hover:shadow-md">
+                            <div className="w-40 font-black uppercase text-[11px] text-blue-600 tracking-wider">
+                              Moisture Reading
                             </div>
-                          ))}
+
+                            <div className="flex flex-1 items-center gap-4 w-full">
+                              <div className="flex-1 relative">
+                                <input
+                                  type="number"
+                                  placeholder="0.0"
+                                  value={record.top.body}
+                                  onChange={(e) =>
+                                    updateSectionData(
+                                      index,
+                                      "top",
+                                      "body",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full pl-4 pr-10 py-3 border-2 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-100 border-gray-100 font-bold text-gray-700 transition-all focus:border-blue-400"
+                                />
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">
+                                  %
+                                </span>
+                              </div>
+                              {record.top.pass ? (
+                                <span className="inline-flex items-center px-4 py-2 rounded-xl bg-emerald-50 text-emerald-600 font-black text-[10px] uppercase tracking-widest border border-emerald-100">
+                                  <svg
+                                    className="w-3.5 h-3.5 mr-2 stroke-[3]"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M5 13l4 4L19 7"
+                                    />
+                                  </svg>
+                                  Pass
+                                </span>
+                              ) : record.top.fail ? (
+                                <span className="inline-flex items-center px-4 py-2 rounded-xl bg-rose-50 text-rose-500 font-black text-[10px] uppercase tracking-widest border border-rose-100">
+                                  <svg
+                                    className="w-3.5 h-3.5 mr-2 stroke-[3]"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M6 18L18 6M6 6l12 12"
+                                    />
+                                  </svg>
+                                  Fail
+                                </span>
+                              ) : (
+                                <span className="text-gray-300 font-bold text-[10px] px-4 uppercase tracking-widest italic">
+                                  Pending
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       )}
 

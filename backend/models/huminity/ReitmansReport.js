@@ -47,7 +47,7 @@ const reitmansReportSchema = new mongoose.Schema(
     timeIn: { type: String, default: "" },
     timeOut: { type: String, default: "" },
     moistureRateAfter: { type: String, default: "" },
-    date: { type: String, default: "" },
+    date: { type: Date, default: Date.now },
     status: {
       type: String,
       enum: ["Failed", "Passed"],
@@ -71,7 +71,14 @@ const reitmansReportSchema = new mongoose.Schema(
       empId: { type: String },
       engName: { type: String },
     },
-    history: [reitmansHistorySchema],
+    history: {
+      type: Map,
+      of: {
+        type: Map,
+        of: reitmansHistorySchema,
+      },
+      default: {},
+    },
   },
   {
     collection: "reitmans_reports",

@@ -4,6 +4,7 @@ import ExportPanel from "./Export";
 import Dashboard from "./dashboard";
 import ReitmansForm from "./Reitmans";
 import { useAuth } from "../../authentication/AuthContext";
+import { CheckCircle2, AlertCircle, X } from "lucide-react";
 
 const FormPage = () => {
   const { user } = useAuth();
@@ -30,6 +31,7 @@ const FormPage = () => {
   const [firstCheckDate, setFirstCheckDate] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [isStyleComplete, setIsStyleComplete] = useState(false);
+  const [isAfterDryMode, setIsAfterDryMode] = useState(false);
   const [formData, setFormData] = useState({
     buyerStyle: "",
     factoryStyleNo: "",
@@ -69,7 +71,6 @@ const FormPage = () => {
     try {
       const ts = new Date().toLocaleTimeString();
       setCalcSteps((prev) => [...prev, `${ts}: ${step}`]);
-      console.log(`CALC STEP - ${ts}:`, step);
     } catch (e) {
       console.error("Error adding calc step", e);
     }
@@ -151,8 +152,7 @@ const FormPage = () => {
             : Array.isArray(result)
               ? result
               : [];
-        console.log("api/yorksys-orders response:", result);
-        console.log("parsed orders array:", orders);
+
         addCalcStep(
           `Fetched orders: ${Array.isArray(orders) ? orders.length : 0}`,
         );
@@ -178,10 +178,7 @@ const FormPage = () => {
           const humJson = await humRes.json();
           const humDocs = humJson && humJson.data ? humJson.data : [];
           setHumidityDocs(humDocs);
-          console.log(
-            "humidity_data docs (fetched with yorksys-orders):",
-            humDocs,
-          );
+
           addCalcStep(
             `Fetched humidity_data docs: ${Array.isArray(humDocs) ? humDocs.length : 0}`,
           );
@@ -227,6 +224,10 @@ const FormPage = () => {
     // Set selected moNo into the factory style field and close dropdown
     setOrderNoSearch(moNo);
 
+    // Reset ribsAvailable and afterDry mode before starting any fetching
+    setRibsAvailable(false);
+    setIsAfterDryMode(false);
+
     // Reset form data for the new style selection to prevent carrying over old inspection data
     setFormData((prev) => {
       // Revoke object URLs for all images to prevent memory leaks
@@ -247,6 +248,8 @@ const FormPage = () => {
         generalRemark: "",
         inspectorSignature: "",
         qamSignature: "",
+        aquaboySpecBody: "",
+        aquaboySpecRibs: "",
         inspectionRecords: [
           {
             top: { body: "", ribs: "", pass: false, fail: false },
@@ -300,7 +303,7 @@ const FormPage = () => {
       );
       const json = await res.json();
       const order = json && json.data ? json.data : json || null;
-      console.log("order by moNo:", json);
+
       addCalcStep(`Fetched order details for "${moNo}"`);
       if (order) {
         let fabricationStr = "";
@@ -377,37 +380,111 @@ const FormPage = () => {
         try {
           const detectRibsAvailable = (ord) => {
             if (!ord) return false;
-            if (typeof ord.hasRibs === "boolean") return ord.hasRibs;
-            if (typeof ord.ribsRequired === "boolean") return ord.ribsRequired;
+            // Check for explicit flags (truthy check to handle string "true" or number 1)
+            if (
+              ord.hasRibs === true ||
+              ord.hasRibs === "true" ||
+              ord.hasRibs === 1
+            )
+              return true;
+            if (
+              ord.ribsRequired === true ||
+              ord.ribsRequired === "true" ||
+              ord.ribsRequired === 1
+            )
+              return true;
+
+            // Check explicit RibContent array from YorksysOrders
+            if (Array.isArray(ord.RibContent) && ord.RibContent.length > 0) {
+              if (
+                ord.RibContent.some((rc) => rc.fabricName || rc.percentageValue)
+              )
+                return true;
+            }
+
+            // Targeted string search in descriptive fields
+            const searchFields = [
+              ord.style,
+              ord.factoryStyleName,
+              ord.description,
+              ord.fabrication,
+              ...(Array.isArray(ord.FabricContent)
+                ? ord.FabricContent.map((f) => f.fabricName || f.fabric || "")
+                : []),
+              ...(Array.isArray(ord.RibContent)
+                ? ord.RibContent.map((f) => f.fabricName || f.fabric || "")
+                : []),
+              ...(Array.isArray(ord.SKUData)
+                ? ord.SKUData.map((s) => s.Color || "")
+                : []),
+            ];
+
+            if (
+              searchFields.some(
+                (field) => field && String(field).toLowerCase().includes("rib"),
+              )
+            )
+              return true;
+
+            // Check SKUData for actual Ribs measurements
             if (
               Array.isArray(ord.SKUData) &&
               ord.SKUData.some(
                 (s) =>
                   s.Ribs !== undefined &&
                   s.Ribs !== null &&
-                  String(s.Ribs).trim() !== "",
+                  String(s.Ribs).trim() !== "" &&
+                  String(s.Ribs).trim().toLowerCase() !== "n/a" &&
+                  String(s.Ribs).trim() !== "0",
               )
             )
               return true;
+
+            // Check FabricContent for ribs-specific metadata
             if (
               Array.isArray(ord.FabricContent) &&
               ord.FabricContent.some(
                 (fc) =>
-                  fc.ribs !== undefined &&
-                  fc.ribs !== null &&
-                  String(fc.ribs).trim() !== "",
+                  (fc.ribs !== undefined &&
+                    fc.ribs !== null &&
+                    String(fc.ribs).trim() !== "") ||
+                  (fc.fabricName &&
+                    String(fc.fabricName).toLowerCase().includes("rib")),
               )
             )
               return true;
-            try {
-              const ordStr = JSON.stringify(ord).toLowerCase();
-              if (ordStr.includes("rib")) return true;
-            } catch (e) {}
+
             return false;
           };
           const ribsFlag = detectRibsAvailable(order);
-          setRibsAvailable(ribsFlag);
-          addCalcStep(`Ribs availability detected: ${ribsFlag}`);
+          setRibsAvailable((prev) => prev || ribsFlag);
+          addCalcStep(
+            `Ribs availability detection: ${ribsFlag ? "ENABLED" : "DISABLED"}`,
+          );
+          if (ribsFlag) {
+            const detectReason = (ord) => {
+              if (ord.hasRibs || ord.ribsRequired) return "explicit flag";
+              if (Array.isArray(ord.RibContent) && ord.RibContent.length > 0)
+                return "RibContent array";
+              if (
+                Array.isArray(ord.SKUData) &&
+                ord.SKUData.some((s) => s.Ribs && s.Ribs !== "0")
+              )
+                return "SKU measurement data";
+              if (
+                Array.isArray(ord.FabricContent) &&
+                ord.FabricContent.some(
+                  (fc) =>
+                    fc.ribs ||
+                    (fc.fabricName &&
+                      fc.fabricName.toLowerCase().includes("rib")),
+                )
+              )
+                return "Fabric metadata";
+              return "descriptive keyword match";
+            };
+            addCalcStep(`Ribs enabled because of: ${detectReason(order)}`);
+          }
           if (!ribsFlag) {
             // clear ribs values from existing inspection records to avoid stale data
             setFormData((prev) => ({
@@ -451,18 +528,16 @@ const FormPage = () => {
               fabricContentArray = [];
             }
           } else {
-            fabricContentArray = rawFabricContent
-              .filter((fc) => {
-                const name = (fc.fabricName || fc.fabric || fc.name || "")
-                  .toString()
-                  .trim();
-                const pctPresent =
-                  fc.percentageValue !== undefined &&
-                  fc.percentageValue !== null &&
-                  fc.percentageValue !== "";
-                return name !== "" && pctPresent;
-              })
-              .slice(0, 2);
+            fabricContentArray = rawFabricContent.filter((fc) => {
+              const name = (fc.fabricName || fc.fabric || fc.name || "")
+                .toString()
+                .trim();
+              const pctPresent =
+                fc.percentageValue !== undefined &&
+                fc.percentageValue !== null &&
+                fc.percentageValue !== "";
+              return name !== "" && pctPresent;
+            });
           }
           addCalcStep(
             `Normalized FabricContent array length: ${fabricContentArray.length}`,
@@ -542,10 +617,7 @@ const FormPage = () => {
               ...prev,
               aquaboySpecBody: totalFormatted,
             }));
-            console.log("FabricContent -> FiberName matches:", matches, {
-              buyerEntry,
-              aquaboySpecBody: totalFormatted,
-            });
+
             addCalcStep(
               `Computed aquaboySpecBody total raw=${total} rounded="${totalFormatted}"`,
             );
@@ -601,7 +673,7 @@ const FormPage = () => {
           if (!firstCreatedAt) firstCreatedAt = report.createdAt || report.date;
           latestReport = report;
 
-          const historyArray = report.history || [];
+          const historyMap = report.history || {};
 
           const determineStatus = (section) => {
             if (!section) return "fail";
@@ -622,53 +694,60 @@ const FormPage = () => {
             const isRibsPass =
               !isNaN(ribsVal) && !isNaN(ribsSpecVal) && ribsVal <= ribsSpecVal;
 
-            // To be 'pass' overall, it needs to pass on all available readings
-            // If one is missing but the other passes, it's still pending/fail in this logic
             if (ribsAvailable) {
               return isBodyPass && isRibsPass ? "pass" : "fail";
             }
             return isBodyPass ? "pass" : "fail";
           };
 
-          historyArray.forEach((historyEntry) => {
-            const topStatus =
-              historyEntry.top?.status || determineStatus(historyEntry.top);
-            const middleStatus =
-              historyEntry.middle?.status ||
-              determineStatus(historyEntry.middle);
-            const bottomStatus =
-              historyEntry.bottom?.status ||
-              determineStatus(historyEntry.bottom);
+          // Process nested Map history
+          Object.keys(historyMap).forEach((itemKey) => {
+            const checks = historyMap[itemKey] || {};
+            Object.keys(checks).forEach((checkKey) => {
+              const historyEntry = checks[checkKey];
+              if (!historyEntry) return;
 
-            allHistoryEntries.push({
-              date:
-                historyEntry.date ||
-                historyEntry.saveTime ||
-                report.createdAt ||
-                report.date ||
-                "",
-              factoryStyleNo: report.factoryStyleNo || "",
-              top: topStatus,
-              middle: middleStatus,
-              bottom: bottomStatus,
-              topBodyReading: historyEntry.top?.body || "",
-              topRibsReading: historyEntry.top?.ribs || "",
-              middleBodyReading: historyEntry.middle?.body || "",
-              middleRibsReading: historyEntry.middle?.ribs || "",
-              bottomBodyReading: historyEntry.bottom?.body || "",
-              bottomRibsReading: historyEntry.bottom?.ribs || "",
-              beforeDryRoom:
-                historyEntry.beforeDryRoom ||
-                historyEntry.beforeDryRoomTime ||
-                "",
-              afterDryRoom:
-                historyEntry.afterDryRoom ||
-                historyEntry.afterDryRoomTime ||
-                "",
-              images: historyEntry.images || [],
-              aquaboySpecBody:
-                report.aquaboySpecBody || report.aquaboySpec || "",
-              aquaboySpecRibs: report.aquaboySpecRibs || "",
+              const topStatus =
+                historyEntry.top?.status || determineStatus(historyEntry.top);
+              const middleStatus =
+                historyEntry.middle?.status ||
+                determineStatus(historyEntry.middle);
+              const bottomStatus =
+                historyEntry.bottom?.status ||
+                determineStatus(historyEntry.bottom);
+
+              allHistoryEntries.push({
+                date:
+                  historyEntry.date ||
+                  historyEntry.saveTime ||
+                  report.createdAt ||
+                  report.date ||
+                  "",
+                factoryStyleNo: report.factoryStyleNo || "",
+                item: itemKey,
+                check: checkKey,
+                top: topStatus,
+                middle: middleStatus,
+                bottom: bottomStatus,
+                topBodyReading: historyEntry.top?.body || "",
+                topRibsReading: historyEntry.top?.ribs || "",
+                middleBodyReading: historyEntry.middle?.body || "",
+                middleRibsReading: historyEntry.middle?.ribs || "",
+                bottomBodyReading: historyEntry.bottom?.body || "",
+                bottomRibsReading: historyEntry.bottom?.ribs || "",
+                beforeDryRoom:
+                  historyEntry.beforeDryRoom ||
+                  historyEntry.beforeDryRoomTime ||
+                  "",
+                afterDryRoom:
+                  historyEntry.afterDryRoom ||
+                  historyEntry.afterDryRoomTime ||
+                  "",
+                images: historyEntry.images || [],
+                aquaboySpecBody:
+                  report.aquaboySpecBody || report.aquaboySpec || "",
+                aquaboySpecRibs: report.aquaboySpecRibs || "",
+              });
             });
           });
         });
@@ -681,6 +760,33 @@ const FormPage = () => {
 
         setCheckHistory(history);
         if (firstCreatedAt) setFirstCheckDate(firstCreatedAt);
+
+        // Auto-detect ribs from history only if they have actual values
+        const hasRibsInHistory = reports.some((r) => {
+          if (r.ribsAvailable === true) return true;
+          if (
+            r.aquaboySpecRibs &&
+            r.aquaboySpecRibs.toString().trim() !== "" &&
+            r.aquaboySpecRibs !== "0"
+          )
+            return true;
+
+          if (r.history && typeof r.history === "object") {
+            return Object.values(r.history).some((itemChecks) => {
+              if (!itemChecks || typeof itemChecks !== "object") return false;
+              return Object.values(itemChecks).some(
+                (h) =>
+                  (h.top?.ribs && h.top.ribs.toString().trim() !== "") ||
+                  (h.middle?.ribs && h.middle.ribs.toString().trim() !== "") ||
+                  (h.bottom?.ribs && h.bottom.ribs.toString().trim() !== ""),
+              );
+            });
+          }
+          return false;
+        });
+        if (hasRibsInHistory) {
+          setRibsAvailable(true);
+        }
 
         if (history.length > 0) {
           const latestCheck = history[history.length - 1];
@@ -1147,8 +1253,8 @@ const FormPage = () => {
 
     // Only require dry room times for non-Reitmans flows
     if (!isReitmans) {
-      // Only require beforeDryRoomTime for the first check
-      if (checkHistory.length === 0) {
+      // In New mode (Before Dry Room)
+      if (!isAfterDryMode) {
         if (
           !formData.beforeDryRoomTime ||
           !formData.beforeDryRoomTime.toString().trim()
@@ -1156,8 +1262,8 @@ const FormPage = () => {
           newErrors.beforeDryRoomTime = "Before dry room time is required";
         }
       }
-
-      if (checkHistory.length > 0) {
+      // In Edit mode (After Dry Room) - only possible if history exists
+      else if (checkHistory.length > 0) {
         if (
           !formData.afterDryRoomTime ||
           !formData.afterDryRoomTime.toString().trim()
@@ -1249,10 +1355,12 @@ const FormPage = () => {
         },
       ],
     }));
+    setIsAfterDryMode(false);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!validateForm()) {
       setMessage({ type: "error", text: "Please fill in all required fields" });
       return;
@@ -1296,12 +1404,6 @@ const FormPage = () => {
           }),
         })),
       };
-
-      console.log(
-        "Saving payload with images:",
-        payload.inspectionRecords[0]?.images?.length || 0,
-        "images",
-      );
 
       const response = await fetch(
         `${API_BASE_URL || "http://localhost:5001"}/api/humidity-reports`,
@@ -1387,6 +1489,7 @@ const FormPage = () => {
         setAvailableColors([]);
         setFabricFiberMatches([]);
         setRibsAvailable(false);
+        setIsAfterDryMode(false);
         setAutoFilledFields({
           buyerStyle: false,
           customer: false,
@@ -1662,7 +1765,7 @@ const FormPage = () => {
                           Fabric → Fiber Calculations
                         </h3>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {fabricFiberMatches.map((m, idx) => (
                           <div
                             key={idx}
@@ -1803,7 +1906,7 @@ const FormPage = () => {
                       </div>
                     </div>
                   )}
-                  <div className="grid grid-cols-3 gap-6">
+                  <div className="grid grid-cols-3 gap-6 border-t border-blue-200 mt-6 pt-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Factory Style No
@@ -2107,7 +2210,7 @@ const FormPage = () => {
                               placeholder=""
                               required
                               aria-required="true"
-                              disabled={!formData.factoryStyleNo}
+                              disabled={true}
                             />
                             <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
                               <span className="text-gray-400 text-sm">
@@ -2124,7 +2227,31 @@ const FormPage = () => {
                       </div>
                     </div>
 
-                    {checkHistory.length === 0 &&
+                    {/* After Dry Mode Toggle (only if history exists) */}
+                    {/* {checkHistory.length > 0 && (formData.inspectionType === 'Inline' || ['Pre-Final', 'Final'].includes(formData.inspectionType)) && (
+                                        <div className="flex items-center gap-2 mb-4 col-span-3">
+                                            <label className="relative inline-flex items-center cursor-pointer group">
+                                                <input
+                                                    type="checkbox"
+                                                    className="sr-only peer"
+                                                    checked={isAfterDryMode}
+                                                    onChange={(e) => setIsAfterDryMode(e.target.checked)}
+                                                />
+                                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                                <div className="ml-3 flex flex-col">
+                                                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">
+                                                        Edit Mode
+                                                    </span>
+                                                    <span className="text-[11px] text-slate-500">
+                                                        Enable to input After Dry Room results
+                                                    </span>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    )} */}
+
+                    {/* Before Dry Room - Visible if not in After Dry mode */}
+                    {(checkHistory.length === 0 || !isAfterDryMode) &&
                       (formData.inspectionType === "Inline" ||
                         ["Pre-Final", "Final"].includes(
                           formData.inspectionType,
@@ -2164,8 +2291,9 @@ const FormPage = () => {
                         </div>
                       )}
 
-                    {/* After Dry Room shown only when there's existing history (not first inspection) */}
+                    {/* After Dry Room - Visible ONLY if Edit mode is on AND history exists */}
                     {checkHistory.length > 0 &&
+                      isAfterDryMode &&
                       (formData.inspectionType === "Inline" ||
                         ["Pre-Final", "Final"].includes(
                           formData.inspectionType,
@@ -2279,16 +2407,45 @@ const FormPage = () => {
                   </div>
 
                   <div className="w-full bg-blue-50 p-8 mb-6 mt-6 rounded-xl shadow-md border border-blue-200">
-                    <h2 className="text-2xl font-bold text-blue-600 mb-2">
-                      Inspection Records
-                    </h2>
-                    <div className="flex flex-col gap-6 w-full">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h2 className="text-2xl font-bold text-blue-600 mb-1">
+                          Inspection Records
+                        </h2>
+                      </div>
+                      <button
+                        onClick={addNewRecord}
+                        disabled={!formData.factoryStyleNo}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl font-bold transition-all duration-300 shadow-sm hover:shadow-md 
+                                                ${
+                                                  formData.factoryStyleNo
+                                                    ? "bg-blue-600 text-white hover:bg-blue-700 active:scale-95"
+                                                    : "bg-gray-200 text-gray-400 cursor-not-allowed opacity-60"
+                                                }`}
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2.5}
+                            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                          />
+                        </svg>
+                        Add New Record
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-4 w-full">
                       {formData.inspectionRecords.map((record, index) => (
                         <div
                           key={index}
                           className="w-full max-w-6xl mx-auto bg-white rounded-xl shadow-md p-5 mb-4 border border-gray-100"
                         >
-                          <div className="flex justify-between items-center mb-6 w-full">
+                          <div className="flex justify-between items-center mb-4 w-full">
                             <h3 className="font-bold text-gray-700 text-xl text-center">
                               Aquaboy Reading
                             </h3>
@@ -2884,7 +3041,7 @@ const FormPage = () => {
 
         {activeTab === "Qc-daily-report" && (
           <div className="p-6">
-            <ExportPanel />
+            <ExportPanel setActiveTab={setActiveTab} />
           </div>
         )}
         {activeTab === "Dashboard" && (
@@ -2894,70 +3051,73 @@ const FormPage = () => {
         )}
         {message.text && (
           <div
-            className={`fixed bottom-4 right-4 z-50 flex items-center p-4 mb-4 rounded-lg transition-opacity duration-300 ${
+            className={`fixed bottom-6 right-6 z-[9999] flex items-center gap-4 p-4 rounded-2xl shadow-2xl border backdrop-blur-xl transition-all duration-500 animate-in fade-in slide-in-from-bottom-5 ${
               message.type === "success"
-                ? "text-green-800 bg-green-50"
-                : "text-red-800 bg-red-50"
+                ? "text-emerald-900 bg-white/95 border-emerald-100 ring-8 ring-emerald-500/5"
+                : "text-rose-900 bg-white/95 border-rose-100 ring-8 ring-rose-500/5"
             }`}
             role="alert"
           >
-            {message.type === "success" ? (
-              <div className="inline-flex items-center justify-center flex-shrink-0 w-5 h-5">
-                <svg
-                  className="w-5 h-5 text-green-900"
-                  aria-hidden="true"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 8.207-4 4a1 1 0 0 1-1.414 0l-2-2a1 1 0 0 1 1.414-1.414L9 10.586l3.293-3.293a1 1 0 0 1 1.414 1.414Z" />
-                </svg>
-                <span className="sr-only">Check icon</span>
+            <div className="relative">
+              {message.type === "success" ? (
+                <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-200 animate-bounce-slow">
+                  <CheckCircle2 size={24} strokeWidth={3} />
+                </div>
+              ) : (
+                <div className="w-10 h-10 rounded-xl bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-200">
+                  <AlertCircle size={24} strokeWidth={3} />
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col min-w-0 pr-4">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-0.5">
+                Notification
+              </span>
+              <div className="text-sm font-black tracking-tight leading-tight">
+                {message.text}
               </div>
-            ) : (
-              <div className="inline-flex items-center justify-center flex-shrink-0 w-5 h-5">
-                <svg
-                  className="w-5 h-5 text-red-900"
-                  aria-hidden="true"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 11.793a1 1 0 1 1-1.414 1.414L10 11.414l-2.293 2.293a1 1 0 0 1-1.414-1.414L8.586 10 6.293 7.707a1 1 0 0 1 1.414-1.414L10 8.586l2.293-2.293a1 1 0 0 1 1.414 1.414L11.414 10l2.293 2.293Z" />
-                </svg>
-                <span className="sr-only">Error icon</span>
-              </div>
-            )}
-            <div className="ml-3 text-sm font-medium">{message.text}</div>
+            </div>
+
             <button
               type="button"
-              className={`ml-3 -mx-1.5 -my-1.5 rounded-lg focus:ring-2 p-1.5 inline-flex items-center justify-center h-8 w-8 ${
+              className={`p-1.5 rounded-lg transition-colors shrink-0 ${
                 message.type === "success"
-                  ? "bg-green-50 text-green-500 hover:bg-green-200 focus:ring-green-400"
-                  : "bg-red-50 text-red-500 hover:bg-red-200 focus:ring-red-400"
+                  ? "text-emerald-400 hover:bg-emerald-50 hover:text-emerald-600"
+                  : "text-rose-400 hover:bg-rose-50 hover:text-rose-600"
               }`}
               onClick={() => setMessage({ type: "", text: "" })}
               aria-label="Close"
             >
-              <span className="sr-only">Close</span>
-              <svg
-                className="w-3 h-3"
-                aria-hidden="true"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 14 14"
-              >
-                <path
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"
-                />
-              </svg>
+              <X size={18} strokeWidth={3} />
             </button>
+
+            {/* Tiny Progress Bar */}
+            <div
+              className={`absolute bottom-0 left-0 h-1 rounded-full opacity-30 ${
+                message.type === "success" ? "bg-emerald-500" : "bg-rose-500"
+              }`}
+              style={{
+                width: "100%",
+                animation: "shrink-width 3s linear forwards",
+              }}
+            ></div>
           </div>
         )}
+
+        <style>{`
+                    @keyframes shrink-width {
+                        from { width: 100%; }
+                        to { width: 0%; }
+                    }
+                    .animate-bounce-slow {
+                        animation: bounce-slow 2s infinite;
+                    }
+                    @keyframes bounce-slow {
+                        0%, 100% { transform: translateY(0); }
+                        50% { transform: translateY(-3px); }
+                    }
+                `}</style>
       </div>
     </div>
   );
