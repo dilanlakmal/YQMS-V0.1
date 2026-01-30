@@ -2,9 +2,13 @@ import { QCWashing } from '../../../controller/MongoDB/dbConnectionController.js
 
 export const getWashingDashboardData = async (req, res) => {
   try {
-    const { startDate, endDate, buyer, orderNo, color, reportType, washType, granularity } = req.query;
+    const { startDate, endDate, buyer, orderNo, color, reportType, washType, factoryName, granularity } = req.query;
 
-    let query = { status: "submitted" };
+    let query = { 
+  status: { 
+    $in: ["submitted", "processing"] 
+  } 
+};
     if (startDate && endDate) {
       query.date = { $gte: new Date(startDate), $lte: new Date(endDate) };
     }
@@ -13,25 +17,56 @@ export const getWashingDashboardData = async (req, res) => {
     if (color) query.color = color;
     if (reportType) query.reportType = reportType;
     if (washType) query.washType = washType;
+    if (factoryName) query.factoryName = factoryName; 
+
+    // HELPER: Reusable stage to resolve the correct Wash Qty based on priority
+    const resolveWashQtyStage = {
+      $addFields: {
+        resolvedWashQty: {
+          $ifNull: [
+            "$actualWashQty", 
+            { $ifNull: ["$editedActualWashQty", "$washQty"] }
+          ]
+        }
+      }
+    };
 
     // 1. ADVANCED SUMMARY: Unique Order Tracking
     const summaryAgg = await QCWashing.aggregate([
       { $match: query },
+      resolveWashQtyStage, // Use resolved qty
+      {
+        $group: {
+          _id: { order: "$orderNo", color: "$color" },
+          skuTotalWashed: { $sum: "$resolvedWashQty" },
+          skuPlanned: { $first: "$orderQty" }, 
+          skuBatches: { $sum: 1 },
+          skuPassReports: { $sum: { $cond: [{ $eq: ["$overallFinalResult", "Pass"] }, 1, 0] } },
+          skuFailReports: { $sum: { $cond: [{ $eq: ["$overallFinalResult", "Fail"] }, 1, 0] } },
+          skuPassRateSum: { $sum: "$passRate" },
+          skuDefectSum: { $sum: "$totalDefectCount" }
+        }
+      },
       {
         $group: {
           _id: null,
-          totalWashQty: { $sum: "$washQty" },
-          numberOfWashings: { $sum: 1 },
-          avgPassRate: { $avg: "$passRate" },
-          totalDefects: { $sum: "$totalDefectCount" },
-          // Group by OrderNo and Color to get the actual planned qty for that specific color-order combo
-          uniqueSKUs: { $addToSet: { order: "$orderNo", color: "$color", qty: "$orderQty" } }
+          totalPlannedQty: { $sum: "$skuPlanned" },
+          totalWashQty: { $sum: "$skuTotalWashed" },
+          numberOfWashings: { $sum: "$skuBatches" },
+          totalPassReports: { $sum: "$skuPassReports" },
+          totalFailReports: { $sum: "$skuFailReports" },
+          totalDefects: { $sum: "$skuDefectSum" },
+          avgPassRate: { $avg: { $divide: ["$skuPassRateSum", "$skuBatches"] } }
         }
       }
     ]);
 
-    const summary = summaryAgg[0] || { totalWashQty: 0, numberOfWashings: 0, avgPassRate: 0, uniqueSKUs: [], totalDefects: 0 };
-    const totalPlannedQty = summary.uniqueSKUs.reduce((sum, item) => sum + (item.qty || 0), 0);
+    const summary = summaryAgg[0] || { 
+      totalPlannedQty: 0, totalWashQty: 0, numberOfWashings: 0, 
+      totalPassReports: 0, totalFailReports: 0, avgPassRate: 0, totalDefects: 0 
+    };
+
+    const remainingQty = Math.max(0, summary.totalPlannedQty - summary.totalWashQty);
 
     // 2. DETAILED DEFECT ANALYTICS
     const defectLimit = parseInt(req.query.defectLimit) || 5;
@@ -66,17 +101,18 @@ export const getWashingDashboardData = async (req, res) => {
       { $sort: { _id: 1 } }
     ]);
 
-    // 4. DYNAMIC TREND (Daily/Weekly/Monthly)
-    let format = "%Y-%m-%d";
-    if (granularity === 'weekly') format = "%Y-W%U";
-    else if (granularity === 'monthly') format = "%Y-%m";
+    // 4. DYNAMIC TREND (Fixed to use resolvedWashQty)
+    let groupFormat = "%Y-%m-%d";
+    if (granularity === 'weekly') groupFormat = "%Y-W%U";
+    else if (granularity === 'monthly') groupFormat = "%Y-%m";
 
     const trendData = await QCWashing.aggregate([
       { $match: query },
+      resolveWashQtyStage, // Use resolved qty here
       {
         $group: {
-          _id: { $dateToString: { format, date: "$date" } },
-          washQty: { $sum: "$washQty" },
+          _id: { $dateToString: { format: groupFormat, date: "$date" } },
+          washQty: { $sum: "$resolvedWashQty" }, // Updated
           inspections: { $sum: 1 }
         }
       },
@@ -93,85 +129,58 @@ export const getWashingDashboardData = async (req, res) => {
           orders: { $addToSet: "$orderNo" },
           colors: { $addToSet: "$color" },
           reportTypes: { $addToSet: "$reportType" },
-          washTypes: { $addToSet: "$washType" }
+          washTypes: { $addToSet: "$washType" },
+          factoryName: { $addToSet: "$factoryName" } 
         }
       }
     ]);
 
-    // 1. Pass Rate by Order No (Showing bottom 5 to highlight trouble spots)
-      const passRateByOrder = await QCWashing.aggregate([
+    // Pass Rates aggregations
+    const passRateByOrder = await QCWashing.aggregate([
         { $match: query },
-        {
-          $group: {
-            _id: "$orderNo",
-            avgPassRate: { $avg: "$passRate" },
-            totalBatches: { $sum: 1 }
-          }
-        },
-        { $sort: { avgPassRate: 1 } }, // Ascending: show lowest quality first
-        { $limit: 5 }
-      ]);
+        { $group: { _id: "$orderNo", avgPassRate: { $avg: "$passRate" }, totalBatches: { $sum: 1 } } },
+        { $sort: { avgPassRate: 1 } }, { $limit: 5 }
+    ]);
 
-      // 2. Pass Rate by Report Type
-      const passRateByReportType = await QCWashing.aggregate([
+    const passRateByReportType = await QCWashing.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: "$reportType",
+          avgPassRate: { $avg: "$passRate" },
+          totalReports: { $sum: 1 }, // Total count of reports for this type
+          passReports: { 
+            $sum: { $cond: [{ $eq: ["$overallFinalResult", "Pass"] }, 1, 0] } 
+          } // Count of reports where result is "Pass"
+        }
+      },
+      { $sort: { avgPassRate: -1 } }
+    ]);
+
+    const passRateByDate = await QCWashing.aggregate([
         { $match: query },
-        {
-          $group: {
-            _id: "$reportType",
-            avgPassRate: { $avg: "$passRate" }
-          }
-        },
-        { $sort: { avgPassRate: -1 } }
-      ]);
+        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } }, avgPassRate: { $avg: "$passRate" } } },
+        { $sort: { "_id": -1 } }, { $limit: 5 }
+    ]);
 
-      // 3. Pass Rate by Date (Recent 5 days)
-      const passRateByDate = await QCWashing.aggregate([
-        { $match: query },
-        {
-          $group: {
-            _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
-            avgPassRate: { $avg: "$passRate" }
-          }
-        },
-        { $sort: { "_id": -1 } },
-        { $limit: 5 }
-      ]);
-
-      // 4. Measurement Analysis by Style & Color
-      const styleColorMeasurement = await QCWashing.aggregate([
+    // 8. Style & Color Measurement (Accuracy)
+    const styleColorMeasurement = await QCWashing.aggregate([
         { $match: query },
         { $unwind: "$measurementDetails.measurementSizeSummary" },
-        {
-          $group: {
-            _id: { orderNo: "$orderNo", color: "$color" },
-            passPoints: { $sum: "$measurementDetails.measurementSizeSummary.totalPass" },
-            totalPoints: { $sum: "$measurementDetails.measurementSizeSummary.checkedPoints" },
-            reportCount: { $addToSet: "$_id" }
-          }
-        },
-        {
-          $project: {
-            style: "$_id.orderNo",
-            color: "$_id.color",
-            totalPoints: 1,
-            accuracy: {
-              $cond: [{ $eq: ["$totalPoints", 0] }, 0, { $multiply: [{ $divide: ["$passPoints", "$totalPoints"] }, 100] }]
-            },
-            reports: { $size: "$reportCount" }
-          }
-        },
-        { $sort: { accuracy: 1 } }, // Show worst performers first
-        { $limit: 10 }
-      ]);
+        { $group: { _id: { orderNo: "$orderNo", color: "$color" }, passPoints: { $sum: "$measurementDetails.measurementSizeSummary.totalPass" }, totalPoints: { $sum: "$measurementDetails.measurementSizeSummary.checkedPoints" }, reportCount: { $addToSet: "$_id" }, orderQty: { $first: "$orderQty" }  } },
+        { $project: { style: "$_id.orderNo", color: "$_id.color", totalPoints: 1, accuracy: { $cond: [{ $eq: ["$totalPoints", 0] }, 0, { $multiply: [{ $divide: ["$passPoints", "$totalPoints"] }, 100] }] }, reports: { $size: "$reportCount" }, orderQty: 1, } },
+        { $sort: { accuracy: 1 } }, { $limit: 10 }
+    ]);
 
-      // 5. Defect Analysis by Style & Color
+    // 9. Style & Color Defects (Fixed to use resolvedWashQty)
       const styleColorDefects = await QCWashing.aggregate([
         { $match: query },
+        resolveWashQtyStage, 
         {
           $group: {
             _id: { orderNo: "$orderNo", color: "$color" },
-            defectQty: { $sum: "$totalDefectCount" },
-            washQty: { $sum: "$washQty" },
+            totalDefects: { $sum: "$totalDefectCount" },
+            totalPiecesChecked: { $sum: "$checkedQty" },
             reportCount: { $sum: 1 }
           }
         },
@@ -179,11 +188,16 @@ export const getWashingDashboardData = async (req, res) => {
           $project: {
             style: "$_id.orderNo",
             color: "$_id.color",
-            defectQty: 1,
-            washQty: 1,
+            defectQty: "$totalDefects",
+            inspectedQty: "$totalPiecesChecked",
             reports: "$reportCount",
+            // NEW CALCULATION: (totalDefects / totalPiecesChecked) * 100
             defectRate: {
-              $cond: [{ $eq: ["$washQty", 0] }, 0, { $multiply: [{ $divide: ["$defectQty", "$washQty"] }, 100] }]
+              $cond: [
+                { $eq: ["$totalPiecesChecked", 0] }, 
+                0, 
+                { $multiply: [{ $divide: ["$totalDefects", "$totalPiecesChecked"] }, 100] }
+              ]
             }
           }
         },
@@ -191,18 +205,65 @@ export const getWashingDashboardData = async (req, res) => {
         { $limit: 10 }
       ]);
 
+    const skuSizeMeasurementSummary = await QCWashing.aggregate([
+    { $match: query },
+    { $unwind: "$measurementDetails.measurementSizeSummary" },
+    {
+      $group: {
+        _id: {
+          orderNo: "$orderNo",
+          color: "$color",
+          size: "$measurementDetails.measurementSizeSummary.size"
+        },
+        totalCheckedPcs: { $sum: "$measurementDetails.measurementSizeSummary.checkedPcs" },
+        totalCheckedPoints: { $sum: "$measurementDetails.measurementSizeSummary.checkedPoints" },
+        totalPass: { $sum: "$measurementDetails.measurementSizeSummary.totalPass" },
+        totalFail: { $sum: "$measurementDetails.measurementSizeSummary.totalFail" },
+        totalPlusFail: { $sum: { $ifNull: ["$measurementDetails.measurementSizeSummary.plusToleranceFailCount", 0] } },
+        totalMinusFail: { $sum: { $ifNull: ["$measurementDetails.measurementSizeSummary.minusToleranceFailCount", 0] } }
+      }
+    },
+    {
+      $project: {
+        orderNo: "$_id.orderNo",
+        color: "$_id.color",
+        size: "$_id.size",
+        totalCheckedPcs: 1,
+        totalCheckedPoints: 1,
+        totalPass: 1,
+        totalFail: 1,
+        totalPlusFail: 1,
+        totalMinusFail: 1,
+        accuracy: {
+          $cond: [
+            { $eq: ["$totalCheckedPoints", 0] },
+            0,
+            { $multiply: [{ $divide: ["$totalPass", "$totalCheckedPoints"] }, 100] }
+          ]
+        }
+      }
+    },
+    { $sort: { orderNo: 1, color: 1, size: 1 } }
+]);
+
+    const reports = await QCWashing.find(query).sort({ date: -1 });
+
     res.status(200).json({
       success: true,
+      reports,
       summary: {
-        totalPlannedQty,
+        totalPlannedQty: summary.totalPlannedQty,
         totalWashQty: summary.totalWashQty,
-        remainingQty: Math.max(0, totalPlannedQty - summary.totalWashQty),
+        remainingQty: remainingQty,
         numberOfWashings: summary.numberOfWashings,
+        totalPassReports: summary.totalPassReports, 
+        totalFailReports: summary.totalFailReports, 
         avgPassRate: summary.avgPassRate,
         totalDefects: summary.totalDefects
       },
       defectSummary,
       measurementSummary,
+      skuSizeMeasurementSummary,
       trendData,
       filterOptions: filterOptions[0] || {},
       passRateByOrder, 
@@ -212,6 +273,7 @@ export const getWashingDashboardData = async (req, res) => {
       styleColorDefects
     });
   } catch (error) {
+    console.error("Dashboard Controller Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
