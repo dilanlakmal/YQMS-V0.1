@@ -23,6 +23,11 @@ import { fileURLToPath } from "url";
 // Get Filtered Inspection Reports
 // ============================================================
 
+// Helper to escape regex characters
+const escapeRegex = (text) => {
+  return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+};
+
 export const getInspectionReports = async (req, res) => {
   try {
     const {
@@ -40,13 +45,22 @@ export const getInspectionReports = async (req, res) => {
       supplier,
       poLine,
       page = 1,
-      limit = 20,
+      limit = 200,
     } = req.query;
 
     // --- Build Query ---
     let query = {
       status: { $ne: "cancelled" },
     };
+
+    // --- Helper to parse comma list to array ---
+    const parseList = (str) =>
+      str
+        ? str
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
 
     // --- PO Line Filter Logic ---
     if (poLine) {
@@ -99,52 +113,102 @@ export const getInspectionReports = async (req, res) => {
       query.reportId = parseInt(reportId);
     }
 
-    // 3. Report Name (Type) Filter
-    if (reportType && reportType !== "All") {
-      query.reportType = reportType;
+    // 3. Report Name/Type (Multi-Select Exact)
+    const reportTypeList = parseList(reportType);
+    if (reportTypeList.length > 0) {
+      // If array has "All", ignore filter, else use $in
+      if (!reportTypeList.includes("All")) {
+        query.reportType = { $in: reportTypeList };
+      }
     }
 
-    // 4. Order Type Filter
+    // 4. Order Type (Single Select usually, but robust check)
     if (orderType && orderType !== "All") {
       query.orderType = orderType.toLowerCase();
     }
 
-    // 5. Order No Filter (Regex Search)
-    if (orderNo) {
-      query.orderNosString = { $regex: orderNo, $options: "i" };
+    // 5. Order No (Multi-Select REGEX)
+    // Example: User selects "123" and "456". We want partial match for either.
+    const orderNoList = parseList(orderNo);
+    if (orderNoList.length > 0) {
+      // Construct an array of regex conditions targeting the ARRAY 'orderNos'
+      // We use escapeRegex to safely handle dashes like in "GPAR12270-1"
+      const regexConditions = orderNoList.map((val) => ({
+        orderNos: { $regex: escapeRegex(val), $options: "i" },
+      }));
+
+      // Use $and if existing query properties need to be preserved
+      if (query.$or) {
+        // If $or already exists (e.g. from another filter), wrap everything in $and
+        query.$and = [...(query.$and || []), { $or: regexConditions }];
+      } else {
+        query.$or = regexConditions;
+      }
     }
 
-    // 6. Product Type Filter
-    if (productType && productType !== "All") {
-      query.productType = productType;
+    // 6. Product Type (Multi-Select Exact)
+    const productTypeList = parseList(productType);
+    if (productTypeList.length > 0 && !productTypeList.includes("All")) {
+      query.productType = { $in: productTypeList };
     }
 
-    // 7. QA ID (Emp ID) Filter
-    if (empId) {
-      query.empId = { $regex: empId, $options: "i" };
+    // 7. QA ID / Emp ID (Multi-Select Exact or Regex)
+    // Usually Emp IDs are exact, but if you want partial:
+    const empIdList = parseList(empId);
+    if (empIdList.length > 0) {
+      // Assuming Exact Match for ID is better for Multi-Select
+      query.empId = { $in: empIdList };
+      // OR if you want regex:
+      // query.empId = { $in: empIdList.map(id => new RegExp(id, "i")) };
     }
 
-    // 8. Sub-Con Factory Filter
-    if (subConFactory && subConFactory !== "All") {
-      query["inspectionDetails.subConFactory"] = subConFactory;
+    // 8. Sub-Con Factory (Multi-Select Exact)
+    const factoryList = parseList(subConFactory);
+    if (factoryList.length > 0 && !factoryList.includes("All")) {
+      query["inspectionDetails.subConFactory"] = { $in: factoryList };
     }
 
-    // 9. Customer Style Filter
-    if (custStyle) {
-      query["inspectionDetails.custStyle"] = {
-        $regex: custStyle,
-        $options: "i",
-      };
+    // 9. Cust Style (Multi-Select REGEX)
+    const styleList = parseList(custStyle);
+    if (styleList.length > 0) {
+      const styleConditions = styleList.map((val) => ({
+        "inspectionDetails.custStyle": { $regex: val, $options: "i" },
+      }));
+
+      // Handle merging with potential existing $or from OrderNo
+      if (query.$or) {
+        // If we have existing $or (from OrderNo), we cannot just overwrite query.$or
+        // We must convert the structure to: $and: [ {$or: orders}, {$or: styles} ]
+
+        // Move existing $or to $and
+        const existingOr = query.$or;
+        delete query.$or;
+
+        query.$and = [
+          ...(query.$and || []),
+          { $or: existingOr },
+          { $or: styleConditions },
+        ];
+      } else {
+        // If $and exists, append to it, else create $or
+        if (query.$and) {
+          query.$and.push({ $or: styleConditions });
+        } else {
+          query.$or = styleConditions;
+        }
+      }
     }
 
-    // 10. Buyer Filter
-    if (buyer && buyer !== "All") {
-      query.buyer = buyer;
+    // 10. Buyer (Multi-Select Exact)
+    const buyerList = parseList(buyer);
+    if (buyerList.length > 0 && !buyerList.includes("All")) {
+      query.buyer = { $in: buyerList };
     }
 
-    // 11. Supplier Filter
-    if (supplier && supplier !== "All") {
-      query["inspectionDetails.supplier"] = supplier;
+    // 11. Supplier (Multi-Select Exact)
+    const supplierList = parseList(supplier);
+    if (supplierList.length > 0 && !supplierList.includes("All")) {
+      query["inspectionDetails.supplier"] = { $in: supplierList };
     }
 
     // Pagination
@@ -314,6 +378,7 @@ export const getFilterOptions = async (req, res) => {
 // ============================================================
 // Autocomplete for Order No
 // ============================================================
+
 export const autocompleteOrderNo = async (req, res) => {
   try {
     const { term } = req.query;
@@ -327,7 +392,7 @@ export const autocompleteOrderNo = async (req, res) => {
       status: { $ne: "cancelled" },
     })
       .select("orderNosString orderNos")
-      .limit(20)
+      .limit(100)
       .lean();
 
     // Extract unique order numbers
@@ -368,7 +433,7 @@ export const autocompleteCustStyle = async (req, res) => {
       status: { $ne: "cancelled" },
     })
       .select("inspectionDetails.custStyle")
-      .limit(30)
+      .limit(100)
       .lean();
 
     // Extract unique styles
@@ -405,7 +470,7 @@ export const autocompletePOLine = async (req, res) => {
       "SKUData.POLine": { $regex: term, $options: "i" },
     })
       .select("SKUData.POLine")
-      .limit(50) // Limit documents to scan
+      .limit(100) // Limit documents to scan
       .lean();
 
     const poSet = new Set();
