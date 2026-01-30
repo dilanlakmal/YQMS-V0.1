@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { Modal, Image } from "antd";
 import { renderToStaticMarkup } from "react-dom/server";
 import PaperPreview from "./PaperPreview";
