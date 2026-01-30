@@ -33,9 +33,10 @@ export default function ExportPanel() {
   const [approvalRemarkInput, setApprovalRemarkInput] = useState("");
   const [isApproving, setIsApproving] = useState(false);
   const [showApproveConfirm, setShowApproveConfirm] = useState(false);
-  // approval success message removed — do not show inline banner
+  // approval success message - uses banner now
+  const [message, setMessage] = useState({ type: "", text: "" });
   const [approveErrorMessage, setApproveErrorMessage] = useState("");
-  const [approveCompleted, setApproveCompleted] = useState(false);
+  const [approveCompleted, setApproveCompleted] = useState(false); // Kept for internal logic if needed, but removed from UI
   const [docsRaw, setDocsRaw] = useState([]);
   const [displayedReports, setDisplayedReports] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -53,10 +54,7 @@ export default function ExportPanel() {
 
   useEffect(() => {
     const today = new Date();
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(today.getMonth() - 1);
-
-    setStartDate(oneMonthAgo.toISOString().split("T")[0]);
+    setStartDate(today.toISOString().split("T")[0]);
     setEndDate(today.toISOString().split("T")[0]);
 
     const fetchData = async () => {
@@ -367,15 +365,19 @@ export default function ExportPanel() {
         } catch (rfErr) {
           console.error("Error refetching reports after approve", rfErr);
         }
-        // remark saved; not showing inline success banner here
-        // keep modal open so user can see the saved remark; mark completed
-        setApproveCompleted(true);
+        // remark saved
+        setMessage({ type: "success", text: "Report Approved Successfully!" });
+
         // Automatically close modal after success feedback
         setTimeout(() => {
           setShowApproveModal(false);
           setApproveTargetId(null);
-          setApproveCompleted(false);
-        }, 2000);
+        }, 500);
+
+        // Clear message after delay
+        setTimeout(() => {
+          setMessage({ type: "", text: "" });
+        }, 3000);
       } else {
         // show error inline and refresh list if server indicates already approved
         const err = json.message || "Approval failed";
@@ -413,17 +415,37 @@ export default function ExportPanel() {
   const formatDate = (dateStr) => {
     if (!dateStr) return "N/A";
     try {
-      const date = new Date(dateStr);
-      // Check if date is valid
-      if (isNaN(date.getTime())) return "N/A";
-      return date.toLocaleDateString("en-US", {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
         year: "numeric",
-        month: "short",
-        day: "numeric",
       });
     } catch (e) {
-      return "N/A";
+      return dateStr;
     }
+  };
+
+  const getFlattenedHistory = (history) => {
+    if (Array.isArray(history)) return history;
+    if (typeof history !== 'object' || history === null) return [];
+
+    return Object.keys(history).sort((a, b) => {
+      const numA = parseInt(a.replace('Item ', ''));
+      const numB = parseInt(b.replace('Item ', ''));
+      return numA - numB;
+    }).flatMap(itemKey => {
+      const checks = history[itemKey] || {};
+      return Object.keys(checks).sort((a, b) => {
+        const numA = parseInt(a.replace('Check ', ''));
+        const numB = parseInt(b.replace('Check ', ''));
+        return numA - numB;
+      }).map(checkKey => ({
+        ...checks[checkKey],
+        itemName: itemKey,
+        checkName: checkKey
+      }));
+    });
   };
 
   const formatTime = (timeStr) => {
@@ -461,23 +483,76 @@ export default function ExportPanel() {
     }
   };
 
+  const getReportStatus = (history) => {
+    if (!history || (Array.isArray(history) && history.length === 0)) return "none";
+    if (typeof history === 'object' && !Array.isArray(history) && Object.keys(history).length === 0) return "none";
+
+    let allPassed = true;
+    let hasCheck = false;
+    const isPass = (status) => String(status || "").toLowerCase() === "pass";
+
+    if (Array.isArray(history)) {
+      const latestCheck = history[history.length - 1];
+      if (latestCheck) {
+        hasCheck = true;
+        allPassed =
+          isPass(latestCheck.top?.status) &&
+          isPass(latestCheck.middle?.status) &&
+          isPass(latestCheck.bottom?.status);
+      }
+    } else if (typeof history === 'object') {
+      Object.keys(history).forEach(itemKey => {
+        const itemChecks = history[itemKey] || {};
+        const checkKeys = Object.keys(itemChecks).sort((a, b) => {
+          const numA = parseInt(a.replace('Check ', ''));
+          const numB = parseInt(b.replace('Check ', ''));
+          return numB - numA;
+        });
+
+        if (checkKeys.length > 0) {
+          hasCheck = true;
+          const latestCheck = itemChecks[checkKeys[0]];
+          const itemPassed =
+            isPass(latestCheck.top?.status) &&
+            isPass(latestCheck.middle?.status) &&
+            isPass(latestCheck.bottom?.status);
+
+          if (!itemPassed) allPassed = false;
+        }
+      });
+    }
+
+    if (!hasCheck) return "none";
+    return allPassed ? "pass" : "fail";
+  };
+
+  const getSessionCount = (history) => {
+    if (!history) return 0;
+    if (Array.isArray(history)) return history.length;
+    if (typeof history === 'object') {
+      const allCheckKeys = new Set();
+      Object.values(history).forEach(itemChecks => {
+        if (typeof itemChecks === 'object' && itemChecks !== null) {
+          Object.keys(itemChecks).forEach(k => allCheckKeys.add(k));
+        }
+      });
+      return allCheckKeys.size;
+    }
+    return 0;
+  };
+
   const getStatusBadge = (history) => {
-    if (!history || history.length === 0)
+    const status = getReportStatus(history);
+
+    if (status === "none") {
       return (
         <span className="px-2 py-1 text-xs rounded bg-gray-200 text-gray-700">
           No checks
         </span>
       );
+    }
 
-    const latestCheck = history[history.length - 1];
-    const isPass = (status) => String(status || "").toLowerCase() === "pass";
-
-    const allPassed =
-      isPass(latestCheck.top?.status) &&
-      isPass(latestCheck.middle?.status) &&
-      isPass(latestCheck.bottom?.status);
-
-    if (allPassed) {
+    if (status === "pass") {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium">
           <svg
@@ -526,30 +601,6 @@ export default function ExportPanel() {
 
   return (
     <div className="space-y-6">
-      {/* DEBUG INFO - REMOVE AFTER FIXING */}
-      {/* <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-xl mb-6 shadow-sm">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-mono">
-                    <div>
-                        <span className="text-gray-500 block">Logged In:</span>
-                        <code className="font-bold text-blue-700">{user?.emp_id}</code>
-                    </div>
-                    <div>
-                        <span className="text-gray-500 block">Is Authorized:</span>
-                        <code className={`font-bold ${AUTHORIZED_APPROVERS.some(id => id.toLowerCase() === String(user?.emp_id).trim().toLowerCase()) ? 'text-green-600' : 'text-red-600'}`}>
-                            {AUTHORIZED_APPROVERS.some(id => id.toLowerCase() === String(user?.emp_id).trim().toLowerCase()) ? 'YES' : 'NO'}
-                        </code>
-                    </div>
-                    <div>
-                        <span className="text-gray-500 block">Authorized IDs:</span>
-                        <code className="text-gray-600 truncate">{AUTHORIZED_APPROVERS.join(',')}</code>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                        <span className="text-gray-400">Backend Fix Applied</span>
-                    </div>
-                </div>
-            </div> */}
-
       <div className="bg-white p-4 rounded-md border">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
           <div>
@@ -559,7 +610,14 @@ export default function ExportPanel() {
             <input
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => {
+                const newStart = e.target.value;
+                setStartDate(newStart);
+                // If the user hasn't explicitly set a range yet (or they are picking a new day), update end date too
+                if (startDate === endDate) {
+                  setEndDate(newStart);
+                }
+              }}
               className="w-full px-3 py-2 border rounded-lg"
             />
           </div>
@@ -740,127 +798,109 @@ export default function ExportPanel() {
             </div>
 
             <div className="p-8">
-              {approveCompleted ? (
-                <div className="py-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  <div className="relative w-24 h-24 mx-auto mb-6">
-                    <div className="absolute inset-0 bg-emerald-100 rounded-full animate-ping opacity-25"></div>
-                    <div className="relative flex items-center justify-center w-24 h-24 rounded-full bg-emerald-500 text-white shadow-xl shadow-emerald-200">
-                      <CheckCircle2 size={48} strokeWidth={3} />
+              <div className="space-y-6">
+                {approveErrorMessage && (
+                  <div className="flex items-center gap-3 bg-rose-50 border border-rose-100 text-rose-600 px-5 py-3 rounded-2xl animate-in slide-in-from-top-2">
+                    <AlertCircle size={20} className="shrink-0" />
+                    <div className="text-[13px] font-bold">
+                      {approveErrorMessage}
                     </div>
                   </div>
-                  <h4 className="text-2xl font-black text-slate-800 mb-2">
-                    Approved Successfully!
-                  </h4>
-                  <p className="text-slate-500 font-medium px-4 leading-relaxed">
-                    The report has been verified and marked as approved on the
-                    system.
-                  </p>
+                )}
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between px-1">
+                    <label className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                      <MessageSquare size={14} className="text-slate-300" />
+                      Supervisor Remarks
+                    </label>
+                    <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">
+                      Optional
+                    </span>
+                  </div>
+                  <div className="relative group">
+                    <textarea
+                      value={approvalRemarkInput}
+                      onChange={(e) => setApprovalRemarkInput(e.target.value)}
+                      rows={4}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:bg-white transition-all outline-none resize-none shadow-inner-white"
+                      placeholder="Enter verification notes or quality remarks..."
+                    />
+                  </div>
                 </div>
-              ) : (
-                <div className="space-y-6">
-                  {approveErrorMessage && (
-                    <div className="flex items-center gap-3 bg-rose-50 border border-rose-100 text-rose-600 px-5 py-3 rounded-2xl animate-in slide-in-from-top-2">
-                      <AlertCircle size={20} className="shrink-0" />
-                      <div className="text-[13px] font-bold">
-                        {approveErrorMessage}
-                      </div>
-                    </div>
-                  )}
 
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between px-1">
-                      <label className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                        <MessageSquare size={14} className="text-slate-300" />
-                        Supervisor Remarks
-                      </label>
-                      <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">
-                        Optional
-                      </span>
-                    </div>
-                    <div className="relative group">
-                      <textarea
-                        value={approvalRemarkInput}
-                        onChange={(e) => setApprovalRemarkInput(e.target.value)}
-                        rows={4}
-                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:bg-white transition-all outline-none resize-none shadow-inner-white"
-                        placeholder="Enter verification notes or quality remarks..."
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-2">
-                    {showApproveConfirm ? (
-                      <div className="space-y-4 animate-in fade-in duration-300">
-                        <div className="bg-rose-50 border-2 border-rose-100 rounded-2xl p-4 flex items-start gap-4 ring-8 ring-rose-50/50">
-                          <div className="p-2 bg-white rounded-xl shadow-sm">
-                            <AlertCircle size={20} className="text-rose-500" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-sm font-black text-rose-900 m-0">
-                              No Remark Provided
-                            </p>
-                            <p className="text-xs text-rose-600/80 font-medium leading-relaxed m-0">
-                              Are you sure you want to approve this report
-                              without any quality notes?
-                            </p>
-                          </div>
+                <div className="pt-2">
+                  {showApproveConfirm ? (
+                    <div className="space-y-4 animate-in fade-in duration-300">
+                      <div className="bg-rose-50 border-2 border-rose-100 rounded-2xl p-4 flex items-start gap-4 ring-8 ring-rose-50/50">
+                        <div className="p-2 bg-white rounded-xl shadow-sm">
+                          <AlertCircle size={20} className="text-rose-500" />
                         </div>
-                        <div className="flex gap-3">
-                          <button
-                            onClick={() => setShowApproveConfirm(false)}
-                            className="flex-1 py-4 bg-white hover:bg-slate-50 text-slate-600 rounded-2xl border-2 border-slate-100 font-bold text-xs uppercase tracking-widest transition-all shadow-sm active:scale-95"
-                          >
-                            No, Wait
-                          </button>
-                          <button
-                            onClick={() => confirmApprove(true)}
-                            disabled={isApproving}
-                            className="flex-[2] py-4 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-emerald-200 active:scale-95 flex items-center justify-center gap-2 group"
-                          >
-                            {isApproving ? (
-                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                            ) : (
-                              <>
-                                <Send
-                                  size={16}
-                                  className="transition-transform group-hover:translate-x-1 group-hover:-translate-y-1"
-                                />
-                                Confirm Now
-                              </>
-                            )}
-                          </button>
+                        <div className="space-y-1">
+                          <p className="text-sm font-black text-rose-900 m-0">
+                            No Remark Provided
+                          </p>
+                          <p className="text-xs text-rose-600/80 font-medium leading-relaxed m-0">
+                            Are you sure you want to approve this report
+                            without any quality notes?
+                          </p>
                         </div>
                       </div>
-                    ) : (
-                      <div className="flex gap-4">
+                      <div className="flex gap-3">
                         <button
-                          onClick={() => {
-                            setShowApproveModal(false);
-                            setApproveTargetId(null);
-                          }}
-                          className="px-4 py-2 text-slate-400 hover:text-slate-600 border border-slate-500 rounded-2xl font-bold text-xs uppercase tracking-widest transition-colors flex-1"
+                          onClick={() => setShowApproveConfirm(false)}
+                          className="flex-1 py-4 bg-white hover:bg-slate-50 text-slate-600 rounded-2xl border-2 border-slate-100 font-bold text-xs uppercase tracking-widest transition-all shadow-sm active:scale-95"
                         >
-                          Discard
+                          No, Wait
                         </button>
                         <button
-                          onClick={() => confirmApprove(false)}
+                          onClick={() => confirmApprove(true)}
                           disabled={isApproving}
-                          className="flex-[2] py-4 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-emerald-200 active:scale-95 flex items-center justify-center gap-2 group"
+                          className="flex-[2] py-4 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-emerald-200 active:scale-95 flex items-center justify-center gap-2 group"
                         >
                           {isApproving ? (
                             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                           ) : (
                             <>
-                              <CheckCircle2 size={16} />
-                              Authorize Approval
+                              <Send
+                                size={16}
+                                className="transition-transform group-hover:translate-x-1 group-hover:-translate-y-1"
+                              />
+                              Confirm Now
                             </>
                           )}
                         </button>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => {
+                          setShowApproveModal(false);
+                          setApproveTargetId(null);
+                        }}
+                        className="px-4 py-2 text-slate-400 hover:text-slate-600 border border-slate-500 rounded-2xl font-bold text-xs uppercase tracking-widest transition-colors flex-1"
+                      >
+                        Discard
+                      </button>
+                      <button
+                        onClick={() => confirmApprove(false)}
+                        disabled={isApproving}
+                        className="flex-[2] py-4 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-emerald-200 active:scale-95 flex items-center justify-center gap-2 group"
+                      >
+                        {isApproving ? (
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        ) : (
+                          <>
+                            <CheckCircle2 size={16} />
+                            Authorize Approval
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -946,19 +986,14 @@ export default function ExportPanel() {
               <tbody className="divide-y divide-gray-200">
                 {currentPageReports.map((report, idx) => {
                   const reportId = report._id || idx;
-                  const history = report.history || [];
+                  const rawHistory = (report.history && (Array.isArray(report.history) ? report.history.length > 0 : Object.keys(report.history).length > 0))
+                    ? report.history
+                    : report.inspectionRecords || [];
+                  const history = getFlattenedHistory(rawHistory);
                   const latestDate = report.updatedAt || report.createdAt || "";
                   const isApproved = report.approvalStatus === "approved";
-                  const isPass = (status) =>
-                    String(status || "").toLowerCase() === "pass";
-                  const latestCheck = history[history.length - 1];
-                  const reportStatus =
-                    latestCheck &&
-                    isPass(latestCheck.top?.status) &&
-                    isPass(latestCheck.middle?.status) &&
-                    isPass(latestCheck.bottom?.status)
-                      ? "pass"
-                      : "fail";
+                  const reportStatus = getReportStatus(rawHistory);
+                  const sessionCount = getSessionCount(rawHistory);
 
                   const isAuthorized =
                     user?.emp_id &&
@@ -985,11 +1020,11 @@ export default function ExportPanel() {
                         </td>
                         <td className="px-4 py-3 text-sm text-center">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 font-medium">
-                            {history.length}
+                            {sessionCount}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-center">
-                          {getStatusBadge(history)}
+                          {getStatusBadge(rawHistory)}
                         </td>
                         <td className="px-4 py-3 text-sm text-center">
                           {isApproved ? (
@@ -1060,23 +1095,16 @@ export default function ExportPanel() {
                               </button>
                             )}
                             {(() => {
-                              const latestCheck = history[history.length - 1];
-                              const isLastPassed =
-                                latestCheck &&
-                                latestCheck.top?.status === "pass" &&
-                                latestCheck.middle?.status === "pass" &&
-                                latestCheck.bottom?.status === "pass";
-                              const isDisabled = isLastPassed;
+                              const isDisabled = reportStatus === "pass";
 
                               return (
                                 <button
                                   onClick={() => handleEdit(reportId)}
                                   disabled={isDisabled}
-                                  className={`inline-flex items-center p-2.5 rounded-xl transition-all duration-200 group ${
-                                    isDisabled
-                                      ? "text-gray-400 bg-gray-100 cursor-not-allowed"
-                                      : "text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
-                                  }`}
+                                  className={`inline-flex items-center p-2.5 rounded-xl transition-all duration-200 group ${isDisabled
+                                    ? "text-gray-400 bg-gray-100 cursor-not-allowed"
+                                    : "text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+                                    }`}
                                   title={
                                     isDisabled
                                       ? "Report locked (3 passed)"
@@ -1169,11 +1197,10 @@ export default function ExportPanel() {
                     <button
                       key={page}
                       onClick={() => setCurrentPage(page)}
-                      className={`min-w-[40px] h-9 px-3 py-2 text-sm font-medium border border-gray-300 -ml-px transition-all duration-200 ${
-                        currentPage === page
-                          ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:border-blue-700 z-10 relative"
-                          : "text-gray-700 bg-white hover:bg-gray-50"
-                      }`}
+                      className={`min-w-[40px] h-9 px-3 py-2 text-sm font-medium border border-gray-300 -ml-px transition-all duration-200 ${currentPage === page
+                        ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:border-blue-700 z-10 relative"
+                        : "text-gray-700 bg-white hover:bg-gray-50"
+                        }`}
                     >
                       {page}
                     </button>
@@ -1253,6 +1280,73 @@ export default function ExportPanel() {
             />
           );
         })()}
+      {/* Premium Message Banner */}
+      {message.text && (
+        <div
+          className={`fixed bottom-6 right-6 z-[200] flex items-center gap-4 p-4 pl-5 pr-6 rounded-2xl shadow-2xl border backdrop-blur-md transition-all duration-500 animate-in fade-in slide-in-from-right-8 ${message.type === "success"
+            ? "text-emerald-900 bg-white/95 border-emerald-100 ring-8 ring-emerald-500/5"
+            : "text-rose-900 bg-white/95 border-rose-100 ring-8 ring-rose-500/5"
+            }`}
+          role="alert"
+        >
+          <div className="relative">
+            {message.type === "success" ? (
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-200 animate-bounce-slow">
+                <CheckCircle2 size={24} strokeWidth={3} />
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-200">
+                <AlertCircle size={24} strokeWidth={3} />
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col min-w-0 pr-4">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-0.5">
+              Notification
+            </span>
+            <div className="text-sm font-black tracking-tight leading-tight">
+              {message.text}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className={`p-1.5 rounded-lg transition-colors shrink-0 ${message.type === "success"
+              ? "text-emerald-400 hover:bg-emerald-50 hover:text-emerald-600"
+              : "text-rose-400 hover:bg-rose-50 hover:text-rose-600"
+              }`}
+            onClick={() => setMessage({ type: "", text: "" })}
+            aria-label="Close"
+          >
+            <X size={18} strokeWidth={3} />
+          </button>
+
+          {/* Tiny Progress Bar */}
+          <div
+            className={`absolute bottom-0 left-0 h-1 rounded-full opacity-30 ${message.type === "success" ? "bg-emerald-500" : "bg-rose-500"
+              }`}
+            style={{
+              width: "100%",
+              animation: "shrink-width 3s linear forwards",
+            }}
+          ></div>
+        </div>
+      )}
+
+      <style>{`
+                @keyframes shrink-width {
+                    from { width: 100%; }
+                    to { width: 0%; }
+                }
+                .animate-bounce-slow {
+                    animation: bounce-slow 2s infinite;
+                }
+                @keyframes bounce-slow {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-3px); }
+                }
+            `}</style>
     </div>
   );
 }

@@ -71,7 +71,14 @@ const reitmansReportSchema = new mongoose.Schema(
       empId: { type: String },
       engName: { type: String },
     },
-    history: [reitmansHistorySchema],
+    history: {
+      type: Map,
+      of: {
+        type: Map,
+        of: reitmansHistorySchema,
+      },
+      default: {},
+    },
   },
   {
     collection: "reitmans_reports",

@@ -53,7 +53,14 @@ const humidityReportSchema = new mongoose.Schema(
     beforeDryRoom: { type: String, default: "" },
     afterDryRoom: { type: String, default: "" },
     date: { type: String, default: "" },
-    history: [historySchema],
+    history: {
+      type: Map,
+      of: {
+        type: Map,
+        of: historySchema,
+      },
+      default: {},
+    },
     generalRemark: { type: String, default: "" },
     inspectorSignature: { type: String, default: "" },
     qamSignature: { type: String, default: "" },

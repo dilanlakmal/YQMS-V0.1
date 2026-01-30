@@ -24,7 +24,85 @@ const HistoryModal = ({
 
   if (!report) return null;
 
-  const history = report.history || [];
+  const rawHistory = (report.history && (Array.isArray(report.history) ? report.history.length > 0 : Object.keys(report.history).length > 0))
+    ? report.history
+    : report.inspectionRecords || [];
+
+  // Helper to group nested history by Session (Check 1, Check 2, etc.)
+  const getGroupedHistory = (history) => {
+    if (Array.isArray(history)) {
+      if (history.length > 0 && (history[0].itemName || history[0].checkName)) {
+        const sessions = {};
+        history.forEach(item => {
+          const ck = item.checkName || 'Check 1';
+          if (!sessions[ck]) sessions[ck] = { name: ck, items: [] };
+          sessions[ck].items.push(item);
+        });
+        return Object.keys(sessions).sort((a, b) => {
+          const numA = parseInt(a.replace('Check ', ''));
+          const numB = parseInt(b.replace('Check ', ''));
+          return numA - numB;
+        }).map(k => sessions[k]);
+      }
+      return history.map((h, i) => ({
+        name: h.checkName || `Check ${i + 1}`,
+        items: [{ ...h, itemName: h.itemName || 'Item 1' }]
+      }));
+    }
+
+    if (typeof history !== 'object' || history === null) return [];
+
+    const sessions = {};
+    Object.keys(history).forEach(itemKey => {
+      const checks = history[itemKey] || {};
+      Object.keys(checks).forEach(checkKey => {
+        if (!sessions[checkKey]) {
+          sessions[checkKey] = {
+            name: checkKey,
+            items: []
+          };
+        }
+        sessions[checkKey].items.push({
+          ...checks[checkKey],
+          itemName: itemKey,
+          checkName: checkKey
+        });
+      });
+    });
+
+    return Object.keys(sessions).sort((a, b) => {
+      const numA = parseInt(a.replace('Check ', ''));
+      const numB = parseInt(b.replace('Check ', ''));
+      return numA - numB;
+    }).map(k => sessions[k]);
+  };
+
+  const groupedHistory = getGroupedHistory(rawHistory);
+  const flattenedHistory = groupedHistory.flatMap(s => s.items);
+  const history = flattenedHistory; // For summary stats
+
+  const getItemStatus = (item) => {
+    return (
+      (item.top?.status === "pass" || !item.top?.status) &&
+      (item.middle?.status === "pass" || !item.middle?.status) &&
+      (item.bottom?.status === "pass" || !item.bottom?.status)
+    ) ? "pass" : "fail";
+  };
+
+  const getSessionStatus = (session) => {
+    if (!session || !session.items) return "fail";
+    return session.items.every(item => getItemStatus(item) === "pass") ? "pass" : "fail";
+  };
+
+  const getReportStatus = (raw) => {
+    const grouped = getGroupedHistory(raw);
+    if (grouped.length === 0) return "fail";
+    const latestSession = grouped[grouped.length - 1];
+    return getSessionStatus(latestSession);
+  };
+
+  const reportStatus = getReportStatus(rawHistory);
+
   const ribsVisible =
     report.ribsAvailable ??
     history.some((h) => h.top?.ribs || h.middle?.ribs || h.bottom?.ribs);
@@ -94,7 +172,6 @@ const HistoryModal = ({
       styles={{
         body: {
           padding: 0,
-          overflow: "hidden",
         },
         content: {
           padding: 0,
@@ -108,7 +185,7 @@ const HistoryModal = ({
       }}
     >
       <>
-        <div className="bg-gradient-to-r from-green-50 to-green-50 border border-gray-200 border-b-0 px-8 py-6 relative overflow-hidden w-full shadow-lg">
+        <div className="bg-gradient-to-r from-green-50 to-green-50 border border-gray-200 border-b-0 px-8 py-6 relative overflow-hidden w-full shadow-lg rounded-t-2xl">
           <div className="absolute top-0 right-0 p-4 opacity-10 transform rotate-12 scale-150 pointer-events-none">
             <svg
               className="w-32 h-32 text-green-500"
@@ -137,8 +214,8 @@ const HistoryModal = ({
                 </svg>
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-green-500 mb-1 tracking-tight">
-                  Inspection History
+                <h3 className="text-2xl font-bold text-green-500 mb-1 tracking-tight flex items-center gap-4">
+                  <span>Inspection History</span>
                 </h3>
                 <div className="flex items-center gap-2 text-green-500 text-sm font-medium">
                   <span className="flex items-center gap-1.5 px-2.5 py-1 bg-white/40 border border-green-200/50 rounded-lg shadow-sm backdrop-blur-sm">
@@ -264,8 +341,8 @@ const HistoryModal = ({
           </div>
         </div>
 
-        <div className=" bg-white p-4">
-          <div className="overflow-hidden border border-gray-200 rounded-lg">
+        <div className="bg-white p-4 max-h-[calc(90vh-180px)] overflow-y-auto custom-scrollbar">
+          <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-inner">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-100/80">
@@ -330,6 +407,12 @@ const HistoryModal = ({
                     Bottom Section
                   </th>
                   <th
+                    className="px-4 py-3 text-center text-sm font-bold text-gray-800 uppercase tracking-widest border-b border-l border-gray-200 bg-emerald-50/20"
+                    rowSpan={2}
+                  >
+                    Total Result
+                  </th>
+                  <th
                     className="px-4 py-3 text-center text-sm font-bold text-gray-800 uppercase tracking-widest border-b border-l border-gray-200"
                     rowSpan={2}
                   >
@@ -373,154 +456,185 @@ const HistoryModal = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 border-b">
-                {history.map((check, checkIdx) => (
-                  <tr
-                    key={checkIdx}
-                    className="hover:bg-green-50/50 transition-colors group border-b"
-                  >
-                    <td className="px-4 py-3.5 text-center font-bold text-gray-400 group-hover:text-green-600 transition-colors">
-                      {checkIdx + 1}
-                    </td>
-                    <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
-                      {formatDate(check.date)}
-                    </td>
-                    <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
-                      {check.customer || report.customer || "N/A"}
-                    </td>
-                    <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
-                      {check.fabrication || report.fabrication || "N/A"}
-                    </td>
-                    <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
-                      {check.colorName ||
-                        check.color ||
-                        report.colorName ||
-                        "N/A"}
-                    </td>
-                    <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
-                      {formatTime(
-                        check.beforeDryRoom || check.beforeDryRoomTime,
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
-                      {formatTime(check.afterDryRoom || check.afterDryRoomTime)}
-                    </td>
-                    {/* Top Section */}
-                    <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
-                      <div className="flex flex-col items-center">
-                        <span>{check.top?.body || "N/A"}</span>
-                        {check.top?.bodyStatus && (
-                          <span
-                            className={`text-[8px] font-bold uppercase ${check.top.bodyStatus === "pass" ? "text-green-500" : "text-rose-500"}`}
-                          >
-                            {check.top.bodyStatus}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    {ribsVisible && (
-                      <td className="px-4 py-3.5 text-center text-gray-600 font-medium bg-blue-50/5">
-                        <div className="flex flex-col items-center">
-                          <span>{check.top?.ribs || "N/A"}</span>
-                          {check.top?.ribsStatus && (
-                            <span
-                              className={`text-[8px] font-bold uppercase ${check.top.ribsStatus === "pass" ? "text-green-500" : "text-rose-500"}`}
-                            >
-                              {check.top.ribsStatus}
+                {groupedHistory.map((session, sessionIdx) => (
+                  <React.Fragment key={sessionIdx}>
+                    {/* Session Header Row */}
+                    <tr className="bg-green-50/50">
+                      <td
+                        colSpan={ribsVisible ? 18 : 15}
+                        className="px-4 py-2 border-y border-green-100/50"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 size={14} className="text-green-600" />
+                            <span className="text-[10px] font-black text-green-700 uppercase tracking-[0.2em]">
+                              {session.name}
                             </span>
-                          )}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[9px] font-bold text-green-600/60 uppercase tracking-widest">
+                              Session Result:
+                            </span>
+                            {renderStatusBadge(getSessionStatus(session), true)}
+                          </div>
                         </div>
                       </td>
-                    )}
-                    <td className="px-4 py-3.5 text-center bg-blue-50/5">
-                      {renderStatusBadge(check.top?.status)}
-                    </td>
-                    {/* Middle Section */}
-                    <td className="px-4 py-3.5 text-center text-gray-600 font-medium border-l border-gray-50 bg-indigo-50/5">
-                      <div className="flex flex-col items-center">
-                        <span>{check.middle?.body || "N/A"}</span>
-                        {check.middle?.bodyStatus && (
-                          <span
-                            className={`text-[8px] font-bold uppercase ${check.middle.bodyStatus === "pass" ? "text-green-500" : "text-rose-500"}`}
-                          >
-                            {check.middle.bodyStatus}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    {ribsVisible && (
-                      <td className="px-4 py-3.5 text-center text-gray-600 font-medium bg-indigo-50/5">
-                        <div className="flex flex-col items-center">
-                          <span>{check.middle?.ribs || "N/A"}</span>
-                          {check.middle?.ribsStatus && (
-                            <span
-                              className={`text-[8px] font-bold uppercase ${check.middle.ribsStatus === "pass" ? "text-green-500" : "text-rose-500"}`}
-                            >
-                              {check.middle.ribsStatus}
-                            </span>
+                    </tr>
+                    {session.items.map((item, itemIdx) => (
+                      <tr
+                        key={`${sessionIdx}-${itemIdx}`}
+                        className="hover:bg-green-50/50 transition-colors group border-b"
+                      >
+                        <td className="px-4 py-3.5 text-center font-bold text-gray-400 group-hover:text-green-600 transition-colors">
+                          {item.itemName || `Item ${itemIdx + 1}`}
+                        </td>
+                        <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
+                          {formatDate(item.date)}
+                        </td>
+                        <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
+                          {item.customer || report.customer || "N/A"}
+                        </td>
+                        <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
+                          {item.fabrication || report.fabrication || "N/A"}
+                        </td>
+                        <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
+                          {item.colorName ||
+                            item.color ||
+                            report.colorName ||
+                            "N/A"}
+                        </td>
+                        <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
+                          {formatTime(
+                            item.beforeDryRoom || item.beforeDryRoomTime,
                           )}
-                        </div>
-                      </td>
-                    )}
-                    <td className="px-4 py-3.5 text-center bg-indigo-50/5">
-                      {renderStatusBadge(check.middle?.status)}
-                    </td>
-                    {/* Bottom Section */}
-                    <td className="px-4 py-3.5 text-center text-gray-600 font-medium border-l border-gray-50 bg-purple-50/5">
-                      <div className="flex flex-col items-center">
-                        <span>{check.bottom?.body || "N/A"}</span>
-                        {check.bottom?.bodyStatus && (
-                          <span
-                            className={`text-[8px] font-bold uppercase ${check.bottom.bodyStatus === "pass" ? "text-green-500" : "text-rose-500"}`}
-                          >
-                            {check.bottom.bodyStatus}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    {ribsVisible && (
-                      <td className="px-4 py-3.5 text-center text-gray-600 font-medium bg-purple-50/5">
-                        <div className="flex flex-col items-center">
-                          <span>{check.bottom?.ribs || "N/A"}</span>
-                          {check.bottom?.ribsStatus && (
-                            <span
-                              className={`text-[8px] font-bold uppercase ${check.bottom.ribsStatus === "pass" ? "text-green-500" : "text-rose-500"}`}
-                            >
-                              {check.bottom.ribsStatus}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    )}
-                    <td className="px-4 py-3.5 text-center bg-purple-50/5">
-                      {renderStatusBadge(check.bottom?.status)}
-                    </td>
-                    <td className="px-4 py-3.5 text-center border-l border-gray-50">
-                      {check.images && check.images.length > 0 ? (
-                        <div className="flex -space-x-2 justify-center hover:space-x-1 transition-all">
-                          <Image.PreviewGroup>
-                            {check.images.map((img, i) => (
-                              <div
-                                key={img.id || i}
-                                className="relative group/img"
+                        </td>
+                        <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
+                          {formatTime(item.afterDryRoom || item.afterDryRoomTime)}
+                        </td>
+                        {/* Top Section */}
+                        <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
+                          <div className="flex flex-col items-center">
+                            <span>{item.top?.body || "N/A"}</span>
+                            {(item.top?.bodyStatus || item.top?.status) && (
+                              <span
+                                className={`text-[8px] font-bold uppercase ${(item.top?.bodyStatus || item.top?.status) === "pass" ? "text-green-500" : "text-rose-500"}`}
                               >
-                                <Image
-                                  src={img.preview}
-                                  width={40}
-                                  height={40}
-                                  className="rounded-lg object-cover border-2 border-white shadow-sm cursor-zoom-in group-hover/img:scale-110 transition-transform"
-                                  fallback="https://via.placeholder.com/40?text=Error"
-                                />
-                              </div>
-                            ))}
-                          </Image.PreviewGroup>
-                        </div>
-                      ) : (
-                        <span className="text-gray-300 text-[10px] uppercase font-bold tracking-widest italic">
-                          No Photos
-                        </span>
-                      )}
-                    </td>
-                  </tr>
+                                {item.top?.bodyStatus || item.top?.status}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        {ribsVisible && (
+                          <td className="px-4 py-3.5 text-center text-gray-600 font-medium bg-blue-50/5 text-[12px]">
+                            <div className="flex flex-col items-center">
+                              <span>{item.top?.ribs || "N/A"}</span>
+                              {(item.top?.ribsStatus || item.top?.status) && (
+                                <span
+                                  className={`text-[8px] font-bold uppercase ${(item.top?.ribsStatus || item.top?.status) === "pass" ? "text-green-500" : "text-rose-500"}`}
+                                >
+                                  {item.top?.ribsStatus || item.top?.status}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                        <td className="px-4 py-3.5 text-center bg-blue-50/5">
+                          {renderStatusBadge(item.top?.status)}
+                        </td>
+
+                        {/* Middle Section */}
+                        <td className="px-4 py-3.5 text-center text-gray-600 font-medium border-l border-gray-50 bg-indigo-50/5">
+                          <div className="flex flex-col items-center">
+                            <span>{item.middle?.body || "N/A"}</span>
+                            {(item.middle?.bodyStatus || item.middle?.status) && (
+                              <span
+                                className={`text-[8px] font-bold uppercase ${(item.middle?.bodyStatus || item.middle?.status) === "pass" ? "text-green-500" : "text-rose-500"}`}
+                              >
+                                {item.middle?.bodyStatus || item.middle?.status}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        {ribsVisible && (
+                          <td className="px-4 py-3.5 text-center text-gray-600 font-medium bg-indigo-50/5 text-[12px]">
+                            <div className="flex flex-col items-center">
+                              <span>{item.middle?.ribs || "N/A"}</span>
+                              {(item.middle?.ribsStatus || item.middle?.status) && (
+                                <span
+                                  className={`text-[8px] font-bold uppercase ${(item.middle?.ribsStatus || item.middle?.status) === "pass" ? "text-green-500" : "text-rose-500"}`}
+                                >
+                                  {item.middle?.ribsStatus || item.middle?.status}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                        <td className="px-4 py-3.5 text-center bg-indigo-50/5">
+                          {renderStatusBadge(item.middle?.status)}
+                        </td>
+
+                        {/* Bottom Section */}
+                        <td className="px-4 py-3.5 text-center text-gray-600 font-medium border-l border-gray-50 bg-purple-50/5">
+                          <div className="flex flex-col items-center">
+                            <span>{item.bottom?.body || "N/A"}</span>
+                            {(item.bottom?.bodyStatus || item.bottom?.status) && (
+                              <span
+                                className={`text-[8px] font-bold uppercase ${(item.bottom?.bodyStatus || item.bottom?.status) === "pass" ? "text-green-500" : "text-rose-500"}`}
+                              >
+                                {item.bottom?.bodyStatus || item.bottom?.status}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        {ribsVisible && (
+                          <td className="px-4 py-3.5 text-center text-gray-600 font-medium bg-purple-50/5 text-[12px]">
+                            <div className="flex flex-col items-center">
+                              <span>{item.bottom?.ribs || "N/A"}</span>
+                              {(item.bottom?.ribsStatus || item.bottom?.status) && (
+                                <span
+                                  className={`text-[8px] font-bold uppercase ${(item.bottom?.ribsStatus || item.bottom?.status) === "pass" ? "text-green-500" : "text-rose-500"}`}
+                                >
+                                  {item.bottom?.ribsStatus || item.bottom?.status}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                        <td className="px-4 py-3.5 text-center bg-purple-50/5">
+                          {renderStatusBadge(item.bottom?.status)}
+                        </td>
+                        <td className="px-4 py-3.5 text-center border-l border-gray-50 bg-emerald-50/10">
+                          {renderStatusBadge(getItemStatus(item))}
+                        </td>
+                        <td className="px-4 py-3.5 text-center border-l border-gray-50">
+                          {item.images && item.images.length > 0 ? (
+                            <div className="flex -space-x-2 justify-center hover:space-x-1 transition-all min-w-[100px]">
+                              <Image.PreviewGroup>
+                                {item.images.map((img, i) => (
+                                  <div
+                                    key={img.id || i}
+                                    className="relative group/img"
+                                  >
+                                    <Image
+                                      src={img.preview}
+                                      width={40}
+                                      height={40}
+                                      className="rounded-lg object-cover border-2 border-white shadow-sm cursor-zoom-in group-hover/img:scale-110 transition-transform"
+                                      fallback="https://via.placeholder.com/40?text=Error"
+                                    />
+                                  </div>
+                                ))}
+                              </Image.PreviewGroup>
+                            </div>
+                          ) : (
+                            <span className="text-gray-300 text-[10px] uppercase font-bold tracking-widest italic">
+                              No Photos
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
@@ -616,9 +730,9 @@ const HistoryModal = ({
               </div>
             )}
           </div>
-        </div>
+        </div >
 
-        <div className="p-4 px-8 flex border-t border-gray-200 justify-between items-center bg-gray-50/50">
+        <div className="p-4 px-8 flex border-t border-gray-200 justify-between items-center bg-gray-50/50 rounded-b-2xl">
           <div className="flex items-center gap-4">
             <div className="flex flex-col">
               <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest leading-none">
@@ -639,15 +753,15 @@ const HistoryModal = ({
           </div>
         </div>
       </>
-    </Modal>
+    </Modal >
   );
 };
-const renderStatusBadge = (status) => {
+const renderStatusBadge = (status, isAdditional = false) => {
   if (status === "pass") {
     return (
-      <div className="inline-flex items-center px-3 py-1 rounded-full bg-green-50 text-green-700 border border-green-100 shadow-sm transition-all hover:scale-105 active:scale-95">
-        <div className="w-1.5 h-1.5 rounded-full bg-green-500 mr-2 animate-pulse"></div>
-        <span className="font-bold text-[10px] uppercase tracking-wider">
+      <div className={`inline-flex items-center ${isAdditional ? 'px-2 py-0.5' : 'px-3 py-1'} rounded-full bg-green-50 text-green-700 border border-green-100 shadow-sm transition-all hover:scale-105 active:scale-95`}>
+        <div className={`w-1.5 h-1.5 rounded-full bg-green-500 mr-2 ${!isAdditional && 'animate-pulse'}`}></div>
+        <span className={`font-bold ${isAdditional ? 'text-[8px]' : 'text-[10px]'} uppercase tracking-wider`}>
           Pass
         </span>
       </div>
@@ -655,9 +769,9 @@ const renderStatusBadge = (status) => {
   }
   if (status === "fail") {
     return (
-      <div className="inline-flex items-center px-3 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-100 shadow-sm transition-all hover:scale-105 active:scale-95">
+      <div className={`inline-flex items-center ${isAdditional ? 'px-2 py-0.5' : 'px-3 py-1'} rounded-full bg-rose-50 text-rose-700 border border-rose-100 shadow-sm transition-all hover:scale-105 active:scale-95`}>
         <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-2"></div>
-        <span className="font-bold text-[10px] uppercase tracking-wider">
+        <span className={`font-bold ${isAdditional ? 'text-[8px]' : 'text-[10px]'} uppercase tracking-wider`}>
           Fail
         </span>
       </div>
@@ -665,7 +779,7 @@ const renderStatusBadge = (status) => {
   }
   return (
     <span className="text-gray-300 font-bold text-[10px] uppercase tracking-widest">
-      N/A
+      {isAdditional ? "-" : "N/A"}
     </span>
   );
 };

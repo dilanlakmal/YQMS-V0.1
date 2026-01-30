@@ -43,12 +43,32 @@ export default function UpdateModelReimans({
 
   useEffect(() => {
     if (open && report) {
-      const sourceRecords =
-        report.inspectionRecords && report.inspectionRecords.length > 0
-          ? report.inspectionRecords
-          : report.history && report.history.length > 0
-            ? report.history
-            : [];
+      let sourceRecords = [];
+      if (report.inspectionRecords && report.inspectionRecords.length > 0) {
+        sourceRecords = report.inspectionRecords;
+      } else if (report.history && typeof report.history === 'object' && !Array.isArray(report.history)) {
+        // Convert nested Map history (Item -> Check) to latest records for editing
+        const historyMap = report.history;
+        sourceRecords = Object.keys(historyMap).sort((a, b) => {
+          const numA = parseInt(a.replace('Item ', ''));
+          const numB = parseInt(b.replace('Item ', ''));
+          return numA - numB;
+        }).map(itemKey => {
+          const checks = historyMap[itemKey] || {};
+          const checkKeys = Object.keys(checks).sort((a, b) => {
+            const numA = parseInt(a.replace('Check ', ''));
+            const numB = parseInt(b.replace('Check ', ''));
+            return numB - numA; // Sort descending to get latest
+          });
+          return {
+            ...checks[checkKeys[0]],
+            itemName: itemKey, // Store the item name to identify it during save
+            checkCount: checkKeys.length
+          };
+        });
+      } else if (Array.isArray(report.history)) {
+        sourceRecords = report.history;
+      }
 
       const specLimit = Number(report.upperCentisimalIndex);
       const parseNumberInternal = (v) => {
@@ -324,7 +344,7 @@ export default function UpdateModelReimans({
           : "http://localhost:5001";
       const prefix = base.endsWith("/") ? base.slice(0, -1) : base;
 
-      const currentEditRecords = formData.inspectionRecords.map((rec) => ({
+      const currentEditRecords = formData.inspectionRecords.map((rec, index) => ({
         top: {
           body: rec.top.body,
           ribs: "",
@@ -362,22 +382,49 @@ export default function UpdateModelReimans({
         timeOut: formData.timeOut,
         moistureRateAfter: formData.moistureRateAfter,
         matchedRule: formData.matchedRule,
-        saveTime: new Date().toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true,
-        }),
+        itemName: rec.itemName || `Item ${index + 1}`
       }));
 
-      const previousHistory = report.history || [];
-      const lastEditedRecord =
-        currentEditRecords[currentEditRecords.length - 1];
-      const newHistory = [...previousHistory, lastEditedRecord];
+      const previousHistory = { ...(report.history || {}) };
+
+      currentEditRecords.forEach((rec) => {
+        const itemKey = rec.itemName;
+        const previousChecks = (previousHistory[itemKey] && typeof previousHistory[itemKey] === 'object') ? previousHistory[itemKey] : {};
+        const checkKeys = Object.keys(previousChecks).sort((a, b) => {
+          const numA = parseInt(a.replace('Check ', ''));
+          const numB = parseInt(b.replace('Check ', ''));
+          return numB - numA;
+        });
+
+        const latestCheck = previousChecks[checkKeys[0]];
+        const newCheckNumber = checkKeys.length + 1;
+        const newCheckKey = `Check ${newCheckNumber}`;
+
+        // Detection: checking if readings changed
+        const isChanged = !latestCheck ||
+          String(rec.top?.body) !== String(latestCheck.top?.body) ||
+          String(rec.middle?.body) !== String(latestCheck.middle?.body) ||
+          String(rec.bottom?.body) !== String(latestCheck.bottom?.body);
+
+        if (isChanged) {
+          previousHistory[itemKey] = {
+            ...previousChecks,
+            [newCheckKey]: {
+              ...rec,
+              saveTime: new Date().toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true,
+              })
+            }
+          };
+        }
+      });
 
       const payload = {
         ...formData,
-        history: newHistory,
-        inspectionRecords: [lastEditedRecord],
+        history: previousHistory,
+        inspectionRecords: currentEditRecords,
       };
 
       const response = await fetch(
@@ -556,11 +603,10 @@ export default function UpdateModelReimans({
                           .map((color, idx) => (
                             <div
                               key={idx}
-                              className={`px-4 py-2 cursor-pointer text-sm font-medium transition-colors border-b border-gray-50 last:border-0 ${
-                                formData.colorName === color
+                              className={`px-4 py-2 cursor-pointer text-sm font-medium transition-colors border-b border-gray-50 last:border-0 ${formData.colorName === color
                                   ? "bg-blue-50 text-blue-700"
                                   : "hover:bg-blue-600 hover:text-white text-gray-700"
-                              }`}
+                                }`}
                               onClick={() => {
                                 setFormData({ ...formData, colorName: color });
                                 setColorSearch(color);

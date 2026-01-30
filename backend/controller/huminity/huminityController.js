@@ -17,14 +17,14 @@ export const getHumidityData = async (req, res) => {
     const col = ymProdConnection.db.collection("humidity_data");
     const query = q
       ? {
-          $or: [
-            { factoryStyleNo: { $regex: q, $options: "i" } },
-            { buyerStyle: { $regex: q, $options: "i" } },
-            { customer: { $regex: q, $options: "i" } },
-            { moNo: { $regex: q, $options: "i" } },
-            { style: { $regex: q, $options: "i" } },
-          ],
-        }
+        $or: [
+          { factoryStyleNo: { $regex: q, $options: "i" } },
+          { buyerStyle: { $regex: q, $options: "i" } },
+          { customer: { $regex: q, $options: "i" } },
+          { moNo: { $regex: q, $options: "i" } },
+          { style: { $regex: q, $options: "i" } },
+        ],
+      }
       : {};
 
     const cursor = col.find(query).sort({ createdAt: -1 });
@@ -643,8 +643,8 @@ export const exportHumidityReportsPaper = async (req, res) => {
 // POST /api/humidity-reports
 export const createHumidityReport = async (req, res) => {
   try {
-    console.log("createHumidityReport hehe");
     const payload = req.body;
+    console.log("[DEBUG-BACKEND] Received Create Request Payload:", JSON.stringify(payload, (key, value) => key === 'images' ? `[${value?.length || 0} images]` : value, 2));
     if (!payload || typeof payload !== "object") {
       return res
         .status(400)
@@ -663,15 +663,16 @@ export const createHumidityReport = async (req, res) => {
       payload.customer === "Reitmans_Form";
 
     // Transform inspectionRecords into history entry format
-    let history = [];
+    let history = {};
     if (isReitmans) {
       history = transformReitmansHistory(payload);
     } else {
-      history = (
-        Array.isArray(payload.inspectionRecords)
-          ? payload.inspectionRecords
-          : []
-      ).map((record) => {
+      const historyObj = {};
+      (Array.isArray(payload.inspectionRecords)
+        ? payload.inspectionRecords
+        : []
+      ).forEach((record, index) => {
+        const itemName = `Item ${index + 1}`;
         const entry = {
           date: payload.date || new Date().toISOString(),
           beforeDryRoom: payload.beforeDryRoom || "",
@@ -696,51 +697,27 @@ export const createHumidityReport = async (req, res) => {
             body: record.middle?.body || "",
             bodyStatus:
               record.middle?.bodyStatus ||
-              (record.middle?.pass
-                ? "pass"
-                : record.middle?.fail
-                  ? "fail"
-                  : ""),
+              (record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""),
             ribs: record.middle?.ribs || "",
             ribsStatus:
               record.middle?.ribsStatus ||
-              (record.middle?.pass
-                ? "pass"
-                : record.middle?.fail
-                  ? "fail"
-                  : ""),
+              (record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""),
             status:
               record.middle?.status ||
-              (record.middle?.pass
-                ? "pass"
-                : record.middle?.fail
-                  ? "fail"
-                  : ""),
+              (record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""),
           },
           bottom: {
             body: record.bottom?.body || "",
             bodyStatus:
               record.bottom?.bodyStatus ||
-              (record.bottom?.pass
-                ? "pass"
-                : record.bottom?.fail
-                  ? "fail"
-                  : ""),
+              (record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""),
             ribs: record.bottom?.ribs || "",
             ribsStatus:
               record.bottom?.ribsStatus ||
-              (record.bottom?.pass
-                ? "pass"
-                : record.bottom?.fail
-                  ? "fail"
-                  : ""),
+              (record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""),
             status:
               record.bottom?.status ||
-              (record.bottom?.pass
-                ? "pass"
-                : record.bottom?.fail
-                  ? "fail"
-                  : ""),
+              (record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""),
           },
 
           images: Array.isArray(record.images) ? record.images : [],
@@ -752,21 +729,29 @@ export const createHumidityReport = async (req, res) => {
             second: "2-digit",
           }),
         };
-        return entry;
+        historyObj[itemName] = { "Check 1": entry };
       });
+      history = historyObj;
     }
 
-    // Determine status: if all sections in ALL history records are 'pass', set status to 'Passed'
+    // Determine status: Passed only if the LATEST check of EVERY item is 'pass'
     let finalStatus = "Failed";
-    if (history.length > 0) {
-      const latest = history[history.length - 1];
-      if (
-        latest.top?.status === "pass" &&
-        latest.middle?.status === "pass" &&
-        latest.bottom?.status === "pass"
-      ) {
-        finalStatus = "Passed";
-      }
+    const items = Object.values(history || {});
+    if (items.length > 0) {
+      const allPassed = items.every((checksObj) => {
+        const checkKeys = Object.keys(checksObj).sort((a, b) => {
+          const numA = parseInt(a.replace("Check ", ""));
+          const numB = parseInt(b.replace("Check ", ""));
+          return numB - numA; // Sort descending to get latest first
+        });
+        const latestCheck = checksObj[checkKeys[0]];
+        return (
+          latestCheck?.top?.status === "pass" &&
+          latestCheck?.middle?.status === "pass" &&
+          latestCheck?.bottom?.status === "pass"
+        );
+      });
+      if (allPassed) finalStatus = "Passed";
     }
 
     let doc;
@@ -1072,17 +1057,24 @@ export const updateHumidityReport = async (req, res) => {
       delete payload.createdAt;
       delete payload.updatedAt;
 
-      // Recalculate top-level status based on the latest history entry
-      if (Array.isArray(payload.history) && payload.history.length > 0) {
-        const latest = payload.history[payload.history.length - 1];
-        if (
-          latest.top?.status === "pass" &&
-          latest.middle?.status === "pass" &&
-          latest.bottom?.status === "pass"
-        ) {
-          payload.status = "Passed";
-        } else {
-          payload.status = "Failed";
+      // Recalculate top-level status based on the latest check of every item
+      if (payload.history && typeof payload.history === "object") {
+        const items = Object.values(payload.history);
+        if (items.length > 0) {
+          const allPassed = items.every((checksObj) => {
+            const checkKeys = Object.keys(checksObj).sort((a, b) => {
+              const numA = parseInt(a.replace("Check ", ""));
+              const numB = parseInt(b.replace("Check ", ""));
+              return numB - numA;
+            });
+            const latestCheck = checksObj[checkKeys[0]];
+            return (
+              latestCheck?.top?.status === "pass" &&
+              latestCheck?.middle?.status === "pass" &&
+              latestCheck?.bottom?.status === "pass"
+            );
+          });
+          payload.status = allPassed ? "Passed" : "Failed";
         }
       }
 
