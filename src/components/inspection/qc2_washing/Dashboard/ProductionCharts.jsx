@@ -28,7 +28,7 @@ const ProductionCharts = ({ dbData, summary }) => (
        </div>
        <div className="flex flex-col items-center py-8">
           <div className="text-7xl font-black mb-2">{summary.avgPassRate?.toFixed(1)}%</div>
-          <div className="text-xs font-bold bg-white/20 px-4 py-1.5 rounded-full uppercase tracking-widest">Global Accuracy</div>
+          <div className="text-xs font-bold bg-white/20 px-4 py-1.5 rounded-full uppercase tracking-widest"> Overall Measurement Pass Rate</div>
        </div>
        <div className="space-y-4">
           <div className="flex justify-between text-xs font-bold border-b border-white/10 pb-2"><span>TOTAL DEFECTS</span><span className="text-amber-400">{summary.totalDefects?.toLocaleString()} PCS</span></div>

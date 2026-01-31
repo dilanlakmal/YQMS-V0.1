@@ -167,7 +167,7 @@ const AnalyticsTables = ({ dbData, defectLimit, setDefectLimit }) => {
               {topFailingPoints.map((p, i) => (
                 <tr key={i} className="hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors">
                   <td className="py-4 text-sm font-black text-slate-700 dark:text-gray-300">
-                    <span className="block truncate max-w-[150px]" title={p._id}>{p._id}</span>
+                    <span className="block max-w-[250px]" title={p._id}>{p._id}</span>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {p.affectedSizes?.slice(0, 4).map((sz) => (
                         <span key={sz} className="text-sm bg-slate-100 dark:bg-gray-800 px-1 rounded text-slate-400 font-bold">{sz}</span>

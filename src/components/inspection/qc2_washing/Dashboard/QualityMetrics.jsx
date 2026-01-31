@@ -12,7 +12,7 @@ const SkuQualityMatrices = ({ dbData }) => {
             <Ruler className="text-blue-600" /> Measurement Accuracy Matrix
           </h3>
           <span className="text-sm font-bold bg-blue-50 text-blue-600 px-3 py-1 rounded-full uppercase tracking-widest">
-            Worst Performing SKUs
+            Worst Performing Styles
           </span>
         </div>
         <div className="overflow-x-auto">

@@ -313,7 +313,7 @@ const CardTiles = ({ reports = [] }) => {
               <Target size={20} className="text-white" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">Production Efficiency</p>
+              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">Completed Washing Rate</p>
               <p className="text-lg font-bold text-blue-800 dark:text-blue-300">{stats.completionRate.toFixed(1)}%</p>
             </div>
           </div>
