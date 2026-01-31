@@ -18,24 +18,28 @@ import { Bar, Line, Doughnut } from "react-chartjs-2";
 // Helper to flatten nested history if it's an object/Map
 const getFlattenedHistory = (history) => {
   if (Array.isArray(history)) return history;
-  if (typeof history !== 'object' || history === null) return [];
+  if (typeof history !== "object" || history === null) return [];
 
-  return Object.keys(history).sort((a, b) => {
-    const numA = parseInt(a.replace('Item ', ''));
-    const numB = parseInt(b.replace('Item ', ''));
-    return numA - numB;
-  }).flatMap(itemKey => {
-    const checks = history[itemKey] || {};
-    return Object.keys(checks).sort((a, b) => {
-      const numA = parseInt(a.replace('Check ', ''));
-      const numB = parseInt(b.replace('Check ', ''));
+  return Object.keys(history)
+    .sort((a, b) => {
+      const numA = parseInt(a.replace("Item ", ""));
+      const numB = parseInt(b.replace("Item ", ""));
       return numA - numB;
-    }).map(checkKey => ({
-      ...checks[checkKey],
-      itemName: itemKey,
-      checkName: checkKey
-    }));
-  });
+    })
+    .flatMap((itemKey) => {
+      const checks = history[itemKey] || {};
+      return Object.keys(checks)
+        .sort((a, b) => {
+          const numA = parseInt(a.replace("Check ", ""));
+          const numB = parseInt(b.replace("Check ", ""));
+          return numA - numB;
+        })
+        .map((checkKey) => ({
+          ...checks[checkKey],
+          itemName: itemKey,
+          checkName: checkKey,
+        }));
+    });
 };
 
 ChartJS.register(
@@ -80,10 +84,11 @@ const KpiCard = ({
             <div className="text-sm font-bold text-gray-500 ">{title}</div>
             {percent !== null && percent !== undefined && (
               <div
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${percent >= 50
-                  ? "bg-green-50 text-green-600 border border-green-100"
-                  : "bg-red-50 text-red-600 border border-red-100"
-                  }`}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+                  percent >= 50
+                    ? "bg-green-50 text-green-600 border border-green-100"
+                    : "bg-red-50 text-red-600 border border-red-100"
+                }`}
               >
                 <svg
                   className={`w-3 h-3 ${graphUp ? "rotate-0" : "rotate-180"}`}
@@ -102,7 +107,9 @@ const KpiCard = ({
               </div>
             )}
           </div>
-          <div className="text-3xl font-extrabold tracking-tight text-gray-900">{value}</div>
+          <div className="text-3xl font-extrabold tracking-tight text-gray-900">
+            {value}
+          </div>
           {subtitle && (
             <div className="mt-1 text-xs font-medium text-gray-400">
               {subtitle}
@@ -894,21 +901,21 @@ export default function Dashboard() {
                     ...new Set([
                       ...(Array.isArray(ordersRaw)
                         ? ordersRaw
-                          .map((o) => (o.moNo || o.style || "").toString())
-                          .filter(Boolean)
+                            .map((o) => (o.moNo || o.style || "").toString())
+                            .filter(Boolean)
                         : []),
                       ...(Array.isArray(docsRaw)
                         ? docsRaw
-                          .map((d) =>
-                            (
-                              d.factoryStyleNo ||
-                              d.factoryStyle ||
-                              d.moNo ||
-                              d.style ||
-                              ""
-                            ).toString(),
-                          )
-                          .filter(Boolean)
+                            .map((d) =>
+                              (
+                                d.factoryStyleNo ||
+                                d.factoryStyle ||
+                                d.moNo ||
+                                d.style ||
+                                ""
+                              ).toString(),
+                            )
+                            .filter(Boolean)
                         : []),
                     ]),
                   ]
@@ -943,8 +950,8 @@ export default function Dashboard() {
               value={
                 factoryStyleFilter
                   ? buyerStyleFilter ||
-                  (buyerOptionsFiltered && buyerOptionsFiltered[0]) ||
-                  ""
+                    (buyerOptionsFiltered && buyerOptionsFiltered[0]) ||
+                    ""
                   : ""
               }
               readOnly
@@ -960,8 +967,8 @@ export default function Dashboard() {
               value={
                 factoryStyleFilter
                   ? customerFilter ||
-                  (customerOptionsFiltered && customerOptionsFiltered[0]) ||
-                  ""
+                    (customerOptionsFiltered && customerOptionsFiltered[0]) ||
+                    ""
                   : ""
               }
               readOnly
@@ -1078,17 +1085,24 @@ export default function Dashboard() {
         />
         {(() => {
           if (!factoryStyleFilter) return null;
-          const relevantDoc = filteredDocs.find(
-            (d) => {
-              if (d.upperCentisimalIndex && String(d.upperCentisimalIndex).trim() !== "") return true;
-              const history = getFlattenedHistory(d.history || d.inspectionRecords || []);
-              return history.some((h) => h.upperCentisimalIndex);
-            }
-          );
+          const relevantDoc = filteredDocs.find((d) => {
+            if (
+              d.upperCentisimalIndex &&
+              String(d.upperCentisimalIndex).trim() !== ""
+            )
+              return true;
+            const history = getFlattenedHistory(
+              d.history || d.inspectionRecords || [],
+            );
+            return history.some((h) => h.upperCentisimalIndex);
+          });
           if (!relevantDoc) return null;
 
-          const history = getFlattenedHistory(relevantDoc.history || relevantDoc.inspectionRecords || []);
-          const uci = relevantDoc.upperCentisimalIndex ||
+          const history = getFlattenedHistory(
+            relevantDoc.history || relevantDoc.inspectionRecords || [],
+          );
+          const uci =
+            relevantDoc.upperCentisimalIndex ||
             history.find((h) => h.upperCentisimalIndex)?.upperCentisimalIndex;
 
           if (!uci) return null;
@@ -1517,7 +1531,6 @@ export default function Dashboard() {
                     },
                   }}
                 />
-
               </>
             )}
           </div>
@@ -1560,9 +1573,7 @@ export default function Dashboard() {
                   />
                 </svg>
               </div>
-              <h3 className="text-md font-bold text-gray-800">
-                Middle Body
-              </h3>
+              <h3 className="text-md font-bold text-gray-800">Middle Body</h3>
             </div>
           </div>
           <div
@@ -1628,7 +1639,6 @@ export default function Dashboard() {
                     },
                   }}
                 />
-
               </>
             )}
           </div>
@@ -1672,9 +1682,7 @@ export default function Dashboard() {
                   />
                 </svg>
               </div>
-              <h3 className="text-md font-bold text-gray-800">
-                Bottom Body
-              </h3>
+              <h3 className="text-md font-bold text-gray-800">Bottom Body</h3>
             </div>
           </div>
           <div
@@ -1740,7 +1748,6 @@ export default function Dashboard() {
                     },
                   }}
                 />
-
               </>
             )}
           </div>
@@ -1848,7 +1855,6 @@ export default function Dashboard() {
                     },
                   }}
                 />
-
               </>
             )}
           </div>
@@ -1891,9 +1897,7 @@ export default function Dashboard() {
                   />
                 </svg>
               </div>
-              <h3 className="text-md font-bold text-gray-800">
-                Middle Ribs
-              </h3>
+              <h3 className="text-md font-bold text-gray-800">Middle Ribs</h3>
             </div>
           </div>
           <div
@@ -1953,7 +1957,6 @@ export default function Dashboard() {
                     },
                   }}
                 />
-
               </>
             )}
           </div>
@@ -1963,8 +1966,8 @@ export default function Dashboard() {
               Pass (
               {middleRibsPass + middleRibsFail
                 ? Math.round(
-                  (middleRibsPass / (middleRibsPass + middleRibsFail)) * 100,
-                )
+                    (middleRibsPass / (middleRibsPass + middleRibsFail)) * 100,
+                  )
                 : 0}
               %)
             </span>
@@ -1973,8 +1976,8 @@ export default function Dashboard() {
               Fail (
               {middleRibsPass + middleRibsFail
                 ? Math.round(
-                  (middleRibsFail / (middleRibsPass + middleRibsFail)) * 100,
-                )
+                    (middleRibsFail / (middleRibsPass + middleRibsFail)) * 100,
+                  )
                 : 0}
               %)
             </span>
@@ -2000,9 +2003,7 @@ export default function Dashboard() {
                   />
                 </svg>
               </div>
-              <h3 className="text-md font-bold text-gray-800">
-                Bottom Ribs
-              </h3>
+              <h3 className="text-md font-bold text-gray-800">Bottom Ribs</h3>
             </div>
           </div>
           <div
@@ -2062,7 +2063,6 @@ export default function Dashboard() {
                     },
                   }}
                 />
-
               </>
             )}
           </div>
@@ -2072,8 +2072,8 @@ export default function Dashboard() {
               Pass (
               {bottomRibsPass + bottomRibsFail
                 ? Math.round(
-                  (bottomRibsPass / (bottomRibsPass + bottomRibsFail)) * 100,
-                )
+                    (bottomRibsPass / (bottomRibsPass + bottomRibsFail)) * 100,
+                  )
                 : 0}
               %)
             </span>
@@ -2082,8 +2082,8 @@ export default function Dashboard() {
               Fail (
               {bottomRibsPass + bottomRibsFail
                 ? Math.round(
-                  (bottomRibsFail / (bottomRibsPass + bottomRibsFail)) * 100,
-                )
+                    (bottomRibsFail / (bottomRibsPass + bottomRibsFail)) * 100,
+                  )
                 : 0}
               %)
             </span>
@@ -2143,12 +2143,13 @@ export default function Dashboard() {
               >
                 <div className="flex items-center gap-4 flex-1">
                   <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center ${activity.latestStatus === "pass"
-                      ? "bg-green-100 text-green-600"
-                      : activity.latestStatus === "fail"
-                        ? "bg-red-100 text-red-600"
-                        : "bg-gray-100 text-gray-600"
-                      }`}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      activity.latestStatus === "pass"
+                        ? "bg-green-100 text-green-600"
+                        : activity.latestStatus === "fail"
+                          ? "bg-red-100 text-red-600"
+                          : "bg-gray-100 text-gray-600"
+                    }`}
                   >
                     {activity.latestStatus === "pass" ? (
                       <svg

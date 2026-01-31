@@ -53,7 +53,7 @@ export default function ExportPanel({ setActiveTab }) {
   const itemsPerPage = 10;
 
   useEffect(() => {
-    // We already set defaults in useState for startDate/endDate in some components, 
+    // We already set defaults in useState for startDate/endDate in some components,
     // but here we initialize them if empty
     if (!startDate || !endDate) {
       const today = new Date();
@@ -68,7 +68,7 @@ export default function ExportPanel({ setActiveTab }) {
         const base = API_BASE_URL && API_BASE_URL !== "" ? API_BASE_URL : "";
         const prefix = base.endsWith("/") ? base.slice(0, -1) : base;
 
-        let url = `${prefix}/api/humidity-reports?limit=100`;
+        let url = `${prefix}/api/humidity-reports?limit=0`;
 
         if (startDate && endDate) {
           const s = new Date(startDate);
@@ -189,7 +189,7 @@ export default function ExportPanel({ setActiveTab }) {
       const prefix = base.endsWith("/") ? base.slice(0, -1) : base;
 
       // Fetch data - build URL with optional filters
-      let url = `${prefix}/api/humidity-reports?limit=100`;
+      let url = `${prefix}/api/humidity-reports?limit=0`;
 
       // Add date filters only if both are selected
       if (startDate && endDate) {
@@ -202,7 +202,6 @@ export default function ExportPanel({ setActiveTab }) {
         const endIso = e.toISOString();
 
         url += `&start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`;
-        console.log("Exporting with date range:", startIso, "to", endIso);
       } else {
         console.log("Exporting all reports (no date filter)");
       }
@@ -210,10 +209,7 @@ export default function ExportPanel({ setActiveTab }) {
       // Add factory style filter if selected
       if (factoryStyleFilter) {
         url += `&factoryStyleNo=${encodeURIComponent(factoryStyleFilter)}`;
-        console.log("Filtering by Factory Style:", factoryStyleFilter);
       }
-
-      console.log("Fetching reports from:", url);
 
       const res = await fetch(url);
       if (!res.ok) {
@@ -223,10 +219,11 @@ export default function ExportPanel({ setActiveTab }) {
       const json = await res.json();
       const docs = json && json.data ? json.data : [];
 
-      console.log("Reports fetched:", docs.length);
-
       if (!Array.isArray(docs) || docs.length === 0) {
-        setMessage({ type: "error", text: "No reports found for the selected period." });
+        setMessage({
+          type: "error",
+          text: "No reports found for the selected period.",
+        });
         setIsLoading(false);
         return;
       }
@@ -269,7 +266,10 @@ export default function ExportPanel({ setActiveTab }) {
 
       const w = window.open("", "_blank");
       if (!w) {
-        setMessage({ type: "error", text: "Popup blocked. Please allow popups." });
+        setMessage({
+          type: "error",
+          text: "Popup blocked. Please allow popups.",
+        });
         setIsLoading(false);
         return;
       }
@@ -278,7 +278,10 @@ export default function ExportPanel({ setActiveTab }) {
       w.document.close();
     } catch (err) {
       console.error("Export error", err);
-      setMessage({ type: "error", text: "Export failed. See console for details." });
+      setMessage({
+        type: "error",
+        text: "Export failed. See console for details.",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -300,7 +303,7 @@ export default function ExportPanel({ setActiveTab }) {
       try {
         const base = API_BASE_URL && API_BASE_URL !== "" ? API_BASE_URL : "";
         const prefix = base.endsWith("/") ? base.slice(0, -1) : base;
-        const res = await fetch(`${prefix}/api/humidity-reports?limit=100`);
+        const res = await fetch(`${prefix}/api/humidity-reports?limit=0`);
         if (res.ok) {
           const json = await res.json();
           if (json.data && Array.isArray(json.data)) {
@@ -373,7 +376,7 @@ export default function ExportPanel({ setActiveTab }) {
       if (res.ok && json.success) {
         // refetch reports from server to get persisted remark and latest state
         try {
-          const res2 = await fetch(`${prefix}/api/humidity-reports?limit=100`);
+          const res2 = await fetch(`${prefix}/api/humidity-reports?limit=0`);
           if (res2.ok) {
             const j2 = await res2.json();
             if (j2.data && Array.isArray(j2.data)) {
@@ -407,7 +410,7 @@ export default function ExportPanel({ setActiveTab }) {
             const base2 =
               API_BASE_URL && API_BASE_URL !== "" ? API_BASE_URL : "";
             const prefix2 = base2.endsWith("/") ? base2.slice(0, -1) : base2;
-            const r = await fetch(`${prefix2}/api/humidity-reports?limit=100`);
+            const r = await fetch(`${prefix2}/api/humidity-reports?limit=0`);
             if (r.ok) {
               const j = await r.json();
               if (j.data && Array.isArray(j.data)) {
@@ -447,24 +450,28 @@ export default function ExportPanel({ setActiveTab }) {
 
   const getFlattenedHistory = (history) => {
     if (Array.isArray(history)) return history;
-    if (typeof history !== 'object' || history === null) return [];
+    if (typeof history !== "object" || history === null) return [];
 
-    return Object.keys(history).sort((a, b) => {
-      const numA = parseInt(a.replace('Item ', ''));
-      const numB = parseInt(b.replace('Item ', ''));
-      return numA - numB;
-    }).flatMap(itemKey => {
-      const checks = history[itemKey] || {};
-      return Object.keys(checks).sort((a, b) => {
-        const numA = parseInt(a.replace('Check ', ''));
-        const numB = parseInt(b.replace('Check ', ''));
+    return Object.keys(history)
+      .sort((a, b) => {
+        const numA = parseInt(a.replace("Item ", ""));
+        const numB = parseInt(b.replace("Item ", ""));
         return numA - numB;
-      }).map(checkKey => ({
-        ...checks[checkKey],
-        itemName: itemKey,
-        checkName: checkKey
-      }));
-    });
+      })
+      .flatMap((itemKey) => {
+        const checks = history[itemKey] || {};
+        return Object.keys(checks)
+          .sort((a, b) => {
+            const numA = parseInt(a.replace("Check ", ""));
+            const numB = parseInt(b.replace("Check ", ""));
+            return numA - numB;
+          })
+          .map((checkKey) => ({
+            ...checks[checkKey],
+            itemName: itemKey,
+            checkName: checkKey,
+          }));
+      });
   };
 
   const formatTime = (timeStr) => {
@@ -503,8 +510,14 @@ export default function ExportPanel({ setActiveTab }) {
   };
 
   const getReportStatus = (history) => {
-    if (!history || (Array.isArray(history) && history.length === 0)) return "none";
-    if (typeof history === 'object' && !Array.isArray(history) && Object.keys(history).length === 0) return "none";
+    if (!history || (Array.isArray(history) && history.length === 0))
+      return "none";
+    if (
+      typeof history === "object" &&
+      !Array.isArray(history) &&
+      Object.keys(history).length === 0
+    )
+      return "none";
 
     let allPassed = true;
     let hasCheck = false;
@@ -519,12 +532,12 @@ export default function ExportPanel({ setActiveTab }) {
           isPass(latestCheck.middle?.status) &&
           isPass(latestCheck.bottom?.status);
       }
-    } else if (typeof history === 'object') {
-      Object.keys(history).forEach(itemKey => {
+    } else if (typeof history === "object") {
+      Object.keys(history).forEach((itemKey) => {
         const itemChecks = history[itemKey] || {};
         const checkKeys = Object.keys(itemChecks).sort((a, b) => {
-          const numA = parseInt(a.replace('Check ', ''));
-          const numB = parseInt(b.replace('Check ', ''));
+          const numA = parseInt(a.replace("Check ", ""));
+          const numB = parseInt(b.replace("Check ", ""));
           return numB - numA;
         });
 
@@ -548,11 +561,11 @@ export default function ExportPanel({ setActiveTab }) {
   const getSessionCount = (history) => {
     if (!history) return 0;
     if (Array.isArray(history)) return history.length;
-    if (typeof history === 'object') {
+    if (typeof history === "object") {
       const allCheckKeys = new Set();
-      Object.values(history).forEach(itemChecks => {
-        if (typeof itemChecks === 'object' && itemChecks !== null) {
-          Object.keys(itemChecks).forEach(k => allCheckKeys.add(k));
+      Object.values(history).forEach((itemChecks) => {
+        if (typeof itemChecks === "object" && itemChecks !== null) {
+          Object.keys(itemChecks).forEach((k) => allCheckKeys.add(k));
         }
       });
       return allCheckKeys.size;
@@ -860,8 +873,8 @@ export default function ExportPanel({ setActiveTab }) {
                             No Remark Provided
                           </p>
                           <p className="text-xs text-rose-600/80 font-medium leading-relaxed m-0">
-                            Are you sure you want to approve this report
-                            without any quality notes?
+                            Are you sure you want to approve this report without
+                            any quality notes?
                           </p>
                         </div>
                       </div>
@@ -967,7 +980,9 @@ export default function ExportPanel({ setActiveTab }) {
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              <p className="text-lg font-medium text-gray-900">No reports found</p>
+              <p className="text-lg font-medium text-gray-900">
+                No reports found
+              </p>
               <p className="text-sm mt-1 text-gray-500 mb-6">
                 No humidity inspection records match your current filters.
               </p>
@@ -1026,9 +1041,13 @@ export default function ExportPanel({ setActiveTab }) {
               <tbody className="divide-y divide-gray-200">
                 {currentPageReports.map((report, idx) => {
                   const reportId = report._id || idx;
-                  const rawHistory = (report.history && (Array.isArray(report.history) ? report.history.length > 0 : Object.keys(report.history).length > 0))
-                    ? report.history
-                    : report.inspectionRecords || [];
+                  const rawHistory =
+                    report.history &&
+                    (Array.isArray(report.history)
+                      ? report.history.length > 0
+                      : Object.keys(report.history).length > 0)
+                      ? report.history
+                      : report.inspectionRecords || [];
                   const history = getFlattenedHistory(rawHistory);
                   const latestDate = report.updatedAt || report.createdAt || "";
                   const isApproved = report.approvalStatus === "approved";
@@ -1141,10 +1160,11 @@ export default function ExportPanel({ setActiveTab }) {
                                 <button
                                   onClick={() => handleEdit(reportId)}
                                   disabled={isDisabled}
-                                  className={`inline-flex items-center p-2.5 rounded-xl transition-all duration-200 group ${isDisabled
-                                    ? "text-gray-400 bg-gray-100 cursor-not-allowed"
-                                    : "text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
-                                    }`}
+                                  className={`inline-flex items-center p-2.5 rounded-xl transition-all duration-200 group ${
+                                    isDisabled
+                                      ? "text-gray-400 bg-gray-100 cursor-not-allowed"
+                                      : "text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+                                  }`}
                                   title={
                                     isDisabled
                                       ? "Report locked (3 passed)"
@@ -1237,10 +1257,11 @@ export default function ExportPanel({ setActiveTab }) {
                     <button
                       key={page}
                       onClick={() => setCurrentPage(page)}
-                      className={`min-w-[40px] h-9 px-3 py-2 text-sm font-medium border border-gray-300 -ml-px transition-all duration-200 ${currentPage === page
-                        ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:border-blue-700 z-10 relative"
-                        : "text-gray-700 bg-white hover:bg-gray-50"
-                        }`}
+                      className={`min-w-[40px] h-9 px-3 py-2 text-sm font-medium border border-gray-300 -ml-px transition-all duration-200 ${
+                        currentPage === page
+                          ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:border-blue-700 z-10 relative"
+                          : "text-gray-700 bg-white hover:bg-gray-50"
+                      }`}
                     >
                       {page}
                     </button>
@@ -1323,10 +1344,11 @@ export default function ExportPanel({ setActiveTab }) {
       {/* Premium Message Banner */}
       {message.text && (
         <div
-          className={`fixed bottom-6 right-6 z-[200] flex items-center gap-4 p-4 pl-5 pr-6 rounded-2xl shadow-2xl border backdrop-blur-md transition-all duration-500 animate-in fade-in slide-in-from-right-8 ${message.type === "success"
-            ? "text-emerald-900 bg-white/95 border-emerald-100 ring-8 ring-emerald-500/5"
-            : "text-rose-900 bg-white/95 border-rose-100 ring-8 ring-rose-500/5"
-            }`}
+          className={`fixed bottom-6 right-6 z-[200] flex items-center gap-4 p-4 pl-5 pr-6 rounded-2xl shadow-2xl border backdrop-blur-md transition-all duration-500 animate-in fade-in slide-in-from-right-8 ${
+            message.type === "success"
+              ? "text-emerald-900 bg-white/95 border-emerald-100 ring-8 ring-emerald-500/5"
+              : "text-rose-900 bg-white/95 border-rose-100 ring-8 ring-rose-500/5"
+          }`}
           role="alert"
         >
           <div className="relative">
@@ -1352,10 +1374,11 @@ export default function ExportPanel({ setActiveTab }) {
 
           <button
             type="button"
-            className={`p-1.5 rounded-lg transition-colors shrink-0 ${message.type === "success"
-              ? "text-emerald-400 hover:bg-emerald-50 hover:text-emerald-600"
-              : "text-rose-400 hover:bg-rose-50 hover:text-rose-600"
-              }`}
+            className={`p-1.5 rounded-lg transition-colors shrink-0 ${
+              message.type === "success"
+                ? "text-emerald-400 hover:bg-emerald-50 hover:text-emerald-600"
+                : "text-rose-400 hover:bg-rose-50 hover:text-rose-600"
+            }`}
             onClick={() => setMessage({ type: "", text: "" })}
             aria-label="Close"
           >
@@ -1364,8 +1387,9 @@ export default function ExportPanel({ setActiveTab }) {
 
           {/* Tiny Progress Bar */}
           <div
-            className={`absolute bottom-0 left-0 h-1 rounded-full opacity-30 ${message.type === "success" ? "bg-emerald-500" : "bg-rose-500"
-              }`}
+            className={`absolute bottom-0 left-0 h-1 rounded-full opacity-30 ${
+              message.type === "success" ? "bg-emerald-500" : "bg-rose-500"
+            }`}
             style={{
               width: "100%",
               animation: "shrink-width 3s linear forwards",

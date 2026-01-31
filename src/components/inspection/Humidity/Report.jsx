@@ -367,7 +367,8 @@ const FormPage = () => {
                         return false;
                     };
                     const ribsFlag = detectRibsAvailable(order);
-                    setRibsAvailable(prev => prev || ribsFlag);
+                    // setRibsAvailable(prev => prev || ribsFlag);
+                    setRibsAvailable(ribsFlag);
                     addCalcStep(`Ribs availability detection: ${ribsFlag ? 'ENABLED' : 'DISABLED'}`);
                     if (ribsFlag) {
                         const detectReason = (ord) => {
@@ -1007,6 +1008,11 @@ const FormPage = () => {
             newErrors.aquaboySpecBody = 'Aquaboy spec is required';
         } else if (isReitmans && !formData.aquaboySpecBody?.trim() && !formData.upperCentisimalIndex?.trim()) {
             newErrors.aquaboySpecBody = 'Upper Centisimal index is required';
+        }
+
+         // Explicitly check for Ribs Spec only if ribs are available
+        if (ribsAvailable && !formData.aquaboySpecRibs?.trim()) {
+            newErrors.aquaboySpecRibs = 'Ribs spec is required';
         }
 
         // Only require dry room times for non-Reitmans flows
@@ -1751,7 +1757,7 @@ const FormPage = () => {
                                                             onChange={(e) => setFormData(prev => ({ ...prev, aquaboySpecRibs: e.target.value }))}
                                                             className={`w-full px-4 py-1 bg-transparent rounded-md focus:ring-blue-300 transition-colors ${errors.aquaboySpecRibs ? 'text-blue-700' : 'text-blue-900'}`}
                                                             placeholder=""
-                                                            required
+                                                            required={ribsAvailable} 
                                                             aria-required="true"
                                                             disabled={!formData.factoryStyleNo}
                                                         />
@@ -1859,6 +1865,7 @@ const FormPage = () => {
                                                                             placeholder="Ribs"
                                                                             className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
                                                                             disabled={!formData.factoryStyleNo}
+                                                                            required={ribsAvailable}
                                                                         />
                                                                     </div>
                                                                     {record[section].ribsPass ? (

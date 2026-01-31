@@ -48,74 +48,84 @@ const HistoryModal = ({
   const activeReport = fullReport || report;
   if (!activeReport) return null;
 
-  const rawHistory = (activeReport.history && (Array.isArray(activeReport.history) ? activeReport.history.length > 0 : Object.keys(activeReport.history).length > 0))
-    ? activeReport.history
-    : activeReport.inspectionRecords || [];
+  const rawHistory =
+    activeReport.history &&
+    (Array.isArray(activeReport.history)
+      ? activeReport.history.length > 0
+      : Object.keys(activeReport.history).length > 0)
+      ? activeReport.history
+      : activeReport.inspectionRecords || [];
 
   // Helper to group nested history by Session (Check 1, Check 2, etc.)
   const getGroupedHistory = (history) => {
     if (Array.isArray(history)) {
       if (history.length > 0 && (history[0].itemName || history[0].checkName)) {
         const sessions = {};
-        history.forEach(item => {
-          const ck = item.checkName || 'Check 1';
+        history.forEach((item) => {
+          const ck = item.checkName || "Check 1";
           if (!sessions[ck]) sessions[ck] = { name: ck, items: [] };
           sessions[ck].items.push(item);
         });
-        return Object.keys(sessions).sort((a, b) => {
-          const numA = parseInt(a.replace('Check ', ''));
-          const numB = parseInt(b.replace('Check ', ''));
-          return numA - numB;
-        }).map(k => sessions[k]);
+        return Object.keys(sessions)
+          .sort((a, b) => {
+            const numA = parseInt(a.replace("Check ", ""));
+            const numB = parseInt(b.replace("Check ", ""));
+            return numA - numB;
+          })
+          .map((k) => sessions[k]);
       }
       return history.map((h, i) => ({
         name: h.checkName || `Check ${i + 1}`,
-        items: [{ ...h, itemName: h.itemName || 'Item 1' }]
+        items: [{ ...h, itemName: h.itemName || "Item 1" }],
       }));
     }
 
-    if (typeof history !== 'object' || history === null) return [];
+    if (typeof history !== "object" || history === null) return [];
 
     const sessions = {};
-    Object.keys(history).forEach(itemKey => {
+    Object.keys(history).forEach((itemKey) => {
       const checks = history[itemKey] || {};
-      Object.keys(checks).forEach(checkKey => {
+      Object.keys(checks).forEach((checkKey) => {
         if (!sessions[checkKey]) {
           sessions[checkKey] = {
             name: checkKey,
-            items: []
+            items: [],
           };
         }
         sessions[checkKey].items.push({
           ...checks[checkKey],
           itemName: itemKey,
-          checkName: checkKey
+          checkName: checkKey,
         });
       });
     });
 
-    return Object.keys(sessions).sort((a, b) => {
-      const numA = parseInt(a.replace('Check ', ''));
-      const numB = parseInt(b.replace('Check ', ''));
-      return numA - numB;
-    }).map(k => sessions[k]);
+    return Object.keys(sessions)
+      .sort((a, b) => {
+        const numA = parseInt(a.replace("Check ", ""));
+        const numB = parseInt(b.replace("Check ", ""));
+        return numA - numB;
+      })
+      .map((k) => sessions[k]);
   };
 
   const groupedHistory = getGroupedHistory(rawHistory);
-  const flattenedHistory = groupedHistory.flatMap(s => s.items);
+  const flattenedHistory = groupedHistory.flatMap((s) => s.items);
   const history = flattenedHistory; // For summary stats
 
   const getItemStatus = (item) => {
-    return (
-      (item.top?.status === "pass" || !item.top?.status) &&
+    return (item.top?.status === "pass" || !item.top?.status) &&
       (item.middle?.status === "pass" || !item.middle?.status) &&
       (item.bottom?.status === "pass" || !item.bottom?.status)
-    ) ? "pass" : "fail";
+      ? "pass"
+      : "fail";
   };
 
   const getSessionStatus = (session) => {
     if (!session || !session.items) return "fail";
-    return session.items.every(item => getItemStatus(item) === "pass") ? "pass" : "fail";
+    return session.items.every((item) => getItemStatus(item) === "pass")
+      ? "pass"
+      : "fail";
   };
 
   const getReportStatus = (raw) => {
@@ -170,7 +180,9 @@ const HistoryModal = ({
 
   const printReport = () => {
     try {
-      const content = renderToStaticMarkup(<PaperPreview data={activeReport} />);
+      const content = renderToStaticMarkup(
+        <PaperPreview data={activeReport} />,
+      );
       const w = openPrintableWindow(content);
       if (w) setTimeout(() => w.print(), 400);
     } catch (err) {
@@ -497,7 +509,10 @@ const HistoryModal = ({
                       >
                         <div className="flex items-center justify-between w-full">
                           <div className="flex items-center gap-2">
-                            <CheckCircle2 size={14} className="text-green-600" />
+                            <CheckCircle2
+                              size={14}
+                              className="text-green-600"
+                            />
                             <span className="text-[10px] font-black text-green-700 uppercase tracking-[0.2em]">
                               {session.name}
                             </span>
@@ -540,7 +555,9 @@ const HistoryModal = ({
                           )}
                         </td>
                         <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
-                          {formatTime(item.afterDryRoom || item.afterDryRoomTime)}
+                          {formatTime(
+                            item.afterDryRoom || item.afterDryRoomTime,
+                          )}
                         </td>
                         {/* Top Section */}
                         <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
@@ -577,7 +594,8 @@ const HistoryModal = ({
                         <td className="px-4 py-3.5 text-center text-gray-600 font-medium border-l border-gray-50 bg-indigo-50/5">
                           <div className="flex flex-col items-center">
                             <span>{item.middle?.body || "N/A"}</span>
-                            {(item.middle?.bodyStatus || item.middle?.status) && (
+                            {(item.middle?.bodyStatus ||
+                              item.middle?.status) && (
                               <span
                                 className={`text-[8px] font-bold uppercase ${(item.middle?.bodyStatus || item.middle?.status) === "pass" ? "text-green-500" : "text-rose-500"}`}
                               >
@@ -590,11 +608,13 @@ const HistoryModal = ({
                           <td className="px-4 py-3.5 text-center text-gray-600 font-medium bg-indigo-50/5 text-[12px]">
                             <div className="flex flex-col items-center">
                               <span>{item.middle?.ribs || "N/A"}</span>
-                              {(item.middle?.ribsStatus || item.middle?.status) && (
+                              {(item.middle?.ribsStatus ||
+                                item.middle?.status) && (
                                 <span
                                   className={`text-[8px] font-bold uppercase ${(item.middle?.ribsStatus || item.middle?.status) === "pass" ? "text-green-500" : "text-rose-500"}`}
                                 >
-                                  {item.middle?.ribsStatus || item.middle?.status}
+                                  {item.middle?.ribsStatus ||
+                                    item.middle?.status}
                                 </span>
                               )}
                             </div>
@@ -608,7 +628,8 @@ const HistoryModal = ({
                         <td className="px-4 py-3.5 text-center text-gray-600 font-medium border-l border-gray-50 bg-purple-50/5">
                           <div className="flex flex-col items-center">
                             <span>{item.bottom?.body || "N/A"}</span>
-                            {(item.bottom?.bodyStatus || item.bottom?.status) && (
+                            {(item.bottom?.bodyStatus ||
+                              item.bottom?.status) && (
                               <span
                                 className={`text-[8px] font-bold uppercase ${(item.bottom?.bodyStatus || item.bottom?.status) === "pass" ? "text-green-500" : "text-rose-500"}`}
                               >
@@ -621,11 +642,13 @@ const HistoryModal = ({
                           <td className="px-4 py-3.5 text-center text-gray-600 font-medium bg-purple-50/5 text-[12px]">
                             <div className="flex flex-col items-center">
                               <span>{item.bottom?.ribs || "N/A"}</span>
-                              {(item.bottom?.ribsStatus || item.bottom?.status) && (
+                              {(item.bottom?.ribsStatus ||
+                                item.bottom?.status) && (
                                 <span
                                   className={`text-[8px] font-bold uppercase ${(item.bottom?.ribsStatus || item.bottom?.status) === "pass" ? "text-green-500" : "text-rose-500"}`}
                                 >
-                                  {item.bottom?.ribsStatus || item.bottom?.status}
+                                  {item.bottom?.ribsStatus ||
+                                    item.bottom?.status}
                                 </span>
                               )}
                             </div>
@@ -726,7 +749,8 @@ const HistoryModal = ({
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="text-sm font-black text-slate-800 truncate tracking-tight">
-                        {activeReport.approvedBy?.engName || activeReport.approvedBy?.empId}
+                        {activeReport.approvedBy?.engName ||
+                          activeReport.approvedBy?.empId}
                       </span>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider tabular-nums">
@@ -761,7 +785,7 @@ const HistoryModal = ({
               </div>
             )}
           </div>
-        </div >
+        </div>
 
         <div className="p-4 px-8 flex border-t border-gray-200 justify-between items-center bg-gray-50/50 rounded-b-2xl">
           <div className="flex items-center gap-4">
@@ -784,15 +808,21 @@ const HistoryModal = ({
           </div>
         </div>
       </>
-    </Modal >
+    </Modal>
   );
 };
 const renderStatusBadge = (status, isAdditional = false) => {
   if (status === "pass") {
     return (
-      <div className={`inline-flex items-center ${isAdditional ? 'px-2 py-0.5' : 'px-3 py-1'} rounded-full bg-green-50 text-green-700 border border-green-100 shadow-sm transition-all hover:scale-105 active:scale-95`}>
-        <div className={`w-1.5 h-1.5 rounded-full bg-green-500 mr-2 ${!isAdditional && 'animate-pulse'}`}></div>
-        <span className={`font-bold ${isAdditional ? 'text-[8px]' : 'text-[10px]'} uppercase tracking-wider`}>
+      <div
+        className={`inline-flex items-center ${isAdditional ? "px-2 py-0.5" : "px-3 py-1"} rounded-full bg-green-50 text-green-700 border border-green-100 shadow-sm transition-all hover:scale-105 active:scale-95`}
+      >
+        <div
+          className={`w-1.5 h-1.5 rounded-full bg-green-500 mr-2 ${!isAdditional && "animate-pulse"}`}
+        ></div>
+        <span
+          className={`font-bold ${isAdditional ? "text-[8px]" : "text-[10px]"} uppercase tracking-wider`}
+        >
           Pass
         </span>
       </div>
@@ -800,9 +830,13 @@ const renderStatusBadge = (status, isAdditional = false) => {
   }
   if (status === "fail") {
     return (
-      <div className={`inline-flex items-center ${isAdditional ? 'px-2 py-0.5' : 'px-3 py-1'} rounded-full bg-rose-50 text-rose-700 border border-rose-100 shadow-sm transition-all hover:scale-105 active:scale-95`}>
+      <div
+        className={`inline-flex items-center ${isAdditional ? "px-2 py-0.5" : "px-3 py-1"} rounded-full bg-rose-50 text-rose-700 border border-rose-100 shadow-sm transition-all hover:scale-105 active:scale-95`}
+      >
         <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-2"></div>
-        <span className={`font-bold ${isAdditional ? 'text-[8px]' : 'text-[10px]'} uppercase tracking-wider`}>
+        <span
+          className={`font-bold ${isAdditional ? "text-[8px]" : "text-[10px]"} uppercase tracking-wider`}
+        >
           Fail
         </span>
       </div>

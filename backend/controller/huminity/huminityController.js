@@ -1,4 +1,3 @@
-import { log } from "console";
 import {
   ymProdConnection,
   HumidityReport,
@@ -17,14 +16,14 @@ export const getHumidityData = async (req, res) => {
     const col = ymProdConnection.db.collection("humidity_data");
     const query = q
       ? {
-        $or: [
-          { factoryStyleNo: { $regex: q, $options: "i" } },
-          { buyerStyle: { $regex: q, $options: "i" } },
-          { customer: { $regex: q, $options: "i" } },
-          { moNo: { $regex: q, $options: "i" } },
-          { style: { $regex: q, $options: "i" } },
-        ],
-      }
+          $or: [
+            { factoryStyleNo: { $regex: q, $options: "i" } },
+            { buyerStyle: { $regex: q, $options: "i" } },
+            { customer: { $regex: q, $options: "i" } },
+            { moNo: { $regex: q, $options: "i" } },
+            { style: { $regex: q, $options: "i" } },
+          ],
+        }
       : {};
 
     const cursor = col.find(query).sort({ createdAt: -1 });
@@ -272,7 +271,6 @@ export const getHumidityReports = async (req, res) => {
     let humidityDocs = await HumidityReport.find(query)
       .sort({ createdAt: -1 })
       .limit(limit ? Number(limit) : 1000)
-      // .limit(Number(limit))
       .exec();
     let reitmansDocs = await getReitmansReports(query, limit);
 
@@ -645,7 +643,6 @@ export const exportHumidityReportsPaper = async (req, res) => {
 export const createHumidityReport = async (req, res) => {
   try {
     const payload = req.body;
-    console.log("[DEBUG-BACKEND] Received Create Request Payload:", JSON.stringify(payload, (key, value) => key === 'images' ? `[${value?.length || 0} images]` : value, 2));
     if (!payload || typeof payload !== "object") {
       return res
         .status(400)
@@ -698,27 +695,51 @@ export const createHumidityReport = async (req, res) => {
             body: record.middle?.body || "",
             bodyStatus:
               record.middle?.bodyStatus ||
-              (record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""),
+              (record.middle?.pass
+                ? "pass"
+                : record.middle?.fail
+                  ? "fail"
+                  : ""),
             ribs: record.middle?.ribs || "",
             ribsStatus:
               record.middle?.ribsStatus ||
-              (record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""),
+              (record.middle?.pass
+                ? "pass"
+                : record.middle?.fail
+                  ? "fail"
+                  : ""),
             status:
               record.middle?.status ||
-              (record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""),
+              (record.middle?.pass
+                ? "pass"
+                : record.middle?.fail
+                  ? "fail"
+                  : ""),
           },
           bottom: {
             body: record.bottom?.body || "",
             bodyStatus:
               record.bottom?.bodyStatus ||
-              (record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""),
+              (record.bottom?.pass
+                ? "pass"
+                : record.bottom?.fail
+                  ? "fail"
+                  : ""),
             ribs: record.bottom?.ribs || "",
             ribsStatus:
               record.bottom?.ribsStatus ||
-              (record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""),
+              (record.bottom?.pass
+                ? "pass"
+                : record.bottom?.fail
+                  ? "fail"
+                  : ""),
             status:
               record.bottom?.status ||
-              (record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""),
+              (record.bottom?.pass
+                ? "pass"
+                : record.bottom?.fail
+                  ? "fail"
+                  : ""),
           },
 
           images: Array.isArray(record.images) ? record.images : [],
