@@ -15,6 +15,29 @@ import {
 } from "chart.js";
 import { Bar, Line, Doughnut } from "react-chartjs-2";
 
+// Helper to flatten nested history if it's an object/Map
+const getFlattenedHistory = (history) => {
+  if (Array.isArray(history)) return history;
+  if (typeof history !== 'object' || history === null) return [];
+
+  return Object.keys(history).sort((a, b) => {
+    const numA = parseInt(a.replace('Item ', ''));
+    const numB = parseInt(b.replace('Item ', ''));
+    return numA - numB;
+  }).flatMap(itemKey => {
+    const checks = history[itemKey] || {};
+    return Object.keys(checks).sort((a, b) => {
+      const numA = parseInt(a.replace('Check ', ''));
+      const numB = parseInt(b.replace('Check ', ''));
+      return numA - numB;
+    }).map(checkKey => ({
+      ...checks[checkKey],
+      itemName: itemKey,
+      checkName: checkKey
+    }));
+  });
+};
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -51,84 +74,42 @@ const KpiCard = ({
     <div
       className={`relative overflow-hidden rounded-2xl p-6 shadow-lg ${gradient} text-gray-800 transform transition-all duration-300 hover:scale-105 hover:shadow-2xl`}
     >
-      <div className="absolute top-0 right-0 opacity-10">
-        <div className="w-32 h-32 transform translate-x-8 -translate-y-8">
-          {icon}
-        </div>
-      </div>
-      <div className="relative z-10">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-sm font-medium opacity-90">{title}</div>
-          {trend !== null && trend !== undefined && trend !== 0 && (
-            <div
-              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${trend > 0 ? "bg-white/20" : "bg-white/10"}`}
-            >
-              <svg
-                className={`w-3 h-3 ${trend > 0 ? "rotate-0" : "rotate-180"}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+      <div className="relative z-10 flex flex-col h-full justify-between">
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-sm font-bold text-gray-500 ">{title}</div>
+            {percent !== null && percent !== undefined && (
+              <div
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${percent >= 50
+                  ? "bg-green-50 text-green-600 border border-green-100"
+                  : "bg-red-50 text-red-600 border border-red-100"
+                  }`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                />
-              </svg>
-              <span>{Math.abs(trend)}%</span>
+                <svg
+                  className={`w-3 h-3 ${graphUp ? "rotate-0" : "rotate-180"}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                  />
+                </svg>
+                <span>{percent}%</span>
+              </div>
+            )}
+          </div>
+          <div className="text-3xl font-extrabold tracking-tight text-gray-900">{value}</div>
+          {subtitle && (
+            <div className="mt-1 text-xs font-medium text-gray-400">
+              {subtitle}
             </div>
           )}
         </div>
-        <div className="text-4xl font-bold mb-1">{value}</div>
-        {subtitle && <div className="text-xs opacity-80">{subtitle}</div>}
       </div>
-      {cornerIcon && (
-        <div className="absolute top-0 right-0 z-0 pointer-events-none">
-          <div
-            className={`w-24 h-24 rounded-full flex items-center justify-center ${cornerBg || "bg-white/10"} opacity-20 transform translate-x-6 -translate-y-6`}
-          >
-            <div className="w-6 h-6 opacity-60 stroke-current">
-              {cornerIcon}
-            </div>
-          </div>
-        </div>
-      )}
-      {percent !== null && percent !== undefined && (
-        <div className="absolute top-4 right-6 z-20">
-          <div
-            className={`w-10 h-10 rounded-full flex items-center justify-center ${percent >= 50 ? "" : ""} shadow-sm`}
-          >
-            <div className="flex items-center gap-1">
-              <svg
-                className={`w-3 h-3 transform ${graphUp ? "rotate-0" : "rotate-180"} ${percent >= 50 ? "text-gray-600" : "text-gray-600"}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <polyline
-                  points="3 17 8 12 12 16 21 7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                />
-                <polyline
-                  points="17 7 21 7 21 11"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                />
-              </svg>
-              <span
-                className={`${percent >= 50 ? "text-gray-600" : "text-gray-600"} text-xs font-semibold`}
-              >
-                {percent}%
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -210,14 +191,14 @@ export default function Dashboard() {
           API_BASE_URL && API_BASE_URL !== ""
             ? API_BASE_URL.replace(/\/$/, "")
             : "";
-        const url = `${base}/api/humidity-reports?limit=100`;
+        const url = `${base}/api/humidity-reports?limit=0`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
         const json = await res.json();
         const docs = json?.data || [];
         if (mounted) setDocsRaw(docs);
         try {
-          const ordersUrl = `${base}/api/yorksys-orders?limit=500`;
+          const ordersUrl = `${base}/api/yorksys-orders?limit=0`;
           const ordRes = await fetch(ordersUrl);
           if (ordRes.ok) {
             const ordJson = await ordRes.json();
@@ -399,8 +380,10 @@ export default function Dashboard() {
         const specNum =
           parseFloat(d.aquaboySpec) || parseFloat(d.upperCentisimalIndex) || 0;
 
-        // Process history array instead of inspectionRecords
-        const history = Array.isArray(d.history) ? d.history : [];
+        // Process flattened history to support both old and new formats
+        const rawHist = d.history || d.inspectionRecords || [];
+        const history = getFlattenedHistory(rawHist);
+
         history.forEach((check) => {
           ["top", "middle", "bottom"].forEach((sec) => {
             const s = check[sec] || {};
@@ -699,7 +682,8 @@ export default function Dashboard() {
 
   // Compute total inspections and styles
   const totalInspections = filteredDocs.reduce((sum, doc) => {
-    const history = Array.isArray(doc.history) ? doc.history : [];
+    const rawHist = doc.history || doc.inspectionRecords || [];
+    const history = getFlattenedHistory(rawHist);
     return sum + history.length;
   }, 0);
 
@@ -715,27 +699,31 @@ export default function Dashboard() {
 
   // Recent activity (last 5 reports)
   const recentActivity = useMemo(() => {
-    return filteredDocs.slice(0, 5).map((doc) => ({
-      factoryStyleNo: doc.factoryStyleNo || "N/A",
-      customer: doc.customer || "N/A",
-      date: doc.updatedAt || doc.createdAt,
-      checksCount: Array.isArray(doc.history) ? doc.history.length : 0,
-      latestStatus: (() => {
-        const history = Array.isArray(doc.history) ? doc.history : [];
-        if (history.length === 0) return "pending";
-        const latest = history[history.length - 1];
-        const allPass =
-          latest.top?.status === "pass" &&
-          latest.middle?.status === "pass" &&
-          latest.bottom?.status === "pass";
-        return allPass ? "pass" : "fail";
-      })(),
-      upperCentisimalIndex:
-        doc.upperCentisimalIndex ||
-        (doc.history && doc.history.length > 0
-          ? doc.history[doc.history.length - 1].upperCentisimalIndex
-          : null),
-    }));
+    return filteredDocs.slice(0, 5).map((doc) => {
+      const rawHist = doc.history || doc.inspectionRecords || [];
+      const history = getFlattenedHistory(rawHist);
+
+      return {
+        factoryStyleNo: doc.factoryStyleNo || "N/A",
+        customer: doc.customer || "N/A",
+        date: doc.updatedAt || doc.createdAt,
+        checksCount: history.length,
+        latestStatus: (() => {
+          if (history.length === 0) return "pending";
+          const latest = history[history.length - 1];
+          const allPass =
+            latest.top?.status === "pass" &&
+            latest.middle?.status === "pass" &&
+            latest.bottom?.status === "pass";
+          return allPass ? "pass" : "fail";
+        })(),
+        upperCentisimalIndex:
+          doc.upperCentisimalIndex ||
+          (history.length > 0
+            ? history[history.length - 1].upperCentisimalIndex
+            : null),
+      };
+    });
   }, [filteredDocs]);
 
   if (loading) {
@@ -906,21 +894,21 @@ export default function Dashboard() {
                     ...new Set([
                       ...(Array.isArray(ordersRaw)
                         ? ordersRaw
-                            .map((o) => (o.moNo || o.style || "").toString())
-                            .filter(Boolean)
+                          .map((o) => (o.moNo || o.style || "").toString())
+                          .filter(Boolean)
                         : []),
                       ...(Array.isArray(docsRaw)
                         ? docsRaw
-                            .map((d) =>
-                              (
-                                d.factoryStyleNo ||
-                                d.factoryStyle ||
-                                d.moNo ||
-                                d.style ||
-                                ""
-                              ).toString(),
-                            )
-                            .filter(Boolean)
+                          .map((d) =>
+                            (
+                              d.factoryStyleNo ||
+                              d.factoryStyle ||
+                              d.moNo ||
+                              d.style ||
+                              ""
+                            ).toString(),
+                          )
+                          .filter(Boolean)
                         : []),
                     ]),
                   ]
@@ -955,8 +943,8 @@ export default function Dashboard() {
               value={
                 factoryStyleFilter
                   ? buyerStyleFilter ||
-                    (buyerOptionsFiltered && buyerOptionsFiltered[0]) ||
-                    ""
+                  (buyerOptionsFiltered && buyerOptionsFiltered[0]) ||
+                  ""
                   : ""
               }
               readOnly
@@ -972,8 +960,8 @@ export default function Dashboard() {
               value={
                 factoryStyleFilter
                   ? customerFilter ||
-                    (customerOptionsFiltered && customerOptionsFiltered[0]) ||
-                    ""
+                  (customerOptionsFiltered && customerOptionsFiltered[0]) ||
+                  ""
                   : ""
               }
               readOnly
@@ -983,64 +971,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-
-      {/* Selected Order Detailed Info Section */}
-      {/* {factoryStyleFilter && (
-        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="flex items-center gap-2 mb-6 border-b border-gray-50 pb-4">
-            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-800">Order Information</h3>
-              <p className="text-xs text-gray-500 font-medium">Detailed specs for Style: <span className="text-blue-600 font-extrabold">{factoryStyleFilter}</span></p>
-            </div>
-          </div>
-
-          {isOrderLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-8 h-8 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-            </div>
-          ) : selectedOrder ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 ">
-                <div className="text-[13px] uppercase text-gray-800 font-bold tracking-widest mb-1">Customer</div>
-                <div className="text-lg font-extrabold text-gray-800">{selectedOrder.buyer || 'N/A'}</div>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <div className="text-[10px] uppercase text-gray-400 font-bold tracking-widest mb-1">Fabrication</div>
-                <div className="text-sm font-bold text-gray-800 break-words">
-                  {Array.isArray(selectedOrder.FabricContent) && selectedOrder.FabricContent.length > 0
-                    ? selectedOrder.FabricContent.map(f => `${f.fabricName || f.fabric || ''} ${f.percentageValue || ''}%`.trim()).join(', ')
-                    : 'N/A'}
-                </div>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <div className="text-[10px] uppercase text-gray-400 font-bold tracking-widest mb-1">PO Number / Line</div>
-                <div className="text-lg font-extrabold text-gray-800">
-                  {selectedOrder.poNo || 'N/A'}
-                  {selectedOrder.SKUData?.[0]?.POLine ? <span className="text-gray-400 text-sm ml-2">({selectedOrder.SKUData[0].POLine})</span> : ''}
-                </div>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <div className="text-[10px] uppercase text-gray-400 font-bold tracking-widest mb-1">Available Colors</div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {[...new Set([
-                    ...(Array.isArray(selectedOrder.SKUData) ? selectedOrder.SKUData.map(s => s.Color).filter(Boolean) : []),
-                    ...((Array.isArray(selectedOrder.OrderQtyByCountry) ? selectedOrder.OrderQtyByCountry.flatMap(c => (c.ColorQty || []).map(cq => cq.ColorName)) : [])).filter(Boolean)
-                  ])].map((col, idx) => (
-                    <span key={idx} className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-black rounded uppercase tracking-tighter shadow-sm">{col}</span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-6 text-gray-400 italic text-sm font-medium">No extended order details found for this style.</div>
-          )}
-        </div>
-      )} */}
 
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -1149,17 +1079,17 @@ export default function Dashboard() {
         {(() => {
           if (!factoryStyleFilter) return null;
           const relevantDoc = filteredDocs.find(
-            (d) =>
-              (d.upperCentisimalIndex &&
-                String(d.upperCentisimalIndex).trim() !== "") ||
-              (Array.isArray(d.history) &&
-                d.history.some((h) => h.upperCentisimalIndex)),
+            (d) => {
+              if (d.upperCentisimalIndex && String(d.upperCentisimalIndex).trim() !== "") return true;
+              const history = getFlattenedHistory(d.history || d.inspectionRecords || []);
+              return history.some((h) => h.upperCentisimalIndex);
+            }
           );
-          const uci = relevantDoc
-            ? relevantDoc.upperCentisimalIndex ||
-              relevantDoc.history.find((h) => h.upperCentisimalIndex)
-                ?.upperCentisimalIndex
-            : null;
+          if (!relevantDoc) return null;
+
+          const history = getFlattenedHistory(relevantDoc.history || relevantDoc.inspectionRecords || []);
+          const uci = relevantDoc.upperCentisimalIndex ||
+            history.find((h) => h.upperCentisimalIndex)?.upperCentisimalIndex;
 
           if (!uci) return null;
 
@@ -1195,15 +1125,7 @@ export default function Dashboard() {
           value={totalBody}
           subtitle={`${passPctBody}% pass rate`}
           gradient="bg-gray-50 border-2 border-blue-300"
-          icon={
-            <svg
-              className="w-full h-full text-blue-400"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          }
+          percent={passPctBody}
         />
         <KpiCard
           title="Body Pass"
@@ -1212,36 +1134,6 @@ export default function Dashboard() {
           gradient="bg-gray-50 border-2 border-green-300"
           trend={passPctBody > 50 ? passPctBody : null}
           percent={passPctBody}
-          cornerBg="bg-green-50"
-          cornerIcon={
-            <svg
-              className="w-5 h-5 text-green-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M4 14h3v6H4zM10 10h3v10h-3zM16 6h3v14h-3z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-          icon={
-            <svg
-              className="w-full h-full text-green-400"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
         />
         <KpiCard
           title="Body Fail"
@@ -1250,36 +1142,6 @@ export default function Dashboard() {
           gradient="bg-gray-50 border-2 border-red-300"
           trend={failPctBody < 50 ? -failPctBody : null}
           percent={failPctBody}
-          cornerBg="bg-red-50"
-          cornerIcon={
-            <svg
-              className="w-5 h-5 text-red-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M4 14h3v6H4zM10 10h3v10h-3zM16 6h3v14h-3z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-          icon={
-            <svg
-              className="w-full h-full text-red-400"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
         />
       </div>
 
@@ -1290,96 +1152,21 @@ export default function Dashboard() {
           value={total}
           subtitle={`${passPct}% pass rate`}
           gradient="bg-gray-50 border-2 border-purple-300"
-          icon={
-            <svg
-              className="w-full h-full text-purple-400"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
-              <path d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
-            </svg>
-          }
+          percent={passPct}
         />
         <KpiCard
           title="Ribs Pass"
           value={totalRibsPass}
           subtitle="Passed inspection"
           gradient="bg-gray-50 border-2 border-teal-300"
-          trend={passPct > 50 ? passPct : null}
           percent={passPct}
-          cornerBg="bg-green-50"
-          cornerIcon={
-            <svg
-              className="w-5 h-5 text-teal-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M4 14h3v6H4zM10 10h3v10h-3zM16 6h3v14h-3z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-          icon={
-            <svg
-              className="w-full h-full text-teal-400"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-          }
         />
         <KpiCard
           title="Ribs Fail"
           value={totalRibsFail}
           subtitle="Requires attention"
           gradient="bg-gray-50 border-2 border-orange-300"
-          trend={failPct < 50 ? -failPct : null}
           percent={failPct}
-          cornerBg="bg-red-50"
-          cornerIcon={
-            <svg
-              className="w-5 h-5 text-orange-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M4 14h3v6H4zM10 10h3v10h-3zM16 6h3v14h-3z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-          icon={
-            <svg
-              className="w-full h-full text-orange-400"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                fillRule="evenodd"
-                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                clipRule="evenodd"
-              />
-            </svg>
-          }
         />
       </div>
 
@@ -1395,47 +1182,6 @@ export default function Dashboard() {
               ? Math.round((topPass / (topPass + topFail)) * 100)
               : 0
           }
-          icon={
-            <svg
-              className="w-5 h-5 text-indigo-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-          cornerBg="bg-blue-50"
-          cornerIcon={
-            <svg
-              className="w-5 h-5 text-blue-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
         />
         <KpiCard
           title="Middle Readings"
@@ -1447,47 +1193,6 @@ export default function Dashboard() {
               ? Math.round((middlePass / (middlePass + middleFail)) * 100)
               : 0
           }
-          icon={
-            <svg
-              className="w-5 h-5 text-pink-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-          cornerBg="bg-orange-50"
-          cornerIcon={
-            <svg
-              className="w-5 h-5 text-orange-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
         />
         <KpiCard
           title="Bottom Readings"
@@ -1498,47 +1203,6 @@ export default function Dashboard() {
             bottomPass + bottomFail
               ? Math.round((bottomPass / (bottomPass + bottomFail)) * 100)
               : 0
-          }
-          icon={
-            <svg
-              className="w-5 h-5 text-pink-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-          cornerBg="bg-green-50"
-          cornerIcon={
-            <svg
-              className="w-5 h-5 text-green-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
           }
         />
       </div>
@@ -1564,7 +1228,7 @@ export default function Dashboard() {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-800">
+              <h3 className="text-lg font-bold text-gray-800">
                 Body Performance
               </h3>
             </div>
@@ -1607,11 +1271,11 @@ export default function Dashboard() {
                       {
                         data: [totalBodyPass, totalBodyFail],
                         backgroundColor: [
-                          "rgba(173, 216, 230, 0.8)",
+                          "rgba(147, 197, 253, 0.8)",
                           "rgba(255, 192, 203, 0.8)",
                         ],
                         borderColor: [
-                          "rgba(173, 216, 230, 1)",
+                          "rgba(147, 197, 253, 1)",
                           "rgba(255, 192, 203, 1)",
                         ],
                         borderWidth: 2,
@@ -1672,7 +1336,7 @@ export default function Dashboard() {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-800">
+              <h3 className="text-lg font-bold text-gray-800">
                 Ribs Performance
               </h3>
             </div>
@@ -1715,10 +1379,13 @@ export default function Dashboard() {
                       {
                         data: [totalRibsPass, totalRibsFail],
                         backgroundColor: [
-                          "#B5EAD7", // Pastel Mint (Pass)
-                          "#FF9AA2", // Pastel Salmon (Fail)
+                          "rgba(147, 197, 253, 0.8)",
+                          "rgba(255, 192, 203, 0.8)",
                         ],
-                        borderColor: ["#98e2c7ff", "#f1828bff"],
+                        borderColor: [
+                          "rgba(147, 197, 253, 1)",
+                          "rgba(255, 192, 203, 1)",
+                        ],
                         borderWidth: 2,
                         hoverOffset: 8,
                       },
@@ -1779,12 +1446,12 @@ export default function Dashboard() {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 15l7-7 7 7"
+                    strokeWidth={2.5}
+                    d="M12 19V5M5 12l7-7 7 7"
                   />
                 </svg>
               </div>
-              <h3 className="text-md font-semibold text-gray-800">Top Body</h3>
+              <h3 className="text-md font-bold text-gray-800">Top Body</h3>
             </div>
           </div>
           <div
@@ -1825,8 +1492,14 @@ export default function Dashboard() {
                     datasets: [
                       {
                         data: [topPass, topFail],
-                        backgroundColor: ["#93c5fd", "#fca5a5"],
-                        borderColor: ["#3b82f6", "#ef4444"],
+                        backgroundColor: [
+                          "rgba(147, 197, 253, 0.8)",
+                          "rgba(255, 192, 203, 0.8)",
+                        ],
+                        borderColor: [
+                          "rgba(147, 197, 253, 1)",
+                          "rgba(250, 179, 191, 1)",
+                        ],
                         borderWidth: 1,
                       },
                     ],
@@ -1844,17 +1517,7 @@ export default function Dashboard() {
                     },
                   }}
                 />
-                <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-xl font-bold text-gray-800">
-                    {topPass + topFail
-                      ? Math.round((topPass / (topPass + topFail)) * 100)
-                      : 0}
-                    %
-                  </span>
-                  <span className="text-[10px] text-gray-500 uppercase font-medium">
-                    Pass
-                  </span>
-                </div>
+
               </>
             )}
           </div>
@@ -1882,9 +1545,9 @@ export default function Dashboard() {
         <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
           <div className="flex items-start justify-between gap-2 mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-pink-100 flex items-center justify-center shrink-0">
                 <svg
-                  className="w-5 h-5 text-orange-600"
+                  className="w-5 h-5 text-pink-600"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1892,12 +1555,12 @@ export default function Dashboard() {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M18 12H6"
+                    strokeWidth={2.5}
+                    d="M5 12h14"
                   />
                 </svg>
               </div>
-              <h3 className="text-md font-semibold text-gray-800">
+              <h3 className="text-md font-bold text-gray-800">
                 Middle Body
               </h3>
             </div>
@@ -1940,8 +1603,14 @@ export default function Dashboard() {
                     datasets: [
                       {
                         data: [middlePass, middleFail],
-                        backgroundColor: ["#fde68a", "#fca5a5"],
-                        borderColor: ["#f59e0b", "#ef4444"],
+                        backgroundColor: [
+                          "rgba(147, 197, 253, 0.8)",
+                          "rgba(255, 192, 203, 0.8)",
+                        ],
+                        borderColor: [
+                          "rgba(147, 197, 253, 1)",
+                          "rgba(250, 179, 191, 1)",
+                        ],
                         borderWidth: 1,
                       },
                     ],
@@ -1959,24 +1628,12 @@ export default function Dashboard() {
                     },
                   }}
                 />
-                <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-xl font-bold text-gray-800">
-                    {middlePass + middleFail
-                      ? Math.round(
-                          (middlePass / (middlePass + middleFail)) * 100,
-                        )
-                      : 0}
-                    %
-                  </span>
-                  <span className="text-[10px] text-gray-500 uppercase font-medium">
-                    Pass
-                  </span>
-                </div>
+
               </>
             )}
           </div>
           <div className="flex items-center justify-center gap-2 mt-3">
-            <div className="w-3 h-3 rounded-full bg-[#fde68a]" />
+            <div className="w-3 h-3 rounded-full bg-[#93c5fd]" />
             <span className="text-sm font-medium text-gray-600">
               Pass (
               {middlePass + middleFail
@@ -2000,9 +1657,9 @@ export default function Dashboard() {
         <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
           <div className="flex items-start justify-between gap-2 mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-fuchsia-100 flex items-center justify-center shrink-0">
                 <svg
-                  className="w-5 h-5 text-green-600"
+                  className="w-5 h-5 text-fuchsia-600"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -2010,12 +1667,12 @@ export default function Dashboard() {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
+                    strokeWidth={2.5}
+                    d="M12 5v14M5 12l7 7 7-7"
                   />
                 </svg>
               </div>
-              <h3 className="text-md font-semibold text-gray-800">
+              <h3 className="text-md font-bold text-gray-800">
                 Bottom Body
               </h3>
             </div>
@@ -2058,8 +1715,14 @@ export default function Dashboard() {
                     datasets: [
                       {
                         data: [bottomPass, bottomFail],
-                        backgroundColor: ["#86efac", "#fca5a5"],
-                        borderColor: ["#22c55e", "#ef4444"],
+                        backgroundColor: [
+                          "rgba(147, 197, 253, 0.8)",
+                          "rgba(255, 192, 203, 0.8)",
+                        ],
+                        borderColor: [
+                          "rgba(147, 197, 253, 1)",
+                          "rgba(250, 179, 191, 1)",
+                        ],
                         borderWidth: 1,
                       },
                     ],
@@ -2077,24 +1740,12 @@ export default function Dashboard() {
                     },
                   }}
                 />
-                <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-xl font-bold text-gray-800">
-                    {bottomPass + bottomFail
-                      ? Math.round(
-                          (bottomPass / (bottomPass + bottomFail)) * 100,
-                        )
-                      : 0}
-                    %
-                  </span>
-                  <span className="text-[10px] text-gray-500 uppercase font-medium">
-                    Pass
-                  </span>
-                </div>
+
               </>
             )}
           </div>
           <div className="flex items-center justify-center gap-2 mt-3">
-            <div className="w-3 h-3 rounded-full bg-[#86efac]" />
+            <div className="w-3 h-3 rounded-full bg-[#93c5fd]" />
             <span className="text-sm font-medium text-gray-600">
               Pass (
               {bottomPass + bottomFail
@@ -2133,12 +1784,12 @@ export default function Dashboard() {
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 15l7-7 7 7"
+                  strokeWidth={2.5}
+                  d="M12 19V5M5 12l7-7 7 7"
                 />
               </svg>
             </div>
-            <h3 className="text-md font-semibold text-gray-800">Top Ribs</h3>
+            <h3 className="text-md font-bold text-gray-800">Top Ribs</h3>
           </div>
           <div
             className="flex items-center justify-center p-2"
@@ -2172,8 +1823,14 @@ export default function Dashboard() {
                     datasets: [
                       {
                         data: [topRibsPass, topRibsFail],
-                        backgroundColor: ["#c084fc", "#fca5a5"],
-                        borderColor: ["#9333ea", "#ef4444"],
+                        backgroundColor: [
+                          "rgba(147, 197, 253, 0.8)",
+                          "rgba(255, 192, 203, 0.8)",
+                        ],
+                        borderColor: [
+                          "rgba(147, 197, 253, 1)",
+                          "rgba(250, 179, 191, 1)",
+                        ],
                         borderWidth: 1,
                       },
                     ],
@@ -2191,24 +1848,12 @@ export default function Dashboard() {
                     },
                   }}
                 />
-                <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-xl font-bold text-gray-800">
-                    {topRibsPass + topRibsFail
-                      ? Math.round(
-                          (topRibsPass / (topRibsPass + topRibsFail)) * 100,
-                        )
-                      : 0}
-                    %
-                  </span>
-                  <span className="text-[10px] text-gray-500 uppercase font-medium">
-                    Pass
-                  </span>
-                </div>
+
               </>
             )}
           </div>
           <div className="flex items-center justify-center gap-2 mt-3">
-            <div className="w-3 h-3 rounded-full bg-[#c084fc]" />
+            <div className="w-3 h-3 rounded-full bg-[#93c5fd]" />
             <span className="text-sm font-medium text-gray-600">
               Pass (
               {topRibsPass + topRibsFail
@@ -2241,12 +1886,12 @@ export default function Dashboard() {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M18 12H6"
+                    strokeWidth={2.5}
+                    d="M5 12h14"
                   />
                 </svg>
               </div>
-              <h3 className="text-md font-semibold text-gray-800">
+              <h3 className="text-md font-bold text-gray-800">
                 Middle Ribs
               </h3>
             </div>
@@ -2283,8 +1928,14 @@ export default function Dashboard() {
                     datasets: [
                       {
                         data: [middleRibsPass, middleRibsFail],
-                        backgroundColor: ["#f472b6", "#fca5a5"],
-                        borderColor: ["#db2777", "#ef4444"],
+                        backgroundColor: [
+                          "rgba(147, 197, 253, 0.8)",
+                          "rgba(255, 192, 203, 0.8)",
+                        ],
+                        borderColor: [
+                          "rgba(147, 197, 253, 1)",
+                          "rgba(250, 179, 191, 1)",
+                        ],
                         borderWidth: 1,
                       },
                     ],
@@ -2302,31 +1953,18 @@ export default function Dashboard() {
                     },
                   }}
                 />
-                <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-xl font-bold text-gray-800">
-                    {middleRibsPass + middleRibsFail
-                      ? Math.round(
-                          (middleRibsPass / (middleRibsPass + middleRibsFail)) *
-                            100,
-                        )
-                      : 0}
-                    %
-                  </span>
-                  <span className="text-[10px] text-gray-500 uppercase font-medium">
-                    Pass
-                  </span>
-                </div>
+
               </>
             )}
           </div>
           <div className="flex items-center justify-center gap-2 mt-3">
-            <div className="w-3 h-3 rounded-full bg-[#f472b6]" />
+            <div className="w-3 h-3 rounded-full bg-[#93c5fd]" />
             <span className="text-sm font-medium text-gray-600">
               Pass (
               {middleRibsPass + middleRibsFail
                 ? Math.round(
-                    (middleRibsPass / (middleRibsPass + middleRibsFail)) * 100,
-                  )
+                  (middleRibsPass / (middleRibsPass + middleRibsFail)) * 100,
+                )
                 : 0}
               %)
             </span>
@@ -2335,8 +1973,8 @@ export default function Dashboard() {
               Fail (
               {middleRibsPass + middleRibsFail
                 ? Math.round(
-                    (middleRibsFail / (middleRibsPass + middleRibsFail)) * 100,
-                  )
+                  (middleRibsFail / (middleRibsPass + middleRibsFail)) * 100,
+                )
                 : 0}
               %)
             </span>
@@ -2357,12 +1995,12 @@ export default function Dashboard() {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
+                    strokeWidth={2.5}
+                    d="M12 5v14M5 12l7 7 7-7"
                   />
                 </svg>
               </div>
-              <h3 className="text-md font-semibold text-gray-800">
+              <h3 className="text-md font-bold text-gray-800">
                 Bottom Ribs
               </h3>
             </div>
@@ -2399,8 +2037,14 @@ export default function Dashboard() {
                     datasets: [
                       {
                         data: [bottomRibsPass, bottomRibsFail],
-                        backgroundColor: ["#e879f9", "#fca5a5"],
-                        borderColor: ["#c026d3", "#ef4444"],
+                        backgroundColor: [
+                          "rgba(147, 197, 253, 0.8)",
+                          "rgba(255, 192, 203, 0.8)",
+                        ],
+                        borderColor: [
+                          "rgba(147, 197, 253, 1)",
+                          "rgba(250, 179, 191, 1)",
+                        ],
                         borderWidth: 1,
                       },
                     ],
@@ -2418,31 +2062,18 @@ export default function Dashboard() {
                     },
                   }}
                 />
-                <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-xl font-bold text-gray-800">
-                    {bottomRibsPass + bottomRibsFail
-                      ? Math.round(
-                          (bottomRibsPass / (bottomRibsPass + bottomRibsFail)) *
-                            100,
-                        )
-                      : 0}
-                    %
-                  </span>
-                  <span className="text-[10px] text-gray-500 uppercase font-medium">
-                    Pass
-                  </span>
-                </div>
+
               </>
             )}
           </div>
           <div className="flex items-center justify-center gap-2 mt-3">
-            <div className="w-3 h-3 rounded-full bg-[#e879f9]" />
+            <div className="w-3 h-3 rounded-full bg-[#93c5fd]" />
             <span className="text-sm font-medium text-gray-600">
               Pass (
               {bottomRibsPass + bottomRibsFail
                 ? Math.round(
-                    (bottomRibsPass / (bottomRibsPass + bottomRibsFail)) * 100,
-                  )
+                  (bottomRibsPass / (bottomRibsPass + bottomRibsFail)) * 100,
+                )
                 : 0}
               %)
             </span>
@@ -2451,8 +2082,8 @@ export default function Dashboard() {
               Fail (
               {bottomRibsPass + bottomRibsFail
                 ? Math.round(
-                    (bottomRibsFail / (bottomRibsPass + bottomRibsFail)) * 100,
-                  )
+                  (bottomRibsFail / (bottomRibsPass + bottomRibsFail)) * 100,
+                )
                 : 0}
               %)
             </span>
@@ -2512,13 +2143,12 @@ export default function Dashboard() {
               >
                 <div className="flex items-center gap-4 flex-1">
                   <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      activity.latestStatus === "pass"
-                        ? "bg-green-100 text-green-600"
-                        : activity.latestStatus === "fail"
-                          ? "bg-red-100 text-red-600"
-                          : "bg-gray-100 text-gray-600"
-                    }`}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${activity.latestStatus === "pass"
+                      ? "bg-green-100 text-green-600"
+                      : activity.latestStatus === "fail"
+                        ? "bg-red-100 text-red-600"
+                        : "bg-gray-100 text-gray-600"
+                      }`}
                   >
                     {activity.latestStatus === "pass" ? (
                       <svg

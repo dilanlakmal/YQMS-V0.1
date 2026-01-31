@@ -29,22 +29,43 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
   const [message, setMessage] = useState({ type: "", text: "" });
 
   const [isSaving, setIsSaving] = useState(false);
-  const [expandedRecordIndex, setExpandedRecordIndex] = useState(0);
   const [availableColors, setAvailableColors] = useState([]);
   const [colorSearch, setColorSearch] = useState("");
   const [showColorDropdown, setShowColorDropdown] = useState(false);
   const colorRef = useRef(null);
 
-  const ribsAvailable = report?.ribsAvailable ?? true;
+  const ribsAvailable = report?.ribsAvailable ?? (
+    report?.aquaboySpecRibs &&
+    report.aquaboySpecRibs.toString().trim() !== '' &&
+    report.aquaboySpecRibs !== '0'
+  ) ?? false;
 
   useEffect(() => {
     if (open && report) {
-      const sourceRecords =
-        report.inspectionRecords && report.inspectionRecords.length > 0
-          ? report.inspectionRecords
-          : report.history && report.history.length > 0
-            ? report.history
-            : [];
+      let sourceRecords = [];
+      if (report.inspectionRecords && report.inspectionRecords.length > 0) {
+        sourceRecords = report.inspectionRecords;
+      } else if (report.history && typeof report.history === 'object') {
+        // Convert nested Map history (Item -> Check) to latest records for editing
+        const historyMap = report.history;
+        sourceRecords = Object.keys(historyMap).sort((a, b) => {
+          const numA = parseInt(a.replace('Item ', ''));
+          const numB = parseInt(b.replace('Item ', ''));
+          return numA - numB;
+        }).map(itemKey => {
+          const checks = historyMap[itemKey] || {};
+          const checkKeys = Object.keys(checks).sort((a, b) => {
+            const numA = parseInt(a.replace('Check ', ''));
+            const numB = parseInt(b.replace('Check ', ''));
+            return numB - numA; // Sort descending to get latest
+          });
+          return {
+            ...checks[checkKeys[0]],
+            itemName: itemKey, // Store the item name to identify it during save
+            checkCount: checkKeys.length
+          };
+        });
+      }
 
       const specLimit = Number(report.aquaboySpecBody || report.aquaboySpec);
       const parseNumberInternal = (v) => {
@@ -102,42 +123,42 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
           bottom: processSection(rec.bottom),
           additional: rec.additional
             ? {
-                top: processSection(rec.additional.top),
-                middle: processSection(rec.additional.middle),
-                bottom: processSection(rec.additional.bottom),
-              }
+              top: processSection(rec.additional.top),
+              middle: processSection(rec.additional.middle),
+              bottom: processSection(rec.additional.bottom),
+            }
             : {
-                top: {
-                  body: "",
-                  ribs: "",
-                  bodyPass: false,
-                  bodyFail: false,
-                  ribsPass: false,
-                  ribsFail: false,
-                  pass: false,
-                  fail: false,
-                },
-                middle: {
-                  body: "",
-                  ribs: "",
-                  bodyPass: false,
-                  bodyFail: false,
-                  ribsPass: false,
-                  ribsFail: false,
-                  pass: false,
-                  fail: false,
-                },
-                bottom: {
-                  body: "",
-                  ribs: "",
-                  bodyPass: false,
-                  bodyFail: false,
-                  ribsPass: false,
-                  ribsFail: false,
-                  pass: false,
-                  fail: false,
-                },
+              top: {
+                body: "",
+                ribs: "",
+                bodyPass: false,
+                bodyFail: false,
+                ribsPass: false,
+                ribsFail: false,
+                pass: false,
+                fail: false,
               },
+              middle: {
+                body: "",
+                ribs: "",
+                bodyPass: false,
+                bodyFail: false,
+                ribsPass: false,
+                ribsFail: false,
+                pass: false,
+                fail: false,
+              },
+              bottom: {
+                body: "",
+                ribs: "",
+                bodyPass: false,
+                bodyFail: false,
+                ribsPass: false,
+                ribsFail: false,
+                pass: false,
+                fail: false,
+              },
+            },
           images: rec.images || [],
         };
       });
@@ -247,9 +268,6 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         inspectorSignature: report.inspectorSignature || "",
         qamSignature: report.qamSignature || "",
       });
-      setExpandedRecordIndex(
-        safeRecords.length > 0 ? safeRecords.length - 1 : 0,
-      );
     }
   }, [open, report]);
 
@@ -595,6 +613,34 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
     });
   };
 
+  const addNewRecord = () => {
+    setFormData((prev) => ({
+      ...prev,
+      inspectionRecords: [
+        ...prev.inspectionRecords,
+        {
+          top: { body: "", ribs: "", pass: false, fail: false },
+          middle: { body: "", ribs: "", pass: false, fail: false },
+          bottom: { body: "", ribs: "", pass: false, fail: false },
+          additional: {
+            top: { body: "", ribs: "", pass: false, fail: false },
+            middle: { body: "", ribs: "", pass: false, fail: false },
+            bottom: { body: "", ribs: "", pass: false, fail: false },
+          },
+          images: [],
+        },
+      ],
+    }));
+  };
+
+  const removeRecord = (index) => {
+    if (formData.inspectionRecords.length <= 1) return;
+    setFormData((prev) => ({
+      ...prev,
+      inspectionRecords: prev.inspectionRecords.filter((_, i) => i !== index),
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSaving(true);
@@ -635,34 +681,34 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         },
         additional: rec.additional
           ? {
-              top: {
-                body: rec.additional.top?.body || "",
-                ribs: rec.additional.top?.ribs || "",
-                status: rec.additional.top?.pass
-                  ? "pass"
-                  : rec.additional.top?.fail
-                    ? "fail"
-                    : "",
-              },
-              middle: {
-                body: rec.additional.middle?.body || "",
-                ribs: rec.additional.middle?.ribs || "",
-                status: rec.additional.middle?.pass
-                  ? "pass"
-                  : rec.additional.middle?.fail
-                    ? "fail"
-                    : "",
-              },
-              bottom: {
-                body: rec.additional.bottom?.body || "",
-                ribs: rec.additional.bottom?.ribs || "",
-                status: rec.additional.bottom?.pass
-                  ? "pass"
-                  : rec.additional.bottom?.fail
-                    ? "fail"
-                    : "",
-              },
-            }
+            top: {
+              body: rec.additional.top?.body || "",
+              ribs: rec.additional.top?.ribs || "",
+              status: rec.additional.top?.pass
+                ? "pass"
+                : rec.additional.top?.fail
+                  ? "fail"
+                  : "",
+            },
+            middle: {
+              body: rec.additional.middle?.body || "",
+              ribs: rec.additional.middle?.ribs || "",
+              status: rec.additional.middle?.pass
+                ? "pass"
+                : rec.additional.middle?.fail
+                  ? "fail"
+                  : "",
+            },
+            bottom: {
+              body: rec.additional.bottom?.body || "",
+              ribs: rec.additional.bottom?.ribs || "",
+              status: rec.additional.bottom?.pass
+                ? "pass"
+                : rec.additional.bottom?.fail
+                  ? "fail"
+                  : "",
+            },
+          }
           : undefined,
         images: rec.images || [],
         date: formData.date || rec.date,
@@ -681,22 +727,58 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         generalRemark: formData.generalRemark || rec.remark || "",
       }));
 
-      const previousHistory = report.history || [];
-      const lastEditedRecord =
-        currentEditRecords[currentEditRecords.length - 1];
-      const newHistory = [...previousHistory, lastEditedRecord];
+      const previousHistory = { ...(report.history || {}) };
+
+      currentEditRecords.forEach((rec, index) => {
+        const itemKey = rec.itemName || `Item ${index + 1}`;
+        const previousChecks = (previousHistory[itemKey] && typeof previousHistory[itemKey] === 'object') ? previousHistory[itemKey] : {};
+        const checkKeys = Object.keys(previousChecks).sort((a, b) => {
+          const numA = parseInt(a.replace('Check ', ''));
+          const numB = parseInt(b.replace('Check ', ''));
+          return numB - numA;
+        });
+
+        const latestCheck = previousChecks[checkKeys[0]];
+        const newCheckNumber = checkKeys.length + 1;
+        const newCheckKey = `Check ${newCheckNumber}`;
+
+        // Simplified change detection: checking if readings changed
+        const isChanged = !latestCheck ||
+          String(rec.top?.body) !== String(latestCheck.top?.body) ||
+          String(rec.middle?.body) !== String(latestCheck.middle?.body) ||
+          String(rec.bottom?.body) !== String(latestCheck.bottom?.body) ||
+          String(rec.top?.ribs) !== String(latestCheck.top?.ribs) ||
+          String(rec.middle?.ribs) !== String(latestCheck.middle?.ribs) ||
+          String(rec.bottom?.ribs) !== String(latestCheck.bottom?.ribs);
+
+        if (isChanged) {
+          previousHistory[itemKey] = {
+            ...previousChecks,
+            [newCheckKey]: {
+              ...rec,
+              date: formData.date || new Date().toISOString(),
+              saveTime: new Date().toLocaleTimeString("en-US", {
+                hour12: true,
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit"
+              })
+            }
+          };
+        }
+      });
 
       const payload = {
         ...formData,
-        history: newHistory,
+        history: previousHistory,
         updatedBy: user
           ? {
-              empId: user.emp_id,
-              engName: user.eng_name || user.name || user.username,
-            }
+            empId: user.emp_id,
+            engName: user.eng_name || user.name || user.username,
+          }
           : null,
         ribsAvailable: ribsAvailable,
-        inspectionRecords: [lastEditedRecord],
+        inspectionRecords: currentEditRecords,
       };
 
       const response = await fetch(
@@ -892,11 +974,10 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                           .map((color, idx) => (
                             <div
                               key={idx}
-                              className={`px-4 py-2 cursor-pointer text-sm font-medium transition-colors border-b border-gray-50 last:border-0 ${
-                                formData.colorName === color
-                                  ? "bg-blue-50 text-blue-700"
-                                  : "hover:bg-blue-600 hover:text-white text-gray-700"
-                              }`}
+                              className={`px-4 py-2 cursor-pointer text-sm font-medium transition-colors border-b border-gray-50 last:border-0 ${formData.colorName === color
+                                ? "bg-blue-50 text-blue-700"
+                                : "hover:bg-blue-600 hover:text-white text-gray-700"
+                                }`}
                               onClick={() => {
                                 setFormData({ ...formData, colorName: color });
                                 setColorSearch(color);
@@ -949,23 +1030,25 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Aquaboy Reading Spec (Ribs)
-                </label>
-                <input
-                  type="text"
-                  value={formData.aquaboySpecRibs}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      aquaboySpecRibs: e.target.value,
-                    })
-                  }
-                  readOnly
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
-                />
-              </div>
+              {ribsAvailable && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Aquaboy Reading Spec (Ribs)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.aquaboySpecRibs}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        aquaboySpecRibs: e.target.value,
+                      })
+                    }
+                    readOnly
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   After Dry Room Time <span className="text-red-500">*</span>
@@ -979,17 +1062,26 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                       afterDryRoomTime: e.target.value,
                     })
                   }
-                  onClick={() => {
-                    if (!formData.afterDryRoomTime) {
-                      const now = new Date();
-                      const timeString = now.toLocaleTimeString("en-GB", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      });
-                      setFormData((prev) => ({
-                        ...prev,
-                        afterDryRoomTime: timeString,
-                      }));
+                  onFocus={() => {
+                    const now = new Date();
+                    // Format time as HH:mm for type="time"
+                    const timeString = now.getHours().toString().padStart(2, '0') + ':' +
+                      now.getMinutes().toString().padStart(2, '0');
+                    // Format date as YYYY-MM-DD for type="date"
+                    const dateString = now.getFullYear() + '-' +
+                      (now.getMonth() + 1).toString().padStart(2, '0') + '-' +
+                      now.getDate().toString().padStart(2, '0');
+
+                    setFormData((prev) => ({
+                      ...prev,
+                      afterDryRoomTime: timeString, // Always update to current time
+                      date: dateString, // Always update to current date
+                    }));
+                  }}
+                  onClick={(e) => {
+                    // Also trigger on click to be safe, but focus usually handles it
+                    if (!formData.afterDryRoomTime || !formData.date) {
+                      e.target.focus();
                     }
                   }}
                   required
@@ -1006,288 +1098,58 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                   onChange={(e) =>
                     setFormData({ ...formData, date: e.target.value })
                   }
-                  disabled
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 text-gray-900"
                 />
               </div>
             </div>
 
             {/* Inspection Records */}
             <div className="border-t pt-4">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Readings
-              </h3>
-              <div className="space-y-4">
-                {formData.inspectionRecords.map((record, index) => {
-                  if (index !== formData.inspectionRecords.length - 1)
-                    return null;
-                  const isExpanded = index === expandedRecordIndex;
-                  const isPassed =
-                    record.top.pass && record.middle.pass && record.bottom.pass;
-
-                  return (
-                    <div
-                      key={index}
-                      className={`border rounded-lg p-4 ${isPassed ? "bg-green-50 border-green-200" : "bg-gray-50"}`}
-                    >
-                      <div
-                        className="flex justify-between items-center cursor-pointer mb-2"
-                        onClick={() => setExpandedRecordIndex(index)}
-                      >
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-gray-700">
-                            Record #{index + 1}
-                          </h4>
-                        </div>
-                        <span className="text-sm text-gray-500">
-                          {isExpanded ? "Collapse" : "Expand"}
-                        </span>
-                      </div>
-
-                      {isExpanded && (
-                        <div className="space-y-4">
-                          {["top", "middle", "bottom"].map((section) => (
-                            <div
-                              key={section}
-                              className="flex flex-col md:flex-row gap-4 w-full items-center p-3 rounded-xl shadow-sm bg-white border border-gray-100"
-                            >
-                              <div className="w-20 font-bold capitalize text-gray-700">
-                                {section}
-                              </div>
-
-                              {/* Body Reading + Status */}
-                              <div className="flex flex-1 items-center gap-2 w-full">
-                                <div className="flex-1">
-                                  <input
-                                    type="number"
-                                    placeholder="Body"
-                                    value={record[section].body}
-                                    onChange={(e) =>
-                                      updateSectionData(
-                                        index,
-                                        section,
-                                        "body",
-                                        e.target.value,
-                                      )
-                                    }
-                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                  />
-                                </div>
-                                {record[section].bodyPass ? (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
-                                    <svg
-                                      className="w-3 h-3 mr-1"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M5 13l4 4L19 7"
-                                      />
-                                    </svg>
-                                    Pass
-                                  </span>
-                                ) : record[section].bodyFail ? (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
-                                    <svg
-                                      className="w-3 h-3 mr-1"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M6 18L18 6M6 6l12 12"
-                                      />
-                                    </svg>
-                                    Fail
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-400 text-xs px-2 italic">
-                                    N/A
-                                  </span>
-                                )}
-                              </div>
-
-                              {ribsAvailable && (
-                                <div className="flex flex-1 items-center gap-2 w-full">
-                                  <div className="flex-1">
-                                    <input
-                                      type="number"
-                                      placeholder="Ribs"
-                                      value={record[section].ribs}
-                                      onChange={(e) =>
-                                        updateSectionData(
-                                          index,
-                                          section,
-                                          "ribs",
-                                          e.target.value,
-                                        )
-                                      }
-                                      className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                    />
-                                  </div>
-                                  {record[section].ribsPass ? (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
-                                      <svg
-                                        className="w-3 h-3 mr-1"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M5 13l4 4L19 7"
-                                        />
-                                      </svg>
-                                      Pass
-                                    </span>
-                                  ) : record[section].ribsFail ? (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
-                                      <svg
-                                        className="w-3 h-3 mr-1"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M6 18L18 6M6 6l12 12"
-                                        />
-                                      </svg>
-                                      Fail
-                                    </span>
-                                  ) : (
-                                    <span className="text-gray-400 text-xs px-2 italic">
-                                      N/A
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Image Upload for this record */}
-                      <div className="mt-4 border-t pt-4">
-                        <h5 className="text-sm font-medium text-gray-700 mb-2">
-                          Inspection Photos
-                        </h5>
-                        <div className="space-y-3">
-                          <label className="flex justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer hover:border-blue-400 focus:outline-none hover:bg-gray-50">
-                            <span className="flex items-center space-x-2">
-                              <svg
-                                className="w-6 h-6 text-gray-400"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth="2"
-                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                                />
-                              </svg>
-                              <span className="font-medium text-gray-600">
-                                Click to upload images
-                              </span>
-                            </span>
-                            <input
-                              type="file"
-                              className="hidden"
-                              multiple
-                              accept="image/png,image/jpeg,image/webp"
-                              onChange={(e) =>
-                                handleImageUpload(index, e.target.files)
-                              }
-                            />
-                          </label>
-
-                          {record.images && record.images.length > 0 && (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-4">
-                              {record.images.map((img, imgIdx) => (
-                                <div
-                                  key={img.id || imgIdx}
-                                  className="relative group aspect-square"
-                                >
-                                  <img
-                                    src={img.preview}
-                                    alt={img.name}
-                                    className="h-full w-full object-cover rounded-lg shadow-sm border border-gray-200"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => removeImage(index, img.id)}
-                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
-                                    title="Remove image"
-                                  >
-                                    <svg
-                                      className="h-4 w-4"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="2"
-                                        d="M6 18L18 6M6 6l12 12"
-                                      />
-                                    </svg>
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Additional Readings if applicable */}
-            {(formData.inspectionType === "Pre-Final" ||
-              formData.inspectionType === "Final") && (
-              <div className="border-t pt-4">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  Additional Readings
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Readings
                 </h3>
-                {formData.inspectionRecords.map((record, index) => {
-                  if (index !== formData.inspectionRecords.length - 1)
-                    return null;
-                  const isPassed =
-                    record.top.pass && record.middle.pass && record.bottom.pass;
-                  return (
-                    <div
-                      key={`add-${index}`}
-                      className={`mb-4 p-4 rounded border ${isPassed ? "bg-green-50 border-green-200" : "bg-gray-50"}`}
-                    >
-                      <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-semibold">
-                          Record #{index + 1} Additional
-                        </h4>
-                      </div>
+                {/* <button
+                  type="button"
+                  onClick={addNewRecord}
+                  className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-sm"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add New Record
+                </button> */}
+              </div>
+              <div className="space-y-4">
+                {formData.inspectionRecords.map((record, index) => (
+                  <div
+                    key={`record-${index}`}
+                    className="border rounded-lg p-4 bg-gray-50 mb-4"
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-bold text-gray-700">
+                        Record #{index + 1}
+                      </h4>
+                      {/* {formData.inspectionRecords.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeRecord(index)}
+                          className="text-red-500 hover:text-red-700 text-xs font-semibold px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                        >
+                          Remove record
+                        </button>
+                      )} */}
+                    </div>
+
+                    <div className="space-y-4">
                       {["top", "middle", "bottom"].map((section) => (
                         <div
                           key={section}
-                          className="flex flex-col md:flex-row gap-4 w-full items-center mb-3"
+                          className="flex flex-col md:flex-row gap-4 w-full items-center p-3 rounded-xl shadow-sm bg-white border border-gray-100"
                         >
-                          <span className="w-20 font-bold capitalize text-gray-700">
+                          <div className="w-20 font-bold capitalize text-gray-700">
                             {section}
-                          </span>
+                          </div>
 
                           {/* Body Reading + Status */}
                           <div className="flex flex-1 items-center gap-2 w-full">
@@ -1295,9 +1157,9 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                               <input
                                 type="number"
                                 placeholder="Body"
-                                value={record.additional?.[section]?.body || ""}
+                                value={record[section].body}
                                 onChange={(e) =>
-                                  updateAdditionalSectionData(
+                                  updateSectionData(
                                     index,
                                     section,
                                     "body",
@@ -1307,7 +1169,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                 className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
                               />
                             </div>
-                            {record.additional?.[section]?.bodyPass ? (
+                            {record[section].bodyPass ? (
                               <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
                                 <svg
                                   className="w-3 h-3 mr-1"
@@ -1324,7 +1186,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                 </svg>
                                 Pass
                               </span>
-                            ) : record.additional?.[section]?.bodyFail ? (
+                            ) : record[section].bodyFail ? (
                               <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
                                 <svg
                                   className="w-3 h-3 mr-1"
@@ -1354,11 +1216,9 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                 <input
                                   type="number"
                                   placeholder="Ribs"
-                                  value={
-                                    record.additional?.[section]?.ribs || ""
-                                  }
+                                  value={record[section].ribs}
                                   onChange={(e) =>
-                                    updateAdditionalSectionData(
+                                    updateSectionData(
                                       index,
                                       section,
                                       "ribs",
@@ -1368,7 +1228,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                   className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
                                 />
                               </div>
-                              {record.additional?.[section]?.ribsPass ? (
+                              {record[section].ribsPass ? (
                                 <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
                                   <svg
                                     className="w-3 h-3 mr-1"
@@ -1385,7 +1245,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                   </svg>
                                   Pass
                                 </span>
-                              ) : record.additional?.[section]?.ribsFail ? (
+                              ) : record[section].ribsFail ? (
                                 <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
                                   <svg
                                     className="w-3 h-3 mr-1"
@@ -1412,10 +1272,154 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                         </div>
                       ))}
                     </div>
-                  );
-                })}
+
+                    {/* Images */}
+                    <div className="mt-4 border-t pt-4">
+                      <h5 className="text-sm font-medium text-gray-700 mb-2">Inspection Photos</h5>
+                      <div className="space-y-3">
+                        <label className="flex justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer hover:border-blue-400 focus:outline-none hover:bg-gray-50">
+                          <span className="flex items-center space-x-2">
+                            <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span className="font-medium text-gray-600">Click to upload images</span>
+                          </span>
+                          <input type="file" className="hidden" multiple accept="image/*" onChange={(e) => handleImageUpload(index, e.target.files)} />
+                        </label>
+                        {record.images?.length > 0 && (
+                          <div className="grid grid-cols-4 gap-4 mt-2">
+                            {record.images.map((img) => (
+                              <div key={img.id} className="relative aspect-square">
+                                <img src={img.preview} className="h-full w-full object-cover rounded-lg border" alt="" />
+                                <button
+                                  type="button"
+                                  onClick={() => removeImage(index, img.id)}
+                                  className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm"
+                                >
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
+
+            {/* Additional Readings if applicable */}
+            {(formData.inspectionType === "Pre-Final" ||
+              formData.inspectionType === "Final") && (
+                <div className="border-t pt-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Additional Readings
+                    </h3>
+                  </div>
+                  <div className="space-y-4">
+                    {formData.inspectionRecords.map((record, index) => (
+                      <div
+                        key={`add-${index}`}
+                        className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4"
+                      >
+                        <h4 className="font-bold text-gray-700 mb-3 underline decoration-blue-500/30 underline-offset-4">
+                          Record #{index + 1} Additional
+                        </h4>
+
+                        <div className="space-y-4">
+                          {["top", "middle", "bottom"].map((section) => (
+                            <div
+                              key={section}
+                              className="flex flex-col md:flex-row gap-4 w-full items-center p-3 rounded-xl shadow-sm bg-white border border-gray-100"
+                            >
+                              <div className="w-20 font-bold capitalize text-gray-700">
+                                {section}
+                              </div>
+
+                              {/* Body Reading */}
+                              <div className="flex flex-1 items-center gap-2 w-full">
+                                <div className="flex-1">
+                                  <input
+                                    type="number"
+                                    placeholder="Body"
+                                    value={record.additional?.[section]?.body || ""}
+                                    onChange={(e) =>
+                                      updateAdditionalSectionData(
+                                        index,
+                                        section,
+                                        "body",
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                                  />
+                                </div>
+                                {record.additional?.[section]?.bodyPass ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
+                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Pass
+                                  </span>
+                                ) : record.additional?.[section]?.bodyFail ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
+                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                    Fail
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400 text-xs px-2 italic">N/A</span>
+                                )}
+                              </div>
+
+                              {ribsAvailable && (
+                                <div className="flex flex-1 items-center gap-2 w-full">
+                                  <div className="flex-1">
+                                    <input
+                                      type="number"
+                                      placeholder="Ribs"
+                                      value={record.additional?.[section]?.ribs || ""}
+                                      onChange={(e) =>
+                                        updateAdditionalSectionData(
+                                          index,
+                                          section,
+                                          "ribs",
+                                          e.target.value,
+                                        )
+                                      }
+                                      className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                                    />
+                                  </div>
+                                  {record.additional?.[section]?.ribsPass ? (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
+                                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                      Pass
+                                    </span>
+                                  ) : record.additional?.[section]?.ribsFail ? (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
+                                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                      Fail
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400 text-xs px-2 italic">N/A</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
             {/* General Remark */}
             <div className="border-t pt-4">
@@ -1451,62 +1455,62 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
             {isSaving ? "Saving..." : "Update Report"}
           </button>
         </div>
-      </div>
+      </div >
 
       {/* Premium Message Banner */}
-      {message.text && (
-        <div
-          className={`fixed bottom-6 right-6 z-[200] flex items-center gap-4 p-4 pl-5 pr-6 rounded-2xl shadow-2xl border backdrop-blur-md transition-all duration-500 animate-in fade-in slide-in-from-right-8 ${
-            message.type === "success"
+      {
+        message.text && (
+          <div
+            className={`fixed bottom-6 right-6 z-[200] flex items-center gap-4 p-4 pl-5 pr-6 rounded-2xl shadow-2xl border backdrop-blur-md transition-all duration-500 animate-in fade-in slide-in-from-right-8 ${message.type === "success"
               ? "text-emerald-900 bg-white/95 border-emerald-100 ring-8 ring-emerald-500/5"
               : "text-rose-900 bg-white/95 border-rose-100 ring-8 ring-rose-500/5"
-          }`}
-          role="alert"
-        >
-          <div className="relative">
-            {message.type === "success" ? (
-              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-200 animate-bounce-slow">
-                <CheckCircle2 size={24} strokeWidth={3} />
-              </div>
-            ) : (
-              <div className="w-10 h-10 rounded-xl bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-200">
-                <AlertCircle size={24} strokeWidth={3} />
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col min-w-0 pr-4">
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-0.5">
-              Notification
-            </span>
-            <div className="text-sm font-black tracking-tight leading-tight">
-              {message.text}
+              }`}
+            role="alert"
+          >
+            <div className="relative">
+              {message.type === "success" ? (
+                <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-200 animate-bounce-slow">
+                  <CheckCircle2 size={24} strokeWidth={3} />
+                </div>
+              ) : (
+                <div className="w-10 h-10 rounded-xl bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-200">
+                  <AlertCircle size={24} strokeWidth={3} />
+                </div>
+              )}
             </div>
-          </div>
 
-          <button
-            type="button"
-            className={`p-1.5 rounded-lg transition-colors shrink-0 ${
-              message.type === "success"
+            <div className="flex flex-col min-w-0 pr-4">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-0.5">
+                Notification
+              </span>
+              <div className="text-sm font-black tracking-tight leading-tight">
+                {message.text}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className={`p-1.5 rounded-lg transition-colors shrink-0 ${message.type === "success"
                 ? "text-emerald-400 hover:bg-emerald-50 hover:text-emerald-600"
                 : "text-rose-400 hover:bg-rose-50 hover:text-rose-600"
-            }`}
-            onClick={() => setMessage({ type: "", text: "" })}
-            aria-label="Close"
-          >
-            <X size={18} strokeWidth={3} />
-          </button>
+                }`}
+              onClick={() => setMessage({ type: "", text: "" })}
+              aria-label="Close"
+            >
+              <X size={18} strokeWidth={3} />
+            </button>
 
-          {/* Tiny Progress Bar */}
-          <div
-            className={`absolute bottom-0 left-0 h-1 rounded-full opacity-30 ${message.type === "success" ? "bg-emerald-500" : "bg-rose-500"}`}
-            style={{
-              width: "100%",
-              animation: "shrink-width 3s linear forwards",
-            }}
-          ></div>
-        </div>
-      )}
+            {/* Tiny Progress Bar */}
+            <div
+              className={`absolute bottom-0 left-0 h-1 rounded-full opacity-30 ${message.type === "success" ? "bg-emerald-500" : "bg-rose-500"}`}
+              style={{
+                width: "100%",
+                animation: "shrink-width 3s linear forwards",
+              }}
+            ></div>
+          </div>
+        )
+      }
 
       <style>{`
                 @keyframes shrink-width {
@@ -1521,6 +1525,6 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                     50% { transform: translateY(-3px); }
                 }
             `}</style>
-    </div>
+    </div >
   );
 }

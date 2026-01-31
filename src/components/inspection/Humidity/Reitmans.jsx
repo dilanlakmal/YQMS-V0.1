@@ -44,7 +44,8 @@ const ReitmansForm = ({
   availableColors = [],
 }) => {
   // Lightweight helpers to avoid errors if props missing
-  const safeSet = (key, value) => setFormData && setFormData(prev => ({ ...prev, [key]: value }));
+  const safeSet = (key, value) =>
+    setFormData && setFormData((prev) => ({ ...prev, [key]: value }));
   const dropdownRef = React.useRef(null);
   const [primaryFabric, setPrimaryFabric] = React.useState(null);
   const [secondaryFabric, setSecondaryFabric] = React.useState(null);
@@ -54,8 +55,8 @@ const ReitmansForm = ({
   const setCurrentTimeIfEmpty = (field) => {
     if (!formData[field]) {
       const now = new Date();
-      const hh = String(now.getHours()).padStart(2, '0');
-      const mm = String(now.getMinutes()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mm = String(now.getMinutes()).padStart(2, "0");
       safeSet(field, `${hh}:${mm}`);
     }
   };
@@ -66,8 +67,8 @@ const ReitmansForm = ({
         setShowOrderNoDropdown && setShowOrderNoDropdown(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [setShowOrderNoDropdown]);
 
   // fetch primary/secondary fabric info when a factory style is selected
@@ -84,7 +85,8 @@ const ReitmansForm = ({
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
         const json = await res.json();
-        const fabrics = (json && json.data && json.data.fabrics) ? json.data.fabrics : [];
+        const fabrics =
+          json && json.data && json.data.fabrics ? json.data.fabrics : [];
         const orderInfo = json && json.data ? json.data : {};
 
         if (!mounted) return;
@@ -93,7 +95,7 @@ const ReitmansForm = ({
 
         // Update basic form data from orderInfo
         if (setFormData) {
-          setFormData(prev => ({
+          setFormData((prev) => ({
             ...prev,
             fabrication: orderInfo.product || prev.fabrication,
             poLine: orderInfo.purchaseOrder || orderInfo.poLine || prev.poLine,
@@ -161,9 +163,9 @@ const ReitmansForm = ({
               }
             }
           }
-        } catch (rhErr) {}
+        } catch (rhErr) { }
       } catch (err) {
-        console.warn('Could not fetch fabric summary for Reitmans style:', err);
+        console.warn("Could not fetch fabric summary for Reitmans style:", err);
         if (mounted) {
           setPrimaryFabric(null);
           setSecondaryFabric(null);
@@ -173,14 +175,17 @@ const ReitmansForm = ({
       }
     };
 
-    const mo = formData && (formData.factoryStyleNo || formData.moNo || formData.style);
+    const mo =
+      formData && (formData.factoryStyleNo || formData.moNo || formData.style);
     if (mo) fetchFabrics(mo);
     else {
       setPrimaryFabric(null);
       setSecondaryFabric(null);
     }
 
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [formData.factoryStyleNo]);
 
   const fetchRhRaw = async (moNo) => {
@@ -232,18 +237,18 @@ const ReitmansForm = ({
                     <div className="text-sm font-bold text-gray-800 flex items-baseline gap-1.5 leading-tight">
                       {primaryFabric
                         ? primaryFabric.fabricName ||
-                          primaryFabric.name ||
-                          primaryFabric.fabricName
+                        primaryFabric.name ||
+                        primaryFabric.fabricName
                         : "N/A"}
                       {primaryFabric && (
                         <span className="text-xs bg-rose-500 text-white px-2 py-0.5 rounded-full font-black">
                           {formData.matchedRule &&
-                          (formData.matchedRule["primary%"] ||
-                            formData.matchedRule.primaryPercent)
+                            (formData.matchedRule["primary%"] ||
+                              formData.matchedRule.primaryPercent)
                             ? formData.matchedRule["primary%"] ||
-                              formData.matchedRule.primaryPercent
+                            formData.matchedRule.primaryPercent
                             : primaryFabric.percentage ||
-                                primaryFabric.percentage === 0
+                              primaryFabric.percentage === 0
                               ? primaryFabric.percentage + "%"
                               : ""}
                         </span>
@@ -264,18 +269,18 @@ const ReitmansForm = ({
                     <div className="text-sm font-bold text-gray-800 flex items-baseline gap-1.5 leading-tight">
                       {secondaryFabric
                         ? secondaryFabric.fabricName ||
-                          secondaryFabric.name ||
-                          secondaryFabric.fabricName
+                        secondaryFabric.name ||
+                        secondaryFabric.fabricName
                         : "N/A"}
                       {secondaryFabric && (
                         <span className="text-xs bg-rose-300 text-rose-700 px-2 py-0.5 rounded-full font-bold">
                           {formData.matchedRule &&
-                          (formData.matchedRule["secondary%"] ||
-                            formData.matchedRule.secondaryPercent)
+                            (formData.matchedRule["secondary%"] ||
+                              formData.matchedRule.secondaryPercent)
                             ? formData.matchedRule["secondary%"] ||
-                              formData.matchedRule.secondaryPercent
+                            formData.matchedRule.secondaryPercent
                             : secondaryFabric.percentage ||
-                                secondaryFabric.percentage === 0
+                              secondaryFabric.percentage === 0
                               ? secondaryFabric.percentage + "%"
                               : ""}
                         </span>
@@ -295,12 +300,12 @@ const ReitmansForm = ({
                     </div>
                     <div className="text-lg font-black text-gray-800 leading-tight">
                       {formData.upperCentisimalIndex !== undefined &&
-                      formData.upperCentisimalIndex !== null &&
-                      formData.upperCentisimalIndex !== "" &&
-                      String(formData.upperCentisimalIndex) !== "0"
+                        formData.upperCentisimalIndex !== null &&
+                        formData.upperCentisimalIndex !== "" &&
+                        String(formData.upperCentisimalIndex) !== "0"
                         ? formData.upperCentisimalIndex
                         : formData.aquaboySpec &&
-                            String(formData.aquaboySpec) !== "0"
+                          String(formData.aquaboySpec) !== "0"
                           ? formData.aquaboySpec
                           : "N/A"}
                     </div>
@@ -310,21 +315,24 @@ const ReitmansForm = ({
             ) : null}
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Style #</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Style #
+            </label>
             <div className="relative" ref={dropdownRef}>
               <input
-                value={formData.factoryStyleNo || orderNoSearch || ''}
+                value={formData.factoryStyleNo || orderNoSearch || ""}
                 onChange={(e) => {
                   const val = e.target.value;
                   setOrderNoSearch && setOrderNoSearch(val);
-                  setFormData && setFormData(prev => ({ ...prev, factoryStyleNo: val }));
+                  setFormData &&
+                    setFormData((prev) => ({ ...prev, factoryStyleNo: val }));
                 }}
                 onFocus={() => {
                   if (orderNoSuggestions && orderNoSuggestions.length > 0) {
                     setShowOrderNoDropdown && setShowOrderNoDropdown(true);
                   }
                 }}
-                className={`w-full rounded-lg border px-4 py-2 bg-white outline-none transition-all ${errors?.factoryStyleNo ? 'border-red-500' : 'border-gray-300'
+                className={`w-full rounded-lg border px-4 py-2 bg-white outline-none transition-all ${errors?.factoryStyleNo ? "border-red-500" : "border-gray-300"
                   }`}
                 placeholder="Search style..."
               />
@@ -337,14 +345,18 @@ const ReitmansForm = ({
                       Searching styles...
                     </li>
                   ) : orderNoSuggestions?.length === 0 ? (
-                    <li className="px-4 py-3 text-sm text-gray-500 italic text-center">No matching styles found</li>
+                    <li className="px-4 py-3 text-sm text-gray-500 italic text-center">
+                      No matching styles found
+                    </li>
                   ) : (
                     orderNoSuggestions?.map((ord, idx) => (
                       <li
                         key={ord._id || idx}
                         onClick={() => {
-                          handleOrderNoSelect && handleOrderNoSelect(ord.moNo || ord.style || '');
-                          setShowOrderNoDropdown && setShowOrderNoDropdown(false);
+                          handleOrderNoSelect &&
+                            handleOrderNoSelect(ord.moNo || ord.style || "");
+                          setShowOrderNoDropdown &&
+                            setShowOrderNoDropdown(false);
                         }}
                         className="px-4 py-3 hover:bg-rose-50 cursor-pointer transition-colors border-b border-gray-50 last:border-0 group"
                       >
@@ -358,7 +370,7 @@ const ReitmansForm = ({
                             </div>
                           </div>
                           <div className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-bold group-hover:bg-rose-100 group-hover:text-rose-600 transition-colors">
-                            {ord.product || 'Standard'}
+                            {ord.product || "Standard"}
                           </div>
                         </div>
                       </li>
@@ -368,15 +380,19 @@ const ReitmansForm = ({
               )}
             </div>
             {errors?.factoryStyleNo && (
-              <p className="text-red-500 text-[11px] mt-1 font-bold italic">{errors.factoryStyleNo}</p>
+              <p className="text-red-500 text-[11px] mt-1 font-bold italic">
+                {errors.factoryStyleNo}
+              </p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Composition:</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Composition:
+            </label>
             <input
-              value={formData?.composition || ''}
-              onChange={(e) => safeSet('composition', e.target.value)}
+              value={formData?.composition || ""}
+              onChange={(e) => safeSet("composition", e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-4 py-2 bg-gray-50 cursor-not-allowed"
               placeholder=""
               disabled
@@ -405,9 +421,8 @@ const ReitmansForm = ({
                       ),
                     }));
                   }}
-                  className={`w-full px-4 py-2 pr-8 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors appearance-none ${
-                    errors.colorName ? "border-red-500" : "border-gray-300"
-                  }`}
+                  className={`w-full px-4 py-2 pr-8 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors appearance-none ${errors.colorName ? "border-red-500" : "border-gray-300"
+                    }`}
                   required
                   aria-required="true"
                   disabled={!formData.factoryStyleNo}
@@ -449,9 +464,8 @@ const ReitmansForm = ({
                     colorName: e.target.value,
                   }))
                 }
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                  errors.colorName ? "border-red-500" : "border-gray-300"
-                }`}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${errors.colorName ? "border-red-500" : "border-gray-300"
+                  }`}
                 placeholder=""
                 required
                 aria-required="true"
@@ -468,72 +482,88 @@ const ReitmansForm = ({
               PO #
             </label>
             <input
-              value={formData?.poLine || ''}
-              onChange={(e) => safeSet('poLine', e.target.value)}
+              value={formData?.poLine || ""}
+              onChange={(e) => safeSet("poLine", e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-4 py-2 bg-gray-50 cursor-not-allowed"
               placeholder=""
               disabled
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Time Checked:</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Time Checked:
+            </label>
             <input
               type="time"
-              value={formData?.timeChecked || ''}
-              onChange={(e) => safeSet('timeChecked', e.target.value)}
-              onFocus={() => setCurrentTimeIfEmpty('timeChecked')}
+              value={formData?.timeChecked || ""}
+              onChange={(e) => safeSet("timeChecked", e.target.value)}
+              onFocus={() => setCurrentTimeIfEmpty("timeChecked")}
               className="w-full rounded-lg border border-gray-300 px-4 py-2 bg-white"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Moisture rate before:</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Moisture rate before:
+            </label>
             <input
-              value={formData?.moistureRateBeforeDehumidify || ''}
-              onChange={(e) => safeSet('moistureRateBeforeDehumidify', e.target.value)}
+              value={formData?.moistureRateBeforeDehumidify || ""}
+              onChange={(e) =>
+                safeSet("moistureRateBeforeDehumidify", e.target.value)
+              }
               className="w-full rounded-lg border border-gray-300 px-4 py-2 bg-white"
               placeholder=""
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">No. pc checked:</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              No. pc checked:
+            </label>
             <input
-              value={formData?.noPcChecked || ''}
-              onChange={(e) => safeSet('noPcChecked', e.target.value)}
+              value={formData?.noPcChecked || ""}
+              onChange={(e) => safeSet("noPcChecked", e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-4 py-2 bg-white"
               placeholder=""
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Time in:</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Time in:
+            </label>
             <input
               type="time"
-              value={formData?.timeIn || ''}
-              onChange={(e) => safeSet('timeIn', e.target.value)}
-              onFocus={() => setCurrentTimeIfEmpty('timeIn')}
+              value={formData?.timeIn || ""}
+              onChange={(e) => safeSet("timeIn", e.target.value)}
+              onFocus={() => setCurrentTimeIfEmpty("timeIn")}
               className="w-full rounded-lg border border-gray-300 px-4 py-2 bg-white"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Time out:</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Time out:
+            </label>
             <input
               type="time"
-              value={formData?.timeOut || ''}
-              onChange={(e) => safeSet('timeOut', e.target.value)}
-              onFocus={() => setCurrentTimeIfEmpty('timeOut')}
+              value={formData?.timeOut || ""}
+              onChange={(e) => safeSet("timeOut", e.target.value)}
+              onFocus={() => setCurrentTimeIfEmpty("timeOut")}
               className="w-full rounded-lg border border-gray-300 px-4 py-2 bg-white"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Moisture rate after:</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Moisture rate after:
+            </label>
             <input
-              value={formData?.moistureRateAfter || ''}
-              onChange={(e) => safeSet('moistureRateAfter', e.target.value)}
+              value={formData?.moistureRateAfter || ""}
+              onChange={(e) => safeSet("moistureRateAfter", e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-4 py-2 bg-white"
               placeholder=""
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Upper Centisimal index:</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Upper Centisimal index:
+            </label>
             <input
               value={formData?.upperCentisimalIndex || ""}
               onChange={(e) => safeSet("upperCentisimalIndex", e.target.value)}
@@ -543,11 +573,13 @@ const ReitmansForm = ({
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Date:</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Date:
+            </label>
             <input
               type="date"
-              value={formData?.date || ''}
-              onChange={(e) => safeSet('date', e.target.value)}
+              value={formData?.date || ""}
+              onChange={(e) => safeSet("date", e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-4 py-2 bg-white"
             />
           </div>
@@ -589,69 +621,51 @@ const ReitmansForm = ({
                     </div>
 
                     <div className="space-y-4">
-                      {["top", "middle", "bottom"].map((section) => (
-                        <div
-                          key={section}
-                          className={`p-4 rounded-3xl border transition-all duration-300 ${record[section].pass ? "bg-emerald-50/50 border-emerald-100" : "bg-rose-50/50 border-rose-100"}`}
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="text-sm font-black text-gray-600 uppercase">
-                              {section}
-                            </span>
-                            <div>
-                              {record[section].pass ? (
-                                <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500 text-white text-[10px] font-black rounded-full shadow-lg shadow-emerald-200 uppercase tracking-wider">
-                                  <Check size={10} strokeWidth={4} /> Pass
-                                </span>
-                              ) : record[section].fail ? (
-                                <span className="flex items-center gap-1.5 px-3 py-1 bg-rose-500 text-white text-[10px] font-black rounded-full shadow-lg shadow-rose-200 uppercase tracking-wider">
-                                  <X size={10} strokeWidth={4} /> Fail
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                  Pending
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <span className="text-[10px] font-bold text-gray-400 uppercase ml-1">
-                                Body
+                      <div
+                        className={`p-6 rounded-3xl border transition-all duration-300 ${record.top.pass ? "bg-emerald-50/50 border-emerald-100" : "bg-rose-50/50 border-rose-100"}`}
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-sm font-black text-gray-600 uppercase tracking-widest">
+                            Moisture Reading
+                          </span>
+                          <div>
+                            {record.top.pass ? (
+                              <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500 text-white text-[10px] font-black rounded-full shadow-lg shadow-emerald-200 uppercase tracking-wider">
+                                <Check size={10} strokeWidth={4} /> Pass
                               </span>
-                              <input
-                                type="number"
-                                value={record[section].body}
-                                onChange={(e) =>
-                                  updateSectionData(
-                                    index,
-                                    section,
-                                    "body",
-                                    e.target.value,
-                                  )
-                                }
-                                className={`w-full bg-white border-2 border-transparent rounded-2xl px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-50 transition-all ${!formData.factoryStyleNo ? "cursor-not-allowed opacity-50" : ""}`}
-                                placeholder="0.0"
-                                disabled={!formData.factoryStyleNo}
-                              />
-                            </div>
-                            {/* {ribsAvailable && (
-                              <div className="space-y-1">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase ml-1">Ribs</span>
-                                <input
-                                  type="number"
-                                  value={record[section].ribs}
-                                  onChange={(e) => updateSectionData(index, section, 'ribs', e.target.value)}
-                                  className={`w-full bg-white border-2 border-transparent rounded-2xl px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-50 transition-all ${!formData.factoryStyleNo ? 'cursor-not-allowed opacity-50' : ''}`}
-                                  placeholder="0.0"
-                                  disabled={!formData.factoryStyleNo}
-                                />
-                              </div>
-                            )} */}
+                            ) : record.top.fail ? (
+                              <span className="flex items-center gap-1.5 px-3 py-1 bg-rose-500 text-white text-[10px] font-black rounded-full shadow-lg shadow-rose-200 uppercase tracking-wider">
+                                <X size={10} strokeWidth={4} /> Fail
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                Pending
+                              </span>
+                            )}
                           </div>
                         </div>
-                      ))}
+
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase ml-1">
+                            Reading Value (%)
+                          </span>
+                          <input
+                            type="number"
+                            value={record.top.body}
+                            onChange={(e) =>
+                              updateSectionData(
+                                index,
+                                "top",
+                                "body",
+                                e.target.value,
+                              )
+                            }
+                            className={`w-full bg-white border-2 border-transparent rounded-2xl px-5 py-3 text-lg font-bold text-gray-700 shadow-sm focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-50 transition-all ${!formData.factoryStyleNo ? "cursor-not-allowed opacity-50" : ""}`}
+                            placeholder="0.0"
+                            disabled={!formData.factoryStyleNo}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -775,7 +789,10 @@ const ReitmansForm = ({
         </div>
 
         <div className="mt-6 ">
-          <h3 className="text-xl font-bold text-gray-600 mb-4"><MessageSquare className="inline mr-2 text-gray-600" size={18} />Remark</h3>
+          <h3 className="text-xl font-bold text-gray-600 mb-4">
+            <MessageSquare className="inline mr-2 text-gray-600" size={18} />
+            Remark
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
             <div>
               <textarea

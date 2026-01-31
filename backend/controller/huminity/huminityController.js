@@ -17,14 +17,14 @@ export const getHumidityData = async (req, res) => {
     const col = ymProdConnection.db.collection("humidity_data");
     const query = q
       ? {
-          $or: [
-            { factoryStyleNo: { $regex: q, $options: "i" } },
-            { buyerStyle: { $regex: q, $options: "i" } },
-            { customer: { $regex: q, $options: "i" } },
-            { moNo: { $regex: q, $options: "i" } },
-            { style: { $regex: q, $options: "i" } },
-          ],
-        }
+        $or: [
+          { factoryStyleNo: { $regex: q, $options: "i" } },
+          { buyerStyle: { $regex: q, $options: "i" } },
+          { customer: { $regex: q, $options: "i" } },
+          { moNo: { $regex: q, $options: "i" } },
+          { style: { $regex: q, $options: "i" } },
+        ],
+      }
       : {};
 
     const cursor = col.find(query).sort({ createdAt: -1 });
@@ -33,7 +33,9 @@ export const getHumidityData = async (req, res) => {
     return res.json({ success: true, data: docs });
   } catch (err) {
     console.error("Error fetching humidity_data:", err);
-    return res.status(500).json({ success: false, message: "Failed to fetch humidity data" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch humidity data" });
   }
 };
 
@@ -41,7 +43,10 @@ export const getHumidityData = async (req, res) => {
 export const getHumidityDataByMoNo = async (req, res) => {
   try {
     const { moNo } = req.params;
-    if (!moNo) return res.status(400).json({ success: false, message: "moNo is required" });
+    if (!moNo)
+      return res
+        .status(400)
+        .json({ success: false, message: "moNo is required" });
 
     const col = ymProdConnection.db.collection("humidity_data");
     const exactQuery = {
@@ -94,7 +99,9 @@ export const getHumidityDataByMoNo = async (req, res) => {
     return res.json({ success: true, data: doc });
   } catch (err) {
     console.error("Error fetching humidity data by moNo:", err);
-    return res.status(500).json({ success: false, message: "Failed to fetch humidity data" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch humidity data" });
   }
 };
 
@@ -102,7 +109,10 @@ export const getHumidityDataByMoNo = async (req, res) => {
 export const getHumiditySummaryByMoNo = async (req, res) => {
   try {
     const { moNo } = req.params;
-    if (!moNo) return res.status(400).json({ success: false, message: "moNo is required" });
+    if (!moNo)
+      return res
+        .status(400)
+        .json({ success: false, message: "moNo is required" });
     const col = ymProdConnection.db.collection("humidity_data");
     const regex = new RegExp(`^${moNo}$`, "i");
     let doc = await col.findOne({
@@ -150,7 +160,7 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
       const pct = Number(f.percentageValue) || 0;
       const decimal = (totalQty * pct) / 100;
       return {
-        fabricName: f.fabricName || f.fabric || '',
+        fabricName: f.fabricName || f.fabric || "",
         percentage: pct,
         allocatedDecimal: decimal,
         allocatedRounded: Math.round(decimal),
@@ -166,7 +176,7 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
     let recordPassAll = 0;
     let recordFailAny = 0;
 
-    inspectionRecords.forEach(r => {
+    inspectionRecords.forEach((r) => {
       const top = r.top || {};
       const middle = r.middle || {};
       const bottom = r.bottom || {};
@@ -219,14 +229,17 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
     });
   } catch (err) {
     console.error("Error computing humidity summary:", err);
-    return res.status(500).json({ success: false, message: "Failed to compute humidity summary" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to compute humidity summary" });
   }
 };
 
 // GET /api/humidity-reports
 export const getHumidityReports = async (req, res) => {
   try {
-    const { limit = 50, start, end, factoryStyleNo, customer, buyerStyle } = req.query;
+    const { limit, start, end, factoryStyleNo, customer, buyerStyle } =
+      req.query;
     const model = HumidityReport;
     const query = {};
 
@@ -257,9 +270,9 @@ export const getHumidityReports = async (req, res) => {
     }
 
     let humidityDocs = await HumidityReport.find(query)
-      .select('-history.images -inspectionRecords.images')
       .sort({ createdAt: -1 })
-      .limit(Number(limit))
+      .limit(limit ? Number(limit) : 1000)
+      // .limit(Number(limit))
       .exec();
     let reitmansDocs = await getReitmansReports(query, limit);
 
@@ -272,7 +285,9 @@ export const getHumidityReports = async (req, res) => {
     return res.json({ success: true, data: allDocs });
   } catch (err) {
     console.error("Error fetching humidity reports:", err);
-    return res.status(500).json({ success: false, message: "Failed to fetch humidity reports" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch humidity reports" });
   }
 };
 
@@ -283,7 +298,8 @@ export const exportHumidityReportsXlsx = async (req, res) => {
     const model = HumidityReport;
     const query = {};
 
-    if (factoryStyleNo) query.factoryStyleNo = { $regex: factoryStyleNo, $options: "i" };
+    if (factoryStyleNo)
+      query.factoryStyleNo = { $regex: factoryStyleNo, $options: "i" };
     if (customer) query.customer = { $regex: customer, $options: "i" };
     if (buyerStyle) query.buyerStyle = { $regex: buyerStyle, $options: "i" };
 
@@ -351,7 +367,8 @@ export const exportHumidityReportsXlsx = async (req, res) => {
     // Title header (merge)
     sheet.mergeCells("B1:R2");
     const titleCell = sheet.getCell("B1");
-    titleCell.value = "YORKMARS (CAMBODIA) GARMENTS MFG CO.,LTD - Humidity Inspection Record";
+    titleCell.value =
+      "YORKMARS (CAMBODIA) GARMENTS MFG CO.,LTD - Humidity Inspection Record";
     titleCell.alignment = { horizontal: "center", vertical: "middle" };
     titleCell.font = { size: 14, bold: true };
 
@@ -380,10 +397,10 @@ export const exportHumidityReportsXlsx = async (req, res) => {
 
     // header styling row (row 6-ish)
     const headerRow = sheet.getRow(6);
-    headerRow.values = columns.map(c => c.header);
+    headerRow.values = columns.map((c) => c.header);
     headerRow.font = { bold: true };
     headerRow.alignment = { horizontal: "center", vertical: "middle" };
-    headerRow.eachCell(cell => {
+    headerRow.eachCell((cell) => {
       cell.fill = {
         type: "pattern",
         pattern: "solid",
@@ -400,7 +417,10 @@ export const exportHumidityReportsXlsx = async (req, res) => {
     // start writing data after header row (row 7)
     let rowIndex = 7;
     for (const d of docs) {
-      const inspections = Array.isArray(d.inspectionRecords) && d.inspectionRecords.length > 0 ? d.inspectionRecords : [{}];
+      const inspections =
+        Array.isArray(d.inspectionRecords) && d.inspectionRecords.length > 0
+          ? d.inspectionRecords
+          : [{}];
       for (const rec of inspections) {
         const top = rec.top || {};
         const middle = rec.middle || {};
@@ -423,13 +443,15 @@ export const exportHumidityReportsXlsx = async (req, res) => {
           d.generalRemark || "",
           d.inspectorSignature || "",
           d.qamSignature || "",
-          d.createdAt ? d.createdAt.toISOString().slice(0, 19).replace("T", " ") : "",
+          d.createdAt
+            ? d.createdAt.toISOString().slice(0, 19).replace("T", " ")
+            : "",
           top.body || "",
           top.ribs || "",
-          top.fail ? "Fail" : (top.pass ? "Pass" : ""),
+          top.fail ? "Fail" : top.pass ? "Pass" : "",
           middle.body || "",
           middle.ribs || "",
-          middle.fail ? "Fail" : (middle.pass ? "Pass" : ""),
+          middle.fail ? "Fail" : middle.pass ? "Pass" : "",
           bottom.body || "",
           bottom.ribs || "",
           bottom.fail ? "Fail" : bottom.pass ? "Pass" : "",
@@ -474,18 +496,22 @@ export const exportHumidityReportsXlsx = async (req, res) => {
     res.end();
   } catch (err) {
     console.error("Error exporting humidity reports to XLSX:", err);
-    return res.status(500).json({ success: false, message: "Failed to export humidity reports" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to export humidity reports" });
   }
 };
 
 // GET /api/humidity-reports/export-paper
 export const exportHumidityReportsPaper = async (req, res) => {
   try {
-    const { type, date, month, factoryStyleNo, customer, buyerStyle } = req.query;
+    const { type, date, month, factoryStyleNo, customer, buyerStyle } =
+      req.query;
     const model = HumidityReport;
     const query = {};
 
-    if (factoryStyleNo) query.factoryStyleNo = { $regex: factoryStyleNo, $options: "i" };
+    if (factoryStyleNo)
+      query.factoryStyleNo = { $regex: factoryStyleNo, $options: "i" };
     if (customer) query.customer = { $regex: customer, $options: "i" };
     if (buyerStyle) query.buyerStyle = { $regex: buyerStyle, $options: "i" };
 
@@ -597,7 +623,7 @@ export const exportHumidityReportsPaper = async (req, res) => {
     };
     const allHtml = `
       <html><head><meta charset="utf-8"><title>Exported Humidity Reports</title></head><body>
-        ${docs.map(d => renderReportHtml(d)).join("\n")}
+        ${docs.map((d) => renderReportHtml(d)).join("\n")}
       </body></html>
     `;
 
@@ -609,22 +635,28 @@ export const exportHumidityReportsPaper = async (req, res) => {
     return res.send(allHtml);
   } catch (err) {
     console.error("Error exporting humidity reports (paper):", err);
-    return res.status(500).json({ success: false, message: "Failed to export reports" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to export reports" });
   }
 };
 
 // POST /api/humidity-reports
 export const createHumidityReport = async (req, res) => {
   try {
-    console.log("createHumidityReport hehe");
     const payload = req.body;
+    console.log("[DEBUG-BACKEND] Received Create Request Payload:", JSON.stringify(payload, (key, value) => key === 'images' ? `[${value?.length || 0} images]` : value, 2));
     if (!payload || typeof payload !== "object") {
-      return res.status(400).json({ success: false, message: "Invalid payload" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid payload" });
     }
 
     // Validate required field
     if (!payload.factoryStyleNo) {
-      return res.status(400).json({ success: false, message: "factoryStyleNo is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "factoryStyleNo is required" });
     }
 
     const isReitmans =
@@ -632,15 +664,16 @@ export const createHumidityReport = async (req, res) => {
       payload.customer === "Reitmans_Form";
 
     // Transform inspectionRecords into history entry format
-    let history = [];
+    let history = {};
     if (isReitmans) {
       history = transformReitmansHistory(payload);
     } else {
-      history = (
-        Array.isArray(payload.inspectionRecords)
-          ? payload.inspectionRecords
-          : []
-      ).map((record) => {
+      const historyObj = {};
+      (Array.isArray(payload.inspectionRecords)
+        ? payload.inspectionRecords
+        : []
+      ).forEach((record, index) => {
+        const itemName = `Item ${index + 1}`;
         const entry = {
           date: payload.date || new Date().toISOString(),
           beforeDryRoom: payload.beforeDryRoom || "",
@@ -665,51 +698,27 @@ export const createHumidityReport = async (req, res) => {
             body: record.middle?.body || "",
             bodyStatus:
               record.middle?.bodyStatus ||
-              (record.middle?.pass
-                ? "pass"
-                : record.middle?.fail
-                  ? "fail"
-                  : ""),
+              (record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""),
             ribs: record.middle?.ribs || "",
             ribsStatus:
               record.middle?.ribsStatus ||
-              (record.middle?.pass
-                ? "pass"
-                : record.middle?.fail
-                  ? "fail"
-                  : ""),
+              (record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""),
             status:
               record.middle?.status ||
-              (record.middle?.pass
-                ? "pass"
-                : record.middle?.fail
-                  ? "fail"
-                  : ""),
+              (record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""),
           },
           bottom: {
             body: record.bottom?.body || "",
             bodyStatus:
               record.bottom?.bodyStatus ||
-              (record.bottom?.pass
-                ? "pass"
-                : record.bottom?.fail
-                  ? "fail"
-                  : ""),
+              (record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""),
             ribs: record.bottom?.ribs || "",
             ribsStatus:
               record.bottom?.ribsStatus ||
-              (record.bottom?.pass
-                ? "pass"
-                : record.bottom?.fail
-                  ? "fail"
-                  : ""),
+              (record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""),
             status:
               record.bottom?.status ||
-              (record.bottom?.pass
-                ? "pass"
-                : record.bottom?.fail
-                  ? "fail"
-                  : ""),
+              (record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""),
           },
 
           images: Array.isArray(record.images) ? record.images : [],
@@ -721,21 +730,29 @@ export const createHumidityReport = async (req, res) => {
             second: "2-digit",
           }),
         };
-        return entry;
+        historyObj[itemName] = { "Check 1": entry };
       });
+      history = historyObj;
     }
 
-    // Determine status: if all sections in ALL history records are 'pass', set status to 'Passed'
+    // Determine status: Passed only if the LATEST check of EVERY item is 'pass'
     let finalStatus = "Failed";
-    if (history.length > 0) {
-      const latest = history[history.length - 1];
-      if (
-        latest.top?.status === "pass" &&
-        latest.middle?.status === "pass" &&
-        latest.bottom?.status === "pass"
-      ) {
-        finalStatus = "Passed";
-      }
+    const items = Object.values(history || {});
+    if (items.length > 0) {
+      const allPassed = items.every((checksObj) => {
+        const checkKeys = Object.keys(checksObj).sort((a, b) => {
+          const numA = parseInt(a.replace("Check ", ""));
+          const numB = parseInt(b.replace("Check ", ""));
+          return numB - numA; // Sort descending to get latest first
+        });
+        const latestCheck = checksObj[checkKeys[0]];
+        return (
+          latestCheck?.top?.status === "pass" &&
+          latestCheck?.middle?.status === "pass" &&
+          latestCheck?.bottom?.status === "pass"
+        );
+      });
+      if (allPassed) finalStatus = "Passed";
     }
 
     let doc;
@@ -780,7 +797,10 @@ export const createHumidityReport = async (req, res) => {
 export const getAggregatedByCustomers = async (req, res) => {
   try {
     const customersParam = req.query.customers || "Costco,MWW,ANF,Aritzia";
-    const customers = customersParam.split(",").map((c) => c.trim()).filter(Boolean);
+    const customers = customersParam
+      .split(",")
+      .map((c) => c.trim())
+      .filter(Boolean);
 
     const ordersCol = ymProdConnection.db.collection("yorksys_orders");
     const humidityCol = ymProdConnection.db.collection("humidity_data");
@@ -820,20 +840,32 @@ export const getAggregatedByCustomers = async (req, res) => {
         .toArray();
 
       // Body / ribs counts from humidity_data
-      const docs = await humidityCol.find({ customer: { $regex: `^${cust}$`, $options: "i" } }).toArray();
+      const docs = await humidityCol
+        .find({ customer: { $regex: `^${cust}$`, $options: "i" } })
+        .toArray();
       const bodyCounts = { top: 0, middle: 0, bottom: 0, total: 0 };
       const ribsCounts = { top: 0, middle: 0, bottom: 0, total: 0 };
 
       docs.forEach((doc) => {
-        const inspectionRecords = Array.isArray(doc.inspectionRecords) ? doc.inspectionRecords : [];
+        const inspectionRecords = Array.isArray(doc.inspectionRecords)
+          ? doc.inspectionRecords
+          : [];
         inspectionRecords.forEach((r) => {
           ["top", "middle", "bottom"].forEach((section) => {
             const sec = r[section] || {};
-            if (sec.body !== undefined && sec.body !== null && String(sec.body).trim() !== "") {
+            if (
+              sec.body !== undefined &&
+              sec.body !== null &&
+              String(sec.body).trim() !== ""
+            ) {
               bodyCounts[section]++;
               bodyCounts.total++;
             }
-            if (sec.ribs !== undefined && sec.ribs !== null && String(sec.ribs).trim() !== "") {
+            if (
+              sec.ribs !== undefined &&
+              sec.ribs !== null &&
+              String(sec.ribs).trim() !== ""
+            ) {
               ribsCounts[section]++;
               ribsCounts.total++;
             }
@@ -854,7 +886,9 @@ export const getAggregatedByCustomers = async (req, res) => {
     });
   } catch (err) {
     console.error("Error aggregating customer data:", err);
-    return res.status(500).json({ success: false, message: "Failed to aggregate customer data" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to aggregate customer data" });
   }
 };
 
@@ -884,10 +918,12 @@ export const getFabricValuesByBuyer = async (req, res) => {
         ).filter(Boolean);
       }
     } else if (buyerName) {
-      const orders = await ordersCol.find({ buyer: { $regex: `^${buyerName}$`, $options: "i" } }).toArray();
-      orders.forEach(o => {
+      const orders = await ordersCol
+        .find({ buyer: { $regex: `^${buyerName}$`, $options: "i" } })
+        .toArray();
+      orders.forEach((o) => {
         if (Array.isArray(o.FabricContent)) {
-          o.FabricContent.forEach(f => {
+          o.FabricContent.forEach((f) => {
             const name = (f.fabricName || f.fabric || "").trim();
             if (name) fabricNames.push(name);
           });
@@ -923,7 +959,9 @@ export const getFabricValuesByBuyer = async (req, res) => {
     return res.json({ success: true, data: results });
   } catch (err) {
     console.error("Error computing fabric values by buyer:", err);
-    return res.status(500).json({ success: false, message: "Failed to compute fabric values" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to compute fabric values" });
   }
 };
 
@@ -934,11 +972,15 @@ export const approveHumidityReport = async (req, res) => {
     const { empId, engName } = req.body;
 
     if (!id) {
-      return res.status(400).json({ success: false, message: "Report ID is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Report ID is required" });
     }
 
     if (!empId || !engName) {
-      return res.status(400).json({ success: false, message: "Approver information is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Approver information is required" });
     }
 
     let model = HumidityReport;
@@ -957,12 +999,14 @@ export const approveHumidityReport = async (req, res) => {
     }
 
     // Check if already approved
-    if (report.approvalStatus === 'approved') {
-      return res.status(400).json({ success: false, message: "Report is already approved" });
+    if (report.approvalStatus === "approved") {
+      return res
+        .status(400)
+        .json({ success: false, message: "Report is already approved" });
     }
 
     // Update the report with approval details
-    report.approvalStatus = 'approved';
+    report.approvalStatus = "approved";
     report.approvedBy = { empId, engName };
     report.approvedAt = new Date();
     // optional remark provided by approver
@@ -979,7 +1023,9 @@ export const approveHumidityReport = async (req, res) => {
     });
   } catch (err) {
     console.error("Error approving humidity report:", err);
-    return res.status(500).json({ success: false, message: "Failed to approve report" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to approve report" });
   }
 };
 
@@ -1012,17 +1058,24 @@ export const updateHumidityReport = async (req, res) => {
       delete payload.createdAt;
       delete payload.updatedAt;
 
-      // Recalculate top-level status based on the latest history entry
-      if (Array.isArray(payload.history) && payload.history.length > 0) {
-        const latest = payload.history[payload.history.length - 1];
-        if (
-          latest.top?.status === "pass" &&
-          latest.middle?.status === "pass" &&
-          latest.bottom?.status === "pass"
-        ) {
-          payload.status = "Passed";
-        } else {
-          payload.status = "Failed";
+      // Recalculate top-level status based on the latest check of every item
+      if (payload.history && typeof payload.history === "object") {
+        const items = Object.values(payload.history);
+        if (items.length > 0) {
+          const allPassed = items.every((checksObj) => {
+            const checkKeys = Object.keys(checksObj).sort((a, b) => {
+              const numA = parseInt(a.replace("Check ", ""));
+              const numB = parseInt(b.replace("Check ", ""));
+              return numB - numA;
+            });
+            const latestCheck = checksObj[checkKeys[0]];
+            return (
+              latestCheck?.top?.status === "pass" &&
+              latestCheck?.middle?.status === "pass" &&
+              latestCheck?.bottom?.status === "pass"
+            );
+          });
+          payload.status = allPassed ? "Passed" : "Failed";
         }
       }
 

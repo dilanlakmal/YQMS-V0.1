@@ -8,10 +8,10 @@ const PaperPreviewReitmans = ({ data }) => {
     try {
       const date = new Date(dateStr);
       if (isNaN(date.getTime())) return dateStr;
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
       const year = date.getFullYear();
-      return `${day}/${month}/${year}`; // Format like in the image (DD/MM/YYYY)
+      return `${month}/${day}/${year}`;
     } catch (e) {
       return "N/A";
     }
@@ -36,7 +36,34 @@ const PaperPreviewReitmans = ({ data }) => {
   };
 
   const formData = data;
-  const history = formData.history || formData.inspectionRecords || [];
+  const rawHistory = formData.history || formData.inspectionRecords || [];
+
+  // Helper to flatten nested history if it's an object/Map
+  const getFlattenedHistory = (history) => {
+    if (Array.isArray(history)) return history;
+    if (typeof history !== 'object' || history === null) return [];
+
+    // For Reitmans, we might want to just show the latest check of each item 
+    // or all checks. Usually for paper preview we show everything.
+    return Object.keys(history).sort((a, b) => {
+      const numA = parseInt(a.replace('Item ', ''));
+      const numB = parseInt(b.replace('Item ', ''));
+      return numA - numB;
+    }).flatMap(itemKey => {
+      const checks = history[itemKey] || {};
+      return Object.keys(checks).sort((a, b) => {
+        const numA = parseInt(a.replace('Check ', ''));
+        const numB = parseInt(b.replace('Check ', ''));
+        return numA - numB;
+      }).map(checkKey => ({
+        ...checks[checkKey],
+        itemName: itemKey,
+        checkName: checkKey
+      }));
+    });
+  };
+
+  const history = getFlattenedHistory(rawHistory);
 
   // Find the max reading for the "before" dehumidify rate across any history entries
   const getMoistureBefore = () => {
@@ -114,17 +141,17 @@ const PaperPreviewReitmans = ({ data }) => {
             <span className="text-2xl font-bold">
               {formData.date
                 ? new Date(formData.date)
-                    .toLocaleDateString("en-US", {
-                      month: "short",
-                      year: "numeric",
-                    })
-                    .replace(" ", " , ")
+                  .toLocaleDateString("en-US", {
+                    month: "short",
+                    year: "numeric",
+                  })
+                  .replace(" ", " , ")
                 : new Date()
-                    .toLocaleDateString("en-US", {
-                      month: "short",
-                      year: "numeric",
-                    })
-                    .replace(" ", " , ")}
+                  .toLocaleDateString("en-US", {
+                    month: "short",
+                    year: "numeric",
+                  })
+                  .replace(" ", " , ")}
             </span>
             <span className="text-[12px] font-bold mt-1">
               Style#: {formData.moNo || formData.factoryStyleNo || "N/A"}
@@ -215,11 +242,11 @@ const PaperPreviewReitmans = ({ data }) => {
                   )}
                   {(formData.updatedBy?.engName ||
                     formData.createdBy?.engName) && (
-                    <div className="text-[10px] font-bold text-gray-800 mt-1 uppercase">
-                      {formData.updatedBy?.engName ||
-                        formData.createdBy?.engName}
-                    </div>
-                  )}
+                      <div className="text-[10px] font-bold text-gray-800 mt-1 uppercase">
+                        {formData.updatedBy?.engName ||
+                          formData.createdBy?.engName}
+                      </div>
+                    )}
                 </td>
               </tr>
             );
