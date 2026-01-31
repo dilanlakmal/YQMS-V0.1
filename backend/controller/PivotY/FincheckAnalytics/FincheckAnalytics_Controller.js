@@ -2,6 +2,8 @@ import {
   FincheckInspectionReports,
   UserMain,
   QASectionsProductLocation,
+  QASectionsMeasurementSpecs,
+  DtOrder,
 } from "../../MongoDB/dbConnectionController.js";
 
 // ============================================================
@@ -1000,6 +1002,173 @@ export const getStyleSummaryDefectMap = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching style location map:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// GET: Style Measurement Analytics (Paginated & Aggregated)
+// ============================================================
+
+export const getStyleMeasurementAnalytics = async (req, res) => {
+  try {
+    const { styleNo, reportType, page = 1, limit = 5 } = req.query;
+
+    if (!styleNo) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Style No required" });
+    }
+
+    // 1. Fetch Specs & Size List
+    const dtOrder = await DtOrder.findOne({
+      Order_No: { $regex: new RegExp(`^${styleNo}$`, "i") },
+    })
+      .select("SizeList OrderColors")
+      .lean();
+
+    const sizeList = dtOrder?.SizeList || [];
+
+    const specsRecord = await QASectionsMeasurementSpecs.findOne({
+      Order_No: { $regex: new RegExp(`^${styleNo}$`, "i") },
+    }).lean();
+
+    const specsData = {
+      Before: { full: [], selected: [] },
+      After: { full: [], selected: [] },
+    };
+
+    if (specsRecord) {
+      specsData.Before.full = specsRecord.AllBeforeWashSpecs || [];
+      // Populate selected (Critical) specs
+      specsData.Before.selected = specsRecord.selectedBeforeWashSpecs || [];
+
+      specsData.After.full = specsRecord.AllAfterWashSpecs || [];
+      specsData.After.selected = specsRecord.selectedAfterWashSpecs || [];
+    } else if (dtOrder && dtOrder.BeforeWashSpecs) {
+      const legacySpecs = dtOrder.BeforeWashSpecs.map((s) => ({
+        ...s,
+        id: s._id ? s._id.toString() : s.id,
+      }));
+      specsData.Before.full = legacySpecs;
+      specsData.Before.selected = legacySpecs; // Legacy often treated all as critical
+    }
+
+    // 2. Query
+    const query = {
+      orderNos: styleNo,
+      status: { $ne: "cancelled" },
+    };
+
+    if (reportType && reportType !== "All") {
+      query.reportType = reportType;
+    }
+
+    const availableTypes = await FincheckInspectionReports.distinct(
+      "reportType",
+      {
+        orderNos: styleNo,
+        status: { $ne: "cancelled" },
+      },
+    );
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const reports = await FincheckInspectionReports.find(query)
+      .sort({ inspectionDate: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .select(
+        "reportId reportType inspectionDate empId empName measurementData inspectionConfig",
+      )
+      .lean();
+
+    const totalReports = await FincheckInspectionReports.countDocuments(query);
+
+    // 3. Process Reports
+    const processedReports = await Promise.all(
+      reports.map(async (report) => {
+        let qaName = report.empName;
+        let qaFacePhoto = null; // Init
+
+        // Fetch QA Details including Face Photo
+        if (report.empId) {
+          const user = await UserMain.findOne({ emp_id: report.empId }).select(
+            "eng_name face_photo",
+          );
+          if (user) {
+            if (!qaName) qaName = user.eng_name;
+            qaFacePhoto = user.face_photo;
+          }
+        }
+
+        const groupedMeasurements = {};
+        const hasMeasurementData =
+          report.measurementData && report.measurementData.length > 0;
+
+        if (hasMeasurementData) {
+          report.measurementData.forEach((m) => {
+            const line = m.lineName || m.line || "";
+            const table = m.tableName || m.table || "";
+            const color = m.colorName || m.color || "";
+            const stage = m.stage || "Before";
+
+            const key = `${line}||${table}||${color}||${stage}`;
+
+            if (!groupedMeasurements[key]) {
+              groupedMeasurements[key] = {
+                config: { line, table, color },
+                stage: stage,
+                stageLabel:
+                  stage === "Before"
+                    ? "Before Wash Measurement"
+                    : "Buyer Spec Measurement",
+                measurements: [],
+                manualMeasurements: [],
+              };
+            }
+            // --- Check for Manual Entry and separate it ---
+            if (m.size === "Manual_Entry") {
+              // Push to manual array so frontend can iterate images easily
+              groupedMeasurements[key].manualMeasurements.push(m);
+            } else {
+              // Push to standard array for the Table
+              groupedMeasurements[key].measurements.push(m);
+            }
+            //groupedMeasurements[key].measurements.push(m);
+          });
+        }
+
+        return {
+          _id: report._id,
+          reportId: report.reportId,
+          reportType: report.reportType,
+          inspectionDate: report.inspectionDate,
+          qaId: report.empId,
+          qaName: qaName,
+          qaFacePhoto: qaFacePhoto, // Return Photo
+          hasMeasurementData: hasMeasurementData,
+          measurementGroups: Object.values(groupedMeasurements),
+        };
+      }),
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        specs: specsData,
+        sizeList: sizeList,
+        reportTypes: availableTypes.sort(),
+        reports: processedReports,
+        pagination: {
+          current: parseInt(page),
+          total: Math.ceil(totalReports / parseInt(limit)),
+          totalRecords: totalReports,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching style measurement analytics:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };
