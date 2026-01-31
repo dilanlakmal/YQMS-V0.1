@@ -1113,12 +1113,19 @@ export const getStyleMeasurementAnalytics = async (req, res) => {
             const color = m.colorName || m.color || "";
             const stage = m.stage || "Before";
 
-            const key = `${line}||${table}||${color}||${stage}`;
+            // 1. EXTRACT K-VALUE (Default to empty string if missing)
+            const kVal = m.kValue || "";
+
+            // 2. MODIFY KEY TO INCLUDE K-VALUE
+            const key = `${line}||${table}||${color}||${stage}||${kVal}`;
+
+            //const key = `${line}||${table}||${color}||${stage}`;
 
             if (!groupedMeasurements[key]) {
               groupedMeasurements[key] = {
                 config: { line, table, color },
                 stage: stage,
+                kValue: kVal,
                 stageLabel:
                   stage === "Before"
                     ? "Before Wash Measurement"

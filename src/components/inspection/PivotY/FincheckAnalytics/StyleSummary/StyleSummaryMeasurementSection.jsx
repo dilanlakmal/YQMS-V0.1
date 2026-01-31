@@ -61,39 +61,56 @@ const resolvePhotoUrl = (url) => {
 // SUB-COMPONENT: Single Measurement Table
 // ============================================================================
 const MeasurementGroupTable = ({ group, specsData, sizeList }) => {
-  const { measurements, manualMeasurements, stage } = group;
+  const { measurements, manualMeasurements, stage, kValue } = group;
 
   // 1. Determine which specs to use (Full and Selected/Critical)
-  const fullSpecs =
+  //   const fullSpecs =
+  //     stage === "Before" ? specsData.Before?.full : specsData.After?.full;
+
+  //   const criticalSpecs =
+  //     stage === "Before" ? specsData.Before?.selected : specsData.After?.selected;
+
+  // 2. GET RAW LISTS
+  let fullSpecs =
     stage === "Before" ? specsData.Before?.full : specsData.After?.full;
-  const criticalSpecs =
+  let criticalSpecs =
     stage === "Before" ? specsData.Before?.selected : specsData.After?.selected;
 
-  // Create a Set for fast Critical lookup
+  // 3. APPLY FILTERING TO BOTH LISTS (Only for 'Before' stage)
+  if (stage === "Before") {
+    if (kValue) {
+      // Case A: Group has specific K-Value -> Filter both lists for this K-Value
+      if (fullSpecs) {
+        fullSpecs = fullSpecs.filter((s) => s.kValue === kValue);
+      }
+      if (criticalSpecs) {
+        criticalSpecs = criticalSpecs.filter((s) => s.kValue === kValue);
+      }
+    } else {
+      // Case B: Group has NO K-Value -> Filter both lists for empty K-Value
+      if (fullSpecs) {
+        fullSpecs = fullSpecs.filter((s) => !s.kValue);
+      }
+      if (criticalSpecs) {
+        criticalSpecs = criticalSpecs.filter((s) => !s.kValue);
+      }
+    }
+  }
+
+  // 4. GENERATE CRITICAL ID SET (From the filtered list)
   const criticalSpecIds = new Set((criticalSpecs || []).map((s) => s.id));
 
-  //   if (!fullSpecs || fullSpecs.length === 0) {
-  //     return (
-  //       <div className="p-4 text-xs text-gray-400 italic">
-  //         No specifications found for {stage} stage.
-  //       </div>
-  //     );
-  //   }
-
-  // 2. Filter out Manual_Entry and Sort Measurements
+  // 5. Filter out Manual_Entry and Sort Measurements
   const validMeasurements = measurements.filter(
     (m) => m.size !== "Manual_Entry",
   );
 
-  // 3. CHECK IF WE HAVE ANYTHING TO SHOW (Table Data OR Manual Images)
+  // 6. CHECK IF WE HAVE ANYTHING TO SHOW (Table Data OR Manual Images)
   const hasTableData =
     validMeasurements.length > 0 && fullSpecs && fullSpecs.length > 0;
   const hasManualData = manualMeasurements && manualMeasurements.length > 0;
 
   if (!hasTableData && !hasManualData) return null;
-
-  // If no columns left after filtering Manual Entry, hide table
-  //if (validMeasurements.length === 0) return null;
 
   const sortedMeasurements = [...validMeasurements].sort((a, b) => {
     const idxA = sizeList.indexOf(a.size);
@@ -270,15 +287,34 @@ const MeasurementGroupTable = ({ group, specsData, sizeList }) => {
 
                             let colorClass = "";
                             // 'C' Logic: 0 = Gray (Skipped/Empty), Value = Check Tol
-                            if (decimal === 0) {
+
+                            // 1. If explicitly empty/skipped ("-"), make it Gray
+                            if (fraction === "-") {
                               colorClass =
-                                "text-gray-400 bg-gray-50 dark:bg-gray-800"; // 0 is Empty for 'C'
-                            } else {
+                                "text-gray-400 bg-gray-50 dark:bg-gray-800";
+                            }
+                            // 2. If it is a real measured 0, make it Green
+                            else if (decimal === 0) {
+                              colorClass =
+                                "text-green-600 font-bold bg-green-50 dark:bg-green-900/20";
+                            }
+                            // 3. Otherwise check tolerance
+                            else {
                               colorClass =
                                 check.isWithin || check.isDefault
                                   ? "text-green-600 font-bold bg-green-50 dark:bg-green-900/20"
                                   : "text-red-600 font-bold bg-red-50 dark:bg-red-900/20";
                             }
+
+                            // if (decimal === 0) {
+                            //   colorClass =
+                            //     "text-green-600 font-bold bg-green-50 dark:bg-green-900/20";
+                            // } else {
+                            //   colorClass =
+                            //     check.isWithin || check.isDefault
+                            //       ? "text-green-600 font-bold bg-green-50 dark:bg-green-900/20"
+                            //       : "text-red-600 font-bold bg-red-50 dark:bg-red-900/20";
+                            // }
 
                             return (
                               <td
@@ -746,6 +782,7 @@ const StyleSummaryMeasurementSection = ({ styleNo }) => {
                           <div className="flex items-center gap-3 mb-3">
                             <div className="h-6 w-1 bg-indigo-500 rounded-full"></div>
                             <h3 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-tight">
+                              {/* 1. Config Info */}
                               {[
                                 group.config.line,
                                 group.config.table,
@@ -753,6 +790,12 @@ const StyleSummaryMeasurementSection = ({ styleNo }) => {
                               ]
                                 .filter(Boolean)
                                 .join(" / ") || "General Config"}
+                              {/* 2. Display K Value if Stage is 'Before' and kValue exists */}
+                              {group.stage === "Before" && group.kValue && (
+                                <span className="ml-2 text-indigo-600 dark:text-indigo-400 font-bold">
+                                  (K: {group.kValue})
+                                </span>
+                              )}
                             </h3>
                             <span
                               className={`text-[10px] px-2 py-0.5 rounded font-bold text-white shadow-sm ${group.stage === "Before" ? "bg-purple-500" : "bg-teal-500"}`}

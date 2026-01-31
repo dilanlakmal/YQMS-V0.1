@@ -71,6 +71,7 @@ const FormPage = () => {
     try {
       const ts = new Date().toLocaleTimeString();
       setCalcSteps((prev) => [...prev, `${ts}: ${step}`]);
+      console.log(`CALC STEP - ${ts}:`, step);
     } catch (e) {
       console.error("Error adding calc step", e);
     }
@@ -152,7 +153,8 @@ const FormPage = () => {
             : Array.isArray(result)
               ? result
               : [];
-
+        console.log("api/yorksys-orders response:", result);
+        console.log("parsed orders array:", orders);
         addCalcStep(
           `Fetched orders: ${Array.isArray(orders) ? orders.length : 0}`,
         );
@@ -178,7 +180,10 @@ const FormPage = () => {
           const humJson = await humRes.json();
           const humDocs = humJson && humJson.data ? humJson.data : [];
           setHumidityDocs(humDocs);
-
+          console.log(
+            "humidity_data docs (fetched with yorksys-orders):",
+            humDocs,
+          );
           addCalcStep(
             `Fetched humidity_data docs: ${Array.isArray(humDocs) ? humDocs.length : 0}`,
           );
@@ -221,6 +226,7 @@ const FormPage = () => {
   }, []);
 
   const handleOrderNoSelect = async (moNo) => {
+    console.log("[DEBUG] Selecting Order:", moNo);
     // Set selected moNo into the factory style field and close dropdown
     setOrderNoSearch(moNo);
 
@@ -303,7 +309,7 @@ const FormPage = () => {
       );
       const json = await res.json();
       const order = json && json.data ? json.data : json || null;
-
+      console.log("order by moNo:", json);
       addCalcStep(`Fetched order details for "${moNo}"`);
       if (order) {
         let fabricationStr = "";
@@ -471,8 +477,7 @@ const FormPage = () => {
             return false;
           };
           const ribsFlag = detectRibsAvailable(order);
-          // setRibsAvailable(prev => prev || ribsFlag);
-          setRibsAvailable(ribsFlag);
+          setRibsAvailable((prev) => prev || ribsFlag);
           addCalcStep(
             `Ribs availability detection: ${ribsFlag ? "ENABLED" : "DISABLED"}`,
           );
@@ -632,7 +637,10 @@ const FormPage = () => {
               ...prev,
               aquaboySpecBody: totalFormatted,
             }));
-
+            console.log("FabricContent -> FiberName matches:", matches, {
+              buyerEntry,
+              aquaboySpecBody: totalFormatted,
+            });
             addCalcStep(
               `Computed aquaboySpecBody total raw=${total} rounded="${totalFormatted}"`,
             );
@@ -776,15 +784,14 @@ const FormPage = () => {
         setCheckHistory(history);
         if (firstCreatedAt) setFirstCheckDate(firstCreatedAt);
 
-        // Auto-detect ribs from history only if they have actual values
+        // Auto-detect ribs from history only if they have actual values or spec
         const hasRibsInHistory = reports.some((r) => {
-          if (r.ribsAvailable === true) return true;
-          if (
+          // Verifying if there's actual data or spec, not just the flag
+          const hasSpec =
             r.aquaboySpecRibs &&
             r.aquaboySpecRibs.toString().trim() !== "" &&
-            r.aquaboySpecRibs !== "0"
-          )
-            return true;
+            r.aquaboySpecRibs !== "0";
+          if (hasSpec) return true;
 
           if (r.history && typeof r.history === "object") {
             return Object.values(r.history).some((itemChecks) => {
@@ -1266,7 +1273,6 @@ const FormPage = () => {
       newErrors.aquaboySpecBody = "Upper Centisimal index is required";
     }
 
-    // Explicitly check for Ribs Spec only if ribs are available
     if (ribsAvailable && !formData.aquaboySpecRibs?.trim()) {
       newErrors.aquaboySpecRibs = "Ribs spec is required";
     }
@@ -1291,6 +1297,48 @@ const FormPage = () => {
           newErrors.afterDryRoomTime = "After dry room time is required";
         }
       }
+    }
+
+    // Check all inspection records for required readings
+    let readingsMissing = false;
+    formData.inspectionRecords.forEach((record, index) => {
+      ["top", "middle", "bottom"].forEach((section) => {
+        if (
+          !record[section].body ||
+          record[section].body.toString().trim() === ""
+        ) {
+          readingsMissing = true;
+        }
+        if (
+          ribsAvailable &&
+          (!record[section].ribs ||
+            record[section].ribs.toString().trim() === "")
+        ) {
+          readingsMissing = true;
+        }
+      });
+
+      // If Pre-Final or Final, check additional readings too
+      if (
+        formData.inspectionType === "Pre-Final" ||
+        formData.inspectionType === "Final"
+      ) {
+        ["top", "middle", "bottom"].forEach((addSec) => {
+          const addBody = record.additional?.[addSec]?.body;
+          const addRibs = record.additional?.[addSec]?.ribs;
+          if (!addBody || addBody.toString().trim() === "") {
+            readingsMissing = true;
+          }
+          if (ribsAvailable && (!addRibs || addRibs.toString().trim() === "")) {
+            readingsMissing = true;
+          }
+        });
+      }
+    });
+
+    if (readingsMissing) {
+      newErrors.readings =
+        "All inspection readings (Body and Ribs) are required";
     }
 
     setErrors(newErrors);
@@ -1380,9 +1428,32 @@ const FormPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log(
+      "[DEBUG] handleSubmit triggered. Current formData:",
+      JSON.stringify(
+        formData,
+        (key, value) =>
+          key === "images" ? `[${value?.length || 0} images]` : value,
+        2,
+      ),
+    );
 
     if (!validateForm()) {
-      setMessage({ type: "error", text: "Please fill in all required fields" });
+      if (errors.readings) {
+        Swal.fire({
+          icon: "warning",
+          title: "Missing Readings",
+          text: "Please complete all Top, Middle, and Bottom readings (Body and Ribs) before submitting.",
+          confirmButtonColor: "#3085d6",
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Validation Failed",
+          text: "Please fill in all required fields marked with *",
+          confirmButtonColor: "#d33",
+        });
+      }
       return;
     }
 
@@ -1424,6 +1495,22 @@ const FormPage = () => {
           }),
         })),
       };
+
+      console.log(
+        "[DEBUG] Final Payload being sent to /api/humidity-reports:",
+        JSON.stringify(
+          payload,
+          (key, value) =>
+            key === "images" ? `[${value?.length || 0} images]` : value,
+          2,
+        ),
+      );
+
+      console.log(
+        "Saving payload with images:",
+        payload.inspectionRecords[0]?.images?.length || 0,
+        "images",
+      );
 
       const response = await fetch(
         `${API_BASE_URL || "http://localhost:5001"}/api/humidity-reports`,
@@ -2226,11 +2313,11 @@ const FormPage = () => {
                                   aquaboySpecBody: e.target.value,
                                 }))
                               }
-                              className={`w-full px-4 py-1 bg-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors ${errors.aquaboySpecBody ? "text-blue-700" : "text-blue-900"}`}
+                              className={`w-full px-4 py-1 bg-transparent rounded-md focus:outline-none focus:ring-2 transition-colors ${errors.aquaboySpecBody ? "text-blue-700 bg-red-50 ring-1 ring-red-200" : "text-blue-900 focus:ring-blue-400"}`}
                               placeholder=""
                               required
                               aria-required="true"
-                              disabled={true}
+                              disabled={!formData.factoryStyleNo}
                             />
                             <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
                               <span className="text-gray-400 text-sm">
@@ -2405,7 +2492,7 @@ const FormPage = () => {
                                 }
                                 className={`w-full px-4 py-1 bg-transparent rounded-md focus:ring-blue-300 transition-colors ${errors.aquaboySpecRibs ? "text-blue-700" : "text-blue-900"}`}
                                 placeholder=""
-                                required={ribsAvailable}
+                                required
                                 aria-required="true"
                                 disabled={!formData.factoryStyleNo}
                               />
@@ -2488,6 +2575,7 @@ const FormPage = () => {
                             >
                               <h4 className="font-bold capitalize text-gray-700 text-base text-start mb-1">
                                 {section}
+                                <span className="text-red-500 ml-1">*</span>
                               </h4>
 
                               {/* Make each row a single column full width */}
@@ -2508,8 +2596,12 @@ const FormPage = () => {
                                         )
                                       }
                                       placeholder="Body"
-                                      className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                      disabled={!formData.factoryStyleNo}
+                                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.readings && (!record[section].body || record[section].body.toString().trim() === "") ? "border-red-500 ring-1 ring-red-200" : "border-gray-300 focus:ring-blue-500"}`}
+                                      disabled={
+                                        !formData.factoryStyleNo ||
+                                        !formData.aquaboySpecBody
+                                      }
+                                      required
                                     />
                                   </div>
                                   {record[section].bodyPass ? (
@@ -2569,9 +2661,12 @@ const FormPage = () => {
                                           )
                                         }
                                         placeholder="Ribs"
-                                        className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                        disabled={!formData.factoryStyleNo}
-                                        required={ribsAvailable}
+                                        className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.readings && (!record[section].ribs || record[section].ribs.toString().trim() === "") ? "border-red-500 ring-1 ring-red-200" : "border-gray-300 focus:ring-blue-500"}`}
+                                        disabled={
+                                          !formData.factoryStyleNo ||
+                                          !formData.aquaboySpecRibs
+                                        }
+                                        required
                                       />
                                     </div>
                                     {record[section].ribsPass ? (
@@ -2860,6 +2955,7 @@ const FormPage = () => {
                                 <div key={addSec} className="w-full">
                                   <h4 className="font-bold capitalize text-gray-700 text-base text-start mb-1">
                                     {addSec}
+                                    <span className="text-red-500 ml-1">*</span>
                                   </h4>
                                   <div className="flex flex-col md:flex-row gap-4 w-full items-center">
                                     {/* Body Reading + Status */}
@@ -2881,8 +2977,12 @@ const FormPage = () => {
                                             )
                                           }
                                           placeholder="Body"
-                                          className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                          disabled={!formData.factoryStyleNo}
+                                          className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.readings && (!record.additional?.[addSec]?.body || record.additional?.[addSec]?.body.toString().trim() === "") ? "border-red-500 ring-1 ring-red-200" : "border-gray-300 focus:ring-blue-500"}`}
+                                          disabled={
+                                            !formData.factoryStyleNo ||
+                                            !formData.aquaboySpecBody
+                                          }
+                                          required
                                         />
                                       </div>
                                       {record.additional?.[addSec]?.bodyPass ? (
@@ -2946,8 +3046,12 @@ const FormPage = () => {
                                               )
                                             }
                                             placeholder="Ribs"
-                                            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                            disabled={!formData.factoryStyleNo}
+                                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.readings && (!record.additional?.[addSec]?.ribs || record.additional?.[addSec]?.ribs.toString().trim() === "") ? "border-red-500 ring-1 ring-red-200" : "border-gray-300 focus:ring-blue-500"}`}
+                                            disabled={
+                                              !formData.factoryStyleNo ||
+                                              !formData.aquaboySpecRibs
+                                            }
+                                            required
                                           />
                                         </div>
                                         {record.additional?.[addSec]
