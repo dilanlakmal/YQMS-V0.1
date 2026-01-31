@@ -11,8 +11,12 @@ import {
   ChevronRight,
   Filter,
   Star, // Using Star icon for Critical label
+  FileDown,
 } from "lucide-react";
+import { pdf } from "@react-pdf/renderer";
+import { saveAs } from "file-saver";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../../config";
+import MeasurementReportPDF from "./MeasurementReportPDF";
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -452,6 +456,9 @@ const StyleSummaryMeasurementSection = ({ styleNo }) => {
   const [sizeList, setSizeList] = useState([]);
   const [currentReport, setCurrentReport] = useState(null);
 
+  // PDF Generation State
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
   // Fetch Function (Limit is always 1)
   const fetchReportData = async (page, rType) => {
     setLoading(true);
@@ -505,205 +512,292 @@ const StyleSummaryMeasurementSection = ({ styleNo }) => {
     }
   };
 
+  // DOWNLOAD HANDLER FUNCTION
+  const handleDownloadPDF = async () => {
+    if (!styleNo || !specs || !sizeList) return;
+
+    setIsGeneratingPDF(true);
+
+    try {
+      // Fetch ALL reports for this style (Limit high number like 1000 to get everything)
+      const res = await axios.get(
+        `${API_BASE_URL}/api/fincheck-analytics/style-measurement`,
+        {
+          params: {
+            styleNo,
+            reportType: activeReportType === "All" ? "" : activeReportType,
+            page: 1,
+            limit: 1000, // Fetch All
+          },
+        },
+      );
+
+      if (res.data.success && res.data.data.reports.length > 0) {
+        const allReports = res.data.data.reports;
+
+        // Generate Blob
+        const blob = await pdf(
+          <MeasurementReportPDF
+            reports={allReports}
+            specs={specs}
+            sizeList={sizeList}
+            styleNo={styleNo}
+          />,
+        ).toBlob();
+
+        // Save File
+        const timestamp = new Date().toISOString().slice(0, 10);
+        saveAs(blob, `Measurement_Reports_${styleNo}_${timestamp}.pdf`);
+      }
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Failed to generate PDF. Please try again.");
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   if (!currentReport && !loading) {
     return null;
   }
 
   return (
-    <div
-      id="measurement-section"
-      className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
-    >
-      {/* 1. Header & Controls */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-        {/* DESKTOP LAYOUT: Title -> Pagination -> Filters */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 rounded-xl shrink-0">
-              <Layers className="w-5 h-5" />
+    <>
+      <div
+        id="measurement-section"
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
+      >
+        {/* 1. Header & Controls */}
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          {/* DESKTOP LAYOUT: Title -> Pagination -> Filters */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 rounded-xl shrink-0">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div className="flex items-center gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-800 dark:text-white leading-tight">
+                    Measurement Data
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    View measurements per report
+                  </p>
+                </div>
+                {/* PDF BUTTON START */}
+                <button
+                  onClick={handleDownloadPDF}
+                  disabled={isGeneratingPDF || !currentReport}
+                  className="ml-2 p-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-lg transition-colors border border-gray-200 dark:border-gray-600 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Download All Reports as PDF"
+                >
+                  {isGeneratingPDF ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+                  ) : (
+                    <FileDown className="w-4 h-4 text-red-500" />
+                  )}
+                  <span className="text-xs font-bold hidden sm:inline">
+                    PDF
+                  </span>
+                </button>
+              </div>
             </div>
-            <div>
-              <h2 className="text-lg font-bold text-gray-800 dark:text-white leading-tight">
-                Measurement Data
-              </h2>
-              <p className="text-xs text-gray-500">
-                View measurements per report
-              </p>
+
+            {/* DESKTOP PAGINATION: Hidden on Mobile */}
+            <div className="hidden md:block">
+              <PaginationBar
+                current={currentPage}
+                total={totalPages}
+                onPageChange={handlePageChange}
+              />
+            </div>
+
+            {/* Filter Tabs (Responsive) */}
+            <div className="w-full md:w-auto flex items-center gap-2 p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
+              <Filter className="w-3 h-3 text-gray-400 ml-2 shrink-0" />
+              <div className="flex-1 grid grid-cols-2 md:flex md:flex-wrap gap-1">
+                {reportTypes.map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setActiveReportType(type)}
+                    className={`px-3 py-1.5 md:py-1 text-[10px] md:text-xs font-bold rounded-md transition-all truncate ${
+                      activeReportType === type
+                        ? "bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-300 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* DESKTOP PAGINATION: Hidden on Mobile */}
-          <div className="hidden md:block">
+          {/* MOBILE PAGINATION: Below Filters */}
+          <div className="md:hidden mt-4 flex justify-center">
             <PaginationBar
               current={currentPage}
               total={totalPages}
               onPageChange={handlePageChange}
             />
           </div>
+        </div>
 
-          {/* Filter Tabs (Responsive) */}
-          <div className="w-full md:w-auto flex items-center gap-2 p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
-            <Filter className="w-3 h-3 text-gray-400 ml-2 shrink-0" />
-            <div className="flex-1 grid grid-cols-2 md:flex md:flex-wrap gap-1">
-              {reportTypes.map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setActiveReportType(type)}
-                  className={`px-3 py-1.5 md:py-1 text-[10px] md:text-xs font-bold rounded-md transition-all truncate ${
-                    activeReportType === type
-                      ? "bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-300 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-200"
-                  }`}
-                >
-                  {type}
-                </button>
-              ))}
+        {/* 2. Content Body */}
+        <div className="p-4 bg-gray-50/50 dark:bg-gray-900/20 flex-1 min-h-[400px]">
+          {loading ? (
+            <div className="h-full flex flex-col items-center justify-center py-20 text-gray-400">
+              <Loader2 className="w-10 h-10 animate-spin mb-3 text-indigo-500" />
+              <p className="text-sm font-medium">
+                Loading Page {currentPage}...
+              </p>
             </div>
-          </div>
-        </div>
-
-        {/* MOBILE PAGINATION: Below Filters */}
-        <div className="md:hidden mt-4 flex justify-center">
-          <PaginationBar
-            current={currentPage}
-            total={totalPages}
-            onPageChange={handlePageChange}
-          />
-        </div>
-      </div>
-
-      {/* 2. Content Body */}
-      <div className="p-4 bg-gray-50/50 dark:bg-gray-900/20 flex-1 min-h-[400px]">
-        {loading ? (
-          <div className="h-full flex flex-col items-center justify-center py-20 text-gray-400">
-            <Loader2 className="w-10 h-10 animate-spin mb-3 text-indigo-500" />
-            <p className="text-sm font-medium">Loading Page {currentPage}...</p>
-          </div>
-        ) : !currentReport ? (
-          <div className="flex flex-col items-center justify-center py-16 text-gray-400 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800">
-            <AlertCircle className="w-10 h-10 mb-2 opacity-50" />
-            <p className="text-sm font-bold">No reports found</p>
-            <p className="text-xs">Try selecting a different report type</p>
-          </div>
-        ) : (
-          <div className="animate-fadeIn">
-            {/* REPORT CARD */}
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden">
-              {/* Card Header Info */}
-              <div className="bg-gradient-to-r from-gray-900 to-gray-800 dark:from-gray-700 dark:to-gray-600 p-4 flex flex-wrap items-center justify-between gap-4">
-                <div className="flex flex-wrap items-center gap-4 md:gap-8">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
-                      Report Type
-                    </span>
-                    <span className="text-white font-bold text-sm">
-                      {currentReport.reportType}
-                    </span>
-                  </div>
-                  <div className="hidden md:block w-px h-8 bg-white/20"></div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
-                      Inspection Date
-                    </span>
-                    <div className="flex items-center gap-1.5 text-white font-bold text-sm">
-                      <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                      {new Date(
-                        currentReport.inspectionDate,
-                      ).toLocaleDateString()}
+          ) : !currentReport ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800">
+              <AlertCircle className="w-10 h-10 mb-2 opacity-50" />
+              <p className="text-sm font-bold">No reports found</p>
+              <p className="text-xs">Try selecting a different report type</p>
+            </div>
+          ) : (
+            <div className="animate-fadeIn">
+              {/* REPORT CARD */}
+              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden">
+                {/* Card Header Info */}
+                <div className="bg-gradient-to-r from-gray-900 to-gray-800 dark:from-gray-700 dark:to-gray-600 p-4 flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center gap-4 md:gap-8">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                        Report Type
+                      </span>
+                      <span className="text-white font-bold text-sm">
+                        {currentReport.reportType}
+                      </span>
                     </div>
-                  </div>
-                  <div className="hidden md:block w-px h-8 bg-white/20"></div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
-                      QC Inspector
-                    </span>
-                    <div className="flex items-center gap-2 mt-1">
-                      {/* QA Photo */}
-                      <div className="w-7 h-7 rounded-full bg-gray-700 border border-gray-500 overflow-hidden flex items-center justify-center shrink-0">
-                        {currentReport.qaFacePhoto ? (
-                          <img
-                            src={resolvePhotoUrl(currentReport.qaFacePhoto)}
-                            alt="QA"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <User className="w-4 h-4 text-gray-400" />
-                        )}
-                      </div>
-                      <div className="flex flex-col leading-tight">
-                        <span className="text-white font-bold text-sm">
-                          {currentReport.qaName}
-                        </span>
-                        <span className="text-[10px] text-indigo-300 font-mono">
-                          ({currentReport.qaId})
-                        </span>
+                    <div className="hidden md:block w-px h-8 bg-white/20"></div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                        Inspection Date
+                      </span>
+                      <div className="flex items-center gap-1.5 text-white font-bold text-sm">
+                        <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                        {new Date(
+                          currentReport.inspectionDate,
+                        ).toLocaleDateString()}
                       </div>
                     </div>
-                  </div>
-                </div>
-
-                <a
-                  href={`/fincheck-reports/view/${currentReport.reportId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg transition-colors text-xs font-bold shadow-lg shadow-indigo-900/20 whitespace-nowrap"
-                >
-                  <FileText className="w-4 h-4" />
-                  View Full Report #{currentReport.reportId}
-                </a>
-              </div>
-
-              {/* Card Content (Tables) */}
-              <div className="p-5">
-                {!currentReport.hasMeasurementData ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-gray-400 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                    <AlertCircle className="w-10 h-10 mb-2 opacity-50" />
-                    <p className="text-sm font-bold text-gray-500 dark:text-gray-400">
-                      No Digital Measurement Recorded
-                    </p>
-                    <p className="text-xs mt-1">
-                      For Report #{currentReport.reportId}
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    {currentReport.measurementGroups.map((group, gIdx) => (
-                      <div key={gIdx} className="mb-8 last:mb-0">
-                        {/* Config Header */}
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="h-6 w-1 bg-indigo-500 rounded-full"></div>
-                          <h3 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-tight">
-                            {[
-                              group.config.line,
-                              group.config.table,
-                              group.config.color,
-                            ]
-                              .filter(Boolean)
-                              .join(" / ") || "General Config"}
-                          </h3>
-                          <span
-                            className={`text-[10px] px-2 py-0.5 rounded font-bold text-white shadow-sm ${group.stage === "Before" ? "bg-purple-500" : "bg-teal-500"}`}
-                          >
-                            {group.stageLabel}
+                    <div className="hidden md:block w-px h-8 bg-white/20"></div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                        QC Inspector
+                      </span>
+                      <div className="flex items-center gap-2 mt-1">
+                        {/* QA Photo */}
+                        <div className="w-7 h-7 rounded-full bg-gray-700 border border-gray-500 overflow-hidden flex items-center justify-center shrink-0">
+                          {currentReport.qaFacePhoto ? (
+                            <img
+                              src={resolvePhotoUrl(currentReport.qaFacePhoto)}
+                              alt="QA"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <User className="w-4 h-4 text-gray-400" />
+                          )}
+                        </div>
+                        <div className="flex flex-col leading-tight">
+                          <span className="text-white font-bold text-sm">
+                            {currentReport.qaName}
+                          </span>
+                          <span className="text-[10px] text-indigo-300 font-mono">
+                            ({currentReport.qaId})
                           </span>
                         </div>
-
-                        {/* Config Table */}
-                        <MeasurementGroupTable
-                          group={group}
-                          specsData={specs}
-                          sizeList={sizeList}
-                        />
                       </div>
-                    ))}
+                    </div>
                   </div>
-                )}
+
+                  <a
+                    href={`/fincheck-reports/view/${currentReport.reportId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg transition-colors text-xs font-bold shadow-lg shadow-indigo-900/20 whitespace-nowrap"
+                  >
+                    <FileText className="w-4 h-4" />
+                    View Full Report #{currentReport.reportId}
+                  </a>
+                </div>
+
+                {/* Card Content (Tables) */}
+                <div className="p-5">
+                  {!currentReport.hasMeasurementData ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-gray-400 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                      <AlertCircle className="w-10 h-10 mb-2 opacity-50" />
+                      <p className="text-sm font-bold text-gray-500 dark:text-gray-400">
+                        No Digital Measurement Recorded
+                      </p>
+                      <p className="text-xs mt-1">
+                        For Report #{currentReport.reportId}
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      {currentReport.measurementGroups.map((group, gIdx) => (
+                        <div key={gIdx} className="mb-8 last:mb-0">
+                          {/* Config Header */}
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="h-6 w-1 bg-indigo-500 rounded-full"></div>
+                            <h3 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-tight">
+                              {[
+                                group.config.line,
+                                group.config.table,
+                                group.config.color,
+                              ]
+                                .filter(Boolean)
+                                .join(" / ") || "General Config"}
+                            </h3>
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded font-bold text-white shadow-sm ${group.stage === "Before" ? "bg-purple-500" : "bg-teal-500"}`}
+                            >
+                              {group.stageLabel}
+                            </span>
+                          </div>
+
+                          {/* Config Table */}
+                          <MeasurementGroupTable
+                            group={group}
+                            specsData={specs}
+                            sizeList={sizeList}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+      {/* 8. ADD PROCESSING MODAL HERE */}
+      {isGeneratingPDF && (
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center animate-fadeIn">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl max-w-sm w-full flex flex-col items-center text-center">
+            <div className="relative mb-4">
+              {/* Spinner Animation */}
+              <div className="w-16 h-16 border-4 border-indigo-100 dark:border-indigo-900/50 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+              <FileDown className="absolute inset-0 m-auto w-6 h-6 text-indigo-500" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-1">
+              Generating PDF...
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Fetching all measurement data and compiling tables. This may take
+              a moment.
+            </p>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
