@@ -1073,6 +1073,30 @@ export const approveHumidityReport = async (req, res) => {
   }
 };
 
+// GET /api/humidity-reports/:id
+export const getHumidityReportById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Try standard collection
+    let report = await HumidityReport.findById(id).lean();
+
+    // 2. Fallback to Reitmans collection
+    if (!report) {
+      report = await ReitmansReport.findById(id).lean();
+    }
+
+    if (!report) {
+      return res.status(404).json({ success: false, message: "Report not found" });
+    }
+
+    return res.json({ success: true, data: report });
+  } catch (err) {
+    console.error("Error fetching report by ID:", err);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
 // PUT /api/humidity-reports/:id
 export const updateHumidityReport = async (req, res) => {
   try {
