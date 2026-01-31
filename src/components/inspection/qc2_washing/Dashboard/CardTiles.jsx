@@ -1,48 +1,70 @@
 import React, { useMemo } from "react";
-import { Target, Waves, Layers, ClipboardList, ArrowRight, CheckCircle2, ShieldAlert, Award, Activity, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import {
+  Target,
+  Waves,
+  Layers,
+  ClipboardList,
+  ArrowRight,
+  CheckCircle2,
+  ShieldAlert,
+  Award,
+  Activity,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+} from "lucide-react";
 
-const KpiCard = ({ title, value, icon: Icon, color, subtitle, isStatus = false, trend, percentage }) => {
+const KpiCard = ({
+  title,
+  value,
+  icon: Icon,
+  color,
+  subtitle,
+  isStatus = false,
+  trend,
+  percentage,
+}) => {
   const colors = {
     blue: {
       bg: "bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20",
       icon: "bg-blue-500 text-white shadow-blue-500/25",
       text: "text-blue-600 dark:text-blue-400",
-      border: "border-blue-200 dark:border-blue-800"
+      border: "border-blue-200 dark:border-blue-800",
     },
     green: {
       bg: "bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20",
       icon: "bg-green-500 text-white shadow-green-500/25",
       text: "text-green-600 dark:text-green-400",
-      border: "border-green-200 dark:border-green-800"
+      border: "border-green-200 dark:border-green-800",
     },
     orange: {
       bg: "bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20",
       icon: "bg-orange-500 text-white shadow-orange-500/25",
       text: "text-orange-600 dark:text-orange-400",
-      border: "border-orange-200 dark:border-orange-800"
+      border: "border-orange-200 dark:border-orange-800",
     },
     purple: {
       bg: "bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20",
       icon: "bg-purple-500 text-white shadow-purple-500/25",
       text: "text-purple-600 dark:text-purple-400",
-      border: "border-purple-200 dark:border-purple-800"
+      border: "border-purple-200 dark:border-purple-800",
     },
     rose: {
       bg: "bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-800/20",
       icon: "bg-rose-500 text-white shadow-rose-500/25",
       text: "text-rose-600 dark:text-rose-400",
-      border: "border-rose-200 dark:border-rose-800"
+      border: "border-rose-200 dark:border-rose-800",
     },
     emerald: {
       bg: "bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20",
       icon: "bg-emerald-500 text-white shadow-emerald-500/25",
       text: "text-emerald-600 dark:text-emerald-400",
-      border: "border-emerald-200 dark:border-emerald-800"
-    }
+      border: "border-emerald-200 dark:border-emerald-800",
+    },
   };
 
   const colorScheme = colors[color];
-  
+
   const getTrendIcon = () => {
     if (!trend) return null;
     if (trend > 0) return <TrendingUp size={12} className="text-green-500" />;
@@ -51,25 +73,33 @@ const KpiCard = ({ title, value, icon: Icon, color, subtitle, isStatus = false, 
   };
 
   return (
-    <div className={`relative overflow-hidden bg-white dark:bg-gray-900 p-6 rounded-3xl border ${colorScheme.border} shadow-lg hover:shadow-2xl transition-all duration-300 group hover:-translate-y-1`}>
+    <div
+      className={`relative overflow-hidden bg-white dark:bg-gray-900 p-6 rounded-3xl border ${colorScheme.border} shadow-lg hover:shadow-2xl transition-all duration-300 group hover:-translate-y-1`}
+    >
       {/* Background Pattern */}
       <div className={`absolute inset-0 ${colorScheme.bg} opacity-30`}></div>
-      
+
       {/* Content */}
       <div className="relative z-10">
         {/* Header with Icon */}
         <div className="flex items-start justify-between mb-4">
-          <div className={`p-3 w-12 h-12 rounded-2xl ${colorScheme.icon} flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-lg`}>
+          <div
+            className={`p-3 w-12 h-12 rounded-2xl ${colorScheme.icon} flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-lg`}
+          >
             <Icon size={24} />
           </div>
-          
+
           {/* Trend Indicator */}
           {trend !== undefined && (
-            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
-              trend > 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-              trend < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-              'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
-            }`}>
+            <div
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+                trend > 0
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                  : trend < 0
+                    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                    : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
+              }`}
+            >
               {getTrendIcon()}
               {Math.abs(trend)}%
             </div>
@@ -83,18 +113,22 @@ const KpiCard = ({ title, value, icon: Icon, color, subtitle, isStatus = false, 
 
         {/* Value */}
         <div className="mb-4">
-          <div className={`text-3xl font-black mb-1 transition-colors duration-300 ${
-            isStatus 
-              ? (color === "emerald" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")
-              : "text-gray-800 dark:text-white"
-          }`}>
+          <div
+            className={`text-3xl font-black mb-1 transition-colors duration-300 ${
+              isStatus
+                ? color === "emerald"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-rose-600 dark:text-rose-400"
+                : "text-gray-800 dark:text-white"
+            }`}
+          >
             {value}
           </div>
-          
+
           {/* Percentage Bar for Status Cards */}
           {isStatus && percentage !== undefined && (
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
-              <div 
+              <div
                 className={`h-2 rounded-full transition-all duration-500 ${
                   color === "emerald" ? "bg-emerald-500" : "bg-rose-500"
                 }`}
@@ -103,12 +137,6 @@ const KpiCard = ({ title, value, icon: Icon, color, subtitle, isStatus = false, 
             </div>
           )}
         </div>
-
-        {/* Subtitle */}
-        {/* <div className={`flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl transition-all duration-300 ${colorScheme.bg} ${colorScheme.text} group-hover:scale-105`}>
-          <ArrowRight size={12} className="transition-transform duration-300 group-hover:translate-x-1" />
-          <span>{subtitle}</span>
-        </div> */}
       </div>
 
       {/* Hover Effect Overlay */}
@@ -118,31 +146,52 @@ const KpiCard = ({ title, value, icon: Icon, color, subtitle, isStatus = false, 
 };
 
 // Enhanced Quality Summary Card Component
-const QualitySummaryCard = ({ passReports, failReports, trend, colorScheme }) => {
+const QualitySummaryCard = ({
+  passReports,
+  failReports,
+  trend,
+  colorScheme,
+}) => {
   const totalReports = passReports + failReports;
   const passRate = totalReports > 0 ? (passReports / totalReports) * 100 : 0;
-  
+
   return (
-    <div className={`relative overflow-hidden bg-white dark:bg-gray-900 p-6 rounded-3xl border ${colorScheme.border} shadow-lg hover:shadow-2xl transition-all duration-300 group hover:-translate-y-1`}>
+    <div
+      className={`relative overflow-hidden bg-white dark:bg-gray-900 p-6 rounded-3xl border ${colorScheme.border} shadow-lg hover:shadow-2xl transition-all duration-300 group hover:-translate-y-1`}
+    >
       {/* Background Pattern */}
       <div className={`absolute inset-0 ${colorScheme.bg} opacity-30`}></div>
-      
+
       {/* Content */}
       <div className="relative z-10">
         {/* Header with Icon */}
         <div className="flex items-start justify-between mb-4">
-          <div className={`p-3 w-12 h-12 rounded-2xl ${colorScheme.icon} flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-lg`}>
-            {failReports > 0 ? <ShieldAlert size={24} /> : <CheckCircle2 size={24} />}
+          <div
+            className={`p-3 w-12 h-12 rounded-2xl ${colorScheme.icon} flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-lg`}
+          >
+            {failReports > 0 ? (
+              <ShieldAlert size={24} />
+            ) : (
+              <CheckCircle2 size={24} />
+            )}
           </div>
-          
+
           {/* Trend Indicator */}
           {trend !== undefined && (
-            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
-              trend > 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-              trend < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-              'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
-            }`}>
-              {trend > 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+            <div
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+                trend > 0
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                  : trend < 0
+                    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                    : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
+              }`}
+            >
+              {trend > 0 ? (
+                <TrendingUp size={12} />
+              ) : (
+                <TrendingDown size={12} />
+              )}
               {Math.abs(trend)}%
             </div>
           )}
@@ -160,8 +209,13 @@ const QualitySummaryCard = ({ passReports, failReports, trend, colorScheme }) =>
             {/* Pass Section */}
             <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-xl border border-emerald-200 dark:border-emerald-800">
               <div className="flex items-center gap-2 mb-1">
-                <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
-                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Pass</span>
+                <CheckCircle2
+                  size={14}
+                  className="text-emerald-600 dark:text-emerald-400"
+                />
+                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                  Pass
+                </span>
               </div>
               <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
                 {passReports}
@@ -171,35 +225,20 @@ const QualitySummaryCard = ({ passReports, failReports, trend, colorScheme }) =>
             {/* Fail Section */}
             <div className="bg-rose-50 dark:bg-rose-900/20 p-3 rounded-xl border border-rose-200 dark:border-rose-800">
               <div className="flex items-center gap-2 mb-1">
-                <ShieldAlert size={14} className="text-rose-600 dark:text-rose-400" />
-                <span className="text-xs font-semibold text-rose-700 dark:text-rose-300">Fail</span>
+                <ShieldAlert
+                  size={14}
+                  className="text-rose-600 dark:text-rose-400"
+                />
+                <span className="text-xs font-semibold text-rose-700 dark:text-rose-300">
+                  Fail
+                </span>
               </div>
               <span className="text-xl font-bold text-rose-600 dark:text-rose-400">
                 {failReports}
               </span>
             </div>
           </div>
-
-          {/* Progress Bar */}
-          {/* <div className="mt-3">
-            <div className="flex justify-between text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-              <span>Success Rate</span>
-              <span>{passRate.toFixed(1)}%</span>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div 
-                className="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-500"
-                style={{ width: `${passRate}%` }}
-              ></div>
-            </div>
-          </div> */}
         </div>
-
-        {/* Subtitle */}
-        {/* <div className={`flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl transition-all duration-300 ${colorScheme.bg} ${colorScheme.text} group-hover:scale-105`}>
-          <ArrowRight size={12} className="transition-transform duration-300 group-hover:translate-x-1" />
-          <span>Total: {totalReports} Reports</span>
-        </div> */}
       </div>
 
       {/* Hover Effect Overlay */}
@@ -222,7 +261,11 @@ const CardTiles = ({ reports = [] }) => {
       }
 
       // 2. Resolved Wash Qty logic
-      const resolvedQty = report.actualWashQty ?? report.editedActualWashQty ?? report.washQty ?? 0;
+      const resolvedQty =
+        report.actualWashQty ??
+        report.editedActualWashQty ??
+        report.washQty ??
+        0;
       totalWashQty += resolvedQty;
 
       // 3. Count Pass/Fail Reports
@@ -230,12 +273,19 @@ const CardTiles = ({ reports = [] }) => {
       else if (report.overallFinalResult === "Fail") failReports++;
     });
 
-    const totalPlannedQty = Array.from(skuMap.values()).reduce((a, b) => a + b, 0);
+    const totalPlannedQty = Array.from(skuMap.values()).reduce(
+      (a, b) => a + b,
+      0,
+    );
     const totalReports = reports.length;
-    
-    // Final Status Calculation: (pass / total) * 100
-    const passRatePercent = totalReports > 0 ? (passReports / totalReports) * 100 : 0;
-    const completionRate = totalPlannedQty > 0 ? (totalWashQty / totalPlannedQty) * 100 : 0;
+
+    // FIXED: Calculate fail rate percentage instead of pass rate
+    const failRatePercent =
+      totalReports > 0 ? (failReports / totalReports) * 100 : 0;
+    const passRatePercent =
+      totalReports > 0 ? (passReports / totalReports) * 100 : 0;
+    const completionRate =
+      totalPlannedQty > 0 ? (totalWashQty / totalPlannedQty) * 100 : 0;
 
     return {
       totalPlannedQty,
@@ -245,36 +295,33 @@ const CardTiles = ({ reports = [] }) => {
       completionRate,
       passReports,
       failReports,
-      passRatePercent
+      passRatePercent,
+      failRatePercent, // ADD THIS NEW FIELD
     };
   }, [reports]);
 
   // Color schemes for the quality summary card
-  const qualityColorScheme = stats.failReports > 0 ? {
-    bg: "bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-800/20",
-    icon: "bg-rose-500 text-white shadow-rose-500/25",
-    text: "text-rose-600 dark:text-rose-400",
-    border: "border-rose-200 dark:border-rose-800"
-  } : {
-    bg: "bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20",
-    icon: "bg-emerald-500 text-white shadow-emerald-500/25",
-    text: "text-emerald-600 dark:text-emerald-400",
-    border: "border-emerald-200 dark:border-emerald-800"
-  };
+  const qualityColorScheme =
+    stats.failReports > 0
+      ? {
+          bg: "bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-800/20",
+          icon: "bg-rose-500 text-white shadow-rose-500/25",
+          text: "text-rose-600 dark:text-rose-400",
+          border: "border-rose-200 dark:border-rose-800",
+        }
+      : {
+          bg: "bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20",
+          icon: "bg-emerald-500 text-white shadow-emerald-500/25",
+          text: "text-emerald-600 dark:text-emerald-400",
+          border: "border-emerald-200 dark:border-emerald-800",
+        };
 
   return (
     <section className="max-w-[1600px] mx-auto mb-12">
       {/* Section Header */}
       <div className="flex items-center justify-between mb-8">
-        <div>
-          {/* <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
-            Production Dashboard
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Real-time overview of your production metrics and quality indicators
-          </p> */}
-        </div>
-        
+        <div></div>
+
         {/* Summary Badge */}
         <div className="hidden md:flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-4 py-2 rounded-2xl border border-blue-200 dark:border-blue-800">
           <Activity size={16} className="text-blue-600 dark:text-blue-400" />
@@ -287,63 +334,52 @@ const CardTiles = ({ reports = [] }) => {
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
         {/* 1. Production Target */}
-        <KpiCard 
-          title="Order QTY" 
-          value={stats.totalPlannedQty.toLocaleString()} 
-          icon={Target} 
-          color="blue" 
-          // subtitle="Total Target Quantity"
-          // trend={5.2}
+        <KpiCard
+          title="Order QTY"
+          value={stats.totalPlannedQty.toLocaleString()}
+          icon={Target}
+          color="blue"
         />
 
         {/* 2. Production Progress */}
-        <KpiCard 
-          title="Washed QTY" 
-          value={stats.totalWashQty.toLocaleString()} 
-          icon={Waves} 
-          color="green" 
-          // subtitle={`${stats.completionRate.toFixed(1)}% Completed`}
-          // trend={12.8}
+        <KpiCard
+          title="Washed QTY"
+          value={stats.totalWashQty.toLocaleString()}
+          icon={Waves}
+          color="green"
         />
 
         {/* 3. Stock Balance */}
-        <KpiCard 
-          title="Remaining Balance" 
-          value={stats.remainingQty.toLocaleString()} 
-          icon={Layers} 
-          color="orange" 
-          // subtitle="Units Pending"
-          // trend={-3.4}
+        <KpiCard
+          title="Remaining Balance"
+          value={stats.remainingQty.toLocaleString()}
+          icon={Layers}
+          color="orange"
         />
 
         {/* 4. Batch Count */}
-        <KpiCard 
-          title="Total Inspections" 
-          value={stats.numberOfWashings.toLocaleString()} 
-          icon={ClipboardList} 
-          color="purple" 
-          // subtitle="Reports Generated"
-          // trend={8.1}
+        <KpiCard
+          title="Total Inspections"
+          value={stats.numberOfWashings.toLocaleString()}
+          icon={ClipboardList}
+          color="purple"
         />
 
         {/* 5. Enhanced Quality Summary */}
-        <QualitySummaryCard 
+        <QualitySummaryCard
           passReports={stats.passReports}
           failReports={stats.failReports}
-          // trend={stats.failReports === 0 ? 2.1 : -1.5}
           colorScheme={qualityColorScheme}
         />
 
-        {/* 6. Final Status Rate */}
-        <KpiCard 
-          title="Quality Rate" 
-          value={`${stats.passRatePercent.toFixed(1)}%`} 
-          icon={stats.passRatePercent >= 95.0 ? Award : Activity} 
-          color={stats.passRatePercent >= 95.0 ? "emerald" : "rose"} 
+        {/* 6. FIXED: Final Fail Rate using failRatePercent */}
+        <KpiCard
+          title="Final Fail Rate"
+          value={`${stats.failRatePercent.toFixed(1)}%`}
+          icon={stats.failRatePercent <= 5.0 ? Award : ShieldAlert} // Good if fail rate is low
+          color={stats.failRatePercent <= 5.0 ? "emerald" : "rose"} // Green if low fail rate, red if high
           isStatus={true}
-          // percentage={stats.passRatePercent}
-          // subtitle={stats.passRatePercent >= 95.0 ? "Excellent Performance" : "Needs Improvement"}
-          // trend={stats.passRatePercent >= 95.0 ? 1.2 : -2.8}
+          // percentage={stats.failRatePercent} // Show fail rate percentage in progress bar
         />
       </div>
 
@@ -355,8 +391,12 @@ const CardTiles = ({ reports = [] }) => {
               <Target size={20} className="text-white" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">Production Efficiency</p>
-              <p className="text-lg font-bold text-blue-800 dark:text-blue-300">{stats.completionRate.toFixed(1)}%</p>
+              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                Completed Wash Rate
+              </p>
+              <p className="text-lg font-bold text-blue-800 dark:text-blue-300">
+                {stats.completionRate.toFixed(1)}%
+              </p>
             </div>
           </div>
         </div>
@@ -367,8 +407,12 @@ const CardTiles = ({ reports = [] }) => {
               <CheckCircle2 size={20} className="text-white" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-green-600 dark:text-green-400">Quality Score</p>
-              <p className="text-lg font-bold text-green-800 dark:text-green-300">{stats.passRatePercent.toFixed(1)}%</p>
+              <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                Overall Pass Rate
+              </p>
+              <p className="text-lg font-bold text-green-800 dark:text-green-300">
+                {stats.passRatePercent.toFixed(1)}%
+              </p>
             </div>
           </div>
         </div>
@@ -379,8 +423,12 @@ const CardTiles = ({ reports = [] }) => {
               <Activity size={20} className="text-white" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-purple-600 dark:text-purple-400">Active Reports</p>
-              <p className="text-lg font-bold text-purple-800 dark:text-purple-300">{stats.numberOfWashings}</p>
+              <p className="text-sm font-semibold text-purple-600 dark:text-purple-400">
+                Active Reports
+              </p>
+              <p className="text-lg font-bold text-purple-800 dark:text-purple-300">
+                {stats.numberOfWashings}
+              </p>
             </div>
           </div>
         </div>
