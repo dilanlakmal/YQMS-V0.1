@@ -11,15 +11,15 @@ const SkuQualityMatrices = ({ dbData }) => {
           <h3 className="text-xl font-black flex items-center gap-3 text-slate-800 dark:text-white uppercase">
             <Ruler className="text-blue-600" /> Measurement Accuracy Matrix
           </h3>
-          <span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-3 py-1 rounded-full uppercase tracking-widest">
+          <span className="text-sm font-bold bg-blue-50 text-blue-600 px-3 py-1 rounded-full uppercase tracking-widest">
             Worst Performing SKUs
           </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 dark:border-gray-800">
-                <th className="pb-4">Style / Order No</th>
+              <tr className="text-slate-400 text-smfont-black uppercase tracking-widest border-b border-slate-100 dark:border-gray-800">
+                <th className="pb-4">Style No</th>
                 <th className="pb-4">Order Qty</th>
                 <th className="pb-4">Colorway</th>
                 <th className="pb-4 text-center">Reports</th>
@@ -68,15 +68,15 @@ const SkuQualityMatrices = ({ dbData }) => {
           <h3 className="text-xl font-black flex items-center gap-3 text-slate-800 dark:text-white uppercase">
             <AlertTriangle className="text-rose-600" /> Defect Severity Matrix
           </h3>
-          <span className="text-[10px] font-bold bg-rose-50 text-rose-600 px-3 py-1 rounded-full uppercase tracking-widest">
-            SKU Performance
+          <span className="text-sm font-bold bg-rose-50 text-rose-600 px-3 py-1 rounded-full uppercase tracking-widest">
+           Performance
           </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 dark:border-gray-800">
-                <th className="pb-4">Style / Order No</th>
+              <tr className="text-slate-400 text-sm font-black uppercase tracking-widest border-b border-slate-100 dark:border-gray-800">
+                <th className="pb-4">Style No</th>
                 <th className="pb-4">Colorway</th>
                 <th className="pb-4 text-center">Total Defects</th>
                 <th className="pb-4 text-right">Defect Rate (%)</th> {/* Changed Label */}

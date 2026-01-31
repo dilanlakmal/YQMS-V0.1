@@ -11,6 +11,7 @@ import ProductionCharts from "./ProductionCharts";
 import AnalyticsTables from "./AnalyticsTables";
 import QualityMatrices from "./QualityMetrics"; 
 import SizeMeasurementTable from "./SizeMeasurementTable";
+import FactoryDefectTable from "./FactoryDefectTable";
 
 const QCWashingDashboard = ({ onBack }) => {
   const [loading, setLoading] = useState(false);
@@ -83,6 +84,8 @@ const QCWashingDashboard = ({ onBack }) => {
       {/* Main Content - Lower z-index */}
       <div className="relative z-10">
         <CardTiles reports={dbData?.reports || []} />
+
+        <FactoryDefectTable data={dbData?.factoryDefectSummary || []} />
         
         <QualityInsights dbData={dbData} />
         

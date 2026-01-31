@@ -103,12 +103,6 @@ const KpiCard = ({ title, value, icon: Icon, color, subtitle, isStatus = false, 
             </div>
           )}
         </div>
-
-        {/* Subtitle */}
-        {/* <div className={`flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl transition-all duration-300 ${colorScheme.bg} ${colorScheme.text} group-hover:scale-105`}>
-          <ArrowRight size={12} className="transition-transform duration-300 group-hover:translate-x-1" />
-          <span>{subtitle}</span>
-        </div> */}
       </div>
 
       {/* Hover Effect Overlay */}
@@ -179,27 +173,7 @@ const QualitySummaryCard = ({ passReports, failReports, trend, colorScheme }) =>
               </span>
             </div>
           </div>
-
-          {/* Progress Bar */}
-          {/* <div className="mt-3">
-            <div className="flex justify-between text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-              <span>Success Rate</span>
-              <span>{passRate.toFixed(1)}%</span>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div 
-                className="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-500"
-                style={{ width: `${passRate}%` }}
-              ></div>
-            </div>
-          </div> */}
         </div>
-
-        {/* Subtitle */}
-        {/* <div className={`flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl transition-all duration-300 ${colorScheme.bg} ${colorScheme.text} group-hover:scale-105`}>
-          <ArrowRight size={12} className="transition-transform duration-300 group-hover:translate-x-1" />
-          <span>Total: {totalReports} Reports</span>
-        </div> */}
       </div>
 
       {/* Hover Effect Overlay */}
@@ -233,7 +207,8 @@ const CardTiles = ({ reports = [] }) => {
     const totalPlannedQty = Array.from(skuMap.values()).reduce((a, b) => a + b, 0);
     const totalReports = reports.length;
     
-    // Final Status Calculation: (pass / total) * 100
+    // FIXED: Calculate fail rate percentage instead of pass rate
+    const failRatePercent = totalReports > 0 ? (failReports / totalReports) * 100 : 0;
     const passRatePercent = totalReports > 0 ? (passReports / totalReports) * 100 : 0;
     const completionRate = totalPlannedQty > 0 ? (totalWashQty / totalPlannedQty) * 100 : 0;
 
@@ -245,7 +220,8 @@ const CardTiles = ({ reports = [] }) => {
       completionRate,
       passReports,
       failReports,
-      passRatePercent
+      passRatePercent,
+      failRatePercent // ADD THIS NEW FIELD
     };
   }, [reports]);
 
@@ -266,14 +242,7 @@ const CardTiles = ({ reports = [] }) => {
     <section className="max-w-[1600px] mx-auto mb-12">
       {/* Section Header */}
       <div className="flex items-center justify-between mb-8">
-        <div>
-          {/* <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
-            Production Dashboard
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Real-time overview of your production metrics and quality indicators
-          </p> */}
-        </div>
+        <div></div>
         
         {/* Summary Badge */}
         <div className="hidden md:flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-4 py-2 rounded-2xl border border-blue-200 dark:border-blue-800">
@@ -292,8 +261,6 @@ const CardTiles = ({ reports = [] }) => {
           value={stats.totalPlannedQty.toLocaleString()} 
           icon={Target} 
           color="blue" 
-          // subtitle="Total Target Quantity"
-          // trend={5.2}
         />
 
         {/* 2. Production Progress */}
@@ -302,8 +269,6 @@ const CardTiles = ({ reports = [] }) => {
           value={stats.totalWashQty.toLocaleString()} 
           icon={Waves} 
           color="green" 
-          // subtitle={`${stats.completionRate.toFixed(1)}% Completed`}
-          // trend={12.8}
         />
 
         {/* 3. Stock Balance */}
@@ -312,8 +277,6 @@ const CardTiles = ({ reports = [] }) => {
           value={stats.remainingQty.toLocaleString()} 
           icon={Layers} 
           color="orange" 
-          // subtitle="Units Pending"
-          // trend={-3.4}
         />
 
         {/* 4. Batch Count */}
@@ -322,28 +285,23 @@ const CardTiles = ({ reports = [] }) => {
           value={stats.numberOfWashings.toLocaleString()} 
           icon={ClipboardList} 
           color="purple" 
-          // subtitle="Reports Generated"
-          // trend={8.1}
         />
 
         {/* 5. Enhanced Quality Summary */}
         <QualitySummaryCard 
           passReports={stats.passReports}
           failReports={stats.failReports}
-          // trend={stats.failReports === 0 ? 2.1 : -1.5}
           colorScheme={qualityColorScheme}
         />
 
-        {/* 6. Final Status Rate */}
+        {/* 6. FIXED: Final Fail Rate using failRatePercent */}
         <KpiCard 
-          title="Quality Rate" 
-          value={`${stats.passRatePercent.toFixed(1)}%`} 
-          icon={stats.passRatePercent >= 95.0 ? Award : Activity} 
-          color={stats.passRatePercent >= 95.0 ? "emerald" : "rose"} 
+          title="Final Fail Rate" 
+          value={`${stats.failRatePercent.toFixed(1)}%`} 
+          icon={stats.failRatePercent <= 5.0 ? Award : ShieldAlert} // Good if fail rate is low
+          color={stats.failRatePercent <= 5.0 ? "emerald" : "rose"} // Green if low fail rate, red if high
           isStatus={true}
-          // percentage={stats.passRatePercent}
-          // subtitle={stats.passRatePercent >= 95.0 ? "Excellent Performance" : "Needs Improvement"}
-          // trend={stats.passRatePercent >= 95.0 ? 1.2 : -2.8}
+          // percentage={stats.failRatePercent} // Show fail rate percentage in progress bar
         />
       </div>
 

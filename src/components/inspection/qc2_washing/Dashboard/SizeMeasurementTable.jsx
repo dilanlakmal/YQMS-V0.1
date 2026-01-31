@@ -85,7 +85,7 @@ const SizeMeasurementTable = ({ data = [] }) => {
 
       <div className="overflow-hidden">
         {/* Table Header */}
-        <div className="grid grid-cols-12 px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-gray-800 mb-4">
+        <div className="grid grid-cols-12 px-6 py-3 text-sm font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-gray-800 mb-4">
           <div className="col-span-4">Production Item</div>
           <div className="col-span-1 text-center">Pcs</div>
           <div className="col-span-1 text-center">Points</div>

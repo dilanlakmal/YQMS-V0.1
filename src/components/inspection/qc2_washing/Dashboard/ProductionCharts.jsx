@@ -5,7 +5,7 @@ import { TrendingUp, Percent } from "lucide-react";
 const ProductionCharts = ({ dbData, summary }) => (
   <div className="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
     <div className="lg:col-span-8 bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-gray-800">
-      <h3 className="text-xl font-black mb-8 flex items-center gap-3 text-slate-800 dark:text-white"><TrendingUp className="text-blue-600" /> PRODUCTION TREND</h3>
+      <h3 className="text-xl font-black mb-8 flex items-center gap-3 text-slate-800 dark:text-white"><TrendingUp className="text-blue-600" /> DAILY WASHING QTY TREND</h3>
       <div className="h-[400px]">
         {dbData && <Line 
           data={{

@@ -246,6 +246,89 @@ export const getWashingDashboardData = async (req, res) => {
     { $sort: { orderNo: 1, color: 1, size: 1 } }
 ]);
 
+const factoryDefectSummary = await QCWashing.aggregate([
+  { $match: query },
+  // 1. Only look at reports that actually have defect records
+  { 
+    $match: { 
+      "defectDetails.defectsByPc": { $exists: true, $not: { $size: 0 } } 
+    } 
+  },
+  { $unwind: "$defectDetails.defectsByPc" },
+  { $unwind: "$defectDetails.defectsByPc.pcDefects" },
+  {
+    $group: {
+      _id: {
+        factory: { $ifNull: ["$factoryName", "Unknown"] },
+        defect: "$defectDetails.defectsByPc.pcDefects.defectName",
+        // Group by report ID and pcNumber to identify a UNIQUE piece
+        reportId: "$_id",
+        pcNum: "$defectDetails.defectsByPc.pcNumber"
+      },
+      // Sum the quantities of this defect found on this specific piece
+      qtyOnThisPiece: { $sum: "$defectDetails.defectsByPc.pcDefects.defectQty" }
+    }
+  },
+  {
+    $group: {
+      _id: {
+        factory: "$_id.factory",
+        defect: "$_id.defect"
+      },
+      totalQty: { $sum: "$qtyOnThisPiece" },
+      // Count how many unique piece entries were in the previous group
+      totalPcs: { $sum: 1 } 
+    }
+  },
+  { $sort: { totalQty: -1 } }
+]);
+
+const pointFailureSummary = await QCWashing.aggregate([
+  { $match: query },
+  { $unwind: "$measurementDetails.measurement" },
+  { $unwind: "$measurementDetails.measurement.pcs" },
+  { $unwind: "$measurementDetails.measurement.pcs.measurementPoints" },
+  { 
+    $match: { 
+      "measurementDetails.measurement.pcs.measurementPoints.result": "fail" 
+    } 
+  },
+  {
+    $group: {
+      _id: "$measurementDetails.measurement.pcs.measurementPoints.pointName",
+      // Total Fails
+      totalFail: { $sum: 1 },
+      // Count Plus Fails: value > tolerancePlus
+      plusFail: {
+        $sum: {
+          $cond: [
+            { $gt: [
+              "$measurementDetails.measurement.pcs.measurementPoints.measured_value_decimal",
+              "$measurementDetails.measurement.pcs.measurementPoints.tolerancePlus"
+            ]},
+            1, 0
+          ]
+        }
+      },
+      // Count Minus Fails: value < toleranceMinus
+      minusFail: {
+        $sum: {
+          $cond: [
+            { $lt: [
+              "$measurementDetails.measurement.pcs.measurementPoints.measured_value_decimal",
+              "$measurementDetails.measurement.pcs.measurementPoints.toleranceMinus"
+            ]},
+            1, 0
+          ]
+        }
+      },
+      affectedSizes: { $addToSet: "$measurementDetails.measurement.size" }
+    }
+  },
+  { $sort: { totalFail: -1 } }
+]);
+
+
     const reports = await QCWashing.find(query).sort({ date: -1 });
 
     res.status(200).json({
@@ -264,6 +347,8 @@ export const getWashingDashboardData = async (req, res) => {
       defectSummary,
       measurementSummary,
       skuSizeMeasurementSummary,
+      factoryDefectSummary,
+      pointFailureSummary,
       trendData,
       filterOptions: filterOptions[0] || {},
       passRateByOrder, 
