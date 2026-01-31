@@ -71,7 +71,7 @@ export const transformReitmansHistory = (payload) => {
 };
 
 // Helper to get Reitmans reports based on query
-export const getReitmansReports = async (query, limit = 1000) => {
+export const getReitmansReports = async (query, limit = 1000, summaryOnly = true) => {
   const q = ReitmansReport.find(query).sort({ createdAt: -1 });
   if (limit && Number(limit) > 0) q.limit(Number(limit));
   return q.exec();

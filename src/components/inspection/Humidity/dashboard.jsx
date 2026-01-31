@@ -171,6 +171,7 @@ export default function Dashboard() {
   const [ordersRaw, setOrdersRaw] = useState([]);
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
+    d.setDate(d.getDate() - 30);
     return d.toISOString().slice(0, 10);
   });
   const [endDate, setEndDate] = useState(() => {
@@ -198,7 +199,7 @@ export default function Dashboard() {
           API_BASE_URL && API_BASE_URL !== ""
             ? API_BASE_URL.replace(/\/$/, "")
             : "";
-        const url = `${base}/api/humidity-reports?limit=0`;
+        const url = `${base}/api/humidity-reports?limit=500`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
         const json = await res.json();
