@@ -44,6 +44,8 @@ export const getInspectionReports = async (req, res) => {
       buyer,
       supplier,
       poLine,
+      qaStatus,
+      leaderDecision,
       page = 1,
       limit = 200,
     } = req.query;
@@ -61,6 +63,70 @@ export const getInspectionReports = async (req, res) => {
             .map((s) => s.trim())
             .filter(Boolean)
         : [];
+
+    // ---------------------------------------------------------
+    // 1. NEW: QA Status Filter
+    // ---------------------------------------------------------
+    const qaStatusList = parseList(qaStatus);
+    if (qaStatusList.length > 0 && !qaStatusList.includes("All")) {
+      const statusConditions = [];
+
+      if (qaStatusList.includes("Pending")) {
+        statusConditions.push("draft", "in_progress");
+      }
+      if (qaStatusList.includes("Completed")) {
+        statusConditions.push("completed");
+      }
+
+      if (statusConditions.length > 0) {
+        query.status = { $in: statusConditions };
+      }
+    }
+
+    // ---------------------------------------------------------
+    // 2. NEW: Leader Decision Filter (Complex Logic)
+    // ---------------------------------------------------------
+    const decisionList = parseList(leaderDecision);
+    if (decisionList.length > 0 && !decisionList.includes("All")) {
+      const decisionOrConditions = [];
+
+      // A. "Approved", "Rework", "Rejected" -> Exist in Decision Collection
+      const specificDecisions = decisionList.filter((d) =>
+        ["Approved", "Rework", "Rejected"].includes(d),
+      );
+
+      if (specificDecisions.length > 0) {
+        const matchingDecisions = await FincheckInspectionDecision.find({
+          decisionStatus: { $in: specificDecisions },
+        }).distinct("reportId");
+
+        decisionOrConditions.push({ reportId: { $in: matchingDecisions } });
+      }
+
+      // B. "Pending" -> QA Completed BUT No Decision Document
+      if (decisionList.includes("Pending")) {
+        // Get ALL existing decision report IDs
+        const allDecisionIds =
+          await FincheckInspectionDecision.find().distinct("reportId");
+
+        decisionOrConditions.push({
+          status: "completed",
+          reportId: { $nin: allDecisionIds },
+        });
+      }
+
+      // C. "Pending QA" -> QA Status is NOT completed
+      if (decisionList.includes("Pending QA")) {
+        decisionOrConditions.push({
+          status: { $ne: "completed" },
+        });
+      }
+
+      // Apply to main Query using $and + $or to ensure strict filtering
+      if (decisionOrConditions.length > 0) {
+        query.$and = [...(query.$and || []), { $or: decisionOrConditions }];
+      }
+    }
 
     // --- PO Line Filter Logic ---
     if (poLine) {

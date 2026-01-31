@@ -1041,14 +1041,16 @@ const YPivotQAReportMain = () => {
     reportId: "",
     // CHANGED TO ARRAYS
     reportType: [],
-    orderType: "All", // Kept single as it has fixed small enum options
+    orderType: "All",
     orderNo: [],
     productType: [],
     empId: [],
     subConFactory: [],
     custStyle: [],
     buyer: [],
-    supplier: [], // Optional: Changed to array if you want supplier multi-select too
+    supplier: [],
+    qaStatus: [],
+    leaderDecision: [],
     poLines: [],
   });
 
@@ -1060,6 +1062,12 @@ const YPivotQAReportMain = () => {
     buyers: [],
     suppliers: [],
   });
+
+  // Static Options for the new filters
+  const staticFilterOptions = {
+    qaStatus: ["Pending", "Completed"],
+    leaderDecision: ["Pending QA", "Pending", "Approved", "Rework", "Rejected"],
+  };
 
   // Product Image Modal State
   const [previewImage, setPreviewImage] = useState(null);
@@ -1371,16 +1379,18 @@ const YPivotQAReportMain = () => {
       startDate: new Date().toISOString().split("T")[0],
       endDate: new Date().toISOString().split("T")[0],
       reportId: "",
-      reportType: [], // Array
+      reportType: [],
       orderType: "All",
-      orderNo: [], // Array
-      productType: [], // Array
-      empId: [], // Array
-      subConFactory: [], // Array
-      custStyle: [], // Array
-      buyer: [], // Array
-      supplier: [], // Array
-      poLines: [], // Array
+      orderNo: [],
+      productType: [],
+      empId: [],
+      subConFactory: [],
+      custStyle: [],
+      buyer: [],
+      supplier: [],
+      qaStatus: [],
+      leaderDecision: [],
+      poLines: [],
     });
   };
 
@@ -1402,6 +1412,8 @@ const YPivotQAReportMain = () => {
       custStyle: [],
       buyer: [],
       supplier: [],
+      qaStatus: [],
+      leaderDecision: [],
       poLines: [],
     });
   };
@@ -1844,6 +1856,31 @@ const YPivotQAReportMain = () => {
                   staticOptions={options.subConFactories}
                 />
               </FilterWrapper>
+              {/* --- NEW: QA Status (Mobile/Tablet Only - Hidden on XL) --- */}
+              <div className="xl:hidden">
+                <FilterWrapper label="QA Status" icon={CheckCircle2}>
+                  <MultiSelectAutocomplete
+                    selectedItems={filters.qaStatus}
+                    onChange={(val) => handleFilterChange("qaStatus", val)}
+                    placeholder="Select Status..."
+                    staticOptions={staticFilterOptions.qaStatus}
+                  />
+                </FilterWrapper>
+              </div>
+
+              {/* --- NEW: Leader Decision (Mobile/Tablet Only - Hidden on LG) --- */}
+              <div className="lg:hidden">
+                <FilterWrapper label="Leader Decision" icon={User}>
+                  <MultiSelectAutocomplete
+                    selectedItems={filters.leaderDecision}
+                    onChange={(val) =>
+                      handleFilterChange("leaderDecision", val)
+                    }
+                    placeholder="Select Decision..."
+                    staticOptions={staticFilterOptions.leaderDecision}
+                  />
+                </FilterWrapper>
+              </div>
             </div>
 
             {/* Mobile Action Buttons */}
@@ -1890,6 +1927,24 @@ const YPivotQAReportMain = () => {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3 flex-1 justify-end min-w-0">
+              <div className="hidden xl:block w-[160px]">
+                <MultiSelectAutocomplete
+                  selectedItems={filters.qaStatus}
+                  onChange={(val) => handleFilterChange("qaStatus", val)}
+                  placeholder="QA Status..."
+                  staticOptions={staticFilterOptions.qaStatus}
+                />
+              </div>
+
+              {/* --- NEW: Leader Decision (Desktop Only) --- */}
+              <div className="hidden lg:block w-[180px]">
+                <MultiSelectAutocomplete
+                  selectedItems={filters.leaderDecision}
+                  onChange={(val) => handleFilterChange("leaderDecision", val)}
+                  placeholder="Leader Decision..."
+                  staticOptions={staticFilterOptions.leaderDecision}
+                />
+              </div>
               {/* --- NEW PO LINE FILTER --- */}
               <div className="w-full max-w-[140px] sm:max-w-[250px]">
                 <MultiSelectAutocomplete
