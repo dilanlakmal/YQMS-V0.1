@@ -311,28 +311,40 @@ const FormPage = () => {
                 try {
                     const detectRibsAvailable = (ord) => {
                         if (!ord) return false;
-                        // Check for explicit flags (truthy check to handle string "true" or number 1)
-                        if (ord.hasRibs === true || ord.hasRibs === 'true' || ord.hasRibs === 1) return true;
-                        if (ord.ribsRequired === true || ord.ribsRequired === 'true' || ord.ribsRequired === 1) return true;
+
+                        // Check for explicit flags (truthy check)
+                        const hasRibsVal = ord.hasRibs === true || ord.hasRibs === 'true' || ord.hasRibs === 1;
+                        const ribsReqVal = ord.ribsRequired === true || ord.ribsRequired === 'true' || ord.ribsRequired === 1;
+                        if (hasRibsVal || ribsReqVal) return true;
+
+                        // Check for explicit 'false' or '0' values to override keyword detection
+                        const noRibsVal = ord.hasRibs === false || ord.hasRibs === 'false' || ord.hasRibs === 0 || ord.hasRibs === '0';
+                        const noRibsReqVal = ord.ribsRequired === false || ord.ribsRequired === 'false' || ord.ribsRequired === 0 || ord.ribsRequired === '0';
+                        if (noRibsVal || noRibsReqVal) return false;
 
                         // Check explicit RibContent array from YorksysOrders
                         if (Array.isArray(ord.RibContent) && ord.RibContent.length > 0) {
                             if (ord.RibContent.some(rc => rc.fabricName || rc.percentageValue)) return true;
                         }
 
-                        // Targeted string search in descriptive fields
+                        // Targeted string search in descriptive fields using regex for better accuracy
+                        // This avoids matches like "RIBBON" (matches rib but not the garment component)
                         const searchFields = [
                             ord.style,
                             ord.factoryStyleName,
                             ord.description,
                             ord.fabrication,
                             ...(Array.isArray(ord.FabricContent) ? ord.FabricContent.map(f => f.fabricName || f.fabric || '') : []),
-                            ...(Array.isArray(ord.RibContent) ? ord.RibContent.map(f => f.fabricName || f.fabric || '') : []),
-                            ...(Array.isArray(ord.SKUData) ? ord.SKUData.map(s => s.Color || '') : [])
+                            ...(Array.isArray(ord.RibContent) ? ord.RibContent.map(f => f.fabricName || f.fabric || '') : [])
                         ];
 
+                        // Regex to match "rib" or "ribs" as a whole word or with specific suffixes
+                        // Matches: "rib", "ribs", "rib-knit", "1x1 rib", "ribbed"
+                        // Does NOT match: "ribbon"
+                        const ribRegex = /\brib(s|bed)?\b/i;
+
                         if (searchFields.some(field =>
-                            field && String(field).toLowerCase().includes('rib')
+                            field && ribRegex.test(String(field).toLowerCase())
                         )) return true;
 
                         // Check SKUData for actual Ribs measurements
@@ -347,7 +359,7 @@ const FormPage = () => {
                         // Check FabricContent for ribs-specific metadata
                         if (Array.isArray(ord.FabricContent) && ord.FabricContent.some(fc =>
                             (fc.ribs !== undefined && fc.ribs !== null && String(fc.ribs).trim() !== '') ||
-                            (fc.fabricName && String(fc.fabricName).toLowerCase().includes('rib'))
+                            (fc.fabricName && ribRegex.test(String(fc.fabricName).toLowerCase()))
                         )) return true;
 
                         return false;
@@ -563,10 +575,11 @@ const FormPage = () => {
                 setCheckHistory(history);
                 if (firstCreatedAt) setFirstCheckDate(firstCreatedAt);
 
-                // Auto-detect ribs from history only if they have actual values
+                // Auto-detect ribs from history only if they have actual values or spec
                 const hasRibsInHistory = reports.some(r => {
-                    if (r.ribsAvailable === true) return true;
-                    if (r.aquaboySpecRibs && r.aquaboySpecRibs.toString().trim() !== '' && r.aquaboySpecRibs !== '0') return true;
+                    // Verifying if there's actual data or spec, not just the flag
+                    const hasSpec = r.aquaboySpecRibs && r.aquaboySpecRibs.toString().trim() !== '' && r.aquaboySpecRibs !== '0';
+                    if (hasSpec) return true;
 
                     if (r.history && typeof r.history === 'object') {
                         return Object.values(r.history).some(itemChecks => {
@@ -994,6 +1007,10 @@ const FormPage = () => {
             newErrors.aquaboySpecBody = 'Upper Centisimal index is required';
         }
 
+        if (ribsAvailable && !formData.aquaboySpecRibs?.trim()) {
+            newErrors.aquaboySpecRibs = 'Ribs spec is required';
+        }
+
         // Only require dry room times for non-Reitmans flows
         if (!isReitmans) {
             // In New mode (Before Dry Room)
@@ -1008,6 +1025,37 @@ const FormPage = () => {
                     newErrors.afterDryRoomTime = 'After dry room time is required';
                 }
             }
+        }
+
+        // Check all inspection records for required readings
+        let readingsMissing = false;
+        formData.inspectionRecords.forEach((record, index) => {
+            ['top', 'middle', 'bottom'].forEach(section => {
+                if (!record[section].body || record[section].body.toString().trim() === '') {
+                    readingsMissing = true;
+                }
+                if (ribsAvailable && (!record[section].ribs || record[section].ribs.toString().trim() === '')) {
+                    readingsMissing = true;
+                }
+            });
+
+            // If Pre-Final or Final, check additional readings too
+            if (formData.inspectionType === 'Pre-Final' || formData.inspectionType === 'Final') {
+                ['top', 'middle', 'bottom'].forEach(addSec => {
+                    const addBody = record.additional?.[addSec]?.body;
+                    const addRibs = record.additional?.[addSec]?.ribs;
+                    if (!addBody || addBody.toString().trim() === '') {
+                        readingsMissing = true;
+                    }
+                    if (ribsAvailable && (!addRibs || addRibs.toString().trim() === '')) {
+                        readingsMissing = true;
+                    }
+                });
+            }
+        });
+
+        if (readingsMissing) {
+            newErrors.readings = 'All inspection readings (Body and Ribs) are required';
         }
 
         setErrors(newErrors);
@@ -1096,7 +1144,21 @@ const FormPage = () => {
         console.log('[DEBUG] handleSubmit triggered. Current formData:', JSON.stringify(formData, (key, value) => key === 'images' ? `[${value?.length || 0} images]` : value, 2));
 
         if (!validateForm()) {
-            setMessage({ type: 'error', text: 'Please fill in all required fields' });
+            if (errors.readings) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Missing Readings',
+                    text: 'Please complete all Top, Middle, and Bottom readings (Body and Ribs) before submitting.',
+                    confirmButtonColor: '#3085d6'
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Validation Failed',
+                    text: 'Please fill in all required fields marked with *',
+                    confirmButtonColor: '#d33'
+                });
+            }
             return;
         }
 
@@ -1618,11 +1680,11 @@ const FormPage = () => {
                                                         type="text"
                                                         value={formData.aquaboySpecBody}
                                                         onChange={(e) => setFormData(prev => ({ ...prev, aquaboySpecBody: e.target.value }))}
-                                                        className={`w-full px-4 py-1 bg-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors ${errors.aquaboySpecBody ? 'text-blue-700' : 'text-blue-900'}`}
+                                                        className={`w-full px-4 py-1 bg-transparent rounded-md focus:outline-none focus:ring-2 transition-colors ${errors.aquaboySpecBody ? 'text-blue-700 bg-red-50 ring-1 ring-red-200' : 'text-blue-900 focus:ring-blue-400'}`}
                                                         placeholder=""
                                                         required
                                                         aria-required="true"
-                                                        disabled={true}
+                                                        disabled={!formData.factoryStyleNo}
                                                     />
                                                     <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
                                                         <span className="text-gray-400 text-sm">% RH</span>
@@ -1795,6 +1857,7 @@ const FormPage = () => {
                                                         className="rounded-lg bg-white p-3 w-full">
                                                         <h4 className="font-bold capitalize text-gray-700 text-base text-start mb-1">
                                                             {section}
+                                                            <span className="text-red-500 ml-1">*</span>
                                                         </h4>
 
                                                         {/* Make each row a single column full width */}
@@ -1802,14 +1865,16 @@ const FormPage = () => {
                                                             {/* Body Reading + Status */}
                                                             <div className="flex flex-1 items-center gap-2 w-full">
                                                                 <div className="flex-1">
+
                                                                     <input
                                                                         id={`body-${index}-${section}-body`}
                                                                         type="number"
                                                                         value={record[section].body}
                                                                         onChange={(e) => handleReadingInput(index, section, 'body', e.target.value)}
                                                                         placeholder="Body"
-                                                                        className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                                                        disabled={!formData.factoryStyleNo}
+                                                                        className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.readings && (!record[section].body || record[section].body.toString().trim() === '') ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-300 focus:ring-blue-500'}`}
+                                                                        disabled={!formData.factoryStyleNo || !formData.aquaboySpecBody}
+                                                                        required
                                                                     />
                                                                 </div>
                                                                 {record[section].bodyPass ? (
@@ -1840,8 +1905,9 @@ const FormPage = () => {
                                                                             value={record[section].ribs}
                                                                             onChange={(e) => handleReadingInput(index, section, 'ribs', e.target.value)}
                                                                             placeholder="Ribs"
-                                                                            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                                                            disabled={!formData.factoryStyleNo}
+                                                                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.readings && (!record[section].ribs || record[section].ribs.toString().trim() === '') ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-300 focus:ring-blue-500'}`}
+                                                                            disabled={!formData.factoryStyleNo || !formData.aquaboySpecRibs}
+                                                                            required
                                                                         />
                                                                     </div>
                                                                     {record[section].ribsPass ? (
@@ -2027,7 +2093,10 @@ const FormPage = () => {
                                                     <div className="space-y-6 ">
                                                         {['top', 'middle', 'bottom'].map(addSec => (
                                                             <div key={addSec} className="w-full">
-                                                                <h4 className="font-bold capitalize text-gray-700 text-base text-start mb-1">{addSec}</h4>
+                                                                <h4 className="font-bold capitalize text-gray-700 text-base text-start mb-1">
+                                                                    {addSec}
+                                                                    <span className="text-red-500 ml-1">*</span>
+                                                                </h4>
                                                                 <div className="flex flex-col md:flex-row gap-4 w-full items-center">
                                                                     {/* Body Reading + Status */}
                                                                     <div className="flex flex-1 items-center gap-2 w-full">
@@ -2038,8 +2107,9 @@ const FormPage = () => {
                                                                                 value={record.additional?.[addSec]?.body || ''}
                                                                                 onChange={(e) => handleAdditionalReadingInput(recIdx, addSec, 'body', e.target.value)}
                                                                                 placeholder="Body"
-                                                                                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                                                                disabled={!formData.factoryStyleNo}
+                                                                                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.readings && (!record.additional?.[addSec]?.body || record.additional?.[addSec]?.body.toString().trim() === '') ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-300 focus:ring-blue-500'}`}
+                                                                                disabled={!formData.factoryStyleNo || !formData.aquaboySpecBody}
+                                                                                required
                                                                             />
                                                                         </div>
                                                                         {record.additional?.[addSec]?.bodyPass ? (
@@ -2070,8 +2140,9 @@ const FormPage = () => {
                                                                                     value={record.additional?.[addSec]?.ribs || ''}
                                                                                     onChange={(e) => handleAdditionalReadingInput(recIdx, addSec, 'ribs', e.target.value)}
                                                                                     placeholder="Ribs"
-                                                                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                                                                    disabled={!formData.factoryStyleNo}
+                                                                                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.readings && (!record.additional?.[addSec]?.ribs || record.additional?.[addSec]?.ribs.toString().trim() === '') ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-300 focus:ring-blue-500'}`}
+                                                                                    disabled={!formData.factoryStyleNo || !formData.aquaboySpecRibs}
+                                                                                    required
                                                                                 />
                                                                             </div>
                                                                             {record.additional?.[addSec]?.ribsPass ? (
