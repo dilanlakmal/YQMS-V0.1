@@ -190,7 +190,7 @@ const MeasurementGroupTable = ({ group, specsData, sizeList }) => {
                 return (
                   <tr key={spec.id} className={rowClass}>
                     <td
-                      className={`p-2 border-r border-gray-200 dark:border-gray-700 sticky left-0 z-10 shadow-[1px_0_2px_-1px_rgba(0,0,0,0.1)] ${stickyCellClass}`}
+                      className={`p-2 border-r border-b border-gray-200 dark:border-gray-700 sticky left-0 z-10 shadow-[1px_0_2px_-1px_rgba(0,0,0,0.1)] ${stickyCellClass}`}
                     >
                       <div className="flex flex-col">
                         <span className="font-medium text-gray-700 dark:text-gray-300 leading-tight">
@@ -204,10 +204,10 @@ const MeasurementGroupTable = ({ group, specsData, sizeList }) => {
                         )}
                       </div>
                     </td>
-                    <td className="p-1 text-center text-red-500 font-bold text-[10px] bg-red-50/30 border-r border-gray-100 dark:border-gray-700">
+                    <td className="p-1 text-center text-red-500 font-bold text-[10px] bg-red-50/30 border-r border-b border-gray-200 dark:border-gray-700">
                       {spec.TolMinus?.fraction || "-"}
                     </td>
-                    <td className="p-1 text-center text-green-500 font-bold text-[10px] bg-green-50/30">
+                    <td className="p-1 text-center text-green-500 font-bold text-[10px] bg-green-50/30 border-b border-gray-200 dark:border-gray-700">
                       {spec.TolPlus?.fraction || "-"}
                     </td>
 
@@ -222,7 +222,7 @@ const MeasurementGroupTable = ({ group, specsData, sizeList }) => {
                       return (
                         <React.Fragment key={mIdx}>
                           {/* Spec Value */}
-                          <td className="p-1 text-center border-l border-gray-200 dark:border-gray-700 font-bold text-blue-600 dark:text-blue-400 bg-blue-50/30">
+                          <td className="p-1 text-center border-l border-b border-gray-200 dark:border-gray-700 font-bold text-blue-600 dark:text-blue-400 bg-blue-50/30">
                             {specValDisplay}
                           </td>
 
@@ -249,7 +249,7 @@ const MeasurementGroupTable = ({ group, specsData, sizeList }) => {
                             return (
                               <td
                                 key={`val-a-${pcsIndex}`}
-                                className={`p-1 text-center text-[10px] font-mono border-l border-gray-100 dark:border-gray-800 ${colorClass}`}
+                                className={`p-1 text-center text-[10px] font-mono border-l border-b border-gray-200 dark:border-gray-700 ${colorClass}`}
                               >
                                 {fraction}
                               </td>
@@ -279,7 +279,7 @@ const MeasurementGroupTable = ({ group, specsData, sizeList }) => {
                             return (
                               <td
                                 key={`val-c-${pcsIndex}`}
-                                className={`p-1 text-center text-[10px] font-mono border-l border-gray-200 dark:border-gray-700 ${colorClass}`}
+                                className={`p-1 text-center text-[10px] font-mono border-l border-b border-gray-200 dark:border-gray-700 ${colorClass}`}
                               >
                                 {fraction}
                               </td>

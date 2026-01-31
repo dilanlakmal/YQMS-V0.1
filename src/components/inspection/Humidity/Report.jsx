@@ -71,7 +71,6 @@ const FormPage = () => {
     try {
       const ts = new Date().toLocaleTimeString();
       setCalcSteps((prev) => [...prev, `${ts}: ${step}`]);
-      console.log(`CALC STEP - ${ts}:`, step);
     } catch (e) {
       console.error("Error adding calc step", e);
     }
@@ -153,8 +152,7 @@ const FormPage = () => {
             : Array.isArray(result)
               ? result
               : [];
-        console.log("api/yorksys-orders response:", result);
-        console.log("parsed orders array:", orders);
+
         addCalcStep(
           `Fetched orders: ${Array.isArray(orders) ? orders.length : 0}`,
         );
@@ -180,10 +178,7 @@ const FormPage = () => {
           const humJson = await humRes.json();
           const humDocs = humJson && humJson.data ? humJson.data : [];
           setHumidityDocs(humDocs);
-          console.log(
-            "humidity_data docs (fetched with yorksys-orders):",
-            humDocs,
-          );
+
           addCalcStep(
             `Fetched humidity_data docs: ${Array.isArray(humDocs) ? humDocs.length : 0}`,
           );
@@ -226,7 +221,6 @@ const FormPage = () => {
   }, []);
 
   const handleOrderNoSelect = async (moNo) => {
-    console.log("[DEBUG] Selecting Order:", moNo);
     // Set selected moNo into the factory style field and close dropdown
     setOrderNoSearch(moNo);
 
@@ -309,7 +303,7 @@ const FormPage = () => {
       );
       const json = await res.json();
       const order = json && json.data ? json.data : json || null;
-      console.log("order by moNo:", json);
+
       addCalcStep(`Fetched order details for "${moNo}"`);
       if (order) {
         let fabricationStr = "";
@@ -638,10 +632,7 @@ const FormPage = () => {
               ...prev,
               aquaboySpecBody: totalFormatted,
             }));
-            console.log("FabricContent -> FiberName matches:", matches, {
-              buyerEntry,
-              aquaboySpecBody: totalFormatted,
-            });
+
             addCalcStep(
               `Computed aquaboySpecBody total raw=${total} rounded="${totalFormatted}"`,
             );
@@ -1389,15 +1380,6 @@ const FormPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log(
-      "[DEBUG] handleSubmit triggered. Current formData:",
-      JSON.stringify(
-        formData,
-        (key, value) =>
-          key === "images" ? `[${value?.length || 0} images]` : value,
-        2,
-      ),
-    );
 
     if (!validateForm()) {
       setMessage({ type: "error", text: "Please fill in all required fields" });
@@ -1442,22 +1424,6 @@ const FormPage = () => {
           }),
         })),
       };
-
-      console.log(
-        "[DEBUG] Final Payload being sent to /api/humidity-reports:",
-        JSON.stringify(
-          payload,
-          (key, value) =>
-            key === "images" ? `[${value?.length || 0} images]` : value,
-          2,
-        ),
-      );
-
-      console.log(
-        "Saving payload with images:",
-        payload.inspectionRecords[0]?.images?.length || 0,
-        "images",
-      );
 
       const response = await fetch(
         `${API_BASE_URL || "http://localhost:5001"}/api/humidity-reports`,
