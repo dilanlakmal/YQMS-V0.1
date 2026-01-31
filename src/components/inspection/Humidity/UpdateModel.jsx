@@ -34,6 +34,10 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
   const [showColorDropdown, setShowColorDropdown] = useState(false);
   const colorRef = useRef(null);
 
+  // Determine if ribs fields should be shown:
+  // 1. Explicit flag in report
+  // 2. Presence of ribs spec limit
+  // 3. Fallback to false if no clear indication
   const ribsAvailable = report?.ribsAvailable ?? (
     report?.aquaboySpecRibs &&
     report.aquaboySpecRibs.toString().trim() !== '' &&
