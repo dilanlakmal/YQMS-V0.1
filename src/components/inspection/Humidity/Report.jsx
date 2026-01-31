@@ -71,6 +71,7 @@ const FormPage = () => {
     try {
       const ts = new Date().toLocaleTimeString();
       setCalcSteps((prev) => [...prev, `${ts}: ${step}`]);
+      console.log(`CALC STEP - ${ts}:`, step);
     } catch (e) {
       console.error("Error adding calc step", e);
     }
@@ -152,7 +153,8 @@ const FormPage = () => {
             : Array.isArray(result)
               ? result
               : [];
-
+        console.log("api/yorksys-orders response:", result);
+        console.log("parsed orders array:", orders);
         addCalcStep(
           `Fetched orders: ${Array.isArray(orders) ? orders.length : 0}`,
         );
@@ -178,7 +180,10 @@ const FormPage = () => {
           const humJson = await humRes.json();
           const humDocs = humJson && humJson.data ? humJson.data : [];
           setHumidityDocs(humDocs);
-
+          console.log(
+            "humidity_data docs (fetched with yorksys-orders):",
+            humDocs,
+          );
           addCalcStep(
             `Fetched humidity_data docs: ${Array.isArray(humDocs) ? humDocs.length : 0}`,
           );
@@ -221,6 +226,7 @@ const FormPage = () => {
   }, []);
 
   const handleOrderNoSelect = async (moNo) => {
+    console.log("[DEBUG] Selecting Order:", moNo);
     // Set selected moNo into the factory style field and close dropdown
     setOrderNoSearch(moNo);
 
@@ -303,7 +309,7 @@ const FormPage = () => {
       );
       const json = await res.json();
       const order = json && json.data ? json.data : json || null;
-
+      console.log("order by moNo:", json);
       addCalcStep(`Fetched order details for "${moNo}"`);
       if (order) {
         let fabricationStr = "";
@@ -380,19 +386,30 @@ const FormPage = () => {
         try {
           const detectRibsAvailable = (ord) => {
             if (!ord) return false;
-            // Check for explicit flags (truthy check to handle string "true" or number 1)
-            if (
+
+            // Check for explicit flags (truthy check)
+            const hasRibsVal =
               ord.hasRibs === true ||
               ord.hasRibs === "true" ||
-              ord.hasRibs === 1
-            )
-              return true;
-            if (
+              ord.hasRibs === 1;
+            const ribsReqVal =
               ord.ribsRequired === true ||
               ord.ribsRequired === "true" ||
-              ord.ribsRequired === 1
-            )
-              return true;
+              ord.ribsRequired === 1;
+            if (hasRibsVal || ribsReqVal) return true;
+
+            // Check for explicit 'false' or '0' values to override keyword detection
+            const noRibsVal =
+              ord.hasRibs === false ||
+              ord.hasRibs === "false" ||
+              ord.hasRibs === 0 ||
+              ord.hasRibs === "0";
+            const noRibsReqVal =
+              ord.ribsRequired === false ||
+              ord.ribsRequired === "false" ||
+              ord.ribsRequired === 0 ||
+              ord.ribsRequired === "0";
+            if (noRibsVal || noRibsReqVal) return false;
 
             // Check explicit RibContent array from YorksysOrders
             if (Array.isArray(ord.RibContent) && ord.RibContent.length > 0) {
@@ -402,7 +419,8 @@ const FormPage = () => {
                 return true;
             }
 
-            // Targeted string search in descriptive fields
+            // Targeted string search in descriptive fields using regex for better accuracy
+            // This avoids matches like "RIBBON" (matches rib but not the garment component)
             const searchFields = [
               ord.style,
               ord.factoryStyleName,
@@ -414,14 +432,16 @@ const FormPage = () => {
               ...(Array.isArray(ord.RibContent)
                 ? ord.RibContent.map((f) => f.fabricName || f.fabric || "")
                 : []),
-              ...(Array.isArray(ord.SKUData)
-                ? ord.SKUData.map((s) => s.Color || "")
-                : []),
             ];
+
+            // Regex to match "rib" or "ribs" as a whole word or with specific suffixes
+            // Matches: "rib", "ribs", "rib-knit", "1x1 rib", "ribbed"
+            // Does NOT match: "ribbon"
+            const ribRegex = /\brib(s|bed)?\b/i;
 
             if (
               searchFields.some(
-                (field) => field && String(field).toLowerCase().includes("rib"),
+                (field) => field && ribRegex.test(String(field).toLowerCase()),
               )
             )
               return true;
@@ -449,7 +469,7 @@ const FormPage = () => {
                     fc.ribs !== null &&
                     String(fc.ribs).trim() !== "") ||
                   (fc.fabricName &&
-                    String(fc.fabricName).toLowerCase().includes("rib")),
+                    ribRegex.test(String(fc.fabricName).toLowerCase())),
               )
             )
               return true;
@@ -457,7 +477,8 @@ const FormPage = () => {
             return false;
           };
           const ribsFlag = detectRibsAvailable(order);
-          setRibsAvailable((prev) => prev || ribsFlag);
+          // setRibsAvailable(prev => prev || ribsFlag);
+          setRibsAvailable(ribsFlag);
           addCalcStep(
             `Ribs availability detection: ${ribsFlag ? "ENABLED" : "DISABLED"}`,
           );
@@ -617,7 +638,10 @@ const FormPage = () => {
               ...prev,
               aquaboySpecBody: totalFormatted,
             }));
-
+            console.log("FabricContent -> FiberName matches:", matches, {
+              buyerEntry,
+              aquaboySpecBody: totalFormatted,
+            });
             addCalcStep(
               `Computed aquaboySpecBody total raw=${total} rounded="${totalFormatted}"`,
             );
@@ -1251,6 +1275,11 @@ const FormPage = () => {
       newErrors.aquaboySpecBody = "Upper Centisimal index is required";
     }
 
+    // Explicitly check for Ribs Spec only if ribs are available
+    if (ribsAvailable && !formData.aquaboySpecRibs?.trim()) {
+      newErrors.aquaboySpecRibs = "Ribs spec is required";
+    }
+
     // Only require dry room times for non-Reitmans flows
     if (!isReitmans) {
       // In New mode (Before Dry Room)
@@ -1360,6 +1389,15 @@ const FormPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log(
+      "[DEBUG] handleSubmit triggered. Current formData:",
+      JSON.stringify(
+        formData,
+        (key, value) =>
+          key === "images" ? `[${value?.length || 0} images]` : value,
+        2,
+      ),
+    );
 
     if (!validateForm()) {
       setMessage({ type: "error", text: "Please fill in all required fields" });
@@ -1404,6 +1442,22 @@ const FormPage = () => {
           }),
         })),
       };
+
+      console.log(
+        "[DEBUG] Final Payload being sent to /api/humidity-reports:",
+        JSON.stringify(
+          payload,
+          (key, value) =>
+            key === "images" ? `[${value?.length || 0} images]` : value,
+          2,
+        ),
+      );
+
+      console.log(
+        "Saving payload with images:",
+        payload.inspectionRecords[0]?.images?.length || 0,
+        "images",
+      );
 
       const response = await fetch(
         `${API_BASE_URL || "http://localhost:5001"}/api/humidity-reports`,
@@ -2385,7 +2439,7 @@ const FormPage = () => {
                                 }
                                 className={`w-full px-4 py-1 bg-transparent rounded-md focus:ring-blue-300 transition-colors ${errors.aquaboySpecRibs ? "text-blue-700" : "text-blue-900"}`}
                                 placeholder=""
-                                required
+                                required={ribsAvailable}
                                 aria-required="true"
                                 disabled={!formData.factoryStyleNo}
                               />
@@ -2551,6 +2605,7 @@ const FormPage = () => {
                                         placeholder="Ribs"
                                         className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
                                         disabled={!formData.factoryStyleNo}
+                                        required={ribsAvailable}
                                       />
                                     </div>
                                     {record[section].ribsPass ? (

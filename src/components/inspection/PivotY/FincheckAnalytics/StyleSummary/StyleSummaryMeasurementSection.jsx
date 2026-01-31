@@ -140,13 +140,13 @@ const MeasurementGroupTable = ({ group, specsData, sizeList }) => {
                 <th colSpan={3}></th> {/* Spacers */}
                 {sortedMeasurements.map((m, idx) => (
                   <React.Fragment key={idx}>
-                    <th className="p-1 text-center bg-blue-50/50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 font-bold border-l border-gray-200 dark:border-gray-700 text-[10px]">
+                    <th className="p-1 text-center bg-blue-50/50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 font-bold border-l border-b border-gray-200 dark:border-gray-700 text-[10px]">
                       Spec
                     </th>
                     {m.allEnabledPcs?.map((pcsIndex, pIdx) => (
                       <th
                         key={`a-${pIdx}`}
-                        className="p-1 text-center bg-amber-50 dark:bg-amber-900/10 text-[9px] min-w-[35px]"
+                        className="p-1 text-center bg-amber-50 dark:bg-amber-900/10 text-[9px] min-w-[35px] border-l border-b border-gray-200 dark:border-gray-700"
                       >
                         <span className="bg-amber-500 text-white px-1 rounded font-bold">
                           A
@@ -157,7 +157,7 @@ const MeasurementGroupTable = ({ group, specsData, sizeList }) => {
                     {m.criticalEnabledPcs?.map((pcsIndex, pIdx) => (
                       <th
                         key={`c-${pIdx}`}
-                        className="p-1 text-center bg-purple-50 dark:bg-purple-900/10 text-[9px] min-w-[35px]"
+                        className="p-1 text-center bg-purple-50 dark:bg-purple-900/10 text-[9px] min-w-[35px] border-l border-b border-gray-200 dark:border-gray-700"
                       >
                         <span className="bg-purple-500 text-white px-1 rounded font-bold">
                           C

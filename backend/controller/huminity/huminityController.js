@@ -268,17 +268,40 @@ export const getHumidityReports = async (req, res) => {
       }
     }
 
-    let humidityDocs = await HumidityReport.find(query)
-      .sort({ createdAt: -1 })
-      .limit(limit ? Number(limit) : 1000)
-      .exec();
-    let reitmansDocs = await getReitmansReports(query, limit);
+    const projection = {
+      "history.Item 1.Check 1.images": 0,
+      "history.Item 2.Check 1.images": 0,
+      "inspectionRecords.images": 0,
+    };
 
+    let humidityDocs = await HumidityReport.find(query, projection)
+      .sort({ createdAt: -1 })
+      .limit(limit && Number(limit) > 0 ? Number(limit) : 500)
+      .lean();
+
+    let reitmansDocs = await getReitmansReports(query, limit);
+    // Manually strip images if projection isn't easy in Reitmans
+    reitmansDocs = reitmansDocs.map((doc) => {
+      const d = doc.toObject ? doc.toObject() : doc;
+      if (d.history) {
+        Object.keys(d.history).forEach((item) => {
+          Object.keys(d.history[item]).forEach((check) => {
+            if (d.history[item][check]) delete d.history[item][check].images;
+          });
+        });
+      }
+      if (d.inspectionRecords) {
+        d.inspectionRecords.forEach((r) => delete r.images);
+      }
+      return d;
+    });
     // Combine and sort
     let allDocs = [...humidityDocs, ...reitmansDocs].sort(
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
     );
-    if (limit && Number(limit) > 0) allDocs = allDocs.slice(0, Number(limit));
+    if (!limit || Number(limit) === 0) {
+      allDocs = allDocs.slice(0, 500);
+    }
 
     return res.json({ success: true, data: allDocs });
   } catch (err) {
@@ -543,7 +566,7 @@ export const exportHumidityReportsPaper = async (req, res) => {
       const recs = Array.isArray(data.inspectionRecords)
         ? data.inspectionRecords
         : [];
-      const hasRibs = data.ribsAvailable !== false; // Default to true if undefined
+      const hasRibs = data.ribsAvailable === true; // Default to true if undefined
       const rows =
         recs
           .map((r) => {
@@ -1047,6 +1070,34 @@ export const approveHumidityReport = async (req, res) => {
     return res
       .status(500)
       .json({ success: false, message: "Failed to approve report" });
+  }
+};
+
+// GET /api/humidity-reports/:id
+export const getHumidityReportById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Try standard collection
+    let report = await HumidityReport.findById(id).lean();
+
+    // 2. Fallback to Reitmans collection
+    if (!report) {
+      report = await ReitmansReport.findById(id).lean();
+    }
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found" });
+    }
+
+    return res.json({ success: true, data: report });
+  } catch (err) {
+    console.error("Error fetching report by ID:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
   }
 };
 
