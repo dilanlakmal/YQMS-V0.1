@@ -34,7 +34,7 @@ export default function GlossaryManager() {
   };
 
   const tabs = [
-    { id: "list", label: "📚 My Glossaries" },
+    { id: "list", label: "📚 Sources Glossary" },
     // { id: "upload", label: "📤 Upload Glossary" },
     { id: "mine", label: "🤖 Mine Documents" },
     { id: "results", label: "✅ Review Terms" }

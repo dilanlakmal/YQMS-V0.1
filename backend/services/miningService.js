@@ -40,7 +40,7 @@ export async function mineSingleDocument({
 
     // 1. Extract text
     const text = await textExtractor(fileBuffer, fileName);
-    if (text.length < 100) {
+    if (text.length < 30) {
         throw new Error('Document too short for meaningful mining (min 100 chars)');
     }
 
