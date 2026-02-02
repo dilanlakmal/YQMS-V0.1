@@ -1179,3 +1179,340 @@ export const getStyleMeasurementAnalytics = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// ============================================================
+// GET: Style Measurement Final Conclusion (Aggregated across all reports)
+// ============================================================
+
+export const getStyleMeasurementConclusion = async (req, res) => {
+  try {
+    const { styleNo, reportType, stage } = req.query;
+
+    if (!styleNo) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Style No required" });
+    }
+
+    // 1. Fetch Specs & Size List
+    const dtOrder = await DtOrder.findOne({
+      Order_No: { $regex: new RegExp(`^${styleNo}$`, "i") },
+    })
+      .select("SizeList")
+      .lean();
+
+    const sizeList = dtOrder?.SizeList || [];
+
+    const specsRecord = await QASectionsMeasurementSpecs.findOne({
+      Order_No: { $regex: new RegExp(`^${styleNo}$`, "i") },
+    }).lean();
+
+    // Get specs
+    const beforeSpecs = specsRecord?.AllBeforeWashSpecs || [];
+    const afterSpecs = specsRecord?.AllAfterWashSpecs || [];
+
+    // 2. Build lookup maps - KEY FIX: Map by measurement point name
+    // Map spec ID to measurement point name
+    const specIdToPointName = new Map();
+    // Map measurement point name to spec details (for Tol-, Tol+)
+    const pointNameToSpec = new Map();
+    // Track all unique measurement point names
+    const allPointNames = new Set();
+
+    [...beforeSpecs, ...afterSpecs].forEach((s) => {
+      const id = s.id || s._id?.toString();
+      const name = (s.MeasurementPointEngName || s.name || "").trim();
+
+      if (!name) return;
+
+      specIdToPointName.set(id, name);
+      allPointNames.add(name);
+
+      // Store first occurrence for tolerance values (they're the same for all K values and stages)
+      if (!pointNameToSpec.has(name)) {
+        pointNameToSpec.set(name, {
+          name: name,
+          TolMinus: s.TolMinus,
+          TolPlus: s.TolPlus,
+        });
+      }
+    });
+
+    // 3. Query Reports
+    const query = {
+      orderNos: styleNo,
+      status: { $ne: "cancelled" },
+    };
+
+    if (reportType && reportType !== "All") {
+      query.reportType = reportType;
+    }
+
+    // Get available report types
+    const availableTypes = await FincheckInspectionReports.distinct(
+      "reportType",
+      {
+        orderNos: styleNo,
+        status: { $ne: "cancelled" },
+      },
+    );
+
+    const reports = await FincheckInspectionReports.find(query)
+      .select("measurementData reportType")
+      .lean();
+
+    // 4. Aggregate measurements by MEASUREMENT POINT NAME (not spec ID)
+    // Structure: { [measurementPointName]: { [size]: { points, pass, fail, negTol, posTol } } }
+    const aggregatedData = {};
+
+    // Helper function to check tolerance
+    const checkToleranceAndCategorize = (decimal, tolMinus, tolPlus) => {
+      if (decimal === 0 || isNaN(decimal)) {
+        return { counted: false };
+      }
+
+      const tolMinusDecimal = parseFloat(tolMinus?.decimal);
+      const tolPlusDecimal = parseFloat(tolPlus?.decimal);
+
+      // If no tolerances defined, consider it as pass
+      if (isNaN(tolMinusDecimal) && isNaN(tolPlusDecimal)) {
+        return {
+          counted: true,
+          isPass: true,
+          isNegTol: false,
+          isPosTol: false,
+        };
+      }
+
+      const lowerLimit = isNaN(tolMinusDecimal)
+        ? 0
+        : -Math.abs(tolMinusDecimal);
+      const upperLimit = isNaN(tolPlusDecimal) ? 0 : Math.abs(tolPlusDecimal);
+      const epsilon = 0.0001;
+
+      const isWithin =
+        decimal >= lowerLimit - epsilon && decimal <= upperLimit + epsilon;
+
+      if (isWithin) {
+        return {
+          counted: true,
+          isPass: true,
+          isNegTol: false,
+          isPosTol: false,
+        };
+      } else {
+        const isNegTol = decimal < lowerLimit;
+        const isPosTol = decimal > upperLimit;
+        return { counted: true, isPass: false, isNegTol, isPosTol };
+      }
+    };
+
+    // Helper to process measurement entries
+    const processMeasurementEntry = (
+      specId,
+      pcsData,
+      size,
+      stageFilter,
+      measurementStage,
+    ) => {
+      if (!pcsData || typeof pcsData !== "object") return;
+
+      // Apply stage filter
+      if (stageFilter !== "All" && measurementStage !== stageFilter) return;
+
+      const measurementPointName = specIdToPointName.get(specId);
+      if (!measurementPointName) return;
+
+      const specInfo = pointNameToSpec.get(measurementPointName);
+      if (!specInfo) return;
+
+      // Initialize aggregated data structure
+      if (!aggregatedData[measurementPointName]) {
+        aggregatedData[measurementPointName] = {};
+      }
+      if (!aggregatedData[measurementPointName][size]) {
+        aggregatedData[measurementPointName][size] = {
+          points: 0,
+          pass: 0,
+          fail: 0,
+          negTol: 0,
+          posTol: 0,
+        };
+      }
+
+      // Process each piece measurement
+      Object.entries(pcsData).forEach(([pcsIndex, valObj]) => {
+        if (!valObj || valObj.decimal === undefined) return;
+
+        const decimal = parseFloat(valObj.decimal);
+        const result = checkToleranceAndCategorize(
+          decimal,
+          specInfo.TolMinus,
+          specInfo.TolPlus,
+        );
+
+        if (result.counted) {
+          aggregatedData[measurementPointName][size].points += 1;
+
+          if (result.isPass) {
+            aggregatedData[measurementPointName][size].pass += 1;
+          } else {
+            aggregatedData[measurementPointName][size].fail += 1;
+            if (result.isNegTol) {
+              aggregatedData[measurementPointName][size].negTol += 1;
+            }
+            if (result.isPosTol) {
+              aggregatedData[measurementPointName][size].posTol += 1;
+            }
+          }
+        }
+      });
+    };
+
+    const stageFilter = stage || "All";
+
+    // Process each report
+    reports.forEach((report) => {
+      if (!report.measurementData || !Array.isArray(report.measurementData))
+        return;
+
+      report.measurementData.forEach((m) => {
+        if (m.size === "Manual_Entry") return;
+
+        const size = m.size;
+        const measurementStage = m.stage || "Before";
+
+        // Process allMeasurements
+        if (m.allMeasurements && typeof m.allMeasurements === "object") {
+          Object.entries(m.allMeasurements).forEach(([specId, pcsData]) => {
+            processMeasurementEntry(
+              specId,
+              pcsData,
+              size,
+              stageFilter,
+              measurementStage,
+            );
+          });
+        }
+
+        // Process criticalMeasurements
+        if (
+          m.criticalMeasurements &&
+          typeof m.criticalMeasurements === "object"
+        ) {
+          Object.entries(m.criticalMeasurements).forEach(
+            ([specId, pcsData]) => {
+              processMeasurementEntry(
+                specId,
+                pcsData,
+                size,
+                stageFilter,
+                measurementStage,
+              );
+            },
+          );
+        }
+      });
+    });
+
+    // 5. Format response - iterate by unique measurement point names
+    const specsWithData = [];
+
+    allPointNames.forEach((pointName) => {
+      const specInfo = pointNameToSpec.get(pointName);
+      if (!specInfo) return;
+
+      const sizeData = {};
+      let hasMeasurements = false;
+
+      sizeList.forEach((size) => {
+        const data = aggregatedData[pointName]?.[size] || {
+          points: 0,
+          pass: 0,
+          fail: 0,
+          negTol: 0,
+          posTol: 0,
+        };
+        sizeData[size] = data;
+        if (data.points > 0) hasMeasurements = true;
+      });
+
+      if (hasMeasurements) {
+        specsWithData.push({
+          id: pointName, // Use point name as unique identifier
+          measurementPointName: pointName,
+          tolMinus: specInfo.TolMinus?.fraction || "-",
+          tolPlus: specInfo.TolPlus?.fraction || "-",
+          sizeData,
+          hasMeasurements,
+        });
+      }
+    });
+
+    // Sort specs alphabetically by measurement point name
+    specsWithData.sort((a, b) =>
+      a.measurementPointName.localeCompare(b.measurementPointName),
+    );
+
+    // 6. Calculate totals per size
+    const sizeTotals = {};
+    sizeList.forEach((size) => {
+      sizeTotals[size] = {
+        points: 0,
+        pass: 0,
+        fail: 0,
+        negTol: 0,
+        posTol: 0,
+      };
+
+      specsWithData.forEach((spec) => {
+        const data = spec.sizeData[size];
+        if (data) {
+          sizeTotals[size].points += data.points;
+          sizeTotals[size].pass += data.pass;
+          sizeTotals[size].fail += data.fail;
+          sizeTotals[size].negTol += data.negTol;
+          sizeTotals[size].posTol += data.posTol;
+        }
+      });
+    });
+
+    // 7. Calculate grand totals
+    const grandTotals = {
+      points: 0,
+      pass: 0,
+      fail: 0,
+      negTol: 0,
+      posTol: 0,
+    };
+
+    Object.values(sizeTotals).forEach((totals) => {
+      grandTotals.points += totals.points;
+      grandTotals.pass += totals.pass;
+      grandTotals.fail += totals.fail;
+      grandTotals.negTol += totals.negTol;
+      grandTotals.posTol += totals.posTol;
+    });
+
+    grandTotals.passRate =
+      grandTotals.points > 0
+        ? ((grandTotals.pass / grandTotals.points) * 100).toFixed(1)
+        : "0.0";
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        specs: specsWithData,
+        sizeList,
+        sizeTotals,
+        grandTotals,
+        reportTypes: availableTypes.sort(),
+        totalReports: reports.length,
+        stageFilter,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching measurement conclusion:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};

@@ -10,6 +10,7 @@ import StyleSummaryPieChart from "./StyleSummaryPieChart";
 import DailyInspectionStyleTrendChart from "./DailyInspectionStyleTrendChart";
 import StyleSummaryLocationDefectMap from "./StyleSummaryLocationDefectMap";
 import StyleSummaryMeasurementSection from "./StyleSummaryMeasurementSection";
+import StyleMeasurementFinalConclusion from "./StyleMeasurementFinalConclusion";
 
 const FincheckAnalyticsStyleSummary = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -188,6 +189,7 @@ const FincheckAnalyticsStyleSummary = () => {
           <DailyInspectionStyleTrendChart styleNo={selectedStyle.style} />
           <StyleSummaryLocationDefectMap styleNo={selectedStyle.style} />
           <StyleSummaryMeasurementSection styleNo={selectedStyle.style} />
+          <StyleMeasurementFinalConclusion styleNo={selectedStyle.style} />
         </div>
       )}
     </div>

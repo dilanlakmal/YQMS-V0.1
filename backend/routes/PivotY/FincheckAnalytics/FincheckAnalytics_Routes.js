@@ -7,6 +7,7 @@ import {
   getStyleTrendAnalytics,
   getStyleSummaryDefectMap,
   getStyleMeasurementAnalytics,
+  getStyleMeasurementConclusion,
 } from "../../../controller/PivotY/FincheckAnalytics/FincheckAnalytics_Controller.js";
 
 const router = express.Router();
@@ -26,6 +27,11 @@ router.get(
 router.get(
   "/api/fincheck-analytics/style-measurement",
   getStyleMeasurementAnalytics,
+);
+
+router.get(
+  "/api/fincheck-analytics/style-measurement-conclusion",
+  getStyleMeasurementConclusion,
 );
 
 export default router;
