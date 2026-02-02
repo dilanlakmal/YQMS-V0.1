@@ -6,7 +6,8 @@ const QualityInsights = ({ dbData }) => (
     {/* Pass Rate by Order No */}
     <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-gray-800">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-black flex items-center gap-2 text-slate-800 dark:text-white"><Package size={20} className="text-blue-500" /> MEASUREMENT PASS RATE BY ORDER</h3>
+        <h3 className="text-lg font-black flex items-center gap-2 text-slate-800 dark:text-white"><Package size={20} className="text-blue-500" /> MEASUREMENT PASS RATE
+          BY ORDER</h3>
         <span className="text-[10px] font-bold bg-rose-50 text-rose-600 px-2 py-1 rounded-lg uppercase">Lowest 5</span>
       </div>
       <div className="space-y-4">
@@ -25,7 +26,8 @@ const QualityInsights = ({ dbData }) => (
     {/* Pass Rate by Report Type */}
     <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-gray-800">
       <h3 className="text-lg font-black mb-6 flex items-center gap-2 text-slate-800 dark:text-white">
-        <ClipboardList size={20} className="text-purple-500" /> MEASUREMENT PASS RATE BY REPORT TYPE
+        <ClipboardList size={20} className="text-purple-500" /> MEASUREMENT PASS
+        RATE BY REPORT
       </h3>
       <div className="grid grid-cols-2 gap-4">
         {dbData?.passRateByReportType?.map((item, idx) => (
@@ -59,7 +61,8 @@ const QualityInsights = ({ dbData }) => (
 
     {/* Pass Rate by Date */}
     <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-gray-800">
-      <h3 className="text-lg font-black mb-6 flex items-center gap-2 text-slate-800 dark:text-white"><TrendingUp size={20} className="text-emerald-500" /> MEASUREMENT DAILY PASS RATE</h3>
+      <h3 className="text-lg font-black mb-6 flex items-center gap-2 text-slate-800 dark:text-white"><TrendingUp size={20} className="text-emerald-500" /> MEASUREMENT DAILY
+        PASS RATE</h3>
       <div className="space-y-3">
         {dbData?.passRateByDate?.map((item, idx) => (
           <div key={idx} className="flex items-center gap-4">

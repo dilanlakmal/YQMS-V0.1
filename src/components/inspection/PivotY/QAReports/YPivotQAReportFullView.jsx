@@ -663,10 +663,10 @@ const SKUDataTable = ({ skuData, orderNo }) => {
                 Color
               </th>
               <th className="px-2 py-2 text-center font-bold text-[10px] uppercase">
-                ETD
+                Ex.Fty Date
               </th>
               <th className="px-2 py-2 text-center font-bold text-[10px] uppercase">
-                ETA
+                Buyer.DEL Date
               </th>
               <th className="px-2 py-2 text-right font-bold text-[10px] uppercase">
                 Qty
@@ -1244,7 +1244,10 @@ const YPivotQAReportFullView = () => {
 
         return {
           stage,
-          label: stage === "Before" ? "Before Wash" : "After Wash",
+          label:
+            stage === "Before"
+              ? "Before Wash Measurement"
+              : "Buyer Spec Measurement",
           suffix,
           groupedData: grouped,
           groupedDataForOverall: groupedForOverall,

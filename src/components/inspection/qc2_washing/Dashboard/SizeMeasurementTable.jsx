@@ -54,7 +54,8 @@ const SizeMeasurementTable = ({ data = [] }) => {
       <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
         <div>
           <h3 className="text-xl font-black flex items-center gap-3 text-slate-800 dark:text-white uppercase">
-            <Ruler className="text-indigo-600" /> Measurement Breakdown By Style
+            <Ruler className="text-indigo-600" /> Measurement Breakdown by
+            Styles
           </h3>
           <p className="text-slate-500 text-[10px] font-bold mt-1 uppercase tracking-widest ml-9">
             Order ➔ Colorway ➔ Size Breakdown

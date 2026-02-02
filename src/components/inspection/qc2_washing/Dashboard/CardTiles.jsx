@@ -313,7 +313,7 @@ const CardTiles = ({ reports = [] }) => {
               <Target size={20} className="text-white" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">Completed Washing Rate</p>
+              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">Completed Wash Rate</p>
               <p className="text-lg font-bold text-blue-800 dark:text-blue-300">{stats.completionRate.toFixed(1)}%</p>
             </div>
           </div>
@@ -325,7 +325,7 @@ const CardTiles = ({ reports = [] }) => {
               <CheckCircle2 size={20} className="text-white" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-green-600 dark:text-green-400">Quality Score</p>
+              <p className="text-sm font-semibold text-green-600 dark:text-green-400">Overall Pass Rate</p>
               <p className="text-lg font-bold text-green-800 dark:text-green-300">{stats.passRatePercent.toFixed(1)}%</p>
             </div>
           </div>

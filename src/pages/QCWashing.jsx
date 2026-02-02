@@ -73,8 +73,8 @@ function transformDefectsByPc(savedDefectsByPc) {
           defectImages: (defect.defectImages || []).map((imgStr) => ({
             file: null,
             preview: normalizeImageSrc(imgStr),
-            name: "image.jpg"
-          }))
+            name: "image.jpg",
+          })),
         }));
       }
       return acc;
@@ -94,8 +94,8 @@ function transformDefectsByPc(savedDefectsByPc) {
         defectImages: (defect.defectImages || []).map((imgStr) => ({
           file: null,
           preview: normalizeImageSrc(imgStr),
-          name: "image.jpg"
-        }))
+          name: "image.jpg",
+        })),
       }));
     });
     return result;
@@ -132,7 +132,7 @@ const initializeDefaultCheckpointData = async () => {
           options: checkpoint.options,
           decision: defaultOption?.name || '',
           remark: defaultRemark,
-          comparisonImages: []
+          comparisonImages: [],
         });
         
         // Add subpoints
@@ -157,7 +157,7 @@ const initializeDefaultCheckpointData = async () => {
             options: subPoint.options,
             decision: defaultSubOption?.name || '',
             remark: defaultSubRemark,
-            comparisonImages: []
+            comparisonImages: [],
           });
         });
       });
@@ -251,7 +251,7 @@ function calculateSummaryData(currentFormData) {
             ? pc.pcDefects.reduce(
                 (defSum, defect) =>
                   defSum + (parseInt(defect.defectQty, 10) || 0),
-                0
+                0,
               )
             : 0)
         );
@@ -297,7 +297,7 @@ function calculateSummaryData(currentFormData) {
     overallResult,
     // Additional fields for measurement statistics
     measurementPoints: measurementPoints || 0,
-    measurementPass: measurementPass || 0
+    measurementPass: measurementPass || 0,
   };
 }
 
@@ -309,13 +309,13 @@ function machineProcessesToObject(machineProcesses) {
         temperature: proc.temperature || "",
         time: proc.time || "",
         silicon: proc.silicon || "",
-        softener: proc.softener || ""
+        softener: proc.softener || "",
       };
     } else if (proc.machineType === "Tumble Dry") {
       obj[proc.machineType] = {
         temperature: proc.temperature || "",
         timeCool: proc.timeCool || "",
-        timeHot: proc.timeHot || ""
+        timeHot: proc.timeHot || "",
       };
     }
   });
@@ -350,8 +350,8 @@ const QCWashingPage = () => {
         sampleSize: "",
         acceptedDefect: "",
         rejectedDefect: "",
-        levelUsed: ""
-      }
+        levelUsed: "",
+      },
     ],
 
     inspectionDetails: {},
@@ -361,7 +361,7 @@ const QCWashingPage = () => {
       result: "",
       defectsByPc: [],
       additionalImages: [],
-      comment: ""
+      comment: "",
     },
     measurementDetails: [],
 
@@ -370,7 +370,7 @@ const QCWashingPage = () => {
     totalDefectCount: 0,
     defectRate: 0,
     defectRatio: 0,
-    overallFinalResult: "Pending"
+    overallFinalResult: "Pending",
   });
 
   // State: Data Lists
@@ -395,7 +395,7 @@ const QCWashingPage = () => {
     if (!recordId) return;
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/overall-summary-by-id/${recordId}`
+        `${API_BASE_URL}/api/qc-washing/overall-summary-by-id/${recordId}`,
       );
       const data = await response.json();
       if (data.success) {
@@ -413,7 +413,7 @@ const QCWashingPage = () => {
   const [inspectionData, setInspectionData] = useState([]);
   const [processData, setProcessData] = useState({
     "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
-    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" },
   });
   const defaultDefectData = [
     {
@@ -423,7 +423,7 @@ const QCWashingPage = () => {
       checkedQty: 0,
       failedQty: 0,
       result: "Pass",
-      remark: ""
+      remark: "",
     },
     {
       parameter: "Appearance",
@@ -432,11 +432,11 @@ const QCWashingPage = () => {
       checkedQty: 0,
       failedQty: 0,
       result: "Pass",
-      remark: ""
-    }
+      remark: "",
+    },
   ];
   const [defectData, setDefectData] = useState(
-    normalizeDefectData(defaultDefectData)
+    normalizeDefectData(defaultDefectData),
   );
   function normalizeDefectData(data) {
     return (data || []).map((param) => ({
@@ -448,7 +448,7 @@ const QCWashingPage = () => {
       failedQty: param.failedQty || 0,
       remark: param.remark || "",
       acceptedDefect: param.aqlAcceptedDefect || "",
-      checkboxes: param.checkboxes || {}
+      checkboxes: param.checkboxes || {},
     }));
   }
   const [addedDefects, setAddedDefects] = useState([]);
@@ -457,7 +457,7 @@ const QCWashingPage = () => {
   const [savedSizes, setSavedSizes] = useState([]);
   const [measurementData, setMeasurementData] = useState({
     beforeWash: [],
-    afterWash: []
+    afterWash: [],
   });
   const [showMeasurementTable, setShowMeasurementTable] = useState(true);
   const [machineType, setMachineType] = useState("Washing Machine");
@@ -506,12 +506,12 @@ const QCWashingPage = () => {
 
   const [standardValues, setStandardValues] = useState({
     "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
-    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" },
   });
 
   const [actualValues, setActualValues] = useState({
     "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
-    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" },
   });
 
   const [machineStatus, setMachineStatus] = useState({
@@ -519,13 +519,13 @@ const QCWashingPage = () => {
       temperature: { ok: true, no: false },
       time: { ok: true, no: false },
       silicon: { ok: true, no: false },
-      softener: { ok: true, no: false }
+      softener: { ok: true, no: false },
     },
     "Tumble Dry": {
       temperature: { ok: true, no: false },
       timeCool: { ok: true, no: false },
-      timeHot: { ok: true, no: false }
-    }
+      timeHot: { ok: true, no: false },
+    },
   });
   const [referenceSampleApproveDate, setReferenceSampleApproveDate] = useState(() => {
   const now = new Date();
@@ -538,7 +538,7 @@ const QCWashingPage = () => {
     const englishToDecisionMap = {
       "Cleaning must be done by fabric mill.": "1",
       "YM doing the cleaning, front & back side.": "2",
-      "Randomly 2-3 pcs back side hairly can acceptable.": "3"
+      "Randomly 2-3 pcs back side hairly can acceptable.": "3",
     };
 
     const decision = englishToDecisionMap[englishRemark];
@@ -599,12 +599,12 @@ const QCWashingPage = () => {
     ) {
       const newCheckedQty = Math.min(
         parseInt(formData.washQty, 10),
-        parseInt(aql.sampleSize, 10)
+        parseInt(aql.sampleSize, 10),
       ).toString();
       if (formData.checkedQty !== newCheckedQty) {
         setFormData((prev) => ({
           ...prev,
-          checkedQty: newCheckedQty
+          checkedQty: newCheckedQty,
         }));
       }
     }
@@ -638,7 +638,7 @@ const QCWashingPage = () => {
         .flat()
         .reduce(
           (sum, defect) => sum + (parseInt(defect.defectQty, 10) || 0),
-          0
+          0,
         );
 
       const acceptedDefectCount = parseInt(aql.acceptedDefect, 10);
@@ -660,7 +660,7 @@ const QCWashingPage = () => {
     formData.reportType,
     formData.firstOutput,
     formData.result,
-    formData.checkedQty
+    formData.checkedQty,
   ]);
 
   useEffect(() => {
@@ -674,7 +674,7 @@ const QCWashingPage = () => {
         const encodedColor = encodeColorForUrl(formData.color);
         
         const response = await fetch(
-          `${API_BASE_URL}/api/qc-washing/order-color-qty/${formData.orderNo}/${encodedColor}`
+          `${API_BASE_URL}/api/qc-washing/order-color-qty/${formData.orderNo}/${encodedColor}`,
         );
         
         if (!response.ok) {
@@ -706,7 +706,7 @@ const QCWashingPage = () => {
           // First, try to convert English remarks to current language
           const translatedRemark = convertEnglishToCurrentLanguage(
             item.remark,
-            t
+            t,
           );
 
           // If it was translated (different from original), use the translation
@@ -734,7 +734,7 @@ const QCWashingPage = () => {
           }
         }
         return item;
-      })
+      }),
     );
   }, [t, inspectionData.length]); // Add inspectionData.length as dependency
 
@@ -762,10 +762,10 @@ const QCWashingPage = () => {
         .filter(Boolean);
 
       const beforeWash = measurements.filter(
-        (m) => m.before_after_wash === "beforeWash"
+        (m) => m.before_after_wash === "beforeWash",
       );
       const afterWash = measurements.filter(
-        (m) => m.before_after_wash === "afterWash"
+        (m) => m.before_after_wash === "afterWash",
       );
       return { beforeWash, afterWash };
     }
@@ -778,7 +778,7 @@ const QCWashingPage = () => {
       checkedList: item.name,
       approvedDate: "",
       na: false,
-      remark: ""
+      remark: "",
     }));
   };
 
@@ -801,7 +801,7 @@ const QCWashingPage = () => {
   const fetchSubFactories = async () => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/supplier-issues/defects/Washing`
+        `${API_BASE_URL}/api/supplier-issues/defects/Washing`,
       );
       const data = await response.json();
       if (data && Array.isArray(data.factoryList)) {
@@ -810,7 +810,7 @@ const QCWashingPage = () => {
           ...prev,
           factoryName: data.factoryList.includes("YM")
             ? "YM"
-            : data.factoryList[0] || ""
+            : data.factoryList[0] || "",
         }));
       } else {
         setSubFactories([]);
@@ -840,7 +840,7 @@ const QCWashingPage = () => {
     }
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/search-mono?term=${searchTerm}`
+        `${API_BASE_URL}/api/search-mono?term=${searchTerm}`,
       );
       if (response.ok) {
         const data = await response.json();
@@ -857,7 +857,7 @@ const QCWashingPage = () => {
   const fetchOrderNumbers = async () => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/order-numbers`
+        `${API_BASE_URL}/api/qc-washing/order-numbers`,
       );
       const data = await response.json();
       if (data.success) {
@@ -875,7 +875,7 @@ const QCWashingPage = () => {
       return;
     }
     const filtered = orderNumbers.filter((orderNo) =>
-      orderNo.toLowerCase().includes(searchTerm.toLowerCase())
+      orderNo.toLowerCase().includes(searchTerm.toLowerCase()),
     );
     setFilteredOrderNumbers(filtered);
   };
@@ -887,7 +887,7 @@ const QCWashingPage = () => {
     }
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/styles/search/${searchTerm}`
+        `${API_BASE_URL}/api/qc-washing/styles/search/${searchTerm}`,
       );
       if (response.ok) {
         const data = await response.json();
@@ -910,7 +910,7 @@ const QCWashingPage = () => {
         ...prev,
         color: "",
         orderQty: "",
-        buyer: ""
+        buyer: "",
       }));
       setStyleSuggestions([]);
       return;
@@ -939,13 +939,13 @@ const QCWashingPage = () => {
 
       // 3. If not submitted, fetch order details from dt_orders
       let response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/order-details-by-style/${orderNo}`
+        `${API_BASE_URL}/api/qc-washing/order-details-by-style/${orderNo}`,
       );
       let orderData = await response.json();
 
       if (!orderData.success) {
         response = await fetch(
-          `${API_BASE_URL}/api/qc-washing/order-details-by-order/${orderNo}`
+          `${API_BASE_URL}/api/qc-washing/order-details-by-order/${orderNo}`,
         );
         orderData = await response.json();
       }
@@ -960,7 +960,7 @@ const QCWashingPage = () => {
       }));
       } else {
         throw new Error(
-          orderData.message || "Style/Order not found in master records."
+          orderData.message || "Style/Order not found in master records.",
         );
       }
     } catch (error) {
@@ -968,7 +968,7 @@ const QCWashingPage = () => {
       Swal.fire(
         "Error",
         `Could not fetch details for: ${orderNo}. Please check the Style No or Order No.`,
-        "error"
+        "error",
       );
       setColorOptions([]);
       setFormData((prev) => ({ ...prev, color: "", orderQty: "", buyer: "" }));
@@ -1428,12 +1428,12 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         formData: {
           washQty: formData.washQty,
           checkedQty: formData.checkedQty,
-          before_after_wash: formData.before_after_wash
-        }
+          before_after_wash: formData.before_after_wash,
+        },
       };
       setColorDataCache((prevCache) => ({
         ...prevCache,
-        [outgoingColor]: currentStateForColor
+        [outgoingColor]: currentStateForColor,
       }));
     }
 
@@ -1476,7 +1476,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         if (value && (prev.orderNo || prev.style)) {
           setTimeout(
             () => loadColorSpecificData(prev.orderNo || prev.style, value),
-            100
+            100,
           );
         }
       }
@@ -1508,7 +1508,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
       Swal.fire(
         "Missing Order No",
         "Please enter an Order No before selecting First Output.",
-        "warning"
+        "warning",
       );
       setFormData((prev) => ({ ...prev, firstOutput: "", reportType: "" }));
       return;
@@ -1520,8 +1520,8 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderNo: orderNo })
-        }
+          body: JSON.stringify({ orderNo: orderNo }),
+        },
       );
       const data = await response.json();
 
@@ -1534,16 +1534,16 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
               sampleSize: data.aqlData.sampleSize,
               acceptedDefect: data.aqlData.acceptedDefect,
               rejectedDefect: data.aqlData.rejectedDefect,
-              levelUsed: data.aqlData.levelUsed
-            }
+              levelUsed: data.aqlData.levelUsed,
+            },
           ],
-          washQty: data.checkedQty
+          washQty: data.checkedQty,
         }));
       } else {
         Swal.fire({
           icon: "error",
           title: "Could not fetch First Output data",
-          text: data.message || "An unknown error occurred."
+          text: data.message || "An unknown error occurred.",
         });
         // Clear relevant fields on failure
         setFormData((prev) => ({
@@ -1555,9 +1555,9 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
               sampleSize: "",
               acceptedDefect: "",
               rejectedDefect: "",
-              levelUsed: ""
-            }
-          ]
+              levelUsed: "",
+            },
+          ],
         }));
       }
     } catch (error) {
@@ -1565,7 +1565,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
       Swal.fire(
         "Error",
         "A network error occurred while fetching First Output details.",
-        "error"
+        "error",
       );
     } finally {
       setIsDataLoading(false);
@@ -1586,14 +1586,14 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             lotSize: parseInt(washQty) || 0,
-            orderNo: orderNo
-          })
-        }
+            orderNo: orderNo,
+          }),
+        },
       );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({
-          message: `Request failed with status ${response.status}`
+          message: `Request failed with status ${response.status}`,
         }));
         setFormData((prev) => ({
           ...prev,
@@ -1602,9 +1602,9 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
               sampleSize: "",
               acceptedDefect: "",
               rejectedDefect: "",
-              levelUsed: ""
-            }
-          ]
+              levelUsed: "",
+            },
+          ],
         }));
         return;
       }
@@ -1618,9 +1618,9 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
               sampleSize: data.aqlData.sampleSize,
               acceptedDefect: data.aqlData.acceptedDefect,
               rejectedDefect: data.aqlData.rejectedDefect,
-              levelUsed: data.aqlData.levelUsed
-            }
-          ]
+              levelUsed: data.aqlData.levelUsed,
+            },
+          ],
         }));
       } else {
         setFormData((prev) => ({
@@ -1630,9 +1630,9 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
               sampleSize: "",
               acceptedDefect: "",
               rejectedDefect: "",
-              levelUsed: ""
-            }
-          ]
+              levelUsed: "",
+            },
+          ],
         }));
       }
     } catch (error) {
@@ -1648,7 +1648,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         if (aql?.sampleSize && washQty) {
           const checkedQty = Math.min(
             parseInt(washQty),
-            parseInt(aql.sampleSize)
+            parseInt(aql.sampleSize),
           );
           return { ...prev, checkedQty: checkedQty };
         }
@@ -1666,7 +1666,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
     if (measurementData && typeof measurementData === "object") {
       const allMeasurements = [
         ...(measurementData.beforeWash || []),
-        ...(measurementData.afterWash || [])
+        ...(measurementData.afterWash || []),
       ];
 
       allMeasurements.forEach((data) => {
@@ -1696,7 +1696,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
       totalCheckedPoint: totalCheckedPoints,
       totalPass,
       totalFail,
-      passRate
+      passRate,
     };
   };
 
@@ -1729,7 +1729,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
           // Add new record
           return {
             ...prev,
-            [before_after_wash]: [...currentArray, transformedSizeData]
+            [before_after_wash]: [...currentArray, transformedSizeData],
           };
         }
       });
@@ -1744,7 +1744,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
       // 2. Remove the just-saved size from selectedSizes to hide its input table
       if (typeof setSelectedSizes === "function") {
         setSelectedSizes((prev) =>
-          prev.filter((s) => s.size !== transformedSizeData.size)
+          prev.filter((s) => s.size !== transformedSizeData.size),
         );
       }
 
@@ -1759,7 +1759,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
       const measurementDetail = { 
         ...transformedSizeData, 
         before_after_wash,
-        isUpdate: !!existingRecord // Flag to indicate if this is an update
+        isUpdate: !!existingRecord, // Flag to indicate if this is an update
       };
 
       const response = await fetch(
@@ -1769,9 +1769,9 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             recordId,
-            measurementDetail
-          })
-        }
+            measurementDetail,
+          }),
+        },
       );
 
       const result = await response.json();
@@ -1783,7 +1783,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         Swal.fire(
           "Error",
           result.message || "Failed to save measurement data",
-          "error"
+          "error",
         );
       }
     } catch (error) {
@@ -1806,13 +1806,13 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         setMeasurementData((prev) => ({
           ...prev,
           [before_after_wash]: prev[before_after_wash].filter(
-            (item) => !(item.size === size && item.kvalue === kvalue)
-          )
+            (item) => !(item.size === size && item.kvalue === kvalue),
+          ),
         }));
         
         // Only remove from savedSizes if no other k-values exist for this size
         const remainingRecords = measurementData[before_after_wash].filter(
-          (item) => item.size === size && item.kvalue !== kvalue
+          (item) => item.size === size && item.kvalue !== kvalue,
         );
         if (remainingRecords.length === 0) {
           setSavedSizes((prev) => prev.filter((s) => s !== size));
@@ -1823,8 +1823,8 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         setMeasurementData((prev) => ({
           ...prev,
           [before_after_wash]: prev[before_after_wash].filter(
-            (item) => item.size !== size
-          )
+            (item) => item.size !== size,
+          ),
         }));
       }
     }
@@ -1844,7 +1844,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
       Swal.fire(
         "Limit Exceeded",
         "You can only upload a maximum of 5 images.",
-        "warning"
+        "warning",
       );
       return;
     }
@@ -1852,7 +1852,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
     const options = {
       maxSizeMB: 0.5,
       maxWidthOrHeight: 1024,
-      useWebWorker: true
+      useWebWorker: true,
     };
 
     Swal.fire({
@@ -1861,7 +1861,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
       allowOutsideClick: false,
       didOpen: () => {
         Swal.showLoading();
-      }
+      },
     });
 
     for (const file of files) {
@@ -1870,7 +1870,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         const preview = URL.createObjectURL(compressedFile);
         setUploadedImages((prev) => [
           ...prev,
-          { file: compressedFile, preview, name: compressedFile.name }
+          { file: compressedFile, preview, name: compressedFile.name },
         ]);
       } catch (error) {
         console.error("Image compression failed:", error);
@@ -1905,8 +1905,8 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ summary })
-        }
+          body: JSON.stringify({ summary }),
+        },
       );
     } catch (error) {
       console.error("Failed to auto-save overall summary:", error);
@@ -1918,7 +1918,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
     const summary = calculateSummaryData(currentFormData);
     setFormData((prevData) => ({
       ...prevData,
-      ...summary
+      ...summary,
     }));
     if (recordId) {
       autoSaveSummary(summary, recordId);
@@ -1949,8 +1949,8 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
           sampleSize: "",
           acceptedDefect: "",
           rejectedDefect: "",
-          levelUsed: ""
-        }
+          levelUsed: "",
+        },
       ],
 
       inspectionDetails: {},
@@ -1960,7 +1960,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         result: "",
         defectsByPc: [],
         additionalImages: [],
-        comment: ""
+        comment: "",
       },
       measurementDetails: [],
 
@@ -1969,7 +1969,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
       totalDefectCount: 0,
       defectRate: 0,
       defectRatio: 0,
-      overallFinalResult: "Pending"
+      overallFinalResult: "Pending",
     });
 
     // Reset all other states
@@ -1989,9 +1989,9 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         temperature: "",
         time: "",
         silicon: "",
-        softener: ""
+        softener: "",
       },
-      "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+      "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" },
     });
     setDefectData(normalizeDefectData(defaultDefectData));
     setAddedDefects([]);
@@ -2023,31 +2023,31 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         temperature: "",
         time: "",
         silicon: "",
-        softener: ""
+        softener: "",
       },
-      "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+      "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" },
     });
     setActualValues({
       "Washing Machine": {
         temperature: "",
         time: "",
         silicon: "",
-        softener: ""
+        softener: "",
       },
-      "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+      "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" },
     });
     setMachineStatus({
       "Washing Machine": {
         temperature: { ok: true, no: false },
         time: { ok: true, no: false },
         silicon: { ok: true, no: false },
-        softener: { ok: true, no: false }
+        softener: { ok: true, no: false },
       },
       "Tumble Dry": {
         temperature: { ok: true, no: false },
         timeCool: { ok: true, no: false },
-        timeHot: { ok: true, no: false }
-      }
+        timeHot: { ok: true, no: false },
+      },
     });
 
     setReferenceSampleApproveDate(new Date().toISOString().split('T')[0]);
@@ -2072,9 +2072,9 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         defectsByPc: Object.entries(defectsByPc).map(
           ([pcNumber, pcDefects]) => ({
             pcNumber,
-            pcDefects
-          })
-        )
+            pcDefects,
+          }),
+        ),
       };
 
       
@@ -2083,20 +2083,20 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         measurement: [
           ...measurementData.beforeWash.map((item) => ({
             ...item,
-            before_after_wash: "beforeWash"
+            before_after_wash: "beforeWash",
           })),
           ...measurementData.afterWash.map((item) => ({
             ...item,
-            before_after_wash: "afterWash"
-          }))
-        ]
+            before_after_wash: "afterWash",
+          })),
+        ],
       };
 
       // Calculate summary from the latest data
       const summary = calculateSummaryData({
         ...formData,
         defectDetails,
-        measurementDetails
+        measurementDetails,
       });
 
 
@@ -2104,7 +2104,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         ...prev,
         defectDetails,
         measurementDetails,
-        ...summary
+        ...summary,
       }));
 
       if (recordId) {
@@ -2120,7 +2120,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
     formData.checkedQty,
     formData.washQty,
     formData.result,
-    recordId
+    recordId,
   ]);
 
   // Load color-specific data
@@ -2142,7 +2142,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
       }
       setFormData((prev) => ({
         ...prev,
-        ...(cachedData.formData || {})
+        ...(cachedData.formData || {}),
       }));
       return;
     }
@@ -2151,7 +2151,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
     setIsDataLoading(true);
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/load-color-data/${orderNo}/${color}`
+        `${API_BASE_URL}/api/qc-washing/load-color-data/${orderNo}/${color}`,
       );
 
       if (response.ok) {
@@ -2193,9 +2193,9 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
                     levelUsed:
                       colorData.orderDetails.aqlLevelUsed ||
                       colorData.inspectionDetails?.aqlLevelUsed ||
-                      prev.aqlLevelUsed
-                  }
-                ]
+                      prev.aqlLevelUsed,
+                  },
+                ],
               };
             });
           }
@@ -2207,19 +2207,21 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
                 point.decision === true
                   ? "ok"
                   : point.decision === false
-                  ? "no"
-                  : point.decision || "",
+                    ? "no"
+                    : point.decision || "",
               comparisonImages: (point.comparison || [])
                 .filter(Boolean)
                 .map((img) => ({
                   file: null,
                   preview: normalizeImageSrc(img),
                   name:
-                    typeof img === "string" ? img.split("/").pop() : "image.jpg"
+                    typeof img === "string"
+                      ? img.split("/").pop()
+                      : "image.jpg",
                 })),
               approvedDate: point.approvedDate || "",
               na: point.condition === "N/A",
-              remark: point.remark || ""
+              remark: point.remark || "",
             })) || initializeInspectionData(masterChecklist);
 
           // Convert English fiber remarks to current language immediately after loading
@@ -2227,7 +2229,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
             if (item.checkedList === "Fiber" && item.remark) {
               const translatedRemark = convertEnglishToCurrentLanguage(
                 item.remark,
-                t
+                t,
               );
               if (translatedRemark !== item.remark) {
                 return { ...item, remark: translatedRemark };
@@ -2262,8 +2264,8 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
 
           setProcessData(
             machineProcessesToObject(
-              colorData.inspectionDetails?.machineProcesses
-            )
+              colorData.inspectionDetails?.machineProcesses,
+            ),
           );
 
           if (
@@ -2271,7 +2273,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
             colorData.inspectionDetails.parameters.length > 0
           ) {
             setDefectData(
-              normalizeDefectData(colorData.inspectionDetails.parameters)
+              normalizeDefectData(colorData.inspectionDetails.parameters),
             );
           } else {
             setDefectData(normalizeDefectData(defaultDefectData));
@@ -2281,13 +2283,13 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
             colorData.defectDetails?.defects?.map((d) => ({
               defectId: d.defectId,
               defectName: d.defectName,
-              qty: d.defectQty
-            })) || []
+              qty: d.defectQty,
+            })) || [],
           );
 
           if (colorData.defectDetails?.defectsByPc) {
             setDefectsByPc(
-              transformDefectsByPc(colorData.defectDetails.defectsByPc)
+              transformDefectsByPc(colorData.defectDetails.defectsByPc),
             );
           } else {
             setDefectsByPc({});
@@ -2299,41 +2301,41 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
                   return {
                     file: null,
                     preview: normalizeImageSrc(img),
-                    name: img.split("/").pop() || "image.jpg"
+                    name: img.split("/").pop() || "image.jpg",
                   };
                 } else if (typeof img === "object" && img !== null) {
                   return {
                     file: null,
                     preview: normalizeImageSrc(img.preview || img),
-                    name: img.name || "image.jpg"
+                    name: img.name || "image.jpg",
                   };
                 }
                 return {
                   file: null,
                   preview: "",
-                  name: "image.jpg"
+                  name: "image.jpg",
                 };
-              })
+              }),
             );
           }
 
           setComment(colorData.defectDetails?.comment || "");
           setMeasurementData(
-            processMeasurementData(colorData.measurementDetails || [])
+            processMeasurementData(colorData.measurementDetails || []),
           );
           setSavedSizes(
             colorData.measurementDetails
               ? [
                   ...new Set([
                     ...(colorData.measurementDetails.beforeWash || []).map(
-                      (m) => m.size
+                      (m) => m.size,
                     ),
                     ...(colorData.measurementDetails.afterWash || []).map(
-                      (m) => m.size
-                    )
-                  ])
+                      (m) => m.size,
+                    ),
+                  ]),
                 ]
-              : []
+              : [],
           );
           setShowMeasurementTable(true);
 
@@ -2349,7 +2351,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
             machineType: "",
             temperature: "",
             time: "",
-            chemical: ""
+            chemical: "",
           });
           setDefectData(normalizeDefectData(defaultDefectData));
 
@@ -2367,7 +2369,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
       Swal.fire({
         icon: "error",
         title: "Load Failed",
-        text: `Could not load data for color "${color}". Please try again.`
+        text: `Could not load data for color "${color}". Please try again.`,
       });
     } finally {
       setIsDataLoading(false);
@@ -2378,7 +2380,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
   const loadSavedSizes = async (orderNo, color) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${color}`
+        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${color}`,
       );
 
       if (!response.ok) {
@@ -2432,13 +2434,13 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
       id: "newInspection",
       label: "New Inspection",
       icon: <ClipboardList size={20} />,
-      description: "Create New QC Inspection"
+      description: "Create New QC Inspection",
     },
     {
       id: "subConEditQty",
       label: "Sub_Con Edit",
       icon: <Edit size={20} />,
-      description: "Edit Sub Contractor Data"
+      description: "Edit Sub Contractor Data",
     },
     {
       id: "submittedData",
@@ -2606,7 +2608,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
                             }`}
                           >
                             {React.cloneElement(tab.icon, {
-                              className: "w-5 h-5"
+                              className: "w-5 h-5",
                             })}
                           </div>
                           <span
@@ -2967,7 +2969,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
                           measurement: [
                             ...measurementData.beforeWash.map((item) => ({
                               ...item,
-                              before_after_wash: "beforeWash"
+                              before_after_wash: "beforeWash",
                             })),
                             ...measurementData.afterWash.map((item) => ({
                               ...item,

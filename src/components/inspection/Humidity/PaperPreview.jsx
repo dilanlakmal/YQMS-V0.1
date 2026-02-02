@@ -101,7 +101,8 @@ const PaperPreview = ({ data }) => {
   const flattenedHistory = groupedHistory.flatMap((s) => s.items);
 
   const getItemStatus = (item) => {
-    const getSStatus = (s) => (s?.status === "pass" || !s?.status ? "pass" : "fail");
+    const getSStatus = (s) =>
+      s?.status === "pass" || !s?.status ? "pass" : "fail";
     return getSStatus(item.top) === "pass" &&
       getSStatus(item.middle) === "pass" &&
       getSStatus(item.bottom) === "pass"
@@ -118,7 +119,9 @@ const PaperPreview = ({ data }) => {
 
   const ribsVisible =
     formData.ribsAvailable ??
-    flattenedHistory.some((h) => h.top?.ribs || h.middle?.ribs || h.bottom?.ribs);
+    flattenedHistory.some(
+      (h) => h.top?.ribs || h.middle?.ribs || h.bottom?.ribs,
+    );
 
   return (
     <div className="mx-6 my-4 p-6 bg-white border rounded shadow-sm print:shadow-none print:border-none print:m-0 print:p-0 page-break-after-always">
@@ -194,8 +197,12 @@ const PaperPreview = ({ data }) => {
               <th className="border border-black px-1 py-2">Customer</th>
               <th className="border border-black px-1 py-2">Fabrication</th>
               <th className="border border-black px-1 py-2">Color</th>
-              <th className="border border-black px-2 py-2 leading-tight">Before Dry Room</th>
-              <th className="border border-black px-2 py-2 leading-tight">After Dry Room</th>
+              <th className="border border-black px-2 py-2 leading-tight">
+                Before Dry Room
+              </th>
+              <th className="border border-black px-2 py-2 leading-tight">
+                After Dry Room
+              </th>
               <th
                 className="border border-black px-1 py-2"
                 colSpan={ribsVisible ? 2 : 1}
@@ -219,11 +226,17 @@ const PaperPreview = ({ data }) => {
             <tr className="bg-gray-50 font-bold uppercase text-[13px]">
               <th className="border border-black px-2 py-2" colSpan={7}></th>
               <th className="border border-black px-2 py-2">Body</th>
-              {ribsVisible && <th className="border border-black px-2 py-2">Rib</th>}
+              {ribsVisible && (
+                <th className="border border-black px-2 py-2">Rib</th>
+              )}
               <th className="border border-black px-2 py-2">Body</th>
-              {ribsVisible && <th className="border border-black px-2 py-2">Rib</th>}
+              {ribsVisible && (
+                <th className="border border-black px-2 py-2">Rib</th>
+              )}
               <th className="border border-black px-2 py-2">Body</th>
-              {ribsVisible && <th className="border border-black px-2 py-2">Rib</th>}
+              {ribsVisible && (
+                <th className="border border-black px-2 py-2">Rib</th>
+              )}
               <th className="border border-black px-2 py-2"></th>
             </tr>
           </thead>
@@ -267,10 +280,14 @@ const PaperPreview = ({ data }) => {
                           {item.colorName || item.color || formData.colorName}
                         </td>
                         <td className="border border-black px-1 py-2 text-center">
-                          {formatTime(item.beforeDryRoom || item.beforeDryRoomTime)}
+                          {formatTime(
+                            item.beforeDryRoom || item.beforeDryRoomTime,
+                          )}
                         </td>
                         <td className="border border-black px-1 py-2 text-center">
-                          {formatTime(item.afterDryRoom || item.afterDryRoomTime)}
+                          {formatTime(
+                            item.afterDryRoom || item.afterDryRoomTime,
+                          )}
                         </td>
 
                         {["top", "middle", "bottom"].map((sect) => {
@@ -280,9 +297,13 @@ const PaperPreview = ({ data }) => {
                             <React.Fragment key={sect}>
                               <td className="border border-black px-1 py-1 text-center">
                                 <div className="flex flex-col items-center justify-center gap-0.5">
-                                  <span className="font-semibold">{s.body || "-"}</span>
+                                  <span className="font-semibold">
+                                    {s.body || "-"}
+                                  </span>
                                   {status && (
-                                    <span className={`text-[10px] font-black uppercase ${status === "fail" ? "text-red-600" : "text-green-600"}`}>
+                                    <span
+                                      className={`text-[10px] font-black uppercase ${status === "fail" ? "text-red-600" : "text-green-600"}`}
+                                    >
                                       {status}
                                     </span>
                                   )}
@@ -291,9 +312,13 @@ const PaperPreview = ({ data }) => {
                               {ribsVisible && (
                                 <td className="border border-black px-1 py-1 text-center">
                                   <div className="flex flex-col items-center justify-center gap-0.5">
-                                    <span className="font-semibold">{s.ribs || "-"}</span>
+                                    <span className="font-semibold">
+                                      {s.ribs || "-"}
+                                    </span>
                                     {status && (
-                                      <span className={`text-[10px] font-black uppercase ${status === "fail" ? "text-red-600" : "text-green-600"}`}>
+                                      <span
+                                        className={`text-[10px] font-black uppercase ${status === "fail" ? "text-red-600" : "text-green-600"}`}
+                                      >
                                         {status}
                                       </span>
                                     )}
@@ -305,15 +330,20 @@ const PaperPreview = ({ data }) => {
                         })}
 
                         <td
-                          className={`border border-black px-1 py-2 text-center font-black uppercase text-xs ${status === "fail" ? "text-red-600 bg-red-50" : "text-green-600 bg-green-50"
-                            }`}
+                          className={`border border-black px-1 py-2 text-center font-black uppercase text-xs ${
+                            status === "fail"
+                              ? "text-red-600 bg-red-50"
+                              : "text-green-600 bg-green-50"
+                          }`}
                         >
                           {status}
                         </td>
                       </tr>
 
                       {/* Additional Readings row if any */}
-                      {(add.top?.body || add.middle?.body || add.bottom?.body) && (
+                      {(add.top?.body ||
+                        add.middle?.body ||
+                        add.bottom?.body) && (
                         <tr className="bg-gray-50/50 italic text-[12px]">
                           <td
                             className="border border-black px-1 py-2 text-center font-bold text-gray-400"
@@ -330,7 +360,9 @@ const PaperPreview = ({ data }) => {
                                   <div className="flex flex-col items-center justify-center gap-0.5">
                                     <span>{s.body || "-"}</span>
                                     {status && (
-                                      <span className={`text-[9px] font-black uppercase ${status === "fail" ? "text-red-500" : "text-green-500"}`}>
+                                      <span
+                                        className={`text-[9px] font-black uppercase ${status === "fail" ? "text-red-500" : "text-green-500"}`}
+                                      >
                                         {status}
                                       </span>
                                     )}
@@ -341,7 +373,9 @@ const PaperPreview = ({ data }) => {
                                     <div className="flex flex-col items-center justify-center gap-0.5">
                                       <span>{s.ribs || "-"}</span>
                                       {status && (
-                                        <span className={`text-[9px] font-black uppercase ${status === "fail" ? "text-red-500" : "text-green-500"}`}>
+                                        <span
+                                          className={`text-[9px] font-black uppercase ${status === "fail" ? "text-red-500" : "text-green-500"}`}
+                                        >
                                           {status}
                                         </span>
                                       )}
@@ -382,7 +416,10 @@ const PaperPreview = ({ data }) => {
               {flattenedHistory
                 .flatMap((rec) => rec.images || [])
                 .map((img, i) => (
-                  <div key={img.id || i} className="flex flex-col items-center gap-1">
+                  <div
+                    key={img.id || i}
+                    className="flex flex-col items-center gap-1"
+                  >
                     <img
                       src={img.preview}
                       alt={`Proof ${i}`}
@@ -404,7 +441,9 @@ const PaperPreview = ({ data }) => {
 
       <div className="mt-4 flex justify-end px-10 gap-8">
         <div className="flex flex-col items-center">
-          <div className="w-48 text-center p-4 font-bold pb-2 border-b border-black">Inspector</div>
+          <div className="w-48 text-center p-4 font-bold pb-2 border-b border-black">
+            Inspector
+          </div>
           {(formData.updatedBy?.engName || formData.createdBy?.engName) && (
             <div className="text-xs font-medium text-gray-700 mt-2">
               {formData.updatedBy?.engName || formData.createdBy?.engName}

@@ -38,37 +38,40 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
   // 1. Explicit flag in report
   // 2. Presence of ribs spec limit
   // 3. Fallback to false if no clear indication
-  const ribsAvailable = report?.ribsAvailable ?? (
-    report?.aquaboySpecRibs &&
-    report.aquaboySpecRibs.toString().trim() !== '' &&
-    report.aquaboySpecRibs !== '0'
-  ) ?? false;
+  const ribsAvailable =
+    report?.ribsAvailable ??
+    (report?.aquaboySpecRibs &&
+      report.aquaboySpecRibs.toString().trim() !== "" &&
+      report.aquaboySpecRibs !== "0") ??
+    false;
 
   useEffect(() => {
     if (open && report) {
       let sourceRecords = [];
       if (report.inspectionRecords && report.inspectionRecords.length > 0) {
         sourceRecords = report.inspectionRecords;
-      } else if (report.history && typeof report.history === 'object') {
+      } else if (report.history && typeof report.history === "object") {
         // Convert nested Map history (Item -> Check) to latest records for editing
         const historyMap = report.history;
-        sourceRecords = Object.keys(historyMap).sort((a, b) => {
-          const numA = parseInt(a.replace('Item ', ''));
-          const numB = parseInt(b.replace('Item ', ''));
-          return numA - numB;
-        }).map(itemKey => {
-          const checks = historyMap[itemKey] || {};
-          const checkKeys = Object.keys(checks).sort((a, b) => {
-            const numA = parseInt(a.replace('Check ', ''));
-            const numB = parseInt(b.replace('Check ', ''));
-            return numB - numA; // Sort descending to get latest
+        sourceRecords = Object.keys(historyMap)
+          .sort((a, b) => {
+            const numA = parseInt(a.replace("Item ", ""));
+            const numB = parseInt(b.replace("Item ", ""));
+            return numA - numB;
+          })
+          .map((itemKey) => {
+            const checks = historyMap[itemKey] || {};
+            const checkKeys = Object.keys(checks).sort((a, b) => {
+              const numA = parseInt(a.replace("Check ", ""));
+              const numB = parseInt(b.replace("Check ", ""));
+              return numB - numA; // Sort descending to get latest
+            });
+            return {
+              ...checks[checkKeys[0]],
+              itemName: itemKey, // Store the item name to identify it during save
+              checkCount: checkKeys.length,
+            };
           });
-          return {
-            ...checks[checkKeys[0]],
-            itemName: itemKey, // Store the item name to identify it during save
-            checkCount: checkKeys.length
-          };
-        });
       }
 
       const specLimit = Number(report.aquaboySpecBody || report.aquaboySpec);
@@ -735,10 +738,14 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
 
       currentEditRecords.forEach((rec, index) => {
         const itemKey = rec.itemName || `Item ${index + 1}`;
-        const previousChecks = (previousHistory[itemKey] && typeof previousHistory[itemKey] === 'object') ? previousHistory[itemKey] : {};
+        const previousChecks =
+          previousHistory[itemKey] &&
+          typeof previousHistory[itemKey] === "object"
+            ? previousHistory[itemKey]
+            : {};
         const checkKeys = Object.keys(previousChecks).sort((a, b) => {
-          const numA = parseInt(a.replace('Check ', ''));
-          const numB = parseInt(b.replace('Check ', ''));
+          const numA = parseInt(a.replace("Check ", ""));
+          const numB = parseInt(b.replace("Check ", ""));
           return numB - numA;
         });
 
@@ -747,7 +754,8 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         const newCheckKey = `Check ${newCheckNumber}`;
 
         // Simplified change detection: checking if readings changed
-        const isChanged = !latestCheck ||
+        const isChanged =
+          !latestCheck ||
           String(rec.top?.body) !== String(latestCheck.top?.body) ||
           String(rec.middle?.body) !== String(latestCheck.middle?.body) ||
           String(rec.bottom?.body) !== String(latestCheck.bottom?.body) ||
@@ -765,9 +773,9 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                 hour12: true,
                 hour: "2-digit",
                 minute: "2-digit",
-                second: "2-digit"
-              })
-            }
+                second: "2-digit",
+              }),
+            },
           };
         }
       });
@@ -1069,12 +1077,17 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                   onFocus={() => {
                     const now = new Date();
                     // Format time as HH:mm for type="time"
-                    const timeString = now.getHours().toString().padStart(2, '0') + ':' +
-                      now.getMinutes().toString().padStart(2, '0');
+                    const timeString =
+                      now.getHours().toString().padStart(2, "0") +
+                      ":" +
+                      now.getMinutes().toString().padStart(2, "0");
                     // Format date as YYYY-MM-DD for type="date"
-                    const dateString = now.getFullYear() + '-' +
-                      (now.getMonth() + 1).toString().padStart(2, '0') + '-' +
-                      now.getDate().toString().padStart(2, '0');
+                    const dateString =
+                      now.getFullYear() +
+                      "-" +
+                      (now.getMonth() + 1).toString().padStart(2, "0") +
+                      "-" +
+                      now.getDate().toString().padStart(2, "0");
 
                     setFormData((prev) => ({
                       ...prev,
@@ -1110,9 +1123,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
             {/* Inspection Records */}
             <div className="border-t pt-4">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Readings
-                </h3>
+                <h3 className="text-lg font-medium text-gray-900">Readings</h3>
                 {/* <button
                   type="button"
                   onClick={addNewRecord}
@@ -1279,28 +1290,69 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
 
                     {/* Images */}
                     <div className="mt-4 border-t pt-4">
-                      <h5 className="text-sm font-medium text-gray-700 mb-2">Inspection Photos</h5>
+                      <h5 className="text-sm font-medium text-gray-700 mb-2">
+                        Inspection Photos
+                      </h5>
                       <div className="space-y-3">
                         <label className="flex justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer hover:border-blue-400 focus:outline-none hover:bg-gray-50">
                           <span className="flex items-center space-x-2">
-                            <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            <svg
+                              className="w-6 h-6 text-gray-400"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
                             </svg>
-                            <span className="font-medium text-gray-600">Click to upload images</span>
+                            <span className="font-medium text-gray-600">
+                              Click to upload images
+                            </span>
                           </span>
-                          <input type="file" className="hidden" multiple accept="image/*" onChange={(e) => handleImageUpload(index, e.target.files)} />
+                          <input
+                            type="file"
+                            className="hidden"
+                            multiple
+                            accept="image/*"
+                            onChange={(e) =>
+                              handleImageUpload(index, e.target.files)
+                            }
+                          />
                         </label>
                         {record.images?.length > 0 && (
                           <div className="grid grid-cols-4 gap-4 mt-2">
                             {record.images.map((img) => (
-                              <div key={img.id} className="relative aspect-square">
-                                <img src={img.preview} className="h-full w-full object-cover rounded-lg border" alt="" />
+                              <div
+                                key={img.id}
+                                className="relative aspect-square"
+                              >
+                                <img
+                                  src={img.preview}
+                                  className="h-full w-full object-cover rounded-lg border"
+                                  alt=""
+                                />
                                 <button
                                   type="button"
                                   onClick={() => removeImage(index, img.id)}
                                   className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm"
                                 >
-                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                  <svg
+                                    className="w-3 h-3"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      d="M6 18L18 6M6 6l12 12"
+                                    />
+                                  </svg>
                                 </button>
                               </div>
                             ))}
@@ -1316,114 +1368,162 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
             {/* Additional Readings if applicable */}
             {(formData.inspectionType === "Pre-Final" ||
               formData.inspectionType === "Final") && (
-                <div className="border-t pt-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium text-gray-900">
-                      Additional Readings
-                    </h3>
-                  </div>
-                  <div className="space-y-4">
-                    {formData.inspectionRecords.map((record, index) => (
-                      <div
-                        key={`add-${index}`}
-                        className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4"
-                      >
-                        <h4 className="font-bold text-gray-700 mb-3 underline decoration-blue-500/30 underline-offset-4">
-                          Record #{index + 1} Additional
-                        </h4>
+              <div className="border-t pt-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Additional Readings
+                  </h3>
+                </div>
+                <div className="space-y-4">
+                  {formData.inspectionRecords.map((record, index) => (
+                    <div
+                      key={`add-${index}`}
+                      className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4"
+                    >
+                      <h4 className="font-bold text-gray-700 mb-3 underline decoration-blue-500/30 underline-offset-4">
+                        Record #{index + 1} Additional
+                      </h4>
 
-                        <div className="space-y-4">
-                          {["top", "middle", "bottom"].map((section) => (
-                            <div
-                              key={section}
-                              className="flex flex-col md:flex-row gap-4 w-full items-center p-3 rounded-xl shadow-sm bg-white border border-gray-100"
-                            >
-                              <div className="w-20 font-bold capitalize text-gray-700">
-                                {section}
+                      <div className="space-y-4">
+                        {["top", "middle", "bottom"].map((section) => (
+                          <div
+                            key={section}
+                            className="flex flex-col md:flex-row gap-4 w-full items-center p-3 rounded-xl shadow-sm bg-white border border-gray-100"
+                          >
+                            <div className="w-20 font-bold capitalize text-gray-700">
+                              {section}
+                            </div>
+
+                            {/* Body Reading */}
+                            <div className="flex flex-1 items-center gap-2 w-full">
+                              <div className="flex-1">
+                                <input
+                                  type="number"
+                                  placeholder="Body"
+                                  value={
+                                    record.additional?.[section]?.body || ""
+                                  }
+                                  onChange={(e) =>
+                                    updateAdditionalSectionData(
+                                      index,
+                                      section,
+                                      "body",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                                />
                               </div>
+                              {record.additional?.[section]?.bodyPass ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
+                                  <svg
+                                    className="w-3 h-3 mr-1"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M5 13l4 4L19 7"
+                                    />
+                                  </svg>
+                                  Pass
+                                </span>
+                              ) : record.additional?.[section]?.bodyFail ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
+                                  <svg
+                                    className="w-3 h-3 mr-1"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M6 18L18 6M6 6l12 12"
+                                    />
+                                  </svg>
+                                  Fail
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-xs px-2 italic">
+                                  N/A
+                                </span>
+                              )}
+                            </div>
 
-                              {/* Body Reading */}
+                            {ribsAvailable && (
                               <div className="flex flex-1 items-center gap-2 w-full">
                                 <div className="flex-1">
                                   <input
                                     type="number"
-                                    placeholder="Body"
-                                    value={record.additional?.[section]?.body || ""}
+                                    placeholder="Ribs"
+                                    value={
+                                      record.additional?.[section]?.ribs || ""
+                                    }
                                     onChange={(e) =>
                                       updateAdditionalSectionData(
                                         index,
                                         section,
-                                        "body",
+                                        "ribs",
                                         e.target.value,
                                       )
                                     }
                                     className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
                                   />
                                 </div>
-                                {record.additional?.[section]?.bodyPass ? (
+                                {record.additional?.[section]?.ribsPass ? (
                                   <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
-                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    <svg
+                                      className="w-3 h-3 mr-1"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M5 13l4 4L19 7"
+                                      />
                                     </svg>
                                     Pass
                                   </span>
-                                ) : record.additional?.[section]?.bodyFail ? (
+                                ) : record.additional?.[section]?.ribsFail ? (
                                   <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
-                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    <svg
+                                      className="w-3 h-3 mr-1"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M6 18L18 6M6 6l12 12"
+                                      />
                                     </svg>
                                     Fail
                                   </span>
                                 ) : (
-                                  <span className="text-gray-400 text-xs px-2 italic">N/A</span>
+                                  <span className="text-gray-400 text-xs px-2 italic">
+                                    N/A
+                                  </span>
                                 )}
                               </div>
-
-                              {ribsAvailable && (
-                                <div className="flex flex-1 items-center gap-2 w-full">
-                                  <div className="flex-1">
-                                    <input
-                                      type="number"
-                                      placeholder="Ribs"
-                                      value={record.additional?.[section]?.ribs || ""}
-                                      onChange={(e) =>
-                                        updateAdditionalSectionData(
-                                          index,
-                                          section,
-                                          "ribs",
-                                          e.target.value,
-                                        )
-                                      }
-                                      className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                    />
-                                  </div>
-                                  {record.additional?.[section]?.ribsPass ? (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
-                                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                      </svg>
-                                      Pass
-                                    </span>
-                                  ) : record.additional?.[section]?.ribsFail ? (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
-                                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                      </svg>
-                                      Fail
-                                    </span>
-                                  ) : (
-                                    <span className="text-gray-400 text-xs px-2 italic">N/A</span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
+            )}
 
             {/* General Remark */}
             <div className="border-t pt-4">

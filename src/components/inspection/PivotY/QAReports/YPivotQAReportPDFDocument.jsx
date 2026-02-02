@@ -7,7 +7,7 @@ import {
   Image,
   StyleSheet,
   Font,
-  Link
+  Link,
 } from "@react-pdf/renderer";
 
 import MeasurementSectionPDF from "./YPivotQAReportMeasurementPDF";
@@ -46,8 +46,8 @@ const colors = {
     600: "#4B5563",
     700: "#374151",
     800: "#1F2937",
-    900: "#111827"
-  }
+    900: "#111827",
+  },
 };
 
 const styles = StyleSheet.create({
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     paddingBottom: 60,
     fontSize: 9,
     fontFamily: "Helvetica",
-    backgroundColor: "#FFFFFF"
+    backgroundColor: "#FFFFFF",
   },
 
   // Header
@@ -70,18 +70,18 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 2,
     borderBottomColor: colors.primary,
-    borderBottomStyle: "solid"
+    borderBottomStyle: "solid",
   },
   headerRow1: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 6
+    marginBottom: 6,
   },
   headerCompany: {
     fontSize: 11,
     fontFamily: "Helvetica-Bold",
-    color: colors.primary
+    color: colors.primary,
   },
   headerOrderNo: {
     fontSize: 10,
@@ -89,37 +89,37 @@ const styles = StyleSheet.create({
     color: colors.gray[700],
     backgroundColor: colors.gray[100],
     padding: "4 8",
-    borderRadius: 4
+    borderRadius: 4,
   },
   headerRow2: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center"
+    alignItems: "center",
   },
   headerMeta: {
     flexDirection: "row",
-    gap: 12
+    gap: 12,
   },
   headerMetaItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4
+    gap: 4,
   },
   headerMetaLabel: {
     fontSize: 7,
     color: colors.gray[500],
-    textTransform: "uppercase"
+    textTransform: "uppercase",
   },
   headerMetaValue: {
     fontSize: 8,
     fontFamily: "Helvetica-Bold",
-    color: colors.gray[800]
+    color: colors.gray[800],
   },
   headerTitle: {
     fontSize: 12,
     fontFamily: "Helvetica-Bold",
     color: colors.primaryDark,
-    textAlign: "center"
+    textAlign: "center",
   },
 
   // Footer
@@ -134,25 +134,25 @@ const styles = StyleSheet.create({
     borderTopStyle: "solid",
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center"
+    alignItems: "center",
   },
   footerLeft: {
     fontSize: 7,
-    color: colors.gray[500]
+    color: colors.gray[500],
   },
   footerCenter: {
     fontSize: 7,
-    color: colors.gray[400]
+    color: colors.gray[400],
   },
   footerRight: {
     fontSize: 8,
     fontFamily: "Helvetica-Bold",
-    color: colors.primary
+    color: colors.primary,
   },
 
   // Content Sections
   section: {
-    marginBottom: 16
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 11,
@@ -160,19 +160,19 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     backgroundColor: colors.primary,
     padding: "8 12",
-    marginBottom: 0
+    marginBottom: 0,
   },
   sectionTitleGradient: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6
+    gap: 6,
   },
   sectionContent: {
     padding: 12,
     backgroundColor: colors.gray[50],
     borderWidth: 1,
     borderColor: colors.gray[200],
-    borderTopWidth: 0
+    borderTopWidth: 0,
   },
 
   // Result Banner
@@ -182,34 +182,34 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 16,
     borderRadius: 8,
-    borderWidth: 2
+    borderWidth: 2,
   },
   resultBannerPass: {
     backgroundColor: "#ECFDF5",
-    borderColor: colors.success
+    borderColor: colors.success,
   },
   resultBannerFail: {
     backgroundColor: "#FEF2F2",
-    borderColor: colors.danger
+    borderColor: colors.danger,
   },
   resultItem: {
-    alignItems: "center"
+    alignItems: "center",
   },
   resultLabel: {
     fontSize: 7,
     color: colors.gray[500],
     textTransform: "uppercase",
-    marginBottom: 2
+    marginBottom: 2,
   },
   resultValue: {
     fontSize: 12,
-    fontFamily: "Helvetica-Bold"
+    fontFamily: "Helvetica-Bold",
   },
   resultPass: {
-    color: colors.success
+    color: colors.success,
   },
   resultFail: {
-    color: colors.danger
+    color: colors.danger,
   },
 
   // Info Grid
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 12
+    marginBottom: 12,
   },
   infoCard: {
     width: "23%",
@@ -225,24 +225,24 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: colors.gray[200],
-    borderRadius: 4
+    borderRadius: 4,
   },
   infoCardWide: {
-    width: "48%"
+    width: "48%",
   },
   infoCardFull: {
-    width: "100%"
+    width: "100%",
   },
   infoLabel: {
     fontSize: 6,
     color: colors.gray[500],
     textTransform: "uppercase",
-    marginBottom: 2
+    marginBottom: 2,
   },
   infoValue: {
     fontSize: 8,
     fontFamily: "Helvetica-Bold",
-    color: colors.gray[800]
+    color: colors.gray[800],
   },
 
   // Tables
@@ -251,11 +251,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.gray[200],
     borderRadius: 4,
-    overflow: "hidden"
+    overflow: "hidden",
   },
   tableHeader: {
     flexDirection: "row",
-    backgroundColor: colors.primary
+    backgroundColor: colors.primary,
   },
   tableHeaderCell: {
     flex: 1,
@@ -264,36 +264,36 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
     color: "#FFFFFF",
     textTransform: "uppercase",
-    textAlign: "center"
+    textAlign: "center",
   },
   tableRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100]
+    borderBottomColor: colors.gray[100],
   },
   tableRowAlt: {
-    backgroundColor: colors.gray[50]
+    backgroundColor: colors.gray[50],
   },
   tableCell: {
     flex: 1,
     padding: 6,
     fontSize: 8,
     color: colors.gray[700],
-    textAlign: "center"
+    textAlign: "center",
   },
   tableCellBold: {
-    fontFamily: "Helvetica-Bold"
+    fontFamily: "Helvetica-Bold",
   },
 
   // Image Grid
   imageGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8
+    gap: 8,
   },
   imageContainer: {
     width: "31%",
-    marginBottom: 8
+    marginBottom: 8,
   },
   imageWrapper: {
     borderWidth: 1,
@@ -301,33 +301,33 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     overflow: "hidden",
     backgroundColor: colors.gray[50], // Light background for letterboxing
-    position: "relative" // Needed for absolute positioning of badges
+    position: "relative", // Needed for absolute positioning of badges
   },
 
   image: {
     width: "100%",
     height: 160, // Increased height to accommodate vertical images better
-    objectFit: "contain" // <--- FIX: Prevents cropping, shows full image
+    objectFit: "contain", // <--- FIX: Prevents cropping, shows full image
   },
 
   imageLarge: {
-    height: 180
+    height: 180,
   },
   imageCaption: {
     padding: 6,
     backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
-    borderTopColor: colors.gray[100]
+    borderTopColor: colors.gray[100],
   },
   imageCaptionTitle: {
     fontSize: 7,
     fontFamily: "Helvetica-Bold",
     color: colors.gray[800],
-    marginBottom: 2
+    marginBottom: 2,
   },
   imageCaptionSubtitle: {
     fontSize: 6,
-    color: colors.gray[500]
+    color: colors.gray[500],
   },
   imageBadge: {
     position: "absolute",
@@ -337,16 +337,16 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     fontSize: 5,
     fontFamily: "Helvetica-Bold",
-    color: "#FFFFFF"
+    color: "#FFFFFF",
   },
   badgeMinor: {
-    backgroundColor: colors.warning
+    backgroundColor: colors.warning,
   },
   badgeMajor: {
-    backgroundColor: colors.danger
+    backgroundColor: colors.danger,
   },
   badgeCritical: {
-    backgroundColor: "#7F1D1D"
+    backgroundColor: "#7F1D1D",
   },
 
   // --- NEW BADGES (Top Left - Position) ---
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
     fontSize: 5,
     fontFamily: "Helvetica-Bold",
     color: "#FFFFFF",
-    textTransform: "uppercase"
+    textTransform: "uppercase",
   },
 
   badgeOutside: { backgroundColor: "#3b82f6" }, // Blue
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
   checklistGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8
+    gap: 8,
   },
   checklistItem: {
     width: "32%",
@@ -381,31 +381,31 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: colors.gray[200],
-    borderRadius: 4
+    borderRadius: 4,
   },
   checklistLabel: {
     fontSize: 7,
     fontFamily: "Helvetica-Bold",
     color: colors.gray[700],
-    maxWidth: "70%"
+    maxWidth: "70%",
   },
   checklistBadge: {
     padding: "2 6",
     borderRadius: 10,
     fontSize: 6,
-    fontFamily: "Helvetica-Bold"
+    fontFamily: "Helvetica-Bold",
   },
   badgeConform: {
     backgroundColor: "#D1FAE5",
-    color: colors.success
+    color: colors.success,
   },
   badgeNonConform: {
     backgroundColor: "#FEE2E2",
-    color: colors.danger
+    color: colors.danger,
   },
   badgeNA: {
     backgroundColor: "#FEF3C7",
-    color: colors.warning
+    color: colors.warning,
   },
 
   // Measurement Table
@@ -413,11 +413,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.gray[200],
     borderRadius: 4,
-    overflow: "hidden"
+    overflow: "hidden",
   },
   measurementHeader: {
     flexDirection: "row",
-    backgroundColor: "#0088CC"
+    backgroundColor: "#0088CC",
   },
   measurementHeaderCell: {
     padding: 4,
@@ -426,12 +426,12 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     textAlign: "center",
     borderRightWidth: 1,
-    borderRightColor: "rgba(255,255,255,0.2)"
+    borderRightColor: "rgba(255,255,255,0.2)",
   },
   measurementRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100]
+    borderBottomColor: colors.gray[100],
   },
   measurementCell: {
     padding: 3,
@@ -439,35 +439,35 @@ const styles = StyleSheet.create({
     color: colors.gray[700],
     textAlign: "center",
     borderRightWidth: 1,
-    borderRightColor: colors.gray[100]
+    borderRightColor: colors.gray[100],
   },
   measurementCellPass: {
     backgroundColor: "#D1FAE5",
-    color: colors.success
+    color: colors.success,
   },
   measurementCellFail: {
     backgroundColor: "#FEE2E2",
-    color: colors.danger
+    color: colors.danger,
   },
 
   // Defect Summary
   defectSummaryRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100]
+    borderBottomColor: colors.gray[100],
   },
   defectNameCell: {
     width: "40%",
     padding: 6,
     fontSize: 7,
-    color: colors.gray[700]
+    color: colors.gray[700],
   },
   defectCountCell: {
     width: "15%",
     padding: 6,
     fontSize: 7,
     textAlign: "center",
-    fontFamily: "Helvetica-Bold"
+    fontFamily: "Helvetica-Bold",
   },
 
   // AQL Section
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
   aqlTopGrid: {
     flexDirection: "row",
     gap: 4,
-    marginBottom: 6
+    marginBottom: 6,
   },
   aqlInfoBox: {
     flex: 1,
@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.gray[100] // Default gray
+    backgroundColor: colors.gray[100], // Default gray
   },
   // Specific backgrounds for the info boxes
   bgPurple: { backgroundColor: "#f3e8ff" }, // Batch
@@ -496,26 +496,26 @@ const styles = StyleSheet.create({
     color: colors.gray[500],
     textTransform: "uppercase",
     marginBottom: 2,
-    fontFamily: "Helvetica-Bold"
+    fontFamily: "Helvetica-Bold",
   },
   aqlValue: {
     fontSize: 8,
     fontFamily: "Helvetica-Bold",
-    color: colors.gray[800]
+    color: colors.gray[800],
   },
 
   // 2. AQL Levels Row (Minor 2.5, Major 1.0...)
   aqlLevelRow: {
     flexDirection: "row",
     gap: 4,
-    marginBottom: 8
+    marginBottom: 8,
   },
   aqlLevelBox: {
     flex: 1,
     padding: 6,
     borderRadius: 4,
     borderWidth: 1,
-    alignItems: "center"
+    alignItems: "center",
   },
   levelGreen: { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" },
   levelOrange: { backgroundColor: "#fff7ed", borderColor: "#fed7aa" },
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
   tableHeaderDark: {
     flexDirection: "row",
     backgroundColor: "#1f2937", // Dark Slate
-    color: "#FFFFFF"
+    color: "#FFFFFF",
   },
   // Column Widths for AQL Table
   colDefectName: { width: "40%", padding: 6, justifyContent: "center" },
@@ -533,7 +533,7 @@ const styles = StyleSheet.create({
     width: "15%",
     padding: 6,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
   },
 
   // Colored Table Headers
@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[200],
     minHeight: 20,
-    alignItems: "center"
+    alignItems: "center",
   },
   bgGrayLight: { backgroundColor: "#f3f4f6" },
 
@@ -557,7 +557,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     fontSize: 6,
     fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase"
+    textTransform: "uppercase",
   },
   badgePass: { backgroundColor: "#dcfce7", color: "#166534" },
   badgeFail: { backgroundColor: "#fee2e2", color: "#991b1b" },
@@ -566,21 +566,21 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: colors.gray[200],
-    marginVertical: 12
+    marginVertical: 12,
   },
 
   // Text utilities
   textCenter: {
-    textAlign: "center"
+    textAlign: "center",
   },
   textBold: {
-    fontFamily: "Helvetica-Bold"
+    fontFamily: "Helvetica-Bold",
   },
   textMuted: {
-    color: colors.gray[500]
+    color: colors.gray[500],
   },
   textSmall: {
-    fontSize: 7
+    fontSize: 7,
   },
 
   // Spacing
@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.gray[200],
     borderRadius: 8,
-    marginBottom: 12
+    marginBottom: 12,
   },
   inspectorPhoto: {
     width: 50,
@@ -608,36 +608,36 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     marginRight: 12,
     objectFit: "cover",
-    backgroundColor: colors.gray[200]
+    backgroundColor: colors.gray[200],
   },
   inspectorInfo: {
-    flex: 1
+    flex: 1,
   },
   inspectorName: {
     fontSize: 11,
     fontFamily: "Helvetica-Bold",
     color: colors.gray[800],
-    marginBottom: 2
+    marginBottom: 2,
   },
   inspectorMeta: {
     flexDirection: "row",
-    gap: 12
+    gap: 12,
   },
   inspectorMetaItem: {
     fontSize: 7,
-    color: colors.gray[500]
+    color: colors.gray[500],
   },
 
   // Color Size Breakdown
   colorRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4
+    gap: 4,
   },
   colorDot: {
     width: 8,
     height: 8,
-    borderRadius: 4
+    borderRadius: 4,
   },
 
   // No data placeholder
@@ -646,23 +646,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.gray[50],
-    borderRadius: 4
+    borderRadius: 4,
   },
   noDataText: {
     fontSize: 8,
     color: colors.gray[400],
-    fontStyle: "italic"
+    fontStyle: "italic",
   },
 
   // Page break
   pageBreak: {
-    marginTop: 20
+    marginTop: 20,
   },
 
   // Subsection
   subsection: {
     marginTop: 12,
-    marginBottom: 8
+    marginBottom: 8,
   },
   subsectionTitle: {
     fontSize: 9,
@@ -671,7 +671,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingBottom: 4,
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray[200]
+    borderBottomColor: colors.gray[200],
   },
 
   // Remark box
@@ -681,19 +681,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#FCD34D",
     borderRadius: 4,
-    marginTop: 6
+    marginTop: 6,
   },
   remarkLabel: {
     fontSize: 6,
     fontFamily: "Helvetica-Bold",
     color: colors.warning,
     textTransform: "uppercase",
-    marginBottom: 2
+    marginBottom: 2,
   },
   remarkText: {
     fontSize: 7,
     color: "#92400E",
-    fontStyle: "italic"
+    fontStyle: "italic",
   },
 
   // Configuration group header
@@ -704,21 +704,21 @@ const styles = StyleSheet.create({
     padding: 6,
     backgroundColor: colors.gray[100],
     borderRadius: 4,
-    marginBottom: 8
+    marginBottom: 8,
   },
   configGroupLabel: {
     fontSize: 8,
     fontFamily: "Helvetica-Bold",
     color: colors.gray[700],
-    textTransform: "uppercase"
+    textTransform: "uppercase",
   },
   configGroupCount: {
     fontSize: 7,
     color: colors.gray[500],
     backgroundColor: "#FFFFFF",
     padding: "2 6",
-    borderRadius: 10
-  }
+    borderRadius: 10,
+  },
 });
 
 // =============================================================================
@@ -793,7 +793,7 @@ const ResultBanner = ({ finalResult, measurementResult, defectResult }) => {
     <View
       style={[
         styles.resultBanner,
-        isPass ? styles.resultBannerPass : styles.resultBannerFail
+        isPass ? styles.resultBannerPass : styles.resultBannerFail,
       ]}
     >
       <View style={styles.resultItem}>
@@ -801,7 +801,7 @@ const ResultBanner = ({ finalResult, measurementResult, defectResult }) => {
         <Text
           style={[
             styles.resultValue,
-            isPass ? styles.resultPass : styles.resultFail
+            isPass ? styles.resultPass : styles.resultFail,
           ]}
         >
           {finalResult}
@@ -812,7 +812,9 @@ const ResultBanner = ({ finalResult, measurementResult, defectResult }) => {
         <Text
           style={[
             styles.resultValue,
-            measurementResult === "PASS" ? styles.resultPass : styles.resultFail
+            measurementResult === "PASS"
+              ? styles.resultPass
+              : styles.resultFail,
           ]}
         >
           {measurementResult}
@@ -823,7 +825,7 @@ const ResultBanner = ({ finalResult, measurementResult, defectResult }) => {
         <Text
           style={[
             styles.resultValue,
-            defectResult === "PASS" ? styles.resultPass : styles.resultFail
+            defectResult === "PASS" ? styles.resultPass : styles.resultFail,
           ]}
         >
           {defectResult}
@@ -841,7 +843,7 @@ const InfoCard = ({ label, value, wide = false, full = false }) => (
     style={[
       styles.infoCard,
       wide && styles.infoCardWide,
-      full && styles.infoCardFull
+      full && styles.infoCardFull,
     ]}
   >
     <Text style={styles.infoLabel}>{label}</Text>
@@ -868,7 +870,7 @@ const InspectorSection = ({ inspector, reportData }) => {
             borderRadius: 25, // Make it a circle
             marginRight: 12,
             objectFit: "cover",
-            backgroundColor: colors.gray[200]
+            backgroundColor: colors.gray[200],
           }}
           src={imageSrc}
         />
@@ -881,7 +883,7 @@ const InspectorSection = ({ inspector, reportData }) => {
             marginRight: 12,
             backgroundColor: colors.gray[200],
             justifyContent: "center",
-            alignItems: "center"
+            alignItems: "center",
           }}
         >
           {/* Fallback Text if no image */}
@@ -926,8 +928,12 @@ const SKUDetailsTable = ({ skuData }) => {
         <Text style={[styles.tableHeaderCell, { width: "40%" }]}>SKU</Text>
         <Text style={[styles.tableHeaderCell, { width: "12%" }]}>PO Line</Text>
         <Text style={[styles.tableHeaderCell, { width: "12%" }]}>Color</Text>
-        <Text style={[styles.tableHeaderCell, { width: "12%" }]}>ETD</Text>
-        <Text style={[styles.tableHeaderCell, { width: "12%" }]}>ETA</Text>
+        <Text style={[styles.tableHeaderCell, { width: "12%" }]}>
+          EX.FTY Date
+        </Text>
+        <Text style={[styles.tableHeaderCell, { width: "12%" }]}>
+          Buyer.DEL Date
+        </Text>
         <Text style={[styles.tableHeaderCell, { width: "12%" }]}>Qty</Text>
       </View>
 
@@ -942,7 +948,7 @@ const SKUDetailsTable = ({ skuData }) => {
             style={[
               styles.tableCell,
               rowTextStyle,
-              { width: "40%", fontFamily: "Helvetica-Bold", textAlign: "left" } // Left align looks better for wrapped text
+              { width: "40%", fontFamily: "Helvetica-Bold", textAlign: "left" }, // Left align looks better for wrapped text
             ]}
           >
             {sku.sku || "N/A"}
@@ -964,7 +970,7 @@ const SKUDetailsTable = ({ skuData }) => {
             style={[
               styles.tableCell,
               rowTextStyle,
-              { width: "12%", color: "#059669", fontFamily: "Helvetica-Bold" }
+              { width: "12%", color: "#059669", fontFamily: "Helvetica-Bold" },
             ]}
           >
             {sku.Qty?.toLocaleString() || 0}
@@ -986,7 +992,7 @@ const ShippingStageSummary = ({ data }) => {
   // 1. Prepare Data: Create objects like { label: "D1", value: "48,000" }
   const items = seqColumns.map((seq) => ({
     label: `D${seq}`,
-    value: columnTotals[seq]?.toLocaleString() || "0"
+    value: columnTotals[seq]?.toLocaleString() || "0",
   }));
 
   // 2. Chunk Data: Group into arrays of 4 for grid layout
@@ -1003,7 +1009,7 @@ const ShippingStageSummary = ({ data }) => {
         backgroundColor: "#FFF7ED", // Light Orange bg
         borderWidth: 1,
         borderColor: "#FDBA74", // Orange border
-        borderRadius: 4
+        borderRadius: 4,
       }}
     >
       <Text
@@ -1012,7 +1018,7 @@ const ShippingStageSummary = ({ data }) => {
           fontFamily: "Helvetica-Bold",
           color: "#C2410C", // Dark Orange
           marginBottom: 4,
-          textTransform: "uppercase"
+          textTransform: "uppercase",
         }}
       >
         Shipping Qty Breakdown
@@ -1023,7 +1029,7 @@ const ShippingStageSummary = ({ data }) => {
           key={rowIndex}
           style={{
             flexDirection: "row",
-            marginBottom: rowIndex === rows.length - 1 ? 0 : 2
+            marginBottom: rowIndex === rows.length - 1 ? 0 : 2,
           }}
         >
           {row.map((item, colIndex) => (
@@ -1032,7 +1038,7 @@ const ShippingStageSummary = ({ data }) => {
               style={{
                 fontSize: 7,
                 width: "25%", // 4 items per line = 25% width each
-                color: colors.gray[700]
+                color: colors.gray[700],
               }}
             >
               {item.label}:{" "}
@@ -1049,7 +1055,7 @@ const OrderInfoSection = ({
   orderData,
   selectedOrders,
   inspectionDetails,
-  shippingBreakdown
+  shippingBreakdown,
 }) => {
   const dtOrder = orderData?.dtOrder || {};
   const yorksys = orderData?.yorksysOrder || {};
@@ -1075,25 +1081,25 @@ const OrderInfoSection = ({
     flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[200],
-    paddingVertical: 4
+    paddingVertical: 4,
   };
 
   const colStyle = {
     width: "50%",
-    paddingRight: 8
+    paddingRight: 8,
   };
 
   const labelStyle = {
     fontSize: 7,
     color: colors.gray[500],
     textTransform: "uppercase",
-    marginBottom: 1
+    marginBottom: 1,
   };
 
   const valueStyle = {
     fontSize: 9,
     fontFamily: "Helvetica-Bold",
-    color: colors.gray[800]
+    color: colors.gray[800],
   };
 
   // Helper for a single data point
@@ -1174,8 +1180,9 @@ const OrderInfoSection = ({
             style={[
               rowStyle,
               {
-                borderBottomWidth: cartonQty || shippingStage || remarks ? 1 : 0
-              }
+                borderBottomWidth:
+                  cartonQty || shippingStage || remarks ? 1 : 0,
+              },
             ]}
           >
             <View style={{ width: "100%" }}>
@@ -1304,14 +1311,14 @@ const ColorSizeTable = ({ data }) => {
                 width: `${cellWidth * 2}%`,
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 4
-              }
+                gap: 4,
+              },
             ]}
           >
             <View
               style={[
                 styles.colorDot,
-                { backgroundColor: row.colorCode || colors.gray[400] }
+                { backgroundColor: row.colorCode || colors.gray[400] },
               ]}
             />
             <Text style={styles.tableCellBold}>{row.color}</Text>
@@ -1328,7 +1335,7 @@ const ColorSizeTable = ({ data }) => {
             style={[
               styles.tableCell,
               styles.tableCellBold,
-              { width: `${cellWidth}%` }
+              { width: `${cellWidth}%` },
             ]}
           >
             {row.total?.toLocaleString()}
@@ -1342,7 +1349,7 @@ const ColorSizeTable = ({ data }) => {
           style={[
             styles.tableCell,
             styles.tableCellBold,
-            { width: `${cellWidth * 2}%` }
+            { width: `${cellWidth * 2}%` },
           ]}
         >
           TOTAL
@@ -1359,7 +1366,7 @@ const ColorSizeTable = ({ data }) => {
           style={[
             styles.tableCell,
             styles.tableCellBold,
-            { width: `${cellWidth}%`, color: colors.primary }
+            { width: `${cellWidth}%`, color: colors.primary },
           ]}
         >
           {grandTotal?.toLocaleString()}
@@ -1378,7 +1385,7 @@ const AQLSection = ({
   aqlSampleData,
   totals,
   inspectedQty,
-  defectsList
+  defectsList,
 }) => {
   if (!aqlResult) return null;
 
@@ -1527,7 +1534,7 @@ const AQLSection = ({
                 key={idx}
                 style={[
                   styles.tableRow,
-                  { backgroundColor: idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB" }
+                  { backgroundColor: idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB" },
                 ]}
               >
                 <View style={styles.colDefectName}>
@@ -1542,7 +1549,7 @@ const AQLSection = ({
                       color:
                         defect.minor > 0 ? colors.success : colors.gray[300],
                       fontFamily:
-                        defect.minor > 0 ? "Helvetica-Bold" : "Helvetica"
+                        defect.minor > 0 ? "Helvetica-Bold" : "Helvetica",
                     }}
                   >
                     {defect.minor || "-"}
@@ -1555,7 +1562,7 @@ const AQLSection = ({
                       color:
                         defect.major > 0 ? colors.warning : colors.gray[300],
                       fontFamily:
-                        defect.major > 0 ? "Helvetica-Bold" : "Helvetica"
+                        defect.major > 0 ? "Helvetica-Bold" : "Helvetica",
                     }}
                   >
                     {defect.major || "-"}
@@ -1568,7 +1575,7 @@ const AQLSection = ({
                       color:
                         defect.critical > 0 ? colors.danger : colors.gray[300],
                       fontFamily:
-                        defect.critical > 0 ? "Helvetica-Bold" : "Helvetica"
+                        defect.critical > 0 ? "Helvetica-Bold" : "Helvetica",
                     }}
                   >
                     {defect.critical || "-"}
@@ -1587,20 +1594,20 @@ const AQLSection = ({
             style={[
               styles.tableFooterRow,
               styles.bgGrayLight,
-              { borderTopWidth: 1, borderTopColor: colors.gray[300] }
+              { borderTopWidth: 1, borderTopColor: colors.gray[300] },
             ]}
           >
             <View
               style={[
                 styles.colDefectName,
-                { alignItems: "flex-end", paddingRight: 10 }
+                { alignItems: "flex-end", paddingRight: 10 },
               ]}
             >
               <Text
                 style={{
                   fontSize: 7,
                   fontFamily: "Helvetica-Bold",
-                  color: colors.gray[600]
+                  color: colors.gray[600],
                 }}
               >
                 TOTAL
@@ -1611,7 +1618,7 @@ const AQLSection = ({
                 style={{
                   fontSize: 7,
                   fontFamily: "Helvetica-Bold",
-                  color: colors.success
+                  color: colors.success,
                 }}
               >
                 {totals.minor}
@@ -1622,7 +1629,7 @@ const AQLSection = ({
                 style={{
                   fontSize: 7,
                   fontFamily: "Helvetica-Bold",
-                  color: colors.warning
+                  color: colors.warning,
                 }}
               >
                 {totals.major}
@@ -1633,7 +1640,7 @@ const AQLSection = ({
                 style={{
                   fontSize: 7,
                   fontFamily: "Helvetica-Bold",
-                  color: colors.danger
+                  color: colors.danger,
                 }}
               >
                 {totals.critical}
@@ -1644,7 +1651,7 @@ const AQLSection = ({
                 style={{
                   fontSize: 7,
                   fontFamily: "Helvetica-Bold",
-                  color: colors.primary
+                  color: colors.primary,
                 }}
               >
                 {totals.total}
@@ -1657,14 +1664,14 @@ const AQLSection = ({
             <View
               style={[
                 styles.colDefectName,
-                { alignItems: "flex-end", paddingRight: 10 }
+                { alignItems: "flex-end", paddingRight: 10 },
               ]}
             >
               <Text
                 style={{
                   fontSize: 7,
                   fontFamily: "Helvetica-Bold",
-                  color: colors.gray[500]
+                  color: colors.gray[500],
                 }}
               >
                 Ac / Re
@@ -1695,14 +1702,14 @@ const AQLSection = ({
             <View
               style={[
                 styles.colDefectName,
-                { alignItems: "flex-end", paddingRight: 10 }
+                { alignItems: "flex-end", paddingRight: 10 },
               ]}
             >
               <Text
                 style={{
                   fontSize: 7,
                   fontFamily: "Helvetica-Bold",
-                  color: colors.gray[600]
+                  color: colors.gray[600],
                 }}
               >
                 STATUS
@@ -1730,7 +1737,7 @@ const AQLSection = ({
             { marginTop: 12, borderWidth: 1 },
             aqlResult.final === "PASS"
               ? { backgroundColor: "#f0fdf4", borderColor: "#15803d" }
-              : { backgroundColor: "#fef2f2", borderColor: "#b91c1c" }
+              : { backgroundColor: "#fef2f2", borderColor: "#b91c1c" },
           ]}
         >
           <View style={{ flex: 1, alignItems: "center" }}>
@@ -1743,7 +1750,7 @@ const AQLSection = ({
                 { fontSize: 14 },
                 aqlResult.final === "PASS"
                   ? { color: "#15803d" }
-                  : { color: "#b91c1c" }
+                  : { color: "#b91c1c" },
               ]}
             >
               {aqlResult.final}
@@ -1761,7 +1768,7 @@ const AQLSection = ({
 const DefectSummarySection = ({
   summaryData,
   defectImages,
-  defectHeatmapData
+  defectHeatmapData,
 }) => {
   if (!summaryData?.groups || summaryData.groups.length === 0) {
     return null;
@@ -1805,7 +1812,7 @@ const DefectImageGrid = ({ images }) => {
   // Helper to split array into chunks of 3 (for manual rows)
   const chunk = (arr, size) =>
     Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
-      arr.slice(i * size, i * size + size)
+      arr.slice(i * size, i * size + size),
     );
 
   // Group images by configLabel
@@ -1858,8 +1865,8 @@ const DefectImageGrid = ({ images }) => {
                             {
                               backgroundColor: colors.gray[200],
                               justifyContent: "center",
-                              alignItems: "center"
-                            }
+                              alignItems: "center",
+                            },
                           ]}
                         >
                           <Text
@@ -1878,8 +1885,8 @@ const DefectImageGrid = ({ images }) => {
                             img.positionType === "Outside"
                               ? styles.badgeOutside
                               : img.positionType === "Inside"
-                              ? styles.badgeInside
-                              : styles.badgeNa
+                                ? styles.badgeInside
+                                : styles.badgeNa,
                           ]}
                         >
                           <Text>{img.positionType}</Text>
@@ -1893,7 +1900,7 @@ const DefectImageGrid = ({ images }) => {
                             styles.imageBadge,
                             img.status === "Minor" && styles.badgeMinor,
                             img.status === "Major" && styles.badgeMajor,
-                            img.status === "Critical" && styles.badgeCritical
+                            img.status === "Critical" && styles.badgeCritical,
                           ]}
                         >
                           <Text>{img.status}</Text>
@@ -1915,8 +1922,8 @@ const DefectImageGrid = ({ images }) => {
                             {
                               marginTop: 2,
                               fontStyle: "italic",
-                              color: colors.gray[600]
-                            }
+                              color: colors.gray[600],
+                            },
                           ]}
                         >
                           "{img.comment}"
@@ -1939,7 +1946,7 @@ const DefectImageGrid = ({ images }) => {
                   styles.textMuted,
                   styles.textSmall,
                   styles.textCenter,
-                  styles.mt8
+                  styles.mt8,
                 ]}
               >
                 +{configImages.length - 9} more images not shown
@@ -1978,8 +1985,8 @@ const ChecklistSection = ({ headers, headerData }) => {
                     selectedVal === "N/A" && styles.badgeNA,
                     !selectedVal && {
                       backgroundColor: colors.gray[200],
-                      color: colors.gray[500]
-                    }
+                      color: colors.gray[500],
+                    },
                   ]}
                 >
                   <Text>{selectedVal || "Pending"}</Text>
@@ -1993,7 +2000,7 @@ const ChecklistSection = ({ headers, headerData }) => {
         {(() => {
           const evidenceSections = headers.filter((section) => {
             const hasImages = Object.keys(
-              headerData?.capturedImages || {}
+              headerData?.capturedImages || {},
             ).some((k) => k.startsWith(`${section._id}_`));
             return hasImages || headerData?.remarks?.[section._id];
           });
@@ -2027,7 +2034,7 @@ const ChecklistSection = ({ headers, headerData }) => {
                                 <View
                                   style={[
                                     styles.image,
-                                    { backgroundColor: colors.gray[200] }
+                                    { backgroundColor: colors.gray[200] },
                                   ]}
                                 />
                               )}
@@ -2063,14 +2070,14 @@ const PhotoDocumentationSection = ({ photoData }) => {
   // Helper to split array into chunks of 3
   const chunk = (arr, size) =>
     Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
-      arr.slice(i * size, i * size + size)
+      arr.slice(i * size, i * size + size),
     );
 
   // Filter sections that actually have content
   const validSections = photoData.filter(
     (section) =>
       section.items &&
-      section.items.some((item) => item.images && item.images.length > 0)
+      section.items.some((item) => item.images && item.images.length > 0),
   );
 
   if (validSections.length === 0) return null;
@@ -2103,7 +2110,7 @@ const PhotoDocumentationSection = ({ photoData }) => {
                     indexStr:
                       item.images.length > 1
                         ? `(${imgIndex + 1}/${item.images.length})`
-                        : ""
+                        : "",
                   });
                 }
               });
@@ -2202,7 +2209,7 @@ const YPivotQAReportPDFDocument = ({
   defectImagesWithBase64,
   ppSheetDataWithImages,
   defectHeatmapData,
-  sizeList = []
+  sizeList = [],
 }) => {
   const selectedOrders = reportData?.orderNos || [];
   const orderNo = selectedOrders.length > 0 ? selectedOrders[0] : "N/A";

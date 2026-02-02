@@ -46,26 +46,32 @@ export default function UpdateModelReimans({
       let sourceRecords = [];
       if (report.inspectionRecords && report.inspectionRecords.length > 0) {
         sourceRecords = report.inspectionRecords;
-      } else if (report.history && typeof report.history === 'object' && !Array.isArray(report.history)) {
+      } else if (
+        report.history &&
+        typeof report.history === "object" &&
+        !Array.isArray(report.history)
+      ) {
         // Convert nested Map history (Item -> Check) to latest records for editing
         const historyMap = report.history;
-        sourceRecords = Object.keys(historyMap).sort((a, b) => {
-          const numA = parseInt(a.replace('Item ', ''));
-          const numB = parseInt(b.replace('Item ', ''));
-          return numA - numB;
-        }).map(itemKey => {
-          const checks = historyMap[itemKey] || {};
-          const checkKeys = Object.keys(checks).sort((a, b) => {
-            const numA = parseInt(a.replace('Check ', ''));
-            const numB = parseInt(b.replace('Check ', ''));
-            return numB - numA; // Sort descending to get latest
+        sourceRecords = Object.keys(historyMap)
+          .sort((a, b) => {
+            const numA = parseInt(a.replace("Item ", ""));
+            const numB = parseInt(b.replace("Item ", ""));
+            return numA - numB;
+          })
+          .map((itemKey) => {
+            const checks = historyMap[itemKey] || {};
+            const checkKeys = Object.keys(checks).sort((a, b) => {
+              const numA = parseInt(a.replace("Check ", ""));
+              const numB = parseInt(b.replace("Check ", ""));
+              return numB - numA; // Sort descending to get latest
+            });
+            return {
+              ...checks[checkKeys[0]],
+              itemName: itemKey, // Store the item name to identify it during save
+              checkCount: checkKeys.length,
+            };
           });
-          return {
-            ...checks[checkKeys[0]],
-            itemName: itemKey, // Store the item name to identify it during save
-            checkCount: checkKeys.length
-          };
-        });
       } else if (Array.isArray(report.history)) {
         sourceRecords = report.history;
       }
@@ -340,47 +346,53 @@ export default function UpdateModelReimans({
           : "http://localhost:5001";
       const prefix = base.endsWith("/") ? base.slice(0, -1) : base;
 
-      const currentEditRecords = formData.inspectionRecords.map((rec, index) => ({
-        top: {
-          body: rec.top.body,
-          ribs: "",
-          status: rec.top.pass ? "pass" : rec.top.fail ? "fail" : "",
-        },
-        middle: { body: "", ribs: "", status: "" },
-        bottom: { body: "", ribs: "", status: "" },
-        images: rec.images || [],
-        date: formData.date || rec.date,
-        generalRemark: formData.generalRemark || rec.remark || "",
-        // Capture full Reitmans snapshot in history
-        factoryStyleNo: formData.factoryStyleNo,
-        buyerStyle: formData.buyerStyle,
-        customer: formData.customer,
-        colorName: formData.colorName,
-        poLine: formData.poLine,
-        composition: formData.composition,
-        primaryFabric: formData.primaryFabric,
-        primaryPercentage: formData.primaryPercentage,
-        upperCentisimalIndex: formData.upperCentisimalIndex,
-        secondaryFabric: formData.secondaryFabric,
-        secondaryPercentage: formData.secondaryPercentage,
-        timeChecked: formData.timeChecked,
-        moistureRateBeforeDehumidify: formData.moistureRateBeforeDehumidify,
-        noPcChecked: formData.noPcChecked,
-        timeIn: formData.timeIn,
-        timeOut: formData.timeOut,
-        moistureRateAfter: formData.moistureRateAfter,
-        matchedRule: formData.matchedRule,
-        itemName: rec.itemName || `Item ${index + 1}`
-      }));
+      const currentEditRecords = formData.inspectionRecords.map(
+        (rec, index) => ({
+          top: {
+            body: rec.top.body,
+            ribs: "",
+            status: rec.top.pass ? "pass" : rec.top.fail ? "fail" : "",
+          },
+          middle: { body: "", ribs: "", status: "" },
+          bottom: { body: "", ribs: "", status: "" },
+          images: rec.images || [],
+          date: formData.date || rec.date,
+          generalRemark: formData.generalRemark || rec.remark || "",
+          // Capture full Reitmans snapshot in history
+          factoryStyleNo: formData.factoryStyleNo,
+          buyerStyle: formData.buyerStyle,
+          customer: formData.customer,
+          colorName: formData.colorName,
+          poLine: formData.poLine,
+          composition: formData.composition,
+          primaryFabric: formData.primaryFabric,
+          primaryPercentage: formData.primaryPercentage,
+          upperCentisimalIndex: formData.upperCentisimalIndex,
+          secondaryFabric: formData.secondaryFabric,
+          secondaryPercentage: formData.secondaryPercentage,
+          timeChecked: formData.timeChecked,
+          moistureRateBeforeDehumidify: formData.moistureRateBeforeDehumidify,
+          noPcChecked: formData.noPcChecked,
+          timeIn: formData.timeIn,
+          timeOut: formData.timeOut,
+          moistureRateAfter: formData.moistureRateAfter,
+          matchedRule: formData.matchedRule,
+          itemName: rec.itemName || `Item ${index + 1}`,
+        }),
+      );
 
       const previousHistory = { ...(report.history || {}) };
 
       currentEditRecords.forEach((rec) => {
         const itemKey = rec.itemName;
-        const previousChecks = (previousHistory[itemKey] && typeof previousHistory[itemKey] === 'object') ? previousHistory[itemKey] : {};
+        const previousChecks =
+          previousHistory[itemKey] &&
+          typeof previousHistory[itemKey] === "object"
+            ? previousHistory[itemKey]
+            : {};
         const checkKeys = Object.keys(previousChecks).sort((a, b) => {
-          const numA = parseInt(a.replace('Check ', ''));
-          const numB = parseInt(b.replace('Check ', ''));
+          const numA = parseInt(a.replace("Check ", ""));
+          const numB = parseInt(b.replace("Check ", ""));
           return numB - numA;
         });
 
@@ -389,7 +401,8 @@ export default function UpdateModelReimans({
         const newCheckKey = `Check ${newCheckNumber}`;
 
         // Detection: checking if readings changed
-        const isChanged = !latestCheck ||
+        const isChanged =
+          !latestCheck ||
           String(rec.top?.body) !== String(latestCheck.top?.body);
 
         if (isChanged) {
@@ -401,8 +414,8 @@ export default function UpdateModelReimans({
                 hour: "2-digit",
                 minute: "2-digit",
                 hour12: true,
-              })
-            }
+              }),
+            },
           };
         }
       });
@@ -781,9 +794,7 @@ export default function UpdateModelReimans({
 
                       {isExpanded && (
                         <div className="space-y-4">
-                          <div
-                            className="flex flex-col md:flex-row gap-4 w-full items-center p-4 rounded-2xl shadow-sm bg-white border border-blue-100 mb-2 transition-all hover:shadow-md"
-                          >
+                          <div className="flex flex-col md:flex-row gap-4 w-full items-center p-4 rounded-2xl shadow-sm bg-white border border-blue-100 mb-2 transition-all hover:shadow-md">
                             <div className="w-40 font-black uppercase text-[11px] text-blue-600 tracking-wider">
                               Moisture Reading
                             </div>

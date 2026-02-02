@@ -61,69 +61,81 @@ const HistoryModelReitmans = ({
   const activeReport = fullReport || report;
   if (!activeReport) return null;
 
-  const rawHistory = (activeReport.history && (Array.isArray(activeReport.history) ? activeReport.history.length > 0 : Object.keys(activeReport.history).length > 0))
-    ? activeReport.history
-    : activeReport.inspectionRecords || [];
+  const rawHistory =
+    activeReport.history &&
+    (Array.isArray(activeReport.history)
+      ? activeReport.history.length > 0
+      : Object.keys(activeReport.history).length > 0)
+      ? activeReport.history
+      : activeReport.inspectionRecords || [];
 
   // Helper to group nested history by Session (Check 1, Check 2, etc.)
   const getGroupedHistory = (history) => {
     if (Array.isArray(history)) {
       if (history.length > 0 && (history[0].itemName || history[0].checkName)) {
         const sessions = {};
-        history.forEach(item => {
-          const ck = item.checkName || 'Check 1';
+        history.forEach((item) => {
+          const ck = item.checkName || "Check 1";
           if (!sessions[ck]) sessions[ck] = { name: ck, items: [] };
           sessions[ck].items.push(item);
         });
-        return Object.keys(sessions).sort((a, b) => {
-          const numA = parseInt(a.replace('Check ', ''));
-          const numB = parseInt(b.replace('Check ', ''));
-          return numA - numB;
-        }).map(k => sessions[k]);
+        return Object.keys(sessions)
+          .sort((a, b) => {
+            const numA = parseInt(a.replace("Check ", ""));
+            const numB = parseInt(b.replace("Check ", ""));
+            return numA - numB;
+          })
+          .map((k) => sessions[k]);
       }
       return history.map((h, i) => ({
         name: h.checkName || `Check ${i + 1}`,
-        items: [{ ...h, itemName: h.itemName || 'Item 1' }]
+        items: [{ ...h, itemName: h.itemName || "Item 1" }],
       }));
     }
 
-    if (typeof history !== 'object' || history === null) return [];
+    if (typeof history !== "object" || history === null) return [];
 
     const sessions = {};
-    Object.keys(history).forEach(itemKey => {
+    Object.keys(history).forEach((itemKey) => {
       const checks = history[itemKey] || {};
-      Object.keys(checks).forEach(checkKey => {
+      Object.keys(checks).forEach((checkKey) => {
         if (!sessions[checkKey]) {
           sessions[checkKey] = {
             name: checkKey,
-            items: []
+            items: [],
           };
         }
         sessions[checkKey].items.push({
           ...checks[checkKey],
           itemName: itemKey,
-          checkName: checkKey
+          checkName: checkKey,
         });
       });
     });
 
-    return Object.keys(sessions).sort((a, b) => {
-      const numA = parseInt(a.replace('Check ', ''));
-      const numB = parseInt(b.replace('Check ', ''));
-      return numA - numB;
-    }).map(k => sessions[k]);
+    return Object.keys(sessions)
+      .sort((a, b) => {
+        const numA = parseInt(a.replace("Check ", ""));
+        const numB = parseInt(b.replace("Check ", ""));
+        return numA - numB;
+      })
+      .map((k) => sessions[k]);
   };
 
   const groupedHistory = getGroupedHistory(rawHistory);
-  const history = groupedHistory.flatMap(s => s.items);
+  const history = groupedHistory.flatMap((s) => s.items);
 
   const getItemStatus = (record) => {
-    return (record.top?.status === "pass" || !record.top?.status) ? "pass" : "fail";
+    return record.top?.status === "pass" || !record.top?.status
+      ? "pass"
+      : "fail";
   };
 
   const getSessionStatus = (session) => {
     if (!session || !session.items) return "fail";
-    return session.items.every(record => getItemStatus(record) === "pass") ? "pass" : "fail";
+    return session.items.every((record) => getItemStatus(record) === "pass")
+      ? "pass"
+      : "fail";
   };
 
   const getReportStatus = (raw) => {
@@ -254,10 +266,10 @@ const HistoryModelReitmans = ({
         </div>
         <div className="flex items-center gap-3">
           <div className="flex flex-col items-end">
-            <span className="text-[10px] text-white/70 font-black uppercase tracking-widest">Overall Result</span>
-            <div className="mt-1">
-              {renderStatusBadge(reportStatus)}
-            </div>
+            <span className="text-[10px] text-white/70 font-black uppercase tracking-widest">
+              Overall Result
+            </span>
+            <div className="mt-1">{renderStatusBadge(reportStatus)}</div>
           </div>
           <button
             onClick={onCancel}
@@ -274,7 +286,11 @@ const HistoryModelReitmans = ({
           groupedHistory.map((session, sIdx) => {
             const isLatest = sIdx === groupedHistory.length - 1;
             return (
-              <div key={sIdx} className="mb-12 space-y-6 animate-fade-in" style={{ animationDelay: `${sIdx * 0.06}s` }}>
+              <div
+                key={sIdx}
+                className="mb-12 space-y-6 animate-fade-in"
+                style={{ animationDelay: `${sIdx * 0.06}s` }}
+              >
                 {/* Session Title Header */}
                 <div className="flex items-center gap-4 bg-emerald-500/10 p-4 rounded-xl border border-emerald-500/20 shadow-sm">
                   <div className="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center text-white shadow-md">
@@ -290,7 +306,9 @@ const HistoryModelReitmans = ({
                   </div>
                   <div className="ml-auto flex items-center gap-6">
                     <div className="flex flex-col items-end">
-                      <span className="text-[8px] text-emerald-600/60 font-black uppercase tracking-widest">Session Status</span>
+                      <span className="text-[8px] text-emerald-600/60 font-black uppercase tracking-widest">
+                        Session Status
+                      </span>
                       <div className="mt-1">
                         {renderStatusBadge(getSessionStatus(session))}
                       </div>
@@ -312,7 +330,9 @@ const HistoryModelReitmans = ({
                       {/* Card 1: Session Information */}
                       <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 shadow-md relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-2 opacity-5 pointer-events-none">
-                          <span className="text-4xl font-black text-emerald-500">{record.itemName || `Item ${rIdx + 1}`}</span>
+                          <span className="text-4xl font-black text-emerald-500">
+                            {record.itemName || `Item ${rIdx + 1}`}
+                          </span>
                         </div>
                         <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                           <div className="flex items-center gap-2">
@@ -322,7 +342,9 @@ const HistoryModelReitmans = ({
                             </h4>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-[9px] font-bold text-emerald-600/50 uppercase tracking-widest">Item Result:</span>
+                            <span className="text-[9px] font-bold text-emerald-600/50 uppercase tracking-widest">
+                              Item Result:
+                            </span>
                             {renderStatusBadge(getItemStatus(record))}
                           </div>
                         </div>
@@ -334,7 +356,7 @@ const HistoryModelReitmans = ({
                             <span className="text-sm font-bold text-slate-800">
                               {formatTime(
                                 record.timeChecked ||
-                                (isLatest ? report.timeChecked : ""),
+                                  (isLatest ? report.timeChecked : ""),
                               )}
                             </span>
                           </div>
@@ -353,7 +375,8 @@ const HistoryModelReitmans = ({
                             </span>
                             <span className="text-sm font-bold text-slate-800">
                               {formatTime(
-                                record.timeIn || (isLatest ? report.timeIn : ""),
+                                record.timeIn ||
+                                  (isLatest ? report.timeIn : ""),
                               )}
                             </span>
                           </div>
@@ -380,7 +403,9 @@ const HistoryModelReitmans = ({
                             >
                               {record.moistureRateAfter ||
                                 record.moistureRateAfterDry ||
-                                (isLatest ? activeReport.moistureRateAfter : "---")}
+                                (isLatest
+                                  ? activeReport.moistureRateAfter
+                                  : "---")}
                               %
                             </span>
                           </div>
@@ -424,7 +449,7 @@ const HistoryModelReitmans = ({
                       </div>
 
                       {/* Card 2: Technical Readings */}
-                      < div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 shadow-md" >
+                      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 shadow-md">
                         <div className="flex items-center gap-3 text-emerald-600 border-b border-gray-100 pb-3">
                           <Beaker size={18} />
                           <h4 className="text-sm font-bold uppercase tracking-wide">
@@ -448,13 +473,12 @@ const HistoryModelReitmans = ({
                             </span>
                             <span className="text-sm font-bold text-slate-800">
                               {formatTime(
-                                record.timeOut || (isLatest ? report.timeOut : ""),
+                                record.timeOut ||
+                                  (isLatest ? report.timeOut : ""),
                               )}
                             </span>
                           </div>
-                          <div
-                            className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0"
-                          >
+                          <div className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
                             <div className="flex items-center gap-2">
                               <div className="w-2 h-2 rounded-full bg-emerald-500" />
                               <span className="text-sm text-slate-500 font-bold uppercase tracking-tight">
@@ -467,7 +491,9 @@ const HistoryModelReitmans = ({
                                   {record.top?.body || "0"}%
                                 </span>
                                 {record.top?.status && (
-                                  <span className={`text-[10px] font-black uppercase tracking-widest ${record.top.status === 'pass' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                  <span
+                                    className={`text-[10px] font-black uppercase tracking-widest ${record.top.status === "pass" ? "text-emerald-500" : "text-rose-500"}`}
+                                  >
                                     {record.top.status}
                                   </span>
                                 )}
@@ -492,10 +518,9 @@ const HistoryModelReitmans = ({
                         </div>
                       </div>
                     </div>
-                  ))
-                  }
-                </div >
-              </div >
+                  ))}
+                </div>
+              </div>
             );
           })
         ) : (

@@ -3,7 +3,7 @@ import React, {
   useEffect,
   useMemo,
   useCallback,
-  useRef
+  useRef,
 } from "react";
 import axios from "axios";
 import {
@@ -41,7 +41,7 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
-  Menu
+  Menu,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
@@ -69,7 +69,7 @@ const StatusBadge = ({ status }) => {
     completed: "bg-green-100 text-green-700 border-green-200",
     draft: "bg-amber-100 text-amber-700 border-amber-200",
     in_progress: "bg-blue-100 text-blue-700 border-blue-200",
-    cancelled: "bg-red-100 text-red-700 border-red-200"
+    cancelled: "bg-red-100 text-red-700 border-red-200",
   };
 
   const label = status ? status.replace("_", " ") : "Unknown";
@@ -112,32 +112,50 @@ const ProductImageModal = ({ src, alt, onClose }) => {
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };
 
 // =============================================================================
-// Sub-Component: Async Inspector Search (ID & Name)
+// Sub-Component: Multi-Inspector Select (Rich UI with Photos)
 // =============================================================================
-const InspectorSearchFilter = ({ value, onChange }) => {
-  const [searchTerm, setSearchTerm] = useState(value || "");
+const MultiInspectorSelect = ({ selectedItems = [], onChange }) => {
+  const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
+  const containerRef = useRef(null);
+  const inputRef = useRef(null);
 
+  // Close dropdown on outside click
   useEffect(() => {
-    if (!value) setSearchTerm("");
-  }, [value]);
+    const handleClickOutside = (event) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target)
+      ) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
+  // Search Users API
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
-      if (searchTerm && searchTerm !== value && searchTerm.length >= 1) {
+      if (searchTerm && searchTerm.length >= 1) {
         setLoading(true);
         try {
           const res = await axios.get(
-            `${API_BASE_URL}/api/users/search?term=${searchTerm}`
+            `${API_BASE_URL}/api/users/search?term=${searchTerm}`,
           );
-          setResults(res.data || []);
+          // Filter out users already selected
+          const existingIds = selectedItems.map((i) => i.emp_id);
+          const filtered = (res.data || []).filter(
+            (u) => !existingIds.includes(u.emp_id),
+          );
+          setResults(filtered);
           setShowDropdown(true);
         } catch (error) {
           console.error("User search error", error);
@@ -145,57 +163,105 @@ const InspectorSearchFilter = ({ value, onChange }) => {
         } finally {
           setLoading(false);
         }
-      } else if (!searchTerm) {
+      } else {
         setResults([]);
-        setShowDropdown(false);
-        if (value) onChange("");
       }
     }, 400);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
+  }, [searchTerm, selectedItems]);
 
   const handleSelect = (user) => {
-    setSearchTerm(user.emp_id);
-    onChange(user.emp_id);
+    // Add full user object to state
+    onChange([...selectedItems, user]);
+    setSearchTerm("");
+    inputRef.current?.focus();
     setShowDropdown(false);
   };
 
-  const handleClear = () => {
-    setSearchTerm("");
-    onChange("");
-    setResults([]);
-    setShowDropdown(false);
+  const handleRemove = (empIdToRemove) => {
+    onChange(selectedItems.filter((u) => u.emp_id !== empIdToRemove));
   };
 
   return (
-    <div className="relative">
-      <div className="relative">
-        <input
-          type="text"
-          placeholder="Type ID or Name..."
-          className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none pr-8"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onFocus={() => {
-            if (results.length > 0) setShowDropdown(true);
-          }}
-          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-        />
-        <div className="absolute right-2 top-1/2 -translate-y-1/2">
-          {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-          ) : searchTerm ? (
-            <button
-              onClick={handleClear}
-              className="text-gray-400 hover:text-red-500"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          ) : null}
+    <div ref={containerRef} className="relative w-full">
+      <div
+        className="flex flex-col gap-1.5 p-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl min-h-[42px] focus-within:ring-2 focus-within:ring-indigo-500 transition-all cursor-text"
+        onClick={() => inputRef.current?.focus()}
+      >
+        {/* Selected Items - Stacked as "One Line One ID" */}
+        {selectedItems.length > 0 && (
+          <div className="flex flex-col gap-1 w-full">
+            {selectedItems.map((user) => (
+              <div
+                key={user.emp_id}
+                className="flex items-center justify-between gap-2 px-2 py-1.5 bg-indigo-50 dark:bg-indigo-900/40 border border-indigo-100 dark:border-indigo-800 rounded-lg group"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  {/* Small Photo Avatar */}
+                  <div className="w-5 h-5 rounded-full bg-indigo-200 flex-shrink-0 overflow-hidden border border-indigo-300">
+                    {user.face_photo ? (
+                      <img
+                        src={user.face_photo}
+                        alt="u"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-3 h-3 text-indigo-700 m-auto mt-1" />
+                    )}
+                  </div>
+                  {/* ID and Name */}
+                  <span className="text-xs font-bold text-indigo-900 dark:text-indigo-200 truncate">
+                    {user.emp_id}
+                    {/* <span className="font-normal text-indigo-600 dark:text-indigo-400 ml-1">
+                      ({user.eng_name?.split(" ")[0]})
+                    </span> */}
+                  </span>
+                </div>
+
+                {/* Remove Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemove(user.emp_id);
+                  }}
+                  className="p-1 text-gray-400 hover:text-red-500 hover:bg-white rounded-full transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Input Field */}
+        <div className="flex items-center gap-2">
+          <Search className="w-4 h-4 text-gray-400 ml-1" />
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={
+              selectedItems.length === 0
+                ? "Search ID or Name..."
+                : "Add more..."
+            }
+            className="flex-1 bg-transparent text-sm outline-none text-gray-700 dark:text-gray-200 h-6 min-w-0"
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              if (e.target.value) setShowDropdown(true);
+            }}
+            onFocus={() => {
+              if (results.length > 0) setShowDropdown(true);
+            }}
+          />
+          {loading && (
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
+          )}
         </div>
       </div>
 
+      {/* Dropdown Results */}
       {showDropdown && results.length > 0 && (
         <div className="absolute z-[100] mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl max-h-60 overflow-y-auto">
           {results.map((u) => (
@@ -204,7 +270,8 @@ const InspectorSearchFilter = ({ value, onChange }) => {
               onClick={() => handleSelect(u)}
               className="w-full text-left px-3 py-2.5 hover:bg-indigo-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0 flex items-center gap-3 transition-colors group"
             >
-              <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-600 flex items-center justify-center flex-shrink-0 border border-gray-200 dark:border-gray-500 overflow-hidden">
+              {/* Dropdown Avatar */}
+              <div className="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-600 flex items-center justify-center flex-shrink-0 border border-gray-200 dark:border-gray-500 overflow-hidden">
                 {u.face_photo ? (
                   <img
                     src={u.face_photo}
@@ -233,128 +300,23 @@ const InspectorSearchFilter = ({ value, onChange }) => {
 };
 
 // =============================================================================
-// Sub-Component: Autocomplete Input (For Order No & Cust Style)
-// =============================================================================
-const AutocompleteInput = ({ value, onChange, placeholder, apiEndpoint }) => {
-  const [searchTerm, setSearchTerm] = useState(value || "");
-  const [results, setResults] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    if (!value) setSearchTerm("");
-  }, [value]);
-
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
-      if (searchTerm && searchTerm.length >= 2) {
-        setLoading(true);
-        try {
-          const res = await axios.get(
-            `${API_BASE_URL}${apiEndpoint}?term=${searchTerm}`
-          );
-          if (res.data.success) {
-            setResults(res.data.data || []);
-            setShowDropdown(true);
-          }
-        } catch (error) {
-          console.error("Autocomplete error", error);
-          setResults([]);
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        setResults([]);
-        setShowDropdown(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, apiEndpoint]);
-
-  const handleSelect = (item) => {
-    setSearchTerm(item);
-    onChange(item);
-    setShowDropdown(false);
-  };
-
-  const handleInputChange = (e) => {
-    const val = e.target.value;
-    setSearchTerm(val);
-    onChange(val);
-  };
-
-  const handleClear = () => {
-    setSearchTerm("");
-    onChange("");
-    setResults([]);
-    setShowDropdown(false);
-  };
-
-  return (
-    <div className="relative">
-      <div className="relative">
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder={placeholder}
-          className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none pr-8"
-          value={searchTerm}
-          onChange={handleInputChange}
-          onFocus={() => {
-            if (results.length > 0) setShowDropdown(true);
-          }}
-          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-        />
-        <div className="absolute right-2 top-1/2 -translate-y-1/2">
-          {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-          ) : searchTerm ? (
-            <button
-              onClick={handleClear}
-              className="text-gray-400 hover:text-red-500"
-              type="button"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          ) : (
-            <Search className="w-4 h-4 text-gray-400" />
-          )}
-        </div>
-      </div>
-
-      {showDropdown && results.length > 0 && (
-        <div className="absolute z-[100] mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
-          {results.map((item, idx) => (
-            <button
-              key={idx}
-              onClick={() => handleSelect(item)}
-              className="w-full text-left px-3 py-2 hover:bg-indigo-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors"
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// =============================================================================
 // Sub-Component: Multi-Select Autocomplete (For PO Line)
 // =============================================================================
+
 const MultiSelectAutocomplete = ({
-  selectedItems,
+  selectedItems = [], // Ensure default is empty array
   onChange,
   placeholder,
-  apiEndpoint
+  apiEndpoint,
+  staticOptions = null, // NEW: Accept static array of strings
+  valueKey = null, // Optional: If searching objects, which key to use? (simple string default)
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef(null);
+  const inputRef = useRef(null); // Ref to focus input
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -372,20 +334,49 @@ const MultiSelectAutocomplete = ({
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
-      if (searchTerm.length >= 2) {
+      // 1. If Static Options are provided (Local Filter)
+      if (staticOptions) {
+        if (searchTerm === "") {
+          // Show all (filtered by selected) if clicked with no search
+          const filtered = staticOptions.filter(
+            (item) => !selectedItems.includes(item),
+          );
+          setResults(filtered);
+        } else {
+          const lowerTerm = searchTerm.toLowerCase();
+          const filtered = staticOptions.filter(
+            (item) =>
+              item.toLowerCase().includes(lowerTerm) &&
+              !selectedItems.includes(item),
+          );
+          setResults(filtered);
+        }
+        // Only show if we have results or user is searching
+        if (searchTerm !== "" || showDropdown) setShowDropdown(true);
+      }
+      // 2. If API Endpoint is provided (Async Fetch)
+      else if (apiEndpoint && searchTerm.length >= 1) {
+        // Allow 1 char search
         setLoading(true);
         try {
           const res = await axios.get(
-            `${API_BASE_URL}${apiEndpoint}?term=${searchTerm}`
+            `${API_BASE_URL}${apiEndpoint}?term=${searchTerm}`,
           );
-          if (res.data.success) {
-            // Filter out already selected items
-            const filtered = (res.data.data || []).filter(
-              (item) => !selectedItems.includes(item)
-            );
-            setResults(filtered);
-            setShowDropdown(true);
+          let data = res.data.data || res.data || [];
+
+          // Handle User Search format specifically if needed, or assume array of strings
+          // If data is array of objects (like Users), map to ID string
+          if (
+            data.length > 0 &&
+            typeof data[0] === "object" &&
+            data[0].emp_id
+          ) {
+            data = data.map((u) => u.emp_id);
           }
+
+          const filtered = data.filter((item) => !selectedItems.includes(item));
+          setResults(filtered);
+          setShowDropdown(true);
         } catch (error) {
           console.error("Autocomplete error", error);
         } finally {
@@ -393,16 +384,16 @@ const MultiSelectAutocomplete = ({
         }
       } else {
         setResults([]);
-        setShowDropdown(false);
       }
     }, 300);
     return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, apiEndpoint, selectedItems]);
+  }, [searchTerm, apiEndpoint, staticOptions, selectedItems, showDropdown]);
 
   const handleSelect = (item) => {
     onChange([...selectedItems, item]);
     setSearchTerm("");
-    setShowDropdown(false);
+    // Keep focus on input
+    if (inputRef.current) inputRef.current.focus();
   };
 
   const handleRemove = (itemToRemove) => {
@@ -410,31 +401,38 @@ const MultiSelectAutocomplete = ({
   };
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-[250px]">
-      <div className="flex flex-wrap items-center gap-1 p-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl min-h-[38px] focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
+    <div ref={containerRef} className="relative w-full">
+      <div
+        className="flex flex-wrap items-center gap-1.5 p-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl min-h-[42px] focus-within:ring-2 focus-within:ring-indigo-500 transition-all cursor-text"
+        onClick={() => {
+          if (inputRef.current) inputRef.current.focus();
+          setShowDropdown(true);
+        }}
+      >
         {selectedItems.map((item) => (
           <span
             key={item}
-            className="flex items-center gap-1 px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold rounded-lg border border-indigo-200 dark:border-indigo-800"
+            className="flex items-center gap-1 px-2 py-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold rounded-md border border-indigo-200 dark:border-indigo-800 break-all"
           >
-            <span className="truncate max-w-[80px]">{item}</span>
+            <span>{item}</span>
             <button
-              onClick={() => handleRemove(item)}
-              className="hover:text-red-500 rounded-full focus:outline-none"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRemove(item);
+              }}
+              className="hover:text-red-500 rounded-full focus:outline-none p-0.5 hover:bg-white/50"
             >
               <X className="w-3 h-3" />
             </button>
           </span>
         ))}
         <input
+          ref={inputRef}
           type="text"
           placeholder={selectedItems.length === 0 ? placeholder : ""}
-          className="flex-1 min-w-[60px] bg-transparent text-sm outline-none px-1 text-gray-700 dark:text-gray-200"
+          className="flex-1 min-w-[60px] bg-transparent text-sm outline-none text-gray-700 dark:text-gray-200 h-6"
           value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setShowDropdown(true);
-          }}
+          onChange={(e) => setSearchTerm(e.target.value)}
           onFocus={() => setShowDropdown(true)}
         />
         {loading && (
@@ -443,12 +441,12 @@ const MultiSelectAutocomplete = ({
       </div>
 
       {showDropdown && results.length > 0 && (
-        <div className="absolute z-[100] mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+        <div className="absolute z-[100] mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl max-h-60 overflow-y-auto">
           {results.map((item, idx) => (
             <button
               key={idx}
               onClick={() => handleSelect(item)}
-              className="w-full text-left px-3 py-2 hover:bg-indigo-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0 text-xs font-medium text-gray-700 dark:text-gray-200 transition-colors"
+              className="w-full text-left px-3 py-2.5 hover:bg-indigo-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors"
             >
               {item}
             </button>
@@ -471,7 +469,7 @@ const InspectorAutoCloseModal = ({ data, onClose }) => {
     const fetchPhoto = async () => {
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/user-details?empId=${data.empId}`
+          `${API_BASE_URL}/api/user-details?empId=${data.empId}`,
         );
         if (isMounted && res.data && res.data.face_photo) {
           let url = res.data.face_photo;
@@ -534,7 +532,7 @@ const InspectorAutoCloseModal = ({ data, onClose }) => {
         <div className="absolute bottom-0 left-0 h-1 bg-indigo-500 animate-shrinkWidth w-full rounded-b-2xl opacity-50"></div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };
 
@@ -570,7 +568,7 @@ const ReportQRModal = ({ report, onClose }) => {
         </p>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };
 
@@ -585,14 +583,14 @@ const ColumnCustomizeModal = ({
   onApplyColumns,
   onApplyFilter, // <--- Function to apply a filter
   onDeleteFilter, // <--- Function to delete
-  onClose
+  onClose,
 }) => {
   const [selected, setSelected] = useState([...visibleColumns]);
   const [activeTab, setActiveTab] = useState("columns"); // 'columns' or 'filters'
 
   const toggleColumn = (colId) => {
     setSelected((prev) =>
-      prev.includes(colId) ? prev.filter((c) => c !== colId) : [...prev, colId]
+      prev.includes(colId) ? prev.filter((c) => c !== colId) : [...prev, colId],
     );
   };
 
@@ -735,7 +733,7 @@ const ColumnCustomizeModal = ({
         )}
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };
 
@@ -777,7 +775,7 @@ const AutoDismissModal = ({ isOpen, onClose, type, message }) => {
         </p>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };
 
@@ -790,7 +788,7 @@ const PaginationControls = ({
   totalCount,
   pageSize,
   onPageChange,
-  loading
+  loading,
 }) => {
   const getPageNumbers = () => {
     const pages = [];
@@ -902,7 +900,7 @@ const PaginationControls = ({
               >
                 {page}
               </button>
-            )
+            ),
           )}
         </div>
 
@@ -929,7 +927,7 @@ const PaginationControls = ({
               >
                 {page}
               </button>
-            )
+            ),
           )}
         </div>
 
@@ -984,7 +982,7 @@ const ALL_COLUMNS = [
   { id: "status", label: "QA Status" },
   { id: "resubmission", label: "Resubmission" },
   { id: "decision", label: "Leader Decision" },
-  { id: "action", label: "Action", required: true }
+  { id: "action", label: "Action", required: true },
 ];
 
 // =============================================================================
@@ -1033,7 +1031,7 @@ const YPivotQAReportMain = () => {
     "status",
     "resubmission",
     "decision",
-    "action"
+    "action",
   ]);
 
   // Filter State
@@ -1041,16 +1039,19 @@ const YPivotQAReportMain = () => {
     startDate: new Date().toISOString().split("T")[0],
     endDate: new Date().toISOString().split("T")[0],
     reportId: "",
-    reportType: "All",
+    // CHANGED TO ARRAYS
+    reportType: [],
     orderType: "All",
-    orderNo: "",
-    productType: "All",
-    empId: "",
-    subConFactory: "All",
-    custStyle: "",
-    buyer: "All",
-    supplier: "All",
-    poLines: []
+    orderNo: [],
+    productType: [],
+    empId: [],
+    subConFactory: [],
+    custStyle: [],
+    buyer: [],
+    supplier: [],
+    qaStatus: [],
+    leaderDecision: [],
+    poLines: [],
   });
 
   // Dynamic Options (for Dropdowns)
@@ -1059,8 +1060,14 @@ const YPivotQAReportMain = () => {
     productTypes: [],
     subConFactories: [],
     buyers: [],
-    suppliers: []
+    suppliers: [],
   });
+
+  // Static Options for the new filters
+  const staticFilterOptions = {
+    qaStatus: ["Pending", "Completed"],
+    leaderDecision: ["Pending QA", "Pending", "Approved", "Rework", "Rejected"],
+  };
 
   // Product Image Modal State
   const [previewImage, setPreviewImage] = useState(null);
@@ -1078,7 +1085,7 @@ const YPivotQAReportMain = () => {
   const [statusModal, setStatusModal] = useState({
     isOpen: false,
     type: "success",
-    message: ""
+    message: "",
   });
 
   const getNumSuffix = (num) => {
@@ -1090,6 +1097,41 @@ const YPivotQAReportMain = () => {
     return "th";
   };
 
+  // --- NEW USE EFFECT FOR REAL-TIME UPDATES ---
+  useEffect(() => {
+    // 1. Open the channel
+    const channel = new BroadcastChannel("qa_report_updates");
+
+    // 2. Listen for messages
+    channel.onmessage = (event) => {
+      if (event.data && event.data.type === "DECISION_UPDATE") {
+        const { reportId, status, updatedAt } = event.data;
+
+        // 3. Update the local state instantly
+        setReports((prevReports) =>
+          prevReports.map((report) => {
+            if (report.reportId === reportId) {
+              return {
+                ...report,
+                // Update the status string
+                decisionStatus: status,
+                // Update timestamp (Critical: this clears the "Action Required"
+                // logic in your table render because UpdatedAt > ResubmissionDate)
+                decisionUpdatedAt: updatedAt,
+              };
+            }
+            return report;
+          }),
+        );
+      }
+    };
+
+    // 4. Cleanup when component unmounts
+    return () => {
+      channel.close();
+    };
+  }, []); // Empty dependency array ensures this runs once on mount
+
   // --- 1. Fetch Preferences on Load ---
   useEffect(() => {
     if (user?.emp_id) {
@@ -1100,7 +1142,7 @@ const YPivotQAReportMain = () => {
   const fetchUserPreferences = async () => {
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/fincheck-reports/preferences/get?empId=${user.emp_id}`
+        `${API_BASE_URL}/api/fincheck-reports/preferences/get?empId=${user.emp_id}`,
       );
       if (res.data.success) {
         setSavedFiltersList(res.data.data.savedFilters || []);
@@ -1127,7 +1169,7 @@ const YPivotQAReportMain = () => {
       setStatusModal({
         isOpen: true,
         type: "error",
-        message: "Please enter a name"
+        message: "Please enter a name",
       });
       return;
     }
@@ -1135,7 +1177,7 @@ const YPivotQAReportMain = () => {
       setStatusModal({
         isOpen: true,
         type: "error",
-        message: "Name too long (max 25 chars)"
+        message: "Name too long (max 25 chars)",
       });
       return;
     }
@@ -1162,9 +1204,9 @@ const YPivotQAReportMain = () => {
           type: "filter",
           data: {
             name: newFilterName,
-            filters: filtersToSave
-          }
-        }
+            filters: filtersToSave,
+          },
+        },
       );
 
       if (res.data.success) {
@@ -1173,7 +1215,7 @@ const YPivotQAReportMain = () => {
         setStatusModal({
           isOpen: true,
           type: "success",
-          message: "Filter saved successfully!"
+          message: "Filter saved successfully!",
         });
       }
     } catch (error) {
@@ -1181,7 +1223,7 @@ const YPivotQAReportMain = () => {
       setStatusModal({
         isOpen: true,
         type: "error",
-        message: error.response?.data?.message || "Failed to save filter"
+        message: error.response?.data?.message || "Failed to save filter",
       });
     }
   };
@@ -1209,15 +1251,15 @@ const YPivotQAReportMain = () => {
         `${API_BASE_URL}/api/fincheck-reports/preferences/delete-filter`,
         {
           empId: user.emp_id,
-          filterId
-        }
+          filterId,
+        },
       );
       if (res.data.success) {
         setSavedFiltersList(res.data.data.savedFilters);
         setStatusModal({
           isOpen: true,
           type: "success",
-          message: "Filter deleted successfully"
+          message: "Filter deleted successfully",
         });
       }
     } catch (error) {
@@ -1225,7 +1267,7 @@ const YPivotQAReportMain = () => {
       setStatusModal({
         isOpen: true,
         type: "error",
-        message: "Failed to delete filter"
+        message: "Failed to delete filter",
       });
     }
   };
@@ -1240,8 +1282,8 @@ const YPivotQAReportMain = () => {
         {
           empId: user.emp_id,
           type: "columns",
-          data: newColumns
-        }
+          data: newColumns,
+        },
       );
     } catch (error) {
       console.error("Failed to save column preference", error);
@@ -1256,9 +1298,9 @@ const YPivotQAReportMain = () => {
         {
           params: {
             startDate: filters.startDate,
-            endDate: filters.endDate
-          }
-        }
+            endDate: filters.endDate,
+          },
+        },
       );
       if (res.data.success) {
         setOptions(res.data.data);
@@ -1273,23 +1315,35 @@ const YPivotQAReportMain = () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
+
       Object.entries(filters).forEach(([key, value]) => {
-        if (key === "poLines") {
-          if (value && value.length > 0) {
-            params.append("poLine", value.join(",")); // Send as comma-separated string
+        // CASE: empId is now an array of Objects {emp_id, eng_name...}
+        if (key === "empId" && Array.isArray(value) && value.length > 0) {
+          // Extract just the emp_id strings and join them
+          const ids = value.map((user) => user.emp_id).join(",");
+          params.append(key, ids);
+        }
+        // Handle Standard Arrays (Multi-selects)
+        else if (Array.isArray(value) && value.length > 0) {
+          // --- Map poLines to poLine ---
+          if (key === "poLines") {
+            params.append("poLine", value.join(",")); // Send as "poLine" to match backend
+          } else {
+            params.append(key, value.join(","));
           }
-        } else if (value && value !== "All") {
+          //params.append(key, value.join(","));
+        }
+        // Handle Single Strings
+        else if (value && value !== "All" && !Array.isArray(value)) {
           params.append(key, value);
         }
       });
-      // Object.entries(filters).forEach(([key, value]) => {
-      //   if (value && value !== "All") params.append(key, value);
-      // });
+
       params.append("page", page);
       params.append("limit", pageSize);
 
       const res = await axios.get(
-        `${API_BASE_URL}/api/fincheck-reports/list?${params}`
+        `${API_BASE_URL}/api/fincheck-reports/list?${params}`,
       );
 
       if (res.data.success) {
@@ -1311,7 +1365,7 @@ const YPivotQAReportMain = () => {
       if (user?.emp_id) {
         try {
           const res = await axios.get(
-            `${API_BASE_URL}/api/fincheck-reports/check-permission?empId=${user.emp_id}`
+            `${API_BASE_URL}/api/fincheck-reports/check-permission?empId=${user.emp_id}`,
           );
           if (res.data && res.data.isAdmin) {
             setCanViewReportId(true);
@@ -1360,38 +1414,46 @@ const YPivotQAReportMain = () => {
       startDate: new Date().toISOString().split("T")[0],
       endDate: new Date().toISOString().split("T")[0],
       reportId: "",
-      reportType: "All",
+      reportType: [],
       orderType: "All",
-      orderNo: "",
-      productType: "All",
-      empId: "",
-      subConFactory: "All",
-      custStyle: "",
-      buyer: "All",
-      supplier: "All",
-      poLines: []
+      orderNo: [],
+      productType: [],
+      empId: [],
+      subConFactory: [],
+      custStyle: [],
+      buyer: [],
+      supplier: [],
+      qaStatus: [],
+      leaderDecision: [],
+      poLines: [],
     });
   };
 
-  // Hard Reset (New): Resets EVERYTHING to default
+  // Hard Reset: Resets EVERYTHING to default
   const handleResetAll = () => {
     setActiveFilterName(null);
     setFilters({
-      startDate: "", // ← Change from getTodayString() to empty string
-      endDate: "", // ← Change from getTodayString() to empty string
+      startDate: "",
+      endDate: "",
       reportId: "",
-      reportType: "All",
+
+      // Must be empty arrays []
+      reportType: [],
       orderType: "All",
-      orderNo: "",
-      productType: "All",
-      empId: "",
-      subConFactory: "All",
-      custStyle: "",
-      buyer: "All",
-      supplier: "All"
+      orderNo: [],
+      productType: [],
+      empId: [],
+      subConFactory: [],
+      custStyle: [],
+      buyer: [],
+      supplier: [],
+      qaStatus: [],
+      leaderDecision: [],
+      poLines: [],
     });
   };
 
+  // Handle Action Menu Toggle
   const handleMenuToggle = (e, id, index) => {
     e.stopPropagation();
 
@@ -1417,7 +1479,7 @@ const YPivotQAReportMain = () => {
         // If upwards: Top of button - menu height - spacing
         // If downwards: Bottom of button + spacing
         top: shouldOpenUpwards ? rect.top - menuHeight - 5 : rect.bottom + 5,
-        left: leftPos
+        left: leftPos,
       });
       setOpenMenuId(id);
     }
@@ -1437,7 +1499,7 @@ const YPivotQAReportMain = () => {
   const handleDeleteReport = (report) => {
     if (
       window.confirm(
-        `Are you sure you want to delete Report #${report.reportId}?`
+        `Are you sure you want to delete Report #${report.reportId}?`,
       )
     ) {
       console.log("Delete Report:", report.reportId);
@@ -1477,12 +1539,12 @@ const YPivotQAReportMain = () => {
     const time = dateObj.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
-      hour12: true
+      hour12: true,
     });
     return { date, time };
   };
 
-  // NEW: Filter by Order Number - Clears all other filters
+  // Filter by Order Number - Clears all other filters
   const handleFilterByOrderNo = (orderNosString) => {
     // Close the menu
     setOpenMenuId(null);
@@ -1498,16 +1560,16 @@ const YPivotQAReportMain = () => {
       startDate: "",
       endDate: "",
       reportId: "",
-      reportType: "All",
+      reportType: [],
       orderType: "All",
-      orderNo: firstOrderNo, // ← Set only the Order No
-      productType: "All",
-      empId: "",
-      subConFactory: "All",
-      custStyle: "",
-      buyer: "All",
-      supplier: "All",
-      sortOrder: "asc"
+      orderNo: [firstOrderNo],
+      productType: [],
+      empId: [],
+      subConFactory: [],
+      custStyle: [],
+      buyer: [],
+      supplier: [],
+      poLines: [],
     });
 
     // Reset to page 1
@@ -1517,7 +1579,7 @@ const YPivotQAReportMain = () => {
     setStatusModal({
       isOpen: true,
       type: "success",
-      message: `Filtering all reports for Order: ${firstOrderNo}`
+      message: `Filtering all reports for Order: ${firstOrderNo}`,
     });
   };
 
@@ -1537,7 +1599,7 @@ const YPivotQAReportMain = () => {
       subConFactory: "Ext. Fac",
       custStyle: "Style",
       buyer: "Buyer",
-      supplier: "Supplier"
+      supplier: "Supplier",
     };
 
     const parts = [];
@@ -1676,11 +1738,6 @@ const YPivotQAReportMain = () => {
               ? "max-h-[2000px] opacity-100"
               : "max-h-0 sm:max-h-none opacity-0 sm:opacity-100"
           }`}
-          // className={`transition-all duration-300 ease-in-out overflow-hidden ${
-          //   isFilterExpanded
-          //     ? "max-h-[2000px] opacity-100"
-          //     : "max-h-0 sm:max-h-none opacity-0 sm:opacity-100"
-          // }`}
         >
           <div className="px-3 sm:px-4 pb-3 sm:pb-4 border-t border-gray-100 dark:border-gray-700 sm:border-t-0">
             {/* Mobile Active Filter Badge */}
@@ -1741,40 +1798,35 @@ const YPivotQAReportMain = () => {
                 />
               </FilterWrapper>
 
+              {/* QA ID (Multi Select) */}
               <FilterWrapper label="QA ID" icon={User}>
-                <InspectorSearchFilter
-                  value={filters.empId}
-                  onChange={(val) => handleFilterChange("empId", val)}
+                <MultiInspectorSelect
+                  selectedItems={filters.empId} // Pass the full objects array
+                  onChange={(val) => handleFilterChange("empId", val)} // Updates state with objects
                 />
               </FilterWrapper>
 
-              {/* Order No with Autocomplete */}
+              {/* Order No (Multi Select) */}
               <FilterWrapper label="Order No" icon={Search}>
-                <AutocompleteInput
-                  value={filters.orderNo}
+                <MultiSelectAutocomplete
+                  selectedItems={filters.orderNo}
                   onChange={(val) => handleFilterChange("orderNo", val)}
                   placeholder="Search Order..."
                   apiEndpoint="/api/fincheck-reports/autocomplete/order-no"
                 />
               </FilterWrapper>
 
+              {/* Report Type (Multi Select) */}
               <FilterWrapper label="Report Name" icon={FileText}>
-                <select
-                  className="w-full px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                  value={filters.reportType}
-                  onChange={(e) =>
-                    handleFilterChange("reportType", e.target.value)
-                  }
-                >
-                  <option value="All">All Reports</option>
-                  {options.reportTypes.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
+                <MultiSelectAutocomplete
+                  selectedItems={filters.reportType}
+                  onChange={(val) => handleFilterChange("reportType", val)}
+                  placeholder="Select Reports..."
+                  staticOptions={options.reportTypes}
+                />
               </FilterWrapper>
 
+              {/* Order Type (Single Select) */}
               <FilterWrapper label="Order Type" icon={Layers}>
                 <select
                   className="w-full px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -1790,81 +1842,80 @@ const YPivotQAReportMain = () => {
                 </select>
               </FilterWrapper>
 
+              {/* Product Type (Multi Select) */}
               <FilterWrapper label="Product Type" icon={Box}>
-                <select
-                  className="w-full px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                  value={filters.productType}
-                  onChange={(e) =>
-                    handleFilterChange("productType", e.target.value)
-                  }
-                >
-                  <option value="All">All Products</option>
-                  {options.productTypes.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
+                <MultiSelectAutocomplete
+                  selectedItems={filters.productType}
+                  onChange={(val) => handleFilterChange("productType", val)}
+                  placeholder="Select Products..."
+                  staticOptions={options.productTypes}
+                />
               </FilterWrapper>
 
-              {/* Cust Style with Autocomplete */}
+              {/* Cust Style (Now Multi Select) */}
               <FilterWrapper label="Cust. Style" icon={Search}>
-                <AutocompleteInput
-                  value={filters.custStyle}
+                <MultiSelectAutocomplete
+                  selectedItems={filters.custStyle}
                   onChange={(val) => handleFilterChange("custStyle", val)}
                   placeholder="Search Style..."
                   apiEndpoint="/api/fincheck-reports/autocomplete/cust-style"
                 />
               </FilterWrapper>
 
+              {/* Buyer (Static Multi Select) */}
               <FilterWrapper label="Buyer" icon={User}>
-                <select
-                  className="w-full px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                  value={filters.buyer}
-                  onChange={(e) => handleFilterChange("buyer", e.target.value)}
-                >
-                  <option value="All">All Buyers</option>
-                  {options.buyers.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
+                <MultiSelectAutocomplete
+                  selectedItems={filters.buyer}
+                  onChange={(val) => handleFilterChange("buyer", val)}
+                  placeholder="Select Buyers..."
+                  staticOptions={options.buyers}
+                />
               </FilterWrapper>
 
+              {/* Supplier (Static Multi Select) */}
               <FilterWrapper label="Supplier" icon={Building2}>
-                <select
-                  className="w-full px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                  value={filters.supplier}
-                  onChange={(e) =>
-                    handleFilterChange("supplier", e.target.value)
-                  }
-                >
-                  <option value="All">All Suppliers</option>
-                  {options.suppliers.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                <MultiSelectAutocomplete
+                  selectedItems={filters.supplier}
+                  onChange={(val) => handleFilterChange("supplier", val)}
+                  placeholder="Select Suppliers..."
+                  staticOptions={options.suppliers}
+                />
               </FilterWrapper>
 
+              {/* Ext. Factory (Static Multi Select) */}
               <FilterWrapper label="Ext. Factory" icon={Factory}>
-                <select
-                  className="w-full px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                  value={filters.subConFactory}
-                  onChange={(e) =>
-                    handleFilterChange("subConFactory", e.target.value)
-                  }
-                >
-                  <option value="All">All Factories</option>
-                  {options.subConFactories.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </select>
+                <MultiSelectAutocomplete
+                  selectedItems={filters.subConFactory}
+                  onChange={(val) => handleFilterChange("subConFactory", val)}
+                  placeholder="Select External..."
+                  staticOptions={options.subConFactories}
+                />
               </FilterWrapper>
+              {/* --- NEW: QA Status (Mobile/Tablet Only - Hidden on XL) --- */}
+              <div className="xl:hidden">
+                <FilterWrapper label="QA Status" icon={CheckCircle2}>
+                  <MultiSelectAutocomplete
+                    selectedItems={filters.qaStatus}
+                    onChange={(val) => handleFilterChange("qaStatus", val)}
+                    placeholder="Select Status..."
+                    staticOptions={staticFilterOptions.qaStatus}
+                  />
+                </FilterWrapper>
+              </div>
+
+              {/* --- NEW: Leader Decision (Mobile/Tablet Only - Hidden on LG) --- */}
+              <div className="lg:hidden">
+                <FilterWrapper label="Leader Decision" icon={User}>
+                  <MultiSelectAutocomplete
+                    selectedItems={filters.leaderDecision}
+                    onChange={(val) =>
+                      handleFilterChange("leaderDecision", val)
+                    }
+                    placeholder="Select Decision..."
+                    staticOptions={staticFilterOptions.leaderDecision}
+                  />
+                </FilterWrapper>
+              </div>
             </div>
 
             {/* Mobile Action Buttons */}
@@ -1911,6 +1962,24 @@ const YPivotQAReportMain = () => {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3 flex-1 justify-end min-w-0">
+              <div className="hidden xl:block w-[160px]">
+                <MultiSelectAutocomplete
+                  selectedItems={filters.qaStatus}
+                  onChange={(val) => handleFilterChange("qaStatus", val)}
+                  placeholder="QA Status..."
+                  staticOptions={staticFilterOptions.qaStatus}
+                />
+              </div>
+
+              {/* --- NEW: Leader Decision (Desktop Only) --- */}
+              <div className="hidden lg:block w-[180px]">
+                <MultiSelectAutocomplete
+                  selectedItems={filters.leaderDecision}
+                  onChange={(val) => handleFilterChange("leaderDecision", val)}
+                  placeholder="Leader Decision..."
+                  staticOptions={staticFilterOptions.leaderDecision}
+                />
+              </div>
               {/* --- NEW PO LINE FILTER --- */}
               <div className="w-full max-w-[140px] sm:max-w-[250px]">
                 <MultiSelectAutocomplete
@@ -1950,7 +2019,7 @@ const YPivotQAReportMain = () => {
           style={{
             maxHeight: "calc(100vh - 350px)",
             minHeight: "300px",
-            WebkitOverflowScrolling: "touch"
+            WebkitOverflowScrolling: "touch",
           }}
         >
           <table className="w-full text-sm text-left min-w-[800px]">
@@ -2126,7 +2195,7 @@ const YPivotQAReportMain = () => {
 
                   const totalDefectQty = (report.defectData || []).reduce(
                     (sum, d) => sum + (d.qty || 0),
-                    0
+                    0,
                   );
 
                   const productImage = report.productTypeId?.imageURL;
@@ -2143,7 +2212,7 @@ const YPivotQAReportMain = () => {
                             <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
                             <span className="truncate">
                               {new Date(
-                                report.inspectionDate
+                                report.inspectionDate,
                               ).toLocaleDateString()}
                             </span>
                           </div>
@@ -2239,7 +2308,7 @@ const YPivotQAReportMain = () => {
                                 onClick={() =>
                                   setPreviewImage({
                                     src: getProductImageUrl(productImage),
-                                    alt: report.productType
+                                    alt: report.productType,
                                   })
                                 }
                               >
@@ -2269,8 +2338,8 @@ const YPivotQAReportMain = () => {
                               report.orderType === "single"
                                 ? "bg-blue-50 text-blue-600 border-blue-100"
                                 : report.orderType === "multi"
-                                ? "bg-purple-50 text-purple-600 border-purple-100"
-                                : "bg-orange-50 text-orange-600 border-orange-100"
+                                  ? "bg-purple-50 text-purple-600 border-purple-100"
+                                  : "bg-orange-50 text-orange-600 border-orange-100"
                             }`}
                           >
                             {report.orderType}
@@ -2337,7 +2406,7 @@ const YPivotQAReportMain = () => {
                                 e.stopPropagation();
                                 setViewingInspector({
                                   empId: report.empId,
-                                  empName: report.empName
+                                  empName: report.empName,
                                 });
                               }}
                               className="p-1 sm:p-1.5 rounded-full bg-gray-100 hover:bg-indigo-100 text-gray-400 hover:text-indigo-600 dark:bg-gray-800 dark:hover:bg-indigo-900/50 transition-colors flex-shrink-0"
@@ -2475,7 +2544,7 @@ const YPivotQAReportMain = () => {
                                   report.resubmissionHistory.length - 1
                                 ];
                               const resubDate = formatDateTime(
-                                lastResub.resubmissionDate
+                                lastResub.resubmissionDate,
                               );
                               return (
                                 <div className="flex items-start gap-2 sm:gap-3">
@@ -2539,14 +2608,14 @@ const YPivotQAReportMain = () => {
                               report.resubmissionHistory?.length > 0
                             ) {
                               const lastDecisionTime = new Date(
-                                report.decisionUpdatedAt
+                                report.decisionUpdatedAt,
                               ).getTime();
                               const lastResub =
                                 report.resubmissionHistory[
                                   report.resubmissionHistory.length - 1
                                 ];
                               const lastResubTime = new Date(
-                                lastResub.resubmissionDate
+                                lastResub.resubmissionDate,
                               ).getTime();
 
                               // If QA submitted AFTER leader decided -> Action Required
@@ -2627,7 +2696,7 @@ const YPivotQAReportMain = () => {
               className="fixed z-[9999] w-36 sm:w-40 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-fadeIn"
               style={{
                 top: menuPos.top,
-                left: menuPos.left
+                left: menuPos.left,
               }}
               onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
             >
@@ -2670,7 +2739,7 @@ const YPivotQAReportMain = () => {
                 </button>
               </div>
             </div>,
-            document.body
+            document.body,
           );
         })()}
 
@@ -2752,7 +2821,7 @@ const YPivotQAReportMain = () => {
               </div>
             </div>
           </div>,
-          document.body
+          document.body,
         )}
 
       {/* --- Auto dismisaal Modal --- */}

@@ -41,26 +41,30 @@ const PaperPreviewReitmans = ({ data }) => {
   // Helper to flatten nested history if it's an object/Map
   const getFlattenedHistory = (history) => {
     if (Array.isArray(history)) return history;
-    if (typeof history !== 'object' || history === null) return [];
+    if (typeof history !== "object" || history === null) return [];
 
-    // For Reitmans, we might want to just show the latest check of each item 
+    // For Reitmans, we might want to just show the latest check of each item
     // or all checks. Usually for paper preview we show everything.
-    return Object.keys(history).sort((a, b) => {
-      const numA = parseInt(a.replace('Item ', ''));
-      const numB = parseInt(b.replace('Item ', ''));
-      return numA - numB;
-    }).flatMap(itemKey => {
-      const checks = history[itemKey] || {};
-      return Object.keys(checks).sort((a, b) => {
-        const numA = parseInt(a.replace('Check ', ''));
-        const numB = parseInt(b.replace('Check ', ''));
+    return Object.keys(history)
+      .sort((a, b) => {
+        const numA = parseInt(a.replace("Item ", ""));
+        const numB = parseInt(b.replace("Item ", ""));
         return numA - numB;
-      }).map(checkKey => ({
-        ...checks[checkKey],
-        itemName: itemKey,
-        checkName: checkKey
-      }));
-    });
+      })
+      .flatMap((itemKey) => {
+        const checks = history[itemKey] || {};
+        return Object.keys(checks)
+          .sort((a, b) => {
+            const numA = parseInt(a.replace("Check ", ""));
+            const numB = parseInt(b.replace("Check ", ""));
+            return numA - numB;
+          })
+          .map((checkKey) => ({
+            ...checks[checkKey],
+            itemName: itemKey,
+            checkName: checkKey,
+          }));
+      });
   };
 
   const history = getFlattenedHistory(rawHistory);

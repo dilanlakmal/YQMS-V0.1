@@ -13,7 +13,7 @@ const historySchema = new mongoose.Schema(
       body: { type: Number, default: 0 },
       bodyStatus: { type: String, default: "" },
       ribs: { type: Number, default: 0 },
-      ribsStatus: { type: String, default: "" },  
+      ribsStatus: { type: String, default: "" },
       status: { type: String, default: "" },
     },
     bottom: {

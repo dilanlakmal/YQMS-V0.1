@@ -62,9 +62,9 @@ const FactoryDefectTable = ({ data = [] }) => {
           </div>
           <div>
             <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
-            YM & External Factory Top N Defect
+           YM & External Factory Top N Defects
             </h2>
-            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Displaying top defects per production unit</p>
+            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Displaying top N defects by factory</p>
           </div>
         </div>
 

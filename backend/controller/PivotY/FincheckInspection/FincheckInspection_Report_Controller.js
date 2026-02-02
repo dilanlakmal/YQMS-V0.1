@@ -23,6 +23,11 @@ import { fileURLToPath } from "url";
 // Get Filtered Inspection Reports
 // ============================================================
 
+// Helper to escape regex characters
+const escapeRegex = (text) => {
+  return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+};
+
 export const getInspectionReports = async (req, res) => {
   try {
     const {
@@ -39,14 +44,89 @@ export const getInspectionReports = async (req, res) => {
       buyer,
       supplier,
       poLine,
+      qaStatus,
+      leaderDecision,
       page = 1,
-      limit = 20,
+      limit = 200,
     } = req.query;
 
     // --- Build Query ---
     let query = {
       status: { $ne: "cancelled" },
     };
+
+    // --- Helper to parse comma list to array ---
+    const parseList = (str) =>
+      str
+        ? str
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+
+    // ---------------------------------------------------------
+    // 1. NEW: QA Status Filter
+    // ---------------------------------------------------------
+    const qaStatusList = parseList(qaStatus);
+    if (qaStatusList.length > 0 && !qaStatusList.includes("All")) {
+      const statusConditions = [];
+
+      if (qaStatusList.includes("Pending")) {
+        statusConditions.push("draft", "in_progress");
+      }
+      if (qaStatusList.includes("Completed")) {
+        statusConditions.push("completed");
+      }
+
+      if (statusConditions.length > 0) {
+        query.status = { $in: statusConditions };
+      }
+    }
+
+    // ---------------------------------------------------------
+    // 2. NEW: Leader Decision Filter (Complex Logic)
+    // ---------------------------------------------------------
+    const decisionList = parseList(leaderDecision);
+    if (decisionList.length > 0 && !decisionList.includes("All")) {
+      const decisionOrConditions = [];
+
+      // A. "Approved", "Rework", "Rejected" -> Exist in Decision Collection
+      const specificDecisions = decisionList.filter((d) =>
+        ["Approved", "Rework", "Rejected"].includes(d),
+      );
+
+      if (specificDecisions.length > 0) {
+        const matchingDecisions = await FincheckInspectionDecision.find({
+          decisionStatus: { $in: specificDecisions },
+        }).distinct("reportId");
+
+        decisionOrConditions.push({ reportId: { $in: matchingDecisions } });
+      }
+
+      // B. "Pending" -> QA Completed BUT No Decision Document
+      if (decisionList.includes("Pending")) {
+        // Get ALL existing decision report IDs
+        const allDecisionIds =
+          await FincheckInspectionDecision.find().distinct("reportId");
+
+        decisionOrConditions.push({
+          status: "completed",
+          reportId: { $nin: allDecisionIds },
+        });
+      }
+
+      // C. "Pending QA" -> QA Status is NOT completed
+      if (decisionList.includes("Pending QA")) {
+        decisionOrConditions.push({
+          status: { $ne: "completed" },
+        });
+      }
+
+      // Apply to main Query using $and + $or to ensure strict filtering
+      if (decisionOrConditions.length > 0) {
+        query.$and = [...(query.$and || []), { $or: decisionOrConditions }];
+      }
+    }
 
     // --- PO Line Filter Logic ---
     if (poLine) {
@@ -99,52 +179,102 @@ export const getInspectionReports = async (req, res) => {
       query.reportId = parseInt(reportId);
     }
 
-    // 3. Report Name (Type) Filter
-    if (reportType && reportType !== "All") {
-      query.reportType = reportType;
+    // 3. Report Name/Type (Multi-Select Exact)
+    const reportTypeList = parseList(reportType);
+    if (reportTypeList.length > 0) {
+      // If array has "All", ignore filter, else use $in
+      if (!reportTypeList.includes("All")) {
+        query.reportType = { $in: reportTypeList };
+      }
     }
 
-    // 4. Order Type Filter
+    // 4. Order Type (Single Select usually, but robust check)
     if (orderType && orderType !== "All") {
       query.orderType = orderType.toLowerCase();
     }
 
-    // 5. Order No Filter (Regex Search)
-    if (orderNo) {
-      query.orderNosString = { $regex: orderNo, $options: "i" };
+    // 5. Order No (Multi-Select REGEX)
+    // Example: User selects "123" and "456". We want partial match for either.
+    const orderNoList = parseList(orderNo);
+    if (orderNoList.length > 0) {
+      // Construct an array of regex conditions targeting the ARRAY 'orderNos'
+      // We use escapeRegex to safely handle dashes like in "GPAR12270-1"
+      const regexConditions = orderNoList.map((val) => ({
+        orderNos: { $regex: escapeRegex(val), $options: "i" },
+      }));
+
+      // Use $and if existing query properties need to be preserved
+      if (query.$or) {
+        // If $or already exists (e.g. from another filter), wrap everything in $and
+        query.$and = [...(query.$and || []), { $or: regexConditions }];
+      } else {
+        query.$or = regexConditions;
+      }
     }
 
-    // 6. Product Type Filter
-    if (productType && productType !== "All") {
-      query.productType = productType;
+    // 6. Product Type (Multi-Select Exact)
+    const productTypeList = parseList(productType);
+    if (productTypeList.length > 0 && !productTypeList.includes("All")) {
+      query.productType = { $in: productTypeList };
     }
 
-    // 7. QA ID (Emp ID) Filter
-    if (empId) {
-      query.empId = { $regex: empId, $options: "i" };
+    // 7. QA ID / Emp ID (Multi-Select Exact or Regex)
+    // Usually Emp IDs are exact, but if you want partial:
+    const empIdList = parseList(empId);
+    if (empIdList.length > 0) {
+      // Assuming Exact Match for ID is better for Multi-Select
+      query.empId = { $in: empIdList };
+      // OR if you want regex:
+      // query.empId = { $in: empIdList.map(id => new RegExp(id, "i")) };
     }
 
-    // 8. Sub-Con Factory Filter
-    if (subConFactory && subConFactory !== "All") {
-      query["inspectionDetails.subConFactory"] = subConFactory;
+    // 8. Sub-Con Factory (Multi-Select Exact)
+    const factoryList = parseList(subConFactory);
+    if (factoryList.length > 0 && !factoryList.includes("All")) {
+      query["inspectionDetails.subConFactory"] = { $in: factoryList };
     }
 
-    // 9. Customer Style Filter
-    if (custStyle) {
-      query["inspectionDetails.custStyle"] = {
-        $regex: custStyle,
-        $options: "i",
-      };
+    // 9. Cust Style (Multi-Select REGEX)
+    const styleList = parseList(custStyle);
+    if (styleList.length > 0) {
+      const styleConditions = styleList.map((val) => ({
+        "inspectionDetails.custStyle": { $regex: val, $options: "i" },
+      }));
+
+      // Handle merging with potential existing $or from OrderNo
+      if (query.$or) {
+        // If we have existing $or (from OrderNo), we cannot just overwrite query.$or
+        // We must convert the structure to: $and: [ {$or: orders}, {$or: styles} ]
+
+        // Move existing $or to $and
+        const existingOr = query.$or;
+        delete query.$or;
+
+        query.$and = [
+          ...(query.$and || []),
+          { $or: existingOr },
+          { $or: styleConditions },
+        ];
+      } else {
+        // If $and exists, append to it, else create $or
+        if (query.$and) {
+          query.$and.push({ $or: styleConditions });
+        } else {
+          query.$or = styleConditions;
+        }
+      }
     }
 
-    // 10. Buyer Filter
-    if (buyer && buyer !== "All") {
-      query.buyer = buyer;
+    // 10. Buyer (Multi-Select Exact)
+    const buyerList = parseList(buyer);
+    if (buyerList.length > 0 && !buyerList.includes("All")) {
+      query.buyer = { $in: buyerList };
     }
 
-    // 11. Supplier Filter
-    if (supplier && supplier !== "All") {
-      query["inspectionDetails.supplier"] = supplier;
+    // 11. Supplier (Multi-Select Exact)
+    const supplierList = parseList(supplier);
+    if (supplierList.length > 0 && !supplierList.includes("All")) {
+      query["inspectionDetails.supplier"] = { $in: supplierList };
     }
 
     // Pagination
@@ -314,6 +444,7 @@ export const getFilterOptions = async (req, res) => {
 // ============================================================
 // Autocomplete for Order No
 // ============================================================
+
 export const autocompleteOrderNo = async (req, res) => {
   try {
     const { term } = req.query;
@@ -327,7 +458,7 @@ export const autocompleteOrderNo = async (req, res) => {
       status: { $ne: "cancelled" },
     })
       .select("orderNosString orderNos")
-      .limit(20)
+      .limit(100)
       .lean();
 
     // Extract unique order numbers
@@ -368,7 +499,7 @@ export const autocompleteCustStyle = async (req, res) => {
       status: { $ne: "cancelled" },
     })
       .select("inspectionDetails.custStyle")
-      .limit(30)
+      .limit(100)
       .lean();
 
     // Extract unique styles
@@ -405,7 +536,7 @@ export const autocompletePOLine = async (req, res) => {
       "SKUData.POLine": { $regex: term, $options: "i" },
     })
       .select("SKUData.POLine")
-      .limit(50) // Limit documents to scan
+      .limit(100) // Limit documents to scan
       .lean();
 
     const poSet = new Set();
@@ -1991,5 +2122,269 @@ export const getShippingStageBreakdown = async (req, res) => {
   } catch (error) {
     console.error("Error fetching shipping stage breakdown:", error);
     return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// Get Report for Modification (Debug View)
+// ============================================================
+export const getReportForModification = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    if (!reportId) {
+      return res.status(400).json({
+        success: false,
+        message: "Report ID is required.",
+      });
+    }
+
+    // Using .lean() is critical here to return fields that might exist
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId),
+    })
+      .select(
+        "reportId inspectionDate orderNosString inspectionConfig measurementData empId empName",
+      )
+      .lean();
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: report,
+    });
+  } catch (error) {
+    console.error("Error fetching report for modification:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================================
+// Copy Measurement Data from Source Group to Target Group
+// ============================================================
+export const copyMeasurementDataToGroup = async (req, res) => {
+  try {
+    const {
+      reportId,
+      sourceGroupId, // The ID (likely index or unique ID) of the source
+      targetGroupId, // The Index of the target group in the array
+      targetConfigId, // The Unique ID of the target group (for verification)
+      selectedSizes,
+    } = req.body;
+
+    if (
+      !reportId ||
+      sourceGroupId === undefined ||
+      targetGroupId === undefined ||
+      !selectedSizes
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields." });
+    }
+
+    // 1. Fetch Report (Not lean, so we can save)
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId),
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    // 2. Get the Target Configuration Group using the Index
+    const targetConfigGroup =
+      report.inspectionConfig?.configGroups?.[targetGroupId];
+
+    if (!targetConfigGroup) {
+      return res.status(400).json({
+        success: false,
+        message: "Target config group not found at index.",
+      });
+    }
+
+    // Safety Check: Ensure the ID matches what the frontend sent
+    // We treat IDs as strings for comparison to be safe
+    if (String(targetConfigGroup.id) !== String(targetConfigId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Config Group index mismatch. Please refresh the report.",
+      });
+    }
+
+    // 3. Extract Target Scope Names & The Correct Unique ID
+    const correctTargetId = targetConfigGroup.id; // <--- THIS IS THE FIX
+    const targetLine = targetConfigGroup.line || "";
+    const targetLineName = targetConfigGroup.lineName || "";
+    const targetTable = targetConfigGroup.table || "";
+    const targetTableName = targetConfigGroup.tableName || "";
+    const targetColor = targetConfigGroup.color || "";
+    const targetColorName = targetConfigGroup.colorName || "";
+
+    // 4. Find Source Measurement Data
+    // We filter by the source Group ID and the sizes selected by the user
+    const sourceMeasurements = report.measurementData.filter(
+      (m) =>
+        String(m.groupId) === String(sourceGroupId) &&
+        selectedSizes.includes(m.size),
+    );
+
+    if (sourceMeasurements.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No source measurement data found for selected sizes.",
+      });
+    }
+
+    // 5. Create New Measurement Records
+    const newRecords = sourceMeasurements.map((sourceItem) => {
+      // Calculate Timestamp: Source Timestamp + 4 Hours
+      const originalTime = new Date(sourceItem.timestamp).getTime();
+      const newTime = new Date(originalTime + 4 * 60 * 60 * 1000);
+
+      return {
+        // --- FIXED: Use the Unique Config ID, not the array index ---
+        groupId: correctTargetId,
+
+        // Scope Names from Target Config
+        line: targetLine,
+        lineName: targetLineName,
+        table: targetTable,
+        tableName: targetTableName,
+        color: targetColor,
+        colorName: targetColorName,
+
+        // Reset Decisions
+        inspectorDecision: "pass",
+        systemDecision: "pass",
+        timestamp: newTime,
+
+        // --- Keys to Copy Exactly ---
+        size: sourceItem.size,
+        kValue: sourceItem.kValue,
+        stage: sourceItem.stage,
+        displayMode: sourceItem.displayMode,
+
+        // Deep copy nested objects
+        allMeasurements: JSON.parse(
+          JSON.stringify(sourceItem.allMeasurements || {}),
+        ),
+        criticalMeasurements: JSON.parse(
+          JSON.stringify(sourceItem.criticalMeasurements || {}),
+        ),
+
+        allQty: sourceItem.allQty,
+        criticalQty: sourceItem.criticalQty,
+        allEnabledPcs: [...(sourceItem.allEnabledPcs || [])],
+        criticalEnabledPcs: [...(sourceItem.criticalEnabledPcs || [])],
+
+        remark: sourceItem.remark || "",
+        manualData: sourceItem.manualData, // Copy existing manual data
+      };
+    });
+
+    // 6. Append to Measurement Data Array
+    report.measurementData.push(...newRecords);
+
+    // 7. Save
+    await report.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully copied ${newRecords.length} records to Group ID ${correctTargetId}.`,
+      data: report, // Return updated report to refresh frontend
+    });
+  } catch (error) {
+    console.error("Error copying measurement data:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================================
+// Fix/Sync Group ID based on Name Matching
+// ============================================================
+export const fixMeasurementGroupId = async (req, res) => {
+  try {
+    const {
+      reportId,
+      correctConfigId, // The ID from the Config Group (Source of Truth)
+      line,
+      table,
+      color,
+    } = req.body;
+
+    if (!reportId || !correctConfigId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields." });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId),
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    let updatedCount = 0;
+
+    // Iterate through measurement data
+    // If names match the provided scope, update the groupId to the correctConfigId
+    report.measurementData.forEach((item) => {
+      const mLine = item.lineName || item.line || "";
+      const mTable = item.tableName || item.table || "";
+      const mColor = item.colorName || item.color || "";
+
+      // Check strict name equality
+      if (mLine === line && mTable === table && mColor === color) {
+        // Only update if the ID is actually different
+        if (String(item.groupId) !== String(correctConfigId)) {
+          item.groupId = correctConfigId;
+          updatedCount++;
+        }
+      }
+    });
+
+    if (updatedCount === 0) {
+      return res.status(200).json({
+        success: true,
+        message:
+          "No records needed fixing (IDs already matched or no name match found).",
+        data: report,
+      });
+    }
+
+    // Save changes
+    await report.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully fixed IDs for ${updatedCount} records.`,
+      data: report,
+    });
+  } catch (error) {
+    console.error("Error fixing group IDs:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Server Error", error: error.message });
   }
 };

@@ -78,7 +78,6 @@ export const getReitmansReports = async (query, limit = 1000, summaryOnly = true
 };
 
 export const createReitmansReport = async (payload, history, status) => {
-  console.log("[DEBUG-BACKEND] createReitmansReport called with history.length:", history?.length);
   try {
     const doc = new ReitmansReport({
       ...payload,
@@ -152,10 +151,6 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
       });
     }
 
-    console.log(
-      `[ReitmansMatch] Found rulesDoc: ${rulesDoc?._id}, Found style doc: ${doc?._id}`,
-    );
-
     // Fetch order data for fabric composition
     const ordersCol = ymProdConnection.db.collection("yorksys_orders");
     const order = await ordersCol.findOne({
@@ -176,10 +171,6 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
     let orderFabrics = [];
     if (order && Array.isArray(order.FabricContent)) {
       orderFabrics = order.FabricContent;
-      console.log(
-        `[ReitmansMatch] Order found for ${moNo}. FabricContent:`,
-        JSON.stringify(order.FabricContent),
-      );
     } else {
       console.log(
         `[ReitmansMatch] No FabricContent found in order for ${moNo}`,
@@ -203,10 +194,6 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
       const sName = sFab
         ? (sFab.fabricName || sFab.fabric || "").toUpperCase().trim()
         : "";
-
-      console.log(
-        `[ReitmansMatch] Target: Primary=${pName} (${pPct}%), Secondary=${sName}`,
-      );
 
       finalPrimary = { fabricName: pName, percentage: pPct };
       if (sName)
@@ -236,7 +223,6 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
           return Number(rangeStr) === actualPct;
         };
 
-        console.log(`[ReitmansMatch] Checking ${targetRules.length} rules...`);
         let bestMatch = targetRules.find((rule) => {
           const rPName = (rule.primary || "").toUpperCase().trim();
           const rSName = (rule.secondary || "").toUpperCase().trim();
@@ -256,16 +242,7 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
           return pMatch && rangeMatch && sMatch;
         });
 
-        if (bestMatch)
-          console.log(
-            `[ReitmansMatch] Strict match found:`,
-            JSON.stringify(bestMatch),
-          );
-
         if (!bestMatch) {
-          console.log(
-            `[ReitmansMatch] No strict match. Trying fallback 1 (Primary + Range + No Secondary)...`,
-          );
           bestMatch = targetRules.find((rule) => {
             const rPName = (rule.primary || "").toUpperCase().trim();
             const pMatch = pName.includes(rPName) || rPName.includes(pName);
@@ -278,9 +255,6 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
         }
 
         if (!bestMatch) {
-          console.log(
-            `[ReitmansMatch] No Match yet. Trying fallback 2 (Primary Name Only + No Secondary)...`,
-          );
           bestMatch = targetRules.find((rule) => {
             const rPName = (rule.primary || "").toUpperCase().trim();
             return (
@@ -291,9 +265,6 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
         }
 
         if (!bestMatch) {
-          console.log(
-            `[ReitmansMatch] No Match yet. Trying fallback 3 (Loose Primary + Range)...`,
-          );
           bestMatch = targetRules.find((rule) => {
             const rPName = (rule.primary || "").toUpperCase().trim();
             const pMatch = pName.includes(rPName) || rPName.includes(pName);
@@ -306,10 +277,6 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
         }
 
         if (bestMatch) {
-          console.log(
-            `[ReitmansMatch] FINAL MATCH:`,
-            JSON.stringify(bestMatch),
-          );
           finalValue =
             bestMatch.upperCentisimal ||
             bestMatch.upperCentisimalIndex ||
