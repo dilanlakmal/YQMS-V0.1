@@ -56,49 +56,58 @@ const HistoryModal = ({
   const getGroupedHistory = (history) => {
     if (Array.isArray(history)) {
       if (history.length > 0 && (history[0].itemName || history[0].checkName)) {
-        const sessions = {};
-        history.forEach(item => {
-          const ck = item.checkName || 'Check 1';
-          if (!sessions[ck]) sessions[ck] = { name: ck, items: [] };
-          sessions[ck].items.push(item);
+        const itemGroups = {};
+        history.forEach(rec => {
+          // In array format, we take the original intention: group by identity
+          const ik = rec.checkName || 'Item 1';
+          if (!itemGroups[ik]) itemGroups[ik] = { name: ik, items: [] };
+          itemGroups[ik].items.push(rec);
         });
-        return Object.keys(sessions).sort((a, b) => {
-          const numA = parseInt(a.replace('Check ', ''));
-          const numB = parseInt(b.replace('Check ', ''));
+        return Object.keys(itemGroups).sort((a, b) => {
+          const numA = parseInt(a.replace('Item ', ''));
+          const numB = parseInt(b.replace('Item ', ''));
           return numA - numB;
-        }).map(k => sessions[k]);
+        }).map(k => itemGroups[k]);
       }
       return history.map((h, i) => ({
-        name: h.checkName || `Check ${i + 1}`,
-        items: [{ ...h, itemName: h.itemName || 'Item 1' }]
+        name: h.checkName || `Item ${i + 1}`,
+        items: [{ ...h, itemName: h.itemName || 'Check 1' }]
       }));
     }
 
     if (typeof history !== 'object' || history === null) return [];
 
-    const sessions = {};
+    const itemGroups = {};
     Object.keys(history).forEach(itemKey => {
+      // Group by Item (Record ID)
+      if (!itemGroups[itemKey]) {
+        itemGroups[itemKey] = {
+          name: itemKey,
+          items: []
+        };
+      }
       const checks = history[itemKey] || {};
       Object.keys(checks).forEach(checkKey => {
-        if (!sessions[checkKey]) {
-          sessions[checkKey] = {
-            name: checkKey,
-            items: []
-          };
-        }
-        sessions[checkKey].items.push({
+        itemGroups[itemKey].items.push({
           ...checks[checkKey],
-          itemName: itemKey,
-          checkName: checkKey
+          itemName: checkKey, // "Check 1"
+          checkName: itemKey   // "Item 1"
         });
+      });
+
+      // Sort checks within the item
+      itemGroups[itemKey].items.sort((a, b) => {
+        const numA = parseInt(a.itemName.replace('Check ', ''));
+        const numB = parseInt(b.itemName.replace('Check ', ''));
+        return numA - numB;
       });
     });
 
-    return Object.keys(sessions).sort((a, b) => {
-      const numA = parseInt(a.replace('Check ', ''));
-      const numB = parseInt(b.replace('Check ', ''));
+    return Object.keys(itemGroups).sort((a, b) => {
+      const numA = parseInt(a.replace('Item ', ''));
+      const numB = parseInt(b.replace('Item ', ''));
       return numA - numB;
-    }).map(k => sessions[k]);
+    }).map(k => itemGroups[k]);
   };
 
   const groupedHistory = getGroupedHistory(rawHistory);
@@ -504,7 +513,7 @@ const HistoryModal = ({
                           </div>
                           <div className="flex items-center gap-3">
                             <span className="text-[9px] font-bold text-green-600/60 uppercase tracking-widest">
-                              Session Result:
+                              Item Result:
                             </span>
                             {renderStatusBadge(getSessionStatus(session), true)}
                           </div>
