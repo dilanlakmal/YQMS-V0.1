@@ -1097,6 +1097,41 @@ const YPivotQAReportMain = () => {
     return "th";
   };
 
+  // --- NEW USE EFFECT FOR REAL-TIME UPDATES ---
+  useEffect(() => {
+    // 1. Open the channel
+    const channel = new BroadcastChannel("qa_report_updates");
+
+    // 2. Listen for messages
+    channel.onmessage = (event) => {
+      if (event.data && event.data.type === "DECISION_UPDATE") {
+        const { reportId, status, updatedAt } = event.data;
+
+        // 3. Update the local state instantly
+        setReports((prevReports) =>
+          prevReports.map((report) => {
+            if (report.reportId === reportId) {
+              return {
+                ...report,
+                // Update the status string
+                decisionStatus: status,
+                // Update timestamp (Critical: this clears the "Action Required"
+                // logic in your table render because UpdatedAt > ResubmissionDate)
+                decisionUpdatedAt: updatedAt,
+              };
+            }
+            return report;
+          }),
+        );
+      }
+    };
+
+    // 4. Cleanup when component unmounts
+    return () => {
+      channel.close();
+    };
+  }, []); // Empty dependency array ensures this runs once on mount
+
   // --- 1. Fetch Preferences on Load ---
   useEffect(() => {
     if (user?.emp_id) {

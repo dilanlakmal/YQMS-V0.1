@@ -20,7 +20,7 @@ import {
   Volume2,
   AlertCircle,
   RefreshCw,
-  FileWarning
+  FileWarning,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
@@ -74,7 +74,7 @@ const AutoDismissModal = ({ isOpen, onClose, type, message }) => {
         </p>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };
 
@@ -92,7 +92,7 @@ const YPivotQAReportDecisionModal = ({
   onClose,
   report,
   user,
-  onSubmit
+  onSubmit,
 }) => {
   const [status, setStatus] = useState("Approved");
   const [autoComment, setAutoComment] = useState("");
@@ -126,7 +126,7 @@ const YPivotQAReportDecisionModal = ({
   const [statusModal, setStatusModal] = useState({
     isOpen: false,
     type: "success",
-    message: ""
+    message: "",
   });
 
   const mediaRecorderRef = useRef(null);
@@ -142,7 +142,7 @@ const YPivotQAReportDecisionModal = ({
       try {
         // Fetch Leader Info
         const userRes = await axios.get(
-          `${API_BASE_URL}/api/user-details?empId=${user.emp_id}`
+          `${API_BASE_URL}/api/user-details?empId=${user.emp_id}`,
         );
         if (userRes.data) {
           setLeaderDetails(userRes.data);
@@ -150,7 +150,7 @@ const YPivotQAReportDecisionModal = ({
 
         // Fetch Decision + Report Info
         const decisionRes = await axios.get(
-          `${API_BASE_URL}/api/fincheck-reports/get-decision/${report.reportId}`
+          `${API_BASE_URL}/api/fincheck-reports/get-decision/${report.reportId}`,
         );
 
         if (decisionRes.data.success) {
@@ -181,7 +181,7 @@ const YPivotQAReportDecisionModal = ({
               const lastResubmission =
                 resubmissionHistory[resubmissionHistory.length - 1];
               const lastResubmissionTime = new Date(
-                lastResubmission.resubmissionDate
+                lastResubmission.resubmissionDate,
               ).getTime();
 
               // If QA submitted AFTER leader decided -> Action Required
@@ -200,7 +200,7 @@ const YPivotQAReportDecisionModal = ({
           emp_id: user.emp_id,
           eng_name: user.eng_name || user.username,
           job_title: "Leader / Manager",
-          face_photo: user.face_photo || null
+          face_photo: user.face_photo || null,
         });
       } finally {
         setLoadingUser(false);
@@ -258,7 +258,7 @@ QA ID: ${report.empId}`;
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-      hour12: true
+      hour12: true,
     });
   };
 
@@ -323,7 +323,7 @@ QA ID: ${report.empId}`;
       setStatusModal({
         isOpen: true,
         type: "error",
-        message: "Please provide a reason (Text or Audio)."
+        message: "Please provide a reason (Text or Audio).",
       });
       return;
     }
@@ -349,8 +349,18 @@ QA ID: ${report.empId}`;
       await axios.post(
         `${API_BASE_URL}/api/fincheck-reports/submit-decision`,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { headers: { "Content-Type": "multipart/form-data" } },
       );
+
+      // Broadcast the update to other tabs (specifically ReportMain)
+      const channel = new BroadcastChannel("qa_report_updates");
+      channel.postMessage({
+        type: "DECISION_UPDATE",
+        reportId: report.reportId,
+        status: status, // e.g., "Approved", "Rework", "Rejected"
+        updatedAt: new Date().toISOString(), // Needed to clear "Action Required" flags
+      });
+      channel.close();
 
       if (onSubmit) onSubmit({ success: true });
       // Show Success Modal
@@ -359,7 +369,7 @@ QA ID: ${report.empId}`;
         type: "success",
         message: existingDecision
           ? "Decision Updated Successfully!"
-          : "Decision Saved Successfully!"
+          : "Decision Saved Successfully!",
       });
 
       // Delay closing the main modal so user sees the success message
@@ -372,7 +382,7 @@ QA ID: ${report.empId}`;
       setStatusModal({
         isOpen: true,
         type: "error",
-        message: "Failed to save decision. Please try again."
+        message: "Failed to save decision. Please try again.",
       });
     } finally {
       setSubmitting(false);
@@ -454,13 +464,13 @@ QA ID: ${report.empId}`;
                       </b>
                       {getNumSuffix(
                         reportResubmissions[reportResubmissions.length - 1]
-                          .resubmissionNo
+                          .resubmissionNo,
                       )}{" "}
                       time at{" "}
                       <b>
                         {formatDecisionDate(
                           reportResubmissions[reportResubmissions.length - 1]
-                            .resubmissionDate
+                            .resubmissionDate,
                         )}
                       </b>
                     </span>
@@ -614,8 +624,8 @@ QA ID: ${report.empId}`;
                               ? s === "Approved"
                                 ? "bg-green-500 text-white"
                                 : s === "Rework"
-                                ? "bg-amber-500 text-white"
-                                : "bg-red-500 text-white"
+                                  ? "bg-amber-500 text-white"
+                                  : "bg-red-500 text-white"
                               : "bg-gray-100 text-gray-400"
                           }`}
                         >
@@ -687,8 +697,8 @@ QA ID: ${report.empId}`;
                                     item.decisionStatus === "Approved"
                                       ? "bg-green-50 text-green-700 border-green-200"
                                       : item.decisionStatus === "Rework"
-                                      ? "bg-amber-50 text-amber-700 border-amber-200"
-                                      : "bg-red-50 text-red-700 border-red-200"
+                                        ? "bg-amber-50 text-amber-700 border-amber-200"
+                                        : "bg-red-50 text-red-700 border-red-200"
                                   }`}
                                 >
                                   {item.decisionStatus}
@@ -825,8 +835,8 @@ QA ID: ${report.empId}`;
               status === "Rejected"
                 ? "bg-red-600 hover:bg-red-700"
                 : status === "Rework"
-                ? "bg-amber-500 hover:bg-amber-600"
-                : "bg-green-600 hover:bg-green-700"
+                  ? "bg-amber-500 hover:bg-amber-600"
+                  : "bg-green-600 hover:bg-green-700"
             }`}
           >
             {submitting ? (
@@ -846,7 +856,7 @@ QA ID: ${report.empId}`;
         message={statusModal.message}
       />
     </div>,
-    document.body
+    document.body,
   );
 };
 
