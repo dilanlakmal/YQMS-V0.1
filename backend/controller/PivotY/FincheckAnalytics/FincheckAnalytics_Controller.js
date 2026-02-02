@@ -1282,7 +1282,7 @@ export const getStyleMeasurementConclusion = async (req, res) => {
 
     // Helper function to check tolerance
     const checkToleranceAndCategorize = (decimal, tolMinus, tolPlus) => {
-      if (decimal === 0 || isNaN(decimal)) {
+      if (isNaN(decimal)) {
         return { counted: false };
       }
 
@@ -1530,6 +1530,393 @@ export const getStyleMeasurementConclusion = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching measurement conclusion:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// GET: Style Measurement Point Calculation (Value Distribution)
+// ============================================================
+
+export const getStyleMeasurementPointCalc = async (req, res) => {
+  try {
+    const { styleNo, reportType, stage } = req.query;
+
+    if (!styleNo) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Style No required" });
+    }
+
+    // 1. Fetch Specs & Size List
+    const dtOrder = await DtOrder.findOne({
+      Order_No: { $regex: new RegExp(`^${styleNo}$`, "i") },
+    })
+      .select("SizeList")
+      .lean();
+
+    const sizeList = dtOrder?.SizeList || [];
+
+    const specsRecord = await QASectionsMeasurementSpecs.findOne({
+      Order_No: { $regex: new RegExp(`^${styleNo}$`, "i") },
+    }).lean();
+
+    // Get critical specs
+    const beforeCritSpecs = specsRecord?.selectedBeforeWashSpecs || [];
+    const afterCritSpecs = specsRecord?.selectedAfterWashSpecs || [];
+    const criticalPointNames = new Set();
+
+    [...beforeCritSpecs, ...afterCritSpecs].forEach((s) => {
+      const name = (s.MeasurementPointEngName || s.name || "").trim();
+      if (name) criticalPointNames.add(name);
+    });
+
+    // Get all specs
+    const beforeSpecs = specsRecord?.AllBeforeWashSpecs || [];
+    const afterSpecs = specsRecord?.AllAfterWashSpecs || [];
+
+    // Build lookup maps
+    const specIdToPointName = new Map();
+    const pointNameToSpec = new Map();
+    const allPointNames = new Set();
+
+    [...beforeSpecs, ...afterSpecs].forEach((s) => {
+      const id = s.id || s._id?.toString();
+      const name = (s.MeasurementPointEngName || s.name || "").trim();
+
+      if (!name) return;
+
+      specIdToPointName.set(id, name);
+      allPointNames.add(name);
+
+      if (!pointNameToSpec.has(name)) {
+        pointNameToSpec.set(name, {
+          name: name,
+          TolMinus: s.TolMinus,
+          TolPlus: s.TolPlus,
+        });
+      }
+    });
+
+    // 2. Query Reports
+    const query = {
+      orderNos: styleNo,
+      status: { $ne: "cancelled" },
+    };
+
+    if (reportType && reportType !== "All") {
+      query.reportType = reportType;
+    }
+
+    const availableTypes = await FincheckInspectionReports.distinct(
+      "reportType",
+      {
+        orderNos: styleNo,
+        status: { $ne: "cancelled" },
+      },
+    );
+
+    const reports = await FincheckInspectionReports.find(query)
+      .select("measurementData reportType")
+      .lean();
+
+    // 3. Define measurement value buckets (1/16 increments from -1 to 1)
+    // Helper to generate fraction label
+    const generateLabel = (sixteenths) => {
+      if (sixteenths === 0) return "0";
+
+      const sign = sixteenths < 0 ? "-" : "";
+      const absVal = Math.abs(sixteenths);
+
+      if (absVal === 16) return `${sign}1`;
+
+      // Find GCD to simplify fraction
+      const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+      const divisor = gcd(absVal, 16);
+      const numerator = absVal / divisor;
+      const denominator = 16 / divisor;
+
+      return `${sign}${numerator}/${denominator}`;
+    };
+
+    const generateValueBuckets = () => {
+      const buckets = [];
+
+      // <-1
+      buckets.push({
+        key: "lt-1",
+        label: "<-1",
+        decimalMin: -Infinity,
+        decimalMax: -1 - 1 / 32,
+        order: -17,
+      });
+
+      // -1 to 1 in 1/16 increments
+      for (let i = -16; i <= 16; i++) {
+        const decimal = i / 16;
+        const label = generateLabel(i);
+        buckets.push({
+          key: `v${i}`,
+          label,
+          decimal,
+          decimalMin: decimal - 1 / 32,
+          decimalMax: decimal + 1 / 32,
+          order: i,
+        });
+      }
+
+      // >1
+      buckets.push({
+        key: "gt1",
+        label: ">1",
+        decimalMin: 1 + 1 / 32,
+        decimalMax: Infinity,
+        order: 17,
+      });
+
+      return buckets;
+    };
+
+    const allBuckets = generateValueBuckets();
+
+    // Function to get bucket key from decimal value
+    const getBucketKey = (decimal) => {
+      if (decimal < -1 - 1 / 32) return "lt-1";
+      if (decimal > 1 + 1 / 32) return "gt1";
+      // Round to nearest 1/16
+      const rounded = Math.round(decimal * 16);
+      // Clamp to -16 to 16 range
+      const clamped = Math.max(-16, Math.min(16, rounded));
+      return `v${clamped}`;
+    };
+
+    // 4. Aggregate data
+    const aggregatedData = {};
+    const usedBucketKeys = new Set();
+
+    const stageFilter = stage || "All";
+
+    const processMeasurementEntry = (
+      specId,
+      pcsData,
+      size,
+      measurementStage,
+    ) => {
+      if (!pcsData || typeof pcsData !== "object") return;
+      if (stageFilter !== "All" && measurementStage !== stageFilter) return;
+
+      const pointName = specIdToPointName.get(specId);
+      if (!pointName) return;
+
+      const specInfo = pointNameToSpec.get(pointName);
+      if (!specInfo) return;
+
+      if (!aggregatedData[pointName]) {
+        aggregatedData[pointName] = {};
+      }
+      if (!aggregatedData[pointName][size]) {
+        aggregatedData[pointName][size] = {
+          points: 0,
+          pass: 0,
+          fail: 0,
+          buckets: {},
+        };
+      }
+
+      const tolMinus = parseFloat(specInfo.TolMinus?.decimal) || 0;
+      const tolPlus = parseFloat(specInfo.TolPlus?.decimal) || 0;
+      const lowerLimit = -Math.abs(tolMinus);
+      const upperLimit = Math.abs(tolPlus);
+
+      Object.entries(pcsData).forEach(([pcsIndex, valObj]) => {
+        if (!valObj || valObj.decimal === undefined) return;
+
+        const decimal = parseFloat(valObj.decimal);
+        if (isNaN(decimal)) return;
+
+        aggregatedData[pointName][size].points += 1;
+
+        // Check tolerance
+        const epsilon = 0.0001;
+        const isWithin =
+          decimal >= lowerLimit - epsilon && decimal <= upperLimit + epsilon;
+
+        if (isWithin) {
+          aggregatedData[pointName][size].pass += 1;
+        } else {
+          aggregatedData[pointName][size].fail += 1;
+        }
+
+        // Add to bucket
+        const bucketKey = getBucketKey(decimal);
+        usedBucketKeys.add(bucketKey);
+
+        if (!aggregatedData[pointName][size].buckets[bucketKey]) {
+          aggregatedData[pointName][size].buckets[bucketKey] = 0;
+        }
+        aggregatedData[pointName][size].buckets[bucketKey] += 1;
+      });
+    };
+
+    reports.forEach((report) => {
+      if (!report.measurementData || !Array.isArray(report.measurementData))
+        return;
+
+      report.measurementData.forEach((m) => {
+        if (m.size === "Manual_Entry") return;
+
+        const size = m.size;
+        const measurementStage = m.stage || "Before";
+
+        if (m.allMeasurements && typeof m.allMeasurements === "object") {
+          Object.entries(m.allMeasurements).forEach(([specId, pcsData]) => {
+            processMeasurementEntry(specId, pcsData, size, measurementStage);
+          });
+        }
+
+        if (
+          m.criticalMeasurements &&
+          typeof m.criticalMeasurements === "object"
+        ) {
+          Object.entries(m.criticalMeasurements).forEach(
+            ([specId, pcsData]) => {
+              processMeasurementEntry(specId, pcsData, size, measurementStage);
+            },
+          );
+        }
+      });
+    });
+
+    // 5. Build used buckets list (sorted by order)
+    const usedBuckets = allBuckets
+      .filter((b) => usedBucketKeys.has(b.key))
+      .sort((a, b) => a.order - b.order);
+
+    // 6. Format response
+    const specsWithData = [];
+
+    allPointNames.forEach((pointName) => {
+      const specInfo = pointNameToSpec.get(pointName);
+      if (!specInfo) return;
+
+      const sizeData = {};
+      const allSizeTotals = {
+        points: 0,
+        pass: 0,
+        fail: 0,
+        buckets: {},
+      };
+      let hasMeasurements = false;
+
+      sizeList.forEach((size) => {
+        const data = aggregatedData[pointName]?.[size] || {
+          points: 0,
+          pass: 0,
+          fail: 0,
+          buckets: {},
+        };
+        sizeData[size] = data;
+
+        if (data.points > 0) hasMeasurements = true;
+
+        // Aggregate to all sizes
+        allSizeTotals.points += data.points;
+        allSizeTotals.pass += data.pass;
+        allSizeTotals.fail += data.fail;
+
+        Object.entries(data.buckets).forEach(([bucketKey, count]) => {
+          if (!allSizeTotals.buckets[bucketKey]) {
+            allSizeTotals.buckets[bucketKey] = 0;
+          }
+          allSizeTotals.buckets[bucketKey] += count;
+        });
+      });
+
+      if (hasMeasurements) {
+        const tolMinusDecimal = parseFloat(specInfo.TolMinus?.decimal) || 0;
+        const tolPlusDecimal = parseFloat(specInfo.TolPlus?.decimal) || 0;
+
+        specsWithData.push({
+          id: pointName,
+          measurementPointName: pointName,
+          tolMinus: specInfo.TolMinus?.fraction || "-",
+          tolPlus: specInfo.TolPlus?.fraction || "-",
+          tolMinusDecimal: -Math.abs(tolMinusDecimal),
+          tolPlusDecimal: Math.abs(tolPlusDecimal),
+          sizeData,
+          allSizeTotals,
+          hasMeasurements,
+          isCritical: criticalPointNames.has(pointName),
+        });
+      }
+    });
+
+    specsWithData.sort((a, b) =>
+      a.measurementPointName.localeCompare(b.measurementPointName),
+    );
+
+    // 7. Filter size list to only include sizes with data
+    const filteredSizeList = sizeList.filter((size) => {
+      return specsWithData.some((spec) => spec.sizeData[size]?.points > 0);
+    });
+
+    // 8. Calculate totals
+    const sizeTotals = {};
+    sizeTotals["__ALL__"] = { points: 0, pass: 0, fail: 0, buckets: {} };
+
+    filteredSizeList.forEach((size) => {
+      sizeTotals[size] = { points: 0, pass: 0, fail: 0, buckets: {} };
+
+      specsWithData.forEach((spec) => {
+        const data = spec.sizeData[size];
+        if (data) {
+          sizeTotals[size].points += data.points;
+          sizeTotals[size].pass += data.pass;
+          sizeTotals[size].fail += data.fail;
+
+          Object.entries(data.buckets).forEach(([bucketKey, count]) => {
+            if (!sizeTotals[size].buckets[bucketKey]) {
+              sizeTotals[size].buckets[bucketKey] = 0;
+            }
+            sizeTotals[size].buckets[bucketKey] += count;
+          });
+        }
+      });
+
+      // Add to ALL
+      sizeTotals["__ALL__"].points += sizeTotals[size].points;
+      sizeTotals["__ALL__"].pass += sizeTotals[size].pass;
+      sizeTotals["__ALL__"].fail += sizeTotals[size].fail;
+
+      Object.entries(sizeTotals[size].buckets).forEach(([bucketKey, count]) => {
+        if (!sizeTotals["__ALL__"].buckets[bucketKey]) {
+          sizeTotals["__ALL__"].buckets[bucketKey] = 0;
+        }
+        sizeTotals["__ALL__"].buckets[bucketKey] += count;
+      });
+    });
+
+    const grandTotals = { ...sizeTotals["__ALL__"] };
+    grandTotals.passRate =
+      grandTotals.points > 0
+        ? ((grandTotals.pass / grandTotals.points) * 100).toFixed(1)
+        : "0.0";
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        specs: specsWithData,
+        sizeList: filteredSizeList,
+        sizeTotals,
+        grandTotals,
+        valueBuckets: usedBuckets,
+        reportTypes: availableTypes.sort(),
+        totalReports: reports.length,
+        stageFilter,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching measurement point calc:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };
