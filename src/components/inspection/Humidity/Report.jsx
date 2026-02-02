@@ -2980,7 +2980,9 @@ const FormPage = () => {
                                           className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.readings && (!record.additional?.[addSec]?.body || record.additional?.[addSec]?.body.toString().trim() === "") ? "border-red-500 ring-1 ring-red-200" : "border-gray-300 focus:ring-blue-500"}`}
                                           disabled={
                                             !formData.factoryStyleNo ||
-                                            !formData.aquaboySpecBody
+                                            !formData.aquaboySpecBody ||
+                                            record.additional?.[addSec]
+                                              ?.bodyPass
                                           }
                                           required
                                         />
@@ -3049,7 +3051,9 @@ const FormPage = () => {
                                             className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.readings && (!record.additional?.[addSec]?.ribs || record.additional?.[addSec]?.ribs.toString().trim() === "") ? "border-red-500 ring-1 ring-red-200" : "border-gray-300 focus:ring-blue-500"}`}
                                             disabled={
                                               !formData.factoryStyleNo ||
-                                              !formData.aquaboySpecRibs
+                                              !formData.aquaboySpecRibs ||
+                                              record.additional?.[addSec]
+                                                ?.ribsPass
                                             }
                                             required
                                           />
