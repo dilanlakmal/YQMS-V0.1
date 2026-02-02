@@ -7,6 +7,7 @@ import {
   XCircle,
   AlertTriangle,
   Inbox,
+  TrendingUp,
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../../config";
 
@@ -71,7 +72,36 @@ const StyleMeasurementFinalConclusion = ({ styleNo }) => {
     }
   };
 
-  // Frontend deduplication as backup (in case controller sends duplicates)
+  // Helper function to format Tol- value (always negative except 0)
+  const formatTolMinus = (tolValue) => {
+    if (!tolValue || tolValue === "-" || tolValue === "0" || tolValue === 0) {
+      return tolValue;
+    }
+
+    let strVal = String(tolValue).trim();
+
+    // If already negative, return as is
+    if (strVal.startsWith("-")) {
+      return strVal;
+    }
+
+    // If it's a positive number or fraction, make it negative
+    // Check if it's a number
+    const numVal = parseFloat(strVal.replace(/[^\d.-]/g, ""));
+    if (!isNaN(numVal) && numVal !== 0) {
+      // Add negative sign
+      return `-${strVal}`;
+    }
+
+    // For fractions like "1/4", make it "-1/4"
+    if (strVal.includes("/")) {
+      return `-${strVal}`;
+    }
+
+    return strVal;
+  };
+
+  // Frontend deduplication and processing
   const processedSpecs = useMemo(() => {
     if (!data?.specs || data.specs.length === 0) return [];
 
@@ -83,18 +113,24 @@ const StyleMeasurementFinalConclusion = ({ styleNo }) => {
       if (!name) return;
 
       if (!specsByName.has(name)) {
-        // First occurrence - initialize
         specsByName.set(name, {
           id: spec.id,
           measurementPointName: name,
           tolMinus: spec.tolMinus,
           tolPlus: spec.tolPlus,
+          isCritical: spec.isCritical || false,
           sizeData: {},
+          allSizeTotals: { points: 0, pass: 0, fail: 0, negTol: 0, posTol: 0 },
           hasMeasurements: false,
         });
       }
 
       const existing = specsByName.get(name);
+
+      // Update critical status if any spec with this name is critical
+      if (spec.isCritical) {
+        existing.isCritical = true;
+      }
 
       // Merge sizeData for all sizes
       Object.keys(spec.sizeData || {}).forEach((size) => {
@@ -116,6 +152,13 @@ const StyleMeasurementFinalConclusion = ({ styleNo }) => {
         existing.sizeData[size].negTol += newData.negTol || 0;
         existing.sizeData[size].posTol += newData.posTol || 0;
 
+        // Update "All" totals
+        existing.allSizeTotals.points += newData.points || 0;
+        existing.allSizeTotals.pass += newData.pass || 0;
+        existing.allSizeTotals.fail += newData.fail || 0;
+        existing.allSizeTotals.negTol += newData.negTol || 0;
+        existing.allSizeTotals.posTol += newData.posTol || 0;
+
         if (existing.sizeData[size].points > 0) {
           existing.hasMeasurements = true;
         }
@@ -129,13 +172,25 @@ const StyleMeasurementFinalConclusion = ({ styleNo }) => {
       );
   }, [data?.specs]);
 
-  // Recalculate size totals based on processed specs
-  const recalculatedSizeTotals = useMemo(() => {
+  // Filter size list to only include sizes with at least 1 point
+  const filteredSizeList = useMemo(() => {
     const sizeList =
       availableSizeList.length > 0 ? availableSizeList : data?.sizeList || [];
+
+    return sizeList.filter((size) => {
+      // Check if any spec has points for this size
+      return processedSpecs.some((spec) => spec.sizeData[size]?.points > 0);
+    });
+  }, [processedSpecs, availableSizeList, data?.sizeList]);
+
+  // Recalculate size totals based on processed specs
+  const recalculatedSizeTotals = useMemo(() => {
     const totals = {};
 
-    sizeList.forEach((size) => {
+    // "All" column totals
+    totals["__ALL__"] = { points: 0, pass: 0, fail: 0, negTol: 0, posTol: 0 };
+
+    filteredSizeList.forEach((size) => {
       totals[size] = { points: 0, pass: 0, fail: 0, negTol: 0, posTol: 0 };
 
       processedSpecs.forEach((spec) => {
@@ -148,29 +203,35 @@ const StyleMeasurementFinalConclusion = ({ styleNo }) => {
           totals[size].posTol += sizeData.posTol;
         }
       });
+
+      // Add to "All" totals
+      totals["__ALL__"].points += totals[size].points;
+      totals["__ALL__"].pass += totals[size].pass;
+      totals["__ALL__"].fail += totals[size].fail;
+      totals["__ALL__"].negTol += totals[size].negTol;
+      totals["__ALL__"].posTol += totals[size].posTol;
     });
 
     return totals;
-  }, [processedSpecs, availableSizeList, data?.sizeList]);
+  }, [processedSpecs, filteredSizeList]);
 
   // Recalculate grand totals
   const recalculatedGrandTotals = useMemo(() => {
-    const totals = { points: 0, pass: 0, fail: 0, negTol: 0, posTol: 0 };
+    const totals = recalculatedSizeTotals["__ALL__"] || {
+      points: 0,
+      pass: 0,
+      fail: 0,
+      negTol: 0,
+      posTol: 0,
+    };
 
-    Object.values(recalculatedSizeTotals).forEach((sizeTotals) => {
-      totals.points += sizeTotals.points;
-      totals.pass += sizeTotals.pass;
-      totals.fail += sizeTotals.fail;
-      totals.negTol += sizeTotals.negTol;
-      totals.posTol += sizeTotals.posTol;
-    });
-
-    totals.passRate =
-      totals.points > 0
-        ? ((totals.pass / totals.points) * 100).toFixed(1)
-        : "0.0";
-
-    return totals;
+    return {
+      ...totals,
+      passRate:
+        totals.points > 0
+          ? ((totals.pass / totals.points) * 100).toFixed(1)
+          : "0.0",
+    };
   }, [recalculatedSizeTotals]);
 
   // Calculate pass rate color
@@ -204,8 +265,7 @@ const StyleMeasurementFinalConclusion = ({ styleNo }) => {
     availableReportTypes.length > 0
       ? availableReportTypes
       : data?.reportTypes || [];
-  const sizeList =
-    availableSizeList.length > 0 ? availableSizeList : data?.sizeList || [];
+  const sizeList = filteredSizeList;
   const specs = processedSpecs;
   const sizeTotals = recalculatedSizeTotals;
   const grandTotals = recalculatedGrandTotals;
@@ -213,7 +273,9 @@ const StyleMeasurementFinalConclusion = ({ styleNo }) => {
 
   // Check if we have any measurement capability at all
   const hasNoMeasurementCapability =
-    initialLoaded && sizeList.length === 0 && specs.length === 0;
+    initialLoaded &&
+    availableSizeList.length === 0 &&
+    availableReportTypes.length === 0;
 
   if (hasNoMeasurementCapability) {
     return (
@@ -268,10 +330,23 @@ const StyleMeasurementFinalConclusion = ({ styleNo }) => {
               </div>
             </div>
 
-            {/* Pass Rate */}
+            {/* Pass Count */}
             <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-700 rounded-lg shadow-sm">
               <div className="w-8 h-8 flex items-center justify-center bg-green-100 dark:bg-green-900/30 rounded-lg">
-                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                <TrendingUp className="w-4 h-4 text-green-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Total Pass</p>
+                <p className="text-sm font-bold text-green-600">
+                  {grandTotals.pass.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {/* Pass Rate */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-700 rounded-lg shadow-sm">
+              <div className="w-8 h-8 flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <CheckCircle2 className="w-4 h-4 text-blue-600" />
               </div>
               <div>
                 <p className="text-xs text-gray-500">Pass Rate</p>
@@ -401,24 +476,32 @@ const StyleMeasurementFinalConclusion = ({ styleNo }) => {
       ) : (
         // Table with data
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="text-xs border-collapse">
             <thead>
               {/* Size Row */}
               <tr className="bg-gray-100 dark:bg-gray-700">
-                <th className="sticky left-0 z-20 bg-gray-100 dark:bg-gray-700 px-3 py-3 text-left font-bold text-gray-700 dark:text-gray-300 min-w-[200px] border-b border-gray-200 dark:border-gray-600">
+                <th className="sticky left-0 z-20 bg-gray-100 dark:bg-gray-700 px-3 py-3 text-left font-bold text-gray-700 dark:text-gray-300 w-[250px] min-w-[250px] max-w-[250px] border-b border-r border-gray-200 dark:border-gray-600">
                   Measurement Point
                 </th>
-                <th className="px-2 py-3 text-center font-bold text-red-600 min-w-[55px] border-b border-gray-200 dark:border-gray-600 bg-red-50 dark:bg-red-900/20">
+                <th className="px-2 py-3 text-center font-bold text-red-600 w-[50px] min-w-[50px] border-b border-gray-200 dark:border-gray-600 bg-red-50 dark:bg-red-900/20">
                   Tol -
                 </th>
-                <th className="px-2 py-3 text-center font-bold text-green-600 min-w-[55px] border-b border-gray-200 dark:border-gray-600 bg-green-50 dark:bg-green-900/20">
+                <th className="px-2 py-3 text-center font-bold text-green-600 w-[50px] min-w-[50px] border-b border-gray-200 dark:border-gray-600 bg-green-50 dark:bg-green-900/20">
                   Tol +
                 </th>
+                {/* All Sizes Column */}
+                <th
+                  colSpan={5}
+                  className="px-2 py-3 text-center font-bold text-purple-700 dark:text-purple-400 border-l-2 border-b border-purple-300 dark:border-purple-700 bg-purple-100 dark:bg-purple-900/30 w-[225px] min-w-[225px]"
+                >
+                  All Sizes
+                </th>
+                {/* Individual Size Columns */}
                 {sizeList.map((size) => (
                   <th
                     key={size}
                     colSpan={5}
-                    className="px-2 py-3 text-center font-bold text-indigo-700 dark:text-indigo-400 border-l-2 border-b border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20"
+                    className="px-2 py-3 text-center font-bold text-indigo-700 dark:text-indigo-400 border-l-2 border-b border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 w-[225px] min-w-[225px]"
                   >
                     {size}
                   </th>
@@ -427,24 +510,43 @@ const StyleMeasurementFinalConclusion = ({ styleNo }) => {
 
               {/* Sub-header Row */}
               <tr className="bg-gray-50 dark:bg-gray-750">
-                <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-750 border-b border-gray-200 dark:border-gray-600"></th>
-                <th className="border-b border-gray-200 dark:border-gray-600"></th>
-                <th className="border-b border-gray-200 dark:border-gray-600"></th>
+                <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-750 border-b border-r border-gray-200 dark:border-gray-600 w-[200px] min-w-[200px] max-w-[200px]"></th>
+                <th className="border-b border-gray-200 dark:border-gray-600 w-[50px] min-w-[50px]"></th>
+                <th className="border-b border-gray-200 dark:border-gray-600 w-[50px] min-w-[50px]"></th>
+
+                {/* All Sizes Sub-headers */}
+                <th className="px-1 py-2 text-center font-semibold text-gray-600 dark:text-gray-400 border-l-2 border-b border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 w-[45px] min-w-[45px]">
+                  Points
+                </th>
+                <th className="px-1 py-2 text-center font-semibold text-green-700 dark:text-green-400 border-b border-gray-200 dark:border-gray-600 bg-green-100 dark:bg-green-900/30 w-[45px] min-w-[45px]">
+                  Pass
+                </th>
+                <th className="px-1 py-2 text-center font-semibold text-red-700 dark:text-red-400 border-b border-gray-200 dark:border-gray-600 bg-red-100 dark:bg-red-900/30 w-[45px] min-w-[45px]">
+                  Fail
+                </th>
+                <th className="px-1 py-2 text-center font-semibold text-orange-700 dark:text-orange-400 border-b border-gray-200 dark:border-gray-600 bg-orange-100 dark:bg-orange-900/30 w-[45px] min-w-[45px]">
+                  Neg.Tol
+                </th>
+                <th className="px-1 py-2 text-center font-semibold text-red-700 dark:text-red-400 border-b border-gray-200 dark:border-gray-600 bg-red-100 dark:bg-red-900/30 w-[45px] min-w-[45px]">
+                  Pos.Tol
+                </th>
+
+                {/* Individual Size Sub-headers */}
                 {sizeList.map((size) => (
                   <React.Fragment key={`sub-${size}`}>
-                    <th className="px-1 py-2 text-center font-semibold text-gray-600 dark:text-gray-400 border-l-2 border-b border-indigo-200 dark:border-indigo-800 bg-gray-100 dark:bg-gray-700 min-w-[45px]">
+                    <th className="px-1 py-2 text-center font-semibold text-gray-600 dark:text-gray-400 border-l-2 border-b border-indigo-200 dark:border-indigo-800 bg-gray-100 dark:bg-gray-700 w-[45px] min-w-[45px]">
                       Points
                     </th>
-                    <th className="px-1 py-2 text-center font-semibold text-green-700 dark:text-green-400 border-b border-gray-200 dark:border-gray-600 bg-green-100 dark:bg-green-900/30 min-w-[45px]">
+                    <th className="px-1 py-2 text-center font-semibold text-green-700 dark:text-green-400 border-b border-gray-200 dark:border-gray-600 bg-green-100 dark:bg-green-900/30 w-[45px] min-w-[45px]">
                       Pass
                     </th>
-                    <th className="px-1 py-2 text-center font-semibold text-red-700 dark:text-red-400 border-b border-gray-200 dark:border-gray-600 bg-red-100 dark:bg-red-900/30 min-w-[45px]">
+                    <th className="px-1 py-2 text-center font-semibold text-red-700 dark:text-red-400 border-b border-gray-200 dark:border-gray-600 bg-red-100 dark:bg-red-900/30 w-[45px] min-w-[45px]">
                       Fail
                     </th>
-                    <th className="px-1 py-2 text-center font-semibold text-orange-700 dark:text-orange-400 border-b border-gray-200 dark:border-gray-600 bg-orange-100 dark:bg-orange-900/30 min-w-[50px]">
+                    <th className="px-1 py-2 text-center font-semibold text-orange-700 dark:text-orange-400 border-b border-gray-200 dark:border-gray-600 bg-orange-100 dark:bg-orange-900/30 w-[45px] min-w-[45px]">
                       Neg.Tol
                     </th>
-                    <th className="px-1 py-2 text-center font-semibold text-red-700 dark:text-red-400 border-b border-gray-200 dark:border-gray-600 bg-red-100 dark:bg-red-900/30 min-w-[50px]">
+                    <th className="px-1 py-2 text-center font-semibold text-red-700 dark:text-red-400 border-b border-gray-200 dark:border-gray-600 bg-red-100 dark:bg-red-900/30 w-[45px] min-w-[45px]">
                       Pos.Tol
                     </th>
                   </React.Fragment>
@@ -453,82 +555,131 @@ const StyleMeasurementFinalConclusion = ({ styleNo }) => {
             </thead>
 
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {specs.map((spec, idx) => (
-                <tr
-                  key={spec.id}
-                  className={`${
-                    idx % 2 === 0
-                      ? "bg-white dark:bg-gray-800"
-                      : "bg-gray-50/50 dark:bg-gray-800/50"
-                  } hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-colors`}
-                >
-                  {/* Measurement Point */}
-                  <td className="sticky left-0 z-10 px-3 py-2.5 font-medium text-gray-800 dark:text-gray-200 min-w-[200px] bg-inherit border-r border-gray-100 dark:border-gray-700">
-                    <span className="line-clamp-2">
-                      {spec.measurementPointName}
-                    </span>
-                  </td>
+              {specs.map((spec, idx) => {
+                // Determine row background based on critical status and alternating
+                const isCritical = spec.isCritical;
+                const baseRowBg = isCritical
+                  ? "bg-blue-50 dark:bg-blue-900/20"
+                  : idx % 2 === 0
+                    ? "bg-white dark:bg-gray-800"
+                    : "bg-gray-50/50 dark:bg-gray-800/50";
 
-                  {/* Tol - */}
-                  <td className="px-2 py-2.5 text-center font-bold text-red-600 bg-red-50/50 dark:bg-red-900/10">
-                    {spec.tolMinus}
-                  </td>
+                return (
+                  <tr
+                    key={spec.id}
+                    className={`${baseRowBg} hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-colors`}
+                  >
+                    {/* Measurement Point */}
+                    <td
+                      className={`sticky left-0 z-10 px-3 py-2.5 font-medium text-gray-800 dark:text-gray-200 w-[200px] min-w-[200px] max-w-[200px] border-r border-gray-100 dark:border-gray-700 ${
+                        isCritical
+                          ? "bg-blue-100 dark:bg-blue-900/30"
+                          : "bg-inherit"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {isCritical && (
+                          <span className="text-blue-600 dark:text-blue-400 font-bold">
+                            ★
+                          </span>
+                        )}
+                        <span className="line-clamp-2">
+                          {spec.measurementPointName}
+                        </span>
+                      </div>
+                    </td>
 
-                  {/* Tol + */}
-                  <td className="px-2 py-2.5 text-center font-bold text-green-600 bg-green-50/50 dark:bg-green-900/10">
-                    {spec.tolPlus}
-                  </td>
+                    {/* Tol - (Always show as negative) */}
+                    <td className="px-2 py-2.5 text-center font-bold text-red-600 bg-red-50/50 dark:bg-red-900/10 w-[50px] min-w-[50px]">
+                      {formatTolMinus(spec.tolMinus)}
+                    </td>
 
-                  {/* Size Data */}
-                  {sizeList.map((size) => {
-                    const sizeData = spec.sizeData[size] || {
-                      points: 0,
-                      pass: 0,
-                      fail: 0,
-                      negTol: 0,
-                      posTol: 0,
-                    };
+                    {/* Tol + */}
+                    <td className="px-2 py-2.5 text-center font-bold text-green-600 bg-green-50/50 dark:bg-green-900/10 w-[50px] min-w-[50px]">
+                      {spec.tolPlus}
+                    </td>
 
-                    return (
-                      <React.Fragment key={`${spec.id}-${size}`}>
-                        {/* Points */}
-                        <td className="px-1 py-2.5 text-center text-gray-700 dark:text-gray-300 font-medium border-l-2 border-indigo-100 dark:border-indigo-900 bg-gray-50/50 dark:bg-gray-700/30">
-                          {sizeData.points || "-"}
-                        </td>
+                    {/* All Sizes Data */}
+                    <td className="px-1 py-2.5 text-center text-gray-700 dark:text-gray-300 font-medium border-l-2 border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-900/20 w-[45px] min-w-[45px]">
+                      {spec.allSizeTotals.points || "-"}
+                    </td>
+                    <td className="px-1 py-2.5 text-center font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 w-[45px] min-w-[45px]">
+                      {spec.allSizeTotals.pass || "-"}
+                    </td>
+                    <td className="px-1 py-2.5 text-center font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 w-[45px] min-w-[45px]">
+                      {spec.allSizeTotals.fail || "-"}
+                    </td>
+                    <td className="px-1 py-2.5 text-center font-bold text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 w-[45px] min-w-[45px]">
+                      {spec.allSizeTotals.negTol || "-"}
+                    </td>
+                    <td className="px-1 py-2.5 text-center font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 w-[45px] min-w-[45px]">
+                      {spec.allSizeTotals.posTol || "-"}
+                    </td>
 
-                        {/* Pass - Light Green */}
-                        <td className="px-1 py-2.5 text-center font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20">
-                          {sizeData.pass || "-"}
-                        </td>
+                    {/* Individual Size Data */}
+                    {sizeList.map((size) => {
+                      const sizeData = spec.sizeData[size] || {
+                        points: 0,
+                        pass: 0,
+                        fail: 0,
+                        negTol: 0,
+                        posTol: 0,
+                      };
 
-                        {/* Fail - Light Red */}
-                        <td className="px-1 py-2.5 text-center font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20">
-                          {sizeData.fail || "-"}
-                        </td>
-
-                        {/* Neg.Tol - Light Orange */}
-                        <td className="px-1 py-2.5 text-center font-bold text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20">
-                          {sizeData.negTol || "-"}
-                        </td>
-
-                        {/* Pos.Tol - Light Red */}
-                        <td className="px-1 py-2.5 text-center font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20">
-                          {sizeData.posTol || "-"}
-                        </td>
-                      </React.Fragment>
-                    );
-                  })}
-                </tr>
-              ))}
+                      return (
+                        <React.Fragment key={`${spec.id}-${size}`}>
+                          <td className="px-1 py-2.5 text-center text-gray-700 dark:text-gray-300 font-medium border-l-2 border-indigo-100 dark:border-indigo-900 bg-gray-50/50 dark:bg-gray-700/30 w-[45px] min-w-[45px]">
+                            {sizeData.points || "-"}
+                          </td>
+                          <td className="px-1 py-2.5 text-center font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 w-[45px] min-w-[45px]">
+                            {sizeData.pass || "-"}
+                          </td>
+                          <td className="px-1 py-2.5 text-center font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 w-[45px] min-w-[45px]">
+                            {sizeData.fail || "-"}
+                          </td>
+                          <td className="px-1 py-2.5 text-center font-bold text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 w-[45px] min-w-[45px]">
+                            {sizeData.negTol || "-"}
+                          </td>
+                          <td className="px-1 py-2.5 text-center font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 w-[45px] min-w-[45px]">
+                            {sizeData.posTol || "-"}
+                          </td>
+                        </React.Fragment>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
 
               {/* Totals Row */}
               <tr className="bg-indigo-100 dark:bg-indigo-900/30 font-bold border-t-2 border-indigo-300 dark:border-indigo-700">
-                <td className="sticky left-0 z-10 px-3 py-3 text-indigo-800 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/30">
+                <td className="sticky left-0 z-10 px-3 py-3 text-indigo-800 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/30 w-[200px] min-w-[200px] max-w-[200px] border-r border-indigo-200 dark:border-indigo-700">
                   TOTAL ({specs.length} Points)
                 </td>
-                <td className="px-2 py-3 text-center text-red-700">-</td>
-                <td className="px-2 py-3 text-center text-green-700">-</td>
+                <td className="px-2 py-3 text-center text-red-700 w-[50px] min-w-[50px]">
+                  -
+                </td>
+                <td className="px-2 py-3 text-center text-green-700 w-[50px] min-w-[50px]">
+                  -
+                </td>
 
+                {/* All Sizes Totals */}
+                <td className="px-1 py-3 text-center text-gray-800 dark:text-gray-200 border-l-2 border-purple-300 dark:border-purple-700 bg-purple-100 dark:bg-purple-900/40 w-[45px] min-w-[45px]">
+                  {sizeTotals["__ALL__"]?.points || "-"}
+                </td>
+                <td className="px-1 py-3 text-center text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/40 w-[45px] min-w-[45px]">
+                  {sizeTotals["__ALL__"]?.pass || "-"}
+                </td>
+                <td className="px-1 py-3 text-center text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/40 w-[45px] min-w-[45px]">
+                  {sizeTotals["__ALL__"]?.fail || "-"}
+                </td>
+                <td className="px-1 py-3 text-center text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40 w-[45px] min-w-[45px]">
+                  {sizeTotals["__ALL__"]?.negTol || "-"}
+                </td>
+                <td className="px-1 py-3 text-center text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/40 w-[45px] min-w-[45px]">
+                  {sizeTotals["__ALL__"]?.posTol || "-"}
+                </td>
+
+                {/* Individual Size Totals */}
                 {sizeList.map((size) => {
                   const totals = sizeTotals[size] || {
                     points: 0,
@@ -540,19 +691,19 @@ const StyleMeasurementFinalConclusion = ({ styleNo }) => {
 
                   return (
                     <React.Fragment key={`total-${size}`}>
-                      <td className="px-1 py-3 text-center text-gray-800 dark:text-gray-200 border-l-2 border-indigo-200 dark:border-indigo-800 bg-gray-100 dark:bg-gray-700">
+                      <td className="px-1 py-3 text-center text-gray-800 dark:text-gray-200 border-l-2 border-indigo-200 dark:border-indigo-800 bg-gray-100 dark:bg-gray-700 w-[45px] min-w-[45px]">
                         {totals.points || "-"}
                       </td>
-                      <td className="px-1 py-3 text-center text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/40">
+                      <td className="px-1 py-3 text-center text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/40 w-[45px] min-w-[45px]">
                         {totals.pass || "-"}
                       </td>
-                      <td className="px-1 py-3 text-center text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/40">
+                      <td className="px-1 py-3 text-center text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/40 w-[45px] min-w-[45px]">
                         {totals.fail || "-"}
                       </td>
-                      <td className="px-1 py-3 text-center text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40">
+                      <td className="px-1 py-3 text-center text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40 w-[45px] min-w-[45px]">
                         {totals.negTol || "-"}
                       </td>
-                      <td className="px-1 py-3 text-center text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/40">
+                      <td className="px-1 py-3 text-center text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/40 w-[45px] min-w-[45px]">
                         {totals.posTol || "-"}
                       </td>
                     </React.Fragment>
@@ -571,6 +722,12 @@ const StyleMeasurementFinalConclusion = ({ styleNo }) => {
             <span className="font-medium text-gray-700 dark:text-gray-300">
               Legend:
             </span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-4 rounded bg-blue-100 border border-blue-200 flex items-center justify-center">
+                <span className="text-blue-600 text-[8px] font-bold">★</span>
+              </div>
+              <span>Critical Point</span>
+            </div>
             <div className="flex items-center gap-1.5">
               <div className="w-4 h-4 rounded bg-green-100 border border-green-200"></div>
               <span>Pass (Within Tolerance)</span>

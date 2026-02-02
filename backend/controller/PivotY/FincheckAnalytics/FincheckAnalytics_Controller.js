@@ -1207,11 +1207,26 @@ export const getStyleMeasurementConclusion = async (req, res) => {
       Order_No: { $regex: new RegExp(`^${styleNo}$`, "i") },
     }).lean();
 
+    // crtical Point variable declarations
+    const criticalPointNames = new Set();
+
     // Get specs
     const beforeSpecs = specsRecord?.AllBeforeWashSpecs || [];
     const afterSpecs = specsRecord?.AllAfterWashSpecs || [];
 
-    // 2. Build lookup maps - KEY FIX: Map by measurement point name
+    // Get SELECTED/CRITICAL specs only
+    const beforeCritSpecs = specsRecord?.selectedBeforeWashSpecs || [];
+    const afterCritSpecs = specsRecord?.selectedAfterWashSpecs || [];
+
+    // Mark critical measurement points from SELECTED specs only
+    [...beforeCritSpecs, ...afterCritSpecs].forEach((s) => {
+      const name = (s.MeasurementPointEngName || s.name || "").trim();
+      if (name) {
+        criticalPointNames.add(name);
+      }
+    });
+
+    // 2. Build lookup maps
     // Map spec ID to measurement point name
     const specIdToPointName = new Map();
     // Map measurement point name to spec details (for Tol-, Tol+)
@@ -1443,8 +1458,10 @@ export const getStyleMeasurementConclusion = async (req, res) => {
           measurementPointName: pointName,
           tolMinus: specInfo.TolMinus?.fraction || "-",
           tolPlus: specInfo.TolPlus?.fraction || "-",
+          tolMinusDecimal: specInfo.TolMinus?.decimal || 0,
           sizeData,
           hasMeasurements,
+          isCritical: criticalPointNames.has(pointName),
         });
       }
     });
