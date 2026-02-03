@@ -1444,7 +1444,7 @@ const YPivotQAReportFullView = () => {
     return flatList;
   }, [report?.photoData]);
 
-  const summaryData = useDefectSummaryData(savedDefects, null);
+  const summaryData = useDefectSummaryData(savedDefects, null, report);
   const { aqlSampleData, loadingAql } = useAqlData(
     isAQLMethod,
     determinedBuyer,
@@ -1963,7 +1963,7 @@ const YPivotQAReportFullView = () => {
         )}
 
         {/* 4. Defect Summary */}
-        {(summaryData.groups.length > 0 ||
+        {(summaryData.groups.length >= 0 ||
           (report.defectManualData && report.defectManualData.length > 0)) && (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div
