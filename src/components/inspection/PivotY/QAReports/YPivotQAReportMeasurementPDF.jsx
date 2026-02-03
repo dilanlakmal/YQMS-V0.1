@@ -1,5 +1,5 @@
 import React from "react";
-import { Text, View, StyleSheet } from "@react-pdf/renderer";
+import { Text, View, StyleSheet, Page } from "@react-pdf/renderer";
 
 // =============================================================================
 // STYLES
@@ -70,6 +70,37 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: "Helvetica-Bold",
     color: colors.gray[800],
+  },
+
+  // --- CONFIG CONTINUATION HEADER (NEW) ---
+  configContinuationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    marginBottom: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: "#f1f5f9", // Slate-100
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    borderRadius: 4,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+  },
+  configContinuationText: {
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
+    color: colors.gray[800],
+  },
+  pointRangeText: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    color: colors.gray[600],
+    marginLeft: "auto",
+    backgroundColor: "#e2e8f0",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
   },
 
   // --- STATS CARDS ---
@@ -202,7 +233,7 @@ const styles = StyleSheet.create({
 
   // Specific Columns
   colPoint: {
-    width: 90,
+    width: 110,
     padding: 3,
     borderRightWidth: 1,
     borderRightColor: colors.gray[300],
@@ -251,6 +282,8 @@ const styles = StyleSheet.create({
     fontSize: 5,
     fontFamily: "Helvetica-Bold",
     color: colors.gray[700],
+    flexWrap: "wrap", // ADD THIS - enables text wrapping
+    lineHeight: 1.3, // ADD THIS - better line spacing for wrapped text
   },
   textTol: { fontSize: 5, color: colors.gray[500] },
   textTolMinus: {
@@ -286,7 +319,52 @@ const cleanText = (str) => {
   if (str === null || str === undefined) return "";
   let s = String(str);
 
-  // Replace unicode fractions with ASCII equivalents
+  // === HTML ENTITIES (handle first before other replacements) ===
+  s = s.replace(/&lt;/gi, "<");
+  s = s.replace(/&gt;/gi, ">");
+  s = s.replace(/&amp;/gi, "&");
+  s = s.replace(/&nbsp;/gi, " ");
+  s = s.replace(/&quot;/gi, '"');
+  s = s.replace(/&apos;/gi, "'");
+  s = s.replace(/&#39;/gi, "'");
+  s = s.replace(/&#x27;/gi, "'");
+  s = s.replace(/&ndash;/gi, "-");
+  s = s.replace(/&mdash;/gi, "-");
+  s = s.replace(/&copy;/gi, "(c)");
+  s = s.replace(/&reg;/gi, "(R)");
+  s = s.replace(/&trade;/gi, "(TM)");
+  s = s.replace(/&deg;/gi, " deg");
+  s = s.replace(/&#\d+;/g, ""); // Remove any remaining numeric HTML entities
+
+  // === UNICODE MATH SYMBOLS ===
+  s = s.replace(/≤/g, "<=");
+  s = s.replace(/≥/g, ">=");
+  s = s.replace(/≠/g, "!=");
+  s = s.replace(/±/g, "+/-");
+  s = s.replace(/×/g, "x");
+  s = s.replace(/÷/g, "/");
+  s = s.replace(/−/g, "-"); // Unicode minus sign
+  s = s.replace(/–/g, "-"); // En dash
+  s = s.replace(/—/g, "-"); // Em dash
+  s = s.replace(/′/g, "'"); // Prime
+  s = s.replace(/″/g, '"'); // Double prime
+  s = s.replace(/°/g, " deg"); // Degree symbol
+  s = s.replace(/µ/g, "u"); // Micro sign
+  s = s.replace(/·/g, "."); // Middle dot
+  s = s.replace(/…/g, "..."); // Ellipsis
+  s = s.replace(/™/g, "(TM)");
+  s = s.replace(/®/g, "(R)");
+  s = s.replace(/©/g, "(c)");
+
+  // === LESS THAN / GREATER THAN VARIATIONS ===
+  s = s.replace(/＜/g, "<"); // Fullwidth less-than
+  s = s.replace(/＞/g, ">"); // Fullwidth greater-than
+  s = s.replace(/‹/g, "<"); // Single left angle quote
+  s = s.replace(/›/g, ">"); // Single right angle quote
+  s = s.replace(/«/g, "<<"); // Left double angle quote
+  s = s.replace(/»/g, ">>"); // Right double angle quote
+
+  // === UNICODE FRACTIONS ===
   s = s
     .replace(/¼/g, " 1/4")
     .replace(/½/g, " 1/2")
@@ -303,26 +381,16 @@ const cleanText = (str) => {
   // Replace fraction slash characters
   s = s.replace(/[\u2044\u2215]/g, "/");
 
-  // Replace math symbols
-  s = s
-    .replace(/≤/g, "<=")
-    .replace(/≥/g, ">=")
-    .replace(/≠/g, "!=")
-    .replace(/±/g, "+/-");
-
   // Replace fancy quotes
-  s = s.replace(/[""]/g, '"').replace(/['']/g, "'");
+  s = s.replace(/[""„]/g, '"').replace(/[''‚]/g, "'");
 
   // FIX: Convert mixed number hyphen to space
   // Pattern: digit followed by hyphen followed by fraction (numerator/denominator)
-  // Examples:
-  //   "27-1/2"  → "27 1/2"  (positive mixed number)
-  //   "1-1/2"   → "1 1/2"   (positive mixed number)
-  //   "-27-1/2" → "-27 1/2" (negative mixed number)
-  //   "-1-1/2"  → "-1 1/2"  (negative mixed number)
-  //   "-1/2"    → "-1/2"    (negative fraction, unchanged)
-  //   "3/16"    → "3/16"    (simple fraction, unchanged)
   s = s.replace(/(\d)-(\d+\/\d+)/g, "$1 $2");
+
+  // Remove any remaining problematic unicode characters (non-printable, control chars)
+  // Keep basic ASCII printable (0x20-0x7E) and common extended chars
+  s = s.replace(/[^\x20-\x7E\u00A0-\u00FF]/g, "");
 
   // Clean up multiple spaces
   s = s.replace(/\s+/g, " ").trim();
@@ -604,7 +672,7 @@ const ConfigSummaryTable = ({ groupedData, sizeList = [] }) => {
   const sortedSizes = sortSizesByReference(Array.from(allSizes), sizeList);
 
   return (
-    <View style={styles.sumTable}>
+    <View style={styles.sumTable} wrap={false}>
       {/* Header */}
       <View style={styles.sumHeaderRow}>
         <View
@@ -719,7 +787,7 @@ const ConfigSummaryTable = ({ groupedData, sizeList = [] }) => {
 };
 
 const MeasurementLegend = () => (
-  <View style={styles.legendRow}>
+  <View style={styles.legendRow} wrap={false}>
     <View style={styles.legendItem}>
       <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
       <Text style={styles.legendText}>Pass (Within Tol)</Text>
@@ -739,14 +807,131 @@ const MeasurementLegend = () => (
   </View>
 );
 
+// =============================================================================
+// COMPONENT: Config Page Header (for continuation pages)
+// =============================================================================
+const ConfigPageHeader = ({
+  configLabel,
+  groupKValue,
+  qcUser,
+  startPoint,
+  endPoint,
+  totalPoints,
+  isFirstPage,
+  stageName,
+  sizeChunkLabel, // NEW
+  isNewSizeChunk, // NEW
+}) => (
+  <View style={styles.configContinuationHeader} wrap={false}>
+    {/* Stage indicator badge */}
+    {!isFirstPage && stageName && (
+      <View
+        style={{
+          backgroundColor: stageName === "Before" ? "#8b5cf6" : "#14b8a6",
+          paddingHorizontal: 6,
+          paddingVertical: 2,
+          borderRadius: 3,
+          marginRight: 8,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 6,
+            color: "#FFFFFF",
+            fontFamily: "Helvetica-Bold",
+          }}
+        >
+          {stageName === "Before" ? "BEFORE" : "AFTER"}
+        </Text>
+      </View>
+    )}
+
+    {/* NEW: Size chunk indicator for new size chunks */}
+    {isNewSizeChunk && sizeChunkLabel && (
+      <View
+        style={{
+          backgroundColor: "#e0e7ff",
+          paddingHorizontal: 6,
+          paddingVertical: 2,
+          borderRadius: 3,
+          marginRight: 8,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 6,
+            color: colors.primary,
+            fontFamily: "Helvetica-Bold",
+          }}
+        >
+          [{sizeChunkLabel}]
+        </Text>
+      </View>
+    )}
+
+    {/* Config Label */}
+    <Text style={styles.configContinuationText}>{cleanText(configLabel)}</Text>
+
+    {/* K-Value */}
+    {groupKValue && (
+      <Text
+        style={{
+          fontSize: 9,
+          color: colors.primary,
+          marginLeft: 6,
+          fontFamily: "Helvetica-Bold",
+        }}
+      >
+        (K: {groupKValue})
+      </Text>
+    )}
+
+    {/* QC User */}
+    {qcUser && (
+      <Text
+        style={{
+          fontSize: 8,
+          color: colors.gray[500],
+          marginLeft: 8,
+        }}
+      >
+        (QC: {cleanText(qcUser.eng_name)})
+      </Text>
+    )}
+
+    {/* Size info for continuation pages (non-new size chunks) */}
+    {!isNewSizeChunk && sizeChunkLabel && (
+      <Text
+        style={{
+          fontSize: 7,
+          color: colors.primary,
+          marginLeft: 8,
+          fontFamily: "Helvetica-Bold",
+        }}
+      >
+        [{sizeChunkLabel}]
+      </Text>
+    )}
+
+    {/* Point Range - Right aligned */}
+    <Text style={styles.pointRangeText}>
+      Points: {startPoint}-{endPoint} (Total: {totalPoints})
+    </Text>
+  </View>
+);
+
+// =============================================================================
+// COMPONENT: Measurement Table Chunk (Modified to accept rowChunk)
+// =============================================================================
 const MeasurementTableChunk = ({
   sizeChunk,
   measurements,
-  uniqueRows,
+  rowChunk, // Changed from uniqueRows to rowChunk - only renders subset of rows
   allSpecs,
-  criticalSpecIds = new Set(), // NEW: Add this parameter
+  criticalSpecIds = new Set(),
+  startPoint, // NEW: starting point number for display
 }) => {
-  if (!sizeChunk.length || !uniqueRows.length) return null;
+  if (!sizeChunk.length || !rowChunk.length) return null;
 
   const sizeColumnConfigs = sizeChunk.map((size) => {
     const m = measurements.find((meas) => meas.size === size);
@@ -767,7 +952,7 @@ const MeasurementTableChunk = ({
   });
 
   return (
-    <View style={styles.tableContainer}>
+    <View style={styles.tableContainer} wrap={false}>
       {/* Header Row */}
       <View style={styles.tableHeaderRow}>
         <View style={styles.colPoint}>
@@ -845,8 +1030,8 @@ const MeasurementTableChunk = ({
         })}
       </View>
 
-      {/* Data Rows */}
-      {uniqueRows.map((rowSpec, rIdx) => {
+      {/* Data Rows - Now using rowChunk instead of uniqueRows */}
+      {rowChunk.map((rowSpec, rIdx) => {
         // Check if this spec is critical
         const isCritical = criticalSpecIds.has(rowSpec.id);
 
@@ -875,26 +1060,46 @@ const MeasurementTableChunk = ({
         // Point cell background - critical gets slightly different shade
         const pointCellBg = isCritical ? "#bfdbfe" : rowBgColor; // Blue-200 for critical point cell
 
+        // Calculate the actual point number (for display if needed)
+        const pointNumber = startPoint ? startPoint + rIdx : rIdx + 1;
+
         return (
           <View
             key={rIdx}
             style={[styles.tableRow, { backgroundColor: rowBgColor }]}
           >
-            {/* Point Name - with critical indicator */}
+            {/* Point Name - with critical indicator and point number */}
             <View style={[styles.colPoint, { backgroundColor: pointCellBg }]}>
-              <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  flexWrap: "wrap",
+                }}
+              >
+                {/* Point Number */}
+                <Text
+                  style={{
+                    fontSize: 4,
+                    color: colors.gray[400],
+                    marginRight: 2,
+                    minWidth: 8,
+                  }}
+                >
+                  {pointNumber}.
+                </Text>
                 {isCritical && (
                   <Text
                     style={{
                       fontSize: 5,
                       color: "#2563eb",
-                      marginRight: 2,
+                      marginRight: 1,
                     }}
                   >
                     ★
                   </Text>
                 )}
-                <Text style={styles.textPoint}>
+                <Text style={[styles.textPoint, { flex: 1 }]}>
                   {cleanText(rowSpec.MeasurementPointEngName)}
                 </Text>
               </View>
@@ -1016,6 +1221,9 @@ const MeasurementTableChunk = ({
   );
 };
 
+// =============================================================================
+// COMPONENT: Stats Cards
+// =============================================================================
 const calculateGroupStats = (measurements, allSpecs) => {
   let totalPoints = 0,
     passPoints = 0,
@@ -1079,7 +1287,7 @@ const calculateGroupStats = (measurements, allSpecs) => {
 };
 
 const MeasurementStatsCards = ({ stats }) => (
-  <View style={styles.statsRow}>
+  <View style={styles.statsRow} wrap={false}>
     <View style={styles.statCard}>
       <Text style={styles.statLabel}>Total Pts</Text>
       <Text style={[styles.statValue, { color: colors.primary }]}>
@@ -1120,165 +1328,320 @@ const MeasurementStatsCards = ({ stats }) => (
 );
 
 // =============================================================================
+// PAGINATION CONSTANTS
+// =============================================================================
+const ROWS_FIRST_PAGE = 20; // First page has summary table + stats, so fewer rows
+const ROWS_CONTINUATION_PAGE = 35; // Continuation pages can have more rows
+const SIZES_PER_TABLE = 2; // Max 2 sizes per table for readability
+
+// =============================================================================
 // MAIN EXPORT
 // =============================================================================
 const MeasurementSectionPDF = ({
   measurementStageData,
   measurementResult,
-  sizeList = [], // NEW: Add sizeList prop
+  sizeList = [],
+  // NEW: Props from parent for page generation
+  reportData,
+  orderNo,
+  HeaderComponent,
+  FooterComponent,
+  pageStyle,
 }) => {
   if (!measurementStageData || measurementStageData.length === 0) return null;
 
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>MEASUREMENT SUMMARY</Text>
+  // ==========================================================================
+  // PRE-CALCULATE ALL PAGES UPFRONT
+  // ==========================================================================
+  const allPages = [];
 
-      <View style={styles.sectionContent}>
-        <MeasurementLegend />
+  measurementStageData.forEach((stageData, sIdx) => {
+    const rawSpecs = stageData.specs?.full || [];
 
-        {measurementStageData.map((stageData, sIdx) => {
-          //const allSpecs = stageData.specs?.full || [];
-          const rawSpecs = stageData.specs?.full || [];
-          return (
-            <View key={sIdx} style={{ marginBottom: 16 }} break={sIdx > 0}>
-              <View
-                style={[
-                  styles.stageHeader,
-                  {
-                    backgroundColor:
-                      stageData.stage === "Before" ? "#8b5cf6" : "#14b8a6",
-                  },
-                ]}
-              >
-                <Text style={styles.textStage}>{stageData.label}</Text>
-              </View>
+    // Add stage header page (with summary table)
+    // This will be the first page for each stage
+    let stageHeaderAdded = false;
 
-              {/* Configuration Summary Table - Pass sizeList */}
-              <ConfigSummaryTable
-                groupedData={stageData.groupedData}
-                sizeList={sizeList}
-              />
+    stageData.groupedData?.groups?.forEach((group, gIdx) => {
+      const configLabel =
+        [
+          group.lineName ? `Line ${group.lineName}` : null,
+          group.tableName ? `Table ${group.tableName}` : null,
+          group.colorName ? group.colorName.toUpperCase() : null,
+        ]
+          .filter(Boolean)
+          .join(" / ") || "General Configuration";
 
-              {stageData.groupedData?.groups?.map((group, gIdx) => {
-                const configLabel =
-                  [
-                    group.lineName ? `Line ${group.lineName}` : null,
-                    group.tableName ? `Table ${group.tableName}` : null,
-                    group.colorName ? group.colorName.toUpperCase() : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" / ") || "General Configuration";
-                const measurements = group.measurements || [];
+      const measurements = group.measurements || [];
+      const groupKValue =
+        measurements.length > 0 ? measurements[0].kValue : null;
 
-                // Filter Specs by K-Value
-                // Get K-Value from the first measurement in the group
-                const groupKValue =
-                  measurements.length > 0 ? measurements[0].kValue : null;
+      let activeSpecs = rawSpecs;
+      if (stageData.stage === "Before") {
+        if (groupKValue) {
+          activeSpecs = rawSpecs.filter((s) => s.kValue === groupKValue);
+        } else {
+          const noKSpecs = rawSpecs.filter((s) => !s.kValue);
+          if (noKSpecs.length > 0) activeSpecs = noKSpecs;
+        }
+      }
+      if (activeSpecs.length === 0) activeSpecs = rawSpecs;
 
-                let activeSpecs = rawSpecs;
+      const uniqueSizes = [...new Set(measurements.map((m) => m.size))];
+      const sortedUniqueSizes = sortSizesByReference(uniqueSizes, sizeList);
 
-                // Only apply filter if it is "Before" stage and we have a K-Value
-                if (stageData.stage === "Before") {
-                  if (groupKValue) {
-                    activeSpecs = rawSpecs.filter(
-                      (s) => s.kValue === groupKValue,
-                    );
-                  } else {
-                    // If group has NO K-Value, try to find specs that also have NO K-Value
-                    // (Optional: depending on your DB data, you might just want all specs if no K is defined)
-                    const noKSpecs = rawSpecs.filter((s) => !s.kValue);
-                    if (noKSpecs.length > 0) activeSpecs = noKSpecs;
-                  }
-                }
+      const stats = calculateGroupStats(measurements, activeSpecs);
+      const uniqueRows = getUniqueRows(activeSpecs);
+      const totalPoints = uniqueRows.length;
 
-                // Fallback: If filtering resulted in 0 specs (data mismatch), revert to raw
-                if (activeSpecs.length === 0) activeSpecs = rawSpecs;
+      const criticalSpecIds = new Set(
+        (stageData.specs?.selected || []).map((s) => s.id),
+      );
 
-                // Use sortSizesByReference for unique sizes
-                const uniqueSizes = [
-                  ...new Set(measurements.map((m) => m.size)),
-                ];
-                const sortedUniqueSizes = sortSizesByReference(
-                  uniqueSizes,
-                  sizeList,
-                );
+      // Chunk sizes (max 2 per table)
+      const sizeChunks = chunkArray(sortedUniqueSizes, SIZES_PER_TABLE);
 
-                const stats = calculateGroupStats(measurements, activeSpecs);
-                const uniqueRows = getUniqueRows(activeSpecs);
+      // For each size chunk, create row chunks
+      sizeChunks.forEach((sizeChunk, sizeChunkIdx) => {
+        let rowOffset = 0;
+        let pageInSizeChunk = 0;
 
-                //const stats = calculateGroupStats(measurements, allSpecs);
-                //const uniqueRows = getUniqueRows(allSpecs);
+        while (rowOffset < uniqueRows.length) {
+          const isFirstPageOfConfig =
+            sizeChunkIdx === 0 && pageInSizeChunk === 0;
+          const maxRows = isFirstPageOfConfig
+            ? ROWS_FIRST_PAGE
+            : ROWS_CONTINUATION_PAGE;
 
-                // Use sorted sizes for chunking (still 2 per chunk)
-                const sizeChunks = chunkArray(sortedUniqueSizes, 2);
+          const rowChunk = uniqueRows.slice(rowOffset, rowOffset + maxRows);
 
-                // Build set of critical spec IDs
-                const criticalSpecIds = new Set(
-                  (stageData.specs?.selected || []).map((s) => s.id),
-                );
+          if (rowChunk.length > 0) {
+            allPages.push({
+              type: "measurement",
+              stageData,
+              stageIdx: sIdx,
+              groupIdx: gIdx,
+              group,
+              configLabel,
+              groupKValue,
+              measurements,
+              activeSpecs,
+              stats,
+              criticalSpecIds,
+              sizeChunk,
+              sizeChunkIdx,
+              rowChunk,
+              isFirstPageOfConfig,
+              isFirstPageOfSizeChunk: pageInSizeChunk === 0,
+              isNewSizeChunk: pageInSizeChunk === 0 && sizeChunkIdx > 0,
+              startPoint: rowOffset + 1,
+              endPoint: rowOffset + rowChunk.length,
+              totalPoints,
+              hasMultipleSizeChunks: sizeChunks.length > 1,
+              // Include stage header info only for first page of first group
+              includeStageHeader: !stageHeaderAdded && isFirstPageOfConfig,
+              includeSummaryTable: !stageHeaderAdded && isFirstPageOfConfig,
+              groupedData: stageData.groupedData,
+            });
 
-                return (
-                  <View key={gIdx} style={{ marginBottom: 12 }}>
-                    <View style={styles.groupHeader}>
-                      <Text style={styles.textGroup}>
-                        {cleanText(configLabel)}
-                      </Text>
-                      {/* Show K-Value in Header if exists */}
-                      {groupKValue && (
-                        <Text
-                          style={{
-                            fontSize: 9,
-                            color: colors.primary,
-                            marginLeft: 6,
-                            fontFamily: "Helvetica-Bold",
-                          }}
-                        >
-                          (K: {groupKValue})
-                        </Text>
-                      )}
-                      {group.qcUser && (
-                        <Text
-                          style={{
-                            fontSize: 8,
-                            color: colors.gray[500],
-                            marginLeft: 8,
-                          }}
-                        >
-                          (QC: {cleanText(group.qcUser.eng_name)})
-                        </Text>
-                      )}
-                    </View>
-                    <MeasurementStatsCards stats={stats} />
-                    {sizeChunks.map((chunk, cIdx) => (
-                      <View key={cIdx} break={cIdx > 0}>
-                        {cIdx > 0 && (
-                          <Text
-                            style={{
-                              fontSize: 8,
-                              color: colors.gray[500],
-                              marginBottom: 4,
-                            }}
-                          >
-                            {cleanText(configLabel)} (Continued...)
-                          </Text>
-                        )}
-                        <MeasurementTableChunk
-                          sizeChunk={chunk}
-                          measurements={measurements}
-                          uniqueRows={uniqueRows}
-                          allSpecs={activeSpecs}
-                          //allSpecs={allSpecs}
-                          criticalSpecIds={criticalSpecIds}
-                        />
-                      </View>
-                    ))}
-                  </View>
-                );
-              })}
+            if (!stageHeaderAdded && isFirstPageOfConfig) {
+              stageHeaderAdded = true;
+            }
+          }
+
+          rowOffset += maxRows;
+          pageInSizeChunk++;
+        }
+      });
+    });
+  });
+
+  // ==========================================================================
+  // RENDER PAGES
+  // ==========================================================================
+
+  // If no HeaderComponent provided, render as Views (legacy mode)
+  if (!HeaderComponent) {
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>MEASUREMENT SUMMARY</Text>
+        <View style={{ padding: 10 }}>
+          <MeasurementLegend />
+          {allPages.map((pageData, pageIdx) => (
+            <View
+              key={pageIdx}
+              break={pageIdx > 0}
+              wrap={false}
+              style={{ marginBottom: 10 }}
+            >
+              <RenderMeasurementPageContent pageData={pageData} />
             </View>
-          );
-        })}
+          ))}
+        </View>
       </View>
+    );
+  }
+
+  // Render as separate Pages with Header/Footer
+  return (
+    <>
+      {allPages.map((pageData, pageIdx) => (
+        <Page key={pageIdx} size="A4" style={pageStyle}>
+          <HeaderComponent reportData={reportData} orderNo={orderNo} />
+          <FooterComponent />
+
+          {/* Section title only on first page */}
+          {pageIdx === 0 && (
+            <View wrap={false} style={{ marginBottom: 8 }}>
+              <Text style={styles.sectionTitle}>MEASUREMENT SUMMARY</Text>
+              <View style={{ padding: 10, backgroundColor: colors.gray[50] }}>
+                <MeasurementLegend />
+              </View>
+            </View>
+          )}
+
+          <View style={{ paddingHorizontal: 10 }}>
+            <RenderMeasurementPageContent pageData={pageData} />
+          </View>
+        </Page>
+      ))}
+    </>
+  );
+};
+
+// =============================================================================
+// HELPER: Render Single Page Content
+// =============================================================================
+const RenderMeasurementPageContent = ({ pageData }) => {
+  const {
+    stageData,
+    group,
+    configLabel,
+    groupKValue,
+    measurements,
+    activeSpecs,
+    stats,
+    criticalSpecIds,
+    sizeChunk,
+    rowChunk,
+    isFirstPageOfConfig,
+    startPoint,
+    endPoint,
+    totalPoints,
+    hasMultipleSizeChunks,
+    includeStageHeader,
+    includeSummaryTable,
+    groupedData,
+    isNewSizeChunk,
+  } = pageData;
+
+  return (
+    <View wrap={false}>
+      {/* Stage Header (only on first page of stage) */}
+      {includeStageHeader && (
+        <View
+          style={[
+            styles.stageHeader,
+            {
+              backgroundColor:
+                stageData.stage === "Before" ? "#8b5cf6" : "#14b8a6",
+            },
+          ]}
+        >
+          <Text style={styles.textStage}>{stageData.label}</Text>
+        </View>
+      )}
+
+      {/* Summary Table (only on first page) */}
+      {includeSummaryTable && groupedData && (
+        <ConfigSummaryTable groupedData={groupedData} sizeList={[]} />
+      )}
+
+      {/* Config Header */}
+      {isFirstPageOfConfig ? (
+        <>
+          <View style={styles.groupHeader}>
+            <Text style={styles.textGroup}>{cleanText(configLabel)}</Text>
+            {groupKValue && (
+              <Text
+                style={{
+                  fontSize: 9,
+                  color: colors.primary,
+                  marginLeft: 6,
+                  fontFamily: "Helvetica-Bold",
+                }}
+              >
+                (K: {groupKValue})
+              </Text>
+            )}
+            {group.qcUser && (
+              <Text
+                style={{
+                  fontSize: 8,
+                  color: colors.gray[500],
+                  marginLeft: 8,
+                }}
+              >
+                (QC: {cleanText(group.qcUser.eng_name)})
+              </Text>
+            )}
+            {hasMultipleSizeChunks && (
+              <Text
+                style={{
+                  fontSize: 7,
+                  color: colors.primary,
+                  marginLeft: 8,
+                  fontFamily: "Helvetica-Bold",
+                  backgroundColor: "#e0e7ff",
+                  paddingHorizontal: 4,
+                  paddingVertical: 1,
+                  borderRadius: 2,
+                }}
+              >
+                [{sizeChunk.join(", ")}]
+              </Text>
+            )}
+            <Text
+              style={{
+                fontSize: 7,
+                color: colors.gray[600],
+                marginLeft: "auto",
+                fontFamily: "Helvetica-Bold",
+                backgroundColor: "#e2e8f0",
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 3,
+              }}
+            >
+              Points: {startPoint}-{endPoint} (Total: {totalPoints})
+            </Text>
+          </View>
+          <MeasurementStatsCards stats={stats} />
+        </>
+      ) : (
+        <ConfigPageHeader
+          configLabel={configLabel}
+          groupKValue={groupKValue}
+          qcUser={group.qcUser}
+          startPoint={startPoint}
+          endPoint={endPoint}
+          totalPoints={totalPoints}
+          isFirstPage={false}
+          stageName={stageData.stage}
+          sizeChunkLabel={hasMultipleSizeChunks ? sizeChunk.join(", ") : null}
+          isNewSizeChunk={isNewSizeChunk}
+        />
+      )}
+
+      {/* Measurement Table */}
+      <MeasurementTableChunk
+        sizeChunk={sizeChunk}
+        measurements={measurements}
+        rowChunk={rowChunk}
+        allSpecs={activeSpecs}
+        criticalSpecIds={criticalSpecIds}
+        startPoint={startPoint}
+      />
     </View>
   );
 };
