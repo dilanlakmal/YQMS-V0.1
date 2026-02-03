@@ -940,15 +940,28 @@ const MeasurementTableChunk = ({
       (a, b) => a - b,
     );
     const columns = [];
-    allPcs.forEach((pIdx) => columns.push({ type: "all", idx: pIdx }));
-    critPcs.forEach((pIdx) => columns.push({ type: "crit", idx: pIdx }));
-    const displayColumns = columns.map((col, i) => ({
-      ...col,
-      label: `#${i + 1}`,
-    }));
-    if (displayColumns.length === 0)
-      displayColumns.push({ type: "empty", label: "-" });
-    return { size, measurement: m, cols: displayColumns };
+
+    // Add All columns with A prefix (A#1, A#2, A#3...)
+    allPcs.forEach((pIdx, aIdx) =>
+      columns.push({
+        type: "all",
+        idx: pIdx,
+        label: `A#${aIdx + 1}`,
+      }),
+    );
+
+    // Add Critical columns with C prefix (C#1, C#2, C#3...)
+    critPcs.forEach((pIdx, cIdx) =>
+      columns.push({
+        type: "crit",
+        idx: pIdx,
+        label: `C#${cIdx + 1}`,
+      }),
+    );
+
+    if (columns.length === 0) columns.push({ type: "empty", label: "-" });
+
+    return { size, measurement: m, cols: columns };
   });
 
   return (
@@ -1096,7 +1109,7 @@ const MeasurementTableChunk = ({
                       marginRight: 1,
                     }}
                   >
-                    ★
+                    [C]
                   </Text>
                 )}
                 <Text style={[styles.textPoint, { flex: 1 }]}>
