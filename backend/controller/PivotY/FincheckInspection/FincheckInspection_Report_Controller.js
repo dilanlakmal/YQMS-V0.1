@@ -46,6 +46,7 @@ export const getInspectionReports = async (req, res) => {
       poLine,
       qaStatus,
       leaderDecision,
+      season,
       page = 1,
       limit = 200,
     } = req.query;
@@ -65,7 +66,7 @@ export const getInspectionReports = async (req, res) => {
         : [];
 
     // ---------------------------------------------------------
-    // 1. NEW: QA Status Filter
+    // 1. QA Status Filter
     // ---------------------------------------------------------
     const qaStatusList = parseList(qaStatus);
     if (qaStatusList.length > 0 && !qaStatusList.includes("All")) {
@@ -84,7 +85,7 @@ export const getInspectionReports = async (req, res) => {
     }
 
     // ---------------------------------------------------------
-    // 2. NEW: Leader Decision Filter (Complex Logic)
+    // 2. Leader Decision Filter (Complex Logic)
     // ---------------------------------------------------------
     const decisionList = parseList(leaderDecision);
     if (decisionList.length > 0 && !decisionList.includes("All")) {
@@ -128,7 +129,48 @@ export const getInspectionReports = async (req, res) => {
       }
     }
 
-    // --- PO Line Filter Logic ---
+    // ---------------------------------------------------------
+    // 3. Season Filter
+    // ---------------------------------------------------------
+    const seasonList = parseList(season);
+    if (seasonList.length > 0 && !seasonList.includes("All")) {
+      // Find all Order Numbers that have matching seasons
+      const matchingSeasonOrders = await YorksysOrders.find({
+        season: { $in: seasonList.map((s) => new RegExp(`^${s}$`, "i")) },
+      })
+        .select("moNo")
+        .lean();
+
+      const matchingOrderNos = matchingSeasonOrders.map((o) => o.moNo);
+
+      // Filter reports that contain these order numbers
+      const seasonCondition = { orderNos: { $in: matchingOrderNos } };
+
+      // Merge with existing query (handle $and/$or logic)
+      if (query.$and) {
+        query.$and.push(seasonCondition);
+      } else if (query.$or) {
+        query.$and = [{ $or: query.$or }, seasonCondition];
+        delete query.$or;
+      } else {
+        // Check if orderNos filter already exists from PO Line filter
+        if (query.orderNos && query.orderNos.$in) {
+          // Intersect the arrays: existing orderNos AND season orderNos
+          const existingOrders = query.orderNos.$in;
+          const intersection = existingOrders.filter((no) =>
+            matchingOrderNos.includes(no),
+          );
+          query.orderNos = { $in: intersection };
+        } else {
+          query.orderNos = { $in: matchingOrderNos };
+        }
+      }
+    }
+
+    // ---------------------------------------------------------
+    // 4. --- PO Line Filter Logic ---
+    // ---------------------------------------------------------
+
     if (poLine) {
       // Split by comma and trim
       const poList = poLine
@@ -330,7 +372,7 @@ export const getInspectionReports = async (req, res) => {
     const yorksysOrders = await YorksysOrders.find({
       moNo: { $in: allOrderNos },
     })
-      .select("moNo SKUData.POLine")
+      .select("moNo SKUData.POLine season")
       .lean();
 
     // C. Create a Map: OrderNo -> Array of PO Lines
@@ -345,6 +387,14 @@ export const getInspectionReports = async (req, res) => {
         });
       }
       orderPOMap[yOrder.moNo] = Array.from(poSet);
+    });
+
+    // --- Fetch Seasons from YorksysOrders ---
+    const orderSeasonMap = {};
+    yorksysOrders.forEach((yOrder) => {
+      if (yOrder.season) {
+        orderSeasonMap[yOrder.moNo] = yOrder.season;
+      }
     });
 
     // --- 4. Merge Data ---
@@ -363,12 +413,24 @@ export const getInspectionReports = async (req, res) => {
       // Convert to comma-separated string
       const poLineString = Array.from(reportPOs).sort().join(", ");
 
+      // Calculate Season for this report (take first match)
+      let reportSeason = "";
+      if (report.orderNos) {
+        for (const orderNo of report.orderNos) {
+          if (orderSeasonMap[orderNo]) {
+            reportSeason = orderSeasonMap[orderNo];
+            break;
+          }
+        }
+      }
+
       return {
         ...report,
         // Add the decision fields to the report object
         decisionStatus: decisionInfo ? decisionInfo.status : null,
         decisionUpdatedAt: decisionInfo ? decisionInfo.updatedAt : null,
         poLines: poLineString,
+        season: reportSeason,
       };
     });
 
@@ -521,7 +583,41 @@ export const autocompleteCustStyle = async (req, res) => {
 };
 
 // ============================================================
-// Autocomplete for PO Line (NEW)
+// Autocomplete Season
+// ============================================================
+export const autocompleteSeason = async (req, res) => {
+  try {
+    const { term } = req.query;
+
+    // Get all distinct seasons first
+    const allSeasons = await YorksysOrders.distinct("season");
+
+    // Filter and limit in JavaScript
+    let filtered = allSeasons
+      .filter((s) => s && s.trim() !== "") // Remove null/empty
+      .sort();
+
+    // Apply regex filter if term provided
+    if (term && term.length >= 1) {
+      const regex = new RegExp(term, "i");
+      filtered = filtered.filter((s) => regex.test(s));
+    }
+
+    // Limit to 20 results
+    const limited = filtered.slice(0, 20);
+
+    return res.status(200).json({
+      success: true,
+      data: limited,
+    });
+  } catch (error) {
+    console.error("Error in Season autocomplete:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// Autocomplete for PO Line
 // ============================================================
 export const autocompletePOLine = async (req, res) => {
   try {
