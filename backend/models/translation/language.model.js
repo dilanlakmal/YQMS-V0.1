@@ -10,7 +10,6 @@ const languageSchema = new Schema({
         required: true,
         unique: true,
         trim: true,
-        lowercase: true
     },
     name: {
         type: String,

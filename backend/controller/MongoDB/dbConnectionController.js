@@ -136,8 +136,6 @@ import createCoverPageSchema from "../../models/YDT/coverPage.js";
 import createHumidityModel from "../../models/huminity/HumidityReport.js";
 
 import createConversationModel from "../../models/chatbot/conversation.model.js";
-import createPTExtractionModel from "../../models/production/instruction/extraction/page.extractions.model.js";
-import createProductionModel from "../../models/production/production.model.js";
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
   process.env.MongoDB_URI_ym_prod || "mongodb://yaidev:Yai%40Dev2025@192.167.4.7:28425/ym_prod?authSource=admin&retryWrites=true&w=majority"
@@ -333,8 +331,6 @@ export const HumidityReport = createHumidityModel(ymProdConnection);
 
 
 export const Conversation = createConversationModel(ymEcoConnection);
-export const PTExtraction = createPTExtractionModel(ymEcoConnection);
-export const ProductionTranModel = createProductionModel(ymEcoConnection);
 //Disconnect DB connection
 export async function disconnectMongoDB() {
   try {

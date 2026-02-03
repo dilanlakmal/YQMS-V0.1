@@ -17,6 +17,7 @@ const CONFIG = {
         CONNECTION_STRING: process.env.AZURE_BLOB_CONNECTION_STRING,
         SOURCE_CONTAINER: process.env.AZURE_SOURCE_CONTAINER || "instruction-source",
         TARGET_CONTAINER: process.env.AZURE_TARGET_CONTAINER || "instruction-target",
+        GLOSSARY_CONTAINER: process.env.AZURE_GLOSSARY_CONTAINER || "instruction-glossary",
     }
 };
 
@@ -39,6 +40,15 @@ const constructSource = (sourceUrl, language) => {
     return base;
 };
 
+const constructGlossary = (glossaryUrl) => {
+    const base = {
+        glossaryUrl,
+        format: "tsv",
+        storageSource: "AzureBlob"
+    };
+    return base;
+};
+
 const constructTarget = (targetUrl, language, glossaries = []) => {
     const base = {
         targetUrl,
@@ -53,4 +63,4 @@ const constructTarget = (targetUrl, language, glossaries = []) => {
 
 const constructBatchRequest = (inputs) => ({ inputs });
 
-export { CONSTANTS, CONFIG, HEADERS, constructSource, constructTarget, constructBatchRequest };
+export { CONSTANTS, CONFIG, HEADERS, constructSource, constructGlossary, constructTarget, constructBatchRequest };

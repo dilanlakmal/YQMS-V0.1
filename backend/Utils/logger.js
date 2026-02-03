@@ -45,6 +45,11 @@ global.logger = {
             timers.delete(label);
             originalLog("[TIME]  ", getTimestamp(), `${label}: ${duration.toFixed(2)}ms`);
         }
+    },
+    debug: (...args) => {
+        if (isDev) {
+            originalLog("[DEBUG] ", getTimestamp(), ...args);
+        }
     }
 }
 

@@ -1,5 +1,6 @@
 import { Document } from "../../models/instruction/index.js";
-import { ensureContainerExists, uploadBlob, deleteBlob, listBlobs, downloadBlob } from "../../storage/azure.blob.storage.js";
+import { ensureContainerExists, uploadBlob, deleteBlob, listBlobs, downloadBlob, deleteBlobsByPrefix } from "../../storage/azure.blob.storage.js";
+import { CONFIG } from "../../Config/translation.config.js";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
@@ -10,7 +11,7 @@ import "../../Utils/logger.js";
 import { Instruction } from "../../models/instruction/index.js";
 import { LLMImageExtractor } from "../ai/extractor/ollama.extract.controller.js";
 import AzureTranslatorService from "../../services/translation/azure.translator.service.js";
-import { Translation, Content, Language } from "../../models/translation/index.js";
+import { Translation, Content, Language, Glossary } from "../../models/translation/index.js";
 import { load } from "cheerio";
 
 /**
@@ -98,20 +99,56 @@ const extractController = {
             if (!doc) {
                 return res.status(404).json({ message: "Document not found" });
             }
-            const urlObj = new URL(doc.source);
+            // 2. Extract Container and Blob Name safely
+            const urlObj = new URL(doc.source || "");
             const pathParts = urlObj.pathname.split('/').filter(p => p.length > 0);
 
-            // pathParts[0] is container (likely user_id), pathParts[1] is blob name
-            const containerName = pathParts[0];
-            const blobName = pathParts.slice(1).join('/'); // In case blob name has slashes
+            // In Azure Blob Storage:
+            // Production: https://account.blob.core.windows.net/container/blob.pdf -> pathParts: ['container', 'blob.pdf']
+            // Emulator: http://127.0.0.1:10000/devstoreaccount1/container/blob.pdf -> pathParts: ['devstoreaccount1', 'container', 'blob.pdf']
 
-            logger.info(`Container: ${containerName}`);
-            logger.info(`Blob Name: ${blobName}`);
+            let containerName, blobName;
+            if (urlObj.hostname === "127.0.0.1" || urlObj.hostname === "localhost") {
+                containerName = pathParts[1];
+                blobName = pathParts.slice(2).join('/');
+            } else {
+                containerName = pathParts[0];
+                blobName = pathParts.slice(1).join('/');
+            }
+
+            if (!containerName || !blobName) {
+                logger.error(`Invalid source URL: ${doc.source}`);
+                return res.status(400).json({ message: "Invalid document source URL" });
+            }
+
+            logger.info(`Source Extraction: Container=${containerName}, Blob=${blobName}`);
+
+            // 2.1 Check if already extracted
+            const baseBlobName = path.parse(blobName).name;
+            if ((doc.status === "imageExtracted" || doc.status === "fieldExtracted") && doc.imageExtracted?.length > 0) {
+                logger.info(`Document ${docId} already has imageExtracted status. Verifying storage...`);
+
+                // Verify if folder exists by listing blobs with the prefix
+                const existingBlobs = await listBlobs(containerName, `${baseBlobName}/`);
+                if (existingBlobs.length > 0) {
+                    logger.info(`Found ${existingBlobs.length} existing images in storage. Skipping conversion.`);
+                    return res.json({
+                        message: "Already processed",
+                        images: doc.imageExtracted,
+                        totalCount: existingBlobs.length
+                    });
+                }
+                logger.warn(`DB marked as extracted but no images found in storage for prefix: ${baseBlobName}/. Re-processing...`);
+            }
 
             // 3. Download PDF
-            logger.info("Downloading PDF from Azure...");
+            logger.info(`Downloading PDF from Azure storage (DocID: ${docId})...`);
             const pdfBuffer = await downloadBlob(containerName, blobName);
-            logger.info(`Downloaded ${pdfBuffer.length} bytes.`);
+
+            if (!pdfBuffer || pdfBuffer.length === 0) {
+                throw new Error("Downloaded PDF buffer is empty");
+            }
+            logger.info(`Downloaded PDF: ${pdfBuffer.length} bytes.`);
 
             // Create temp directory
             tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "pdf_conv_"));
@@ -134,12 +171,7 @@ const extractController = {
             const files = await fs.readdir(tempDir);
             const imageFiles = files.filter(f => f.endsWith(".jpg") || f.endsWith(".jpeg"));
 
-            // Sort to ensure order if needed, but we rely on file names 
-            // pdf-poppler names them page-1.jpg, page-2.jpg etc.
-
             const uploadedUrls = [];
-            // "folder as blob name" -> Remove extension from blob name to get folder name
-            const baseBlobName = path.parse(blobName).name;
 
             logger.info(`Uploading ${imageFiles.length} images...`);
 
@@ -164,9 +196,12 @@ const extractController = {
             }
 
             // Update Document
-            doc.imageExtracted = uploadedUrls;
-            doc.status = "imageExtracted";
-            await doc.save();
+            await Document.findByIdAndUpdate(docId, {
+                $set: {
+                    imageExtracted: uploadedUrls,
+                    status: "imageExtracted"
+                }
+            });
 
             // Cleanup: Delete original PDF blob after conversion
             // try {
@@ -180,7 +215,7 @@ const extractController = {
             res.json({ message: "Conversion successful", images: uploadedUrls });
 
         } catch (error) {
-            logger.error("convertPdfToImage error:", { error: error.message });
+            logger.error("convertPdfToImage error:", error.message);
             res.status(500).json({ message: "Failed to convert PDF to image", error: error.message });
         } finally {
             // Cleanup temp dir
@@ -200,16 +235,32 @@ const extractController = {
             const pageNumber = req.body.pageNumber;
 
 
-            const doc = await Document.findOne({ _id: docId, status: "imageExtracted", user_id: userId });
+            const doc = await Document.findOne({ _id: docId, user_id: userId });
             if (!doc) {
                 logger.warn(`Document not found for extraction: ID=${docId}, User=${userId}`);
-                return res.status(404).json({ message: "Document not found or not in 'imageExtracted' status" });
+                return res.status(404).json({ message: "Document not found" });
             }
 
             const instruction = await Instruction.findOne({ document_id: docId });
             if (!instruction) {
                 logger.warn(`Instruction not found for document: ID=${docId}`);
                 return res.status(404).json({ message: "Associated instruction record not found" });
+            }
+
+            // If already extracted, skip and return instruction info
+            if (doc.status === "fieldExtracted") {
+                logger.info(`Fields already extracted for document: ${docId}. Returning existing record.`);
+                return res.json({
+                    message: "Fields already extracted",
+                    instructionId: instruction._id,
+                    detectedLanguage: await instruction.getDetectedLanguage(),
+                    data: await Instruction.getInstruction(docId)
+                });
+            }
+
+            if (doc.status !== "imageExtracted") {
+                logger.warn(`Document ${docId} is in status '${doc.status}', expected 'imageExtracted'`);
+                return res.status(400).json({ message: "Document is not ready for extraction (must be in 'imageExtracted' status)" });
             }
 
             // 1. Get Image and convert to Base64
@@ -219,10 +270,22 @@ const extractController = {
             }
 
             logger.info(`Extracting fields from page ${pageNumber}...`);
-            const urlObj = new URL(imageUrl);
+            // Safe URL extraction
+            const urlObj = new URL(imageUrl || "");
             const pathParts = urlObj.pathname.split('/').filter(p => p.length > 0);
-            const containerName = pathParts[0];
-            const blobName = pathParts.slice(1).join('/');
+
+            let containerName, blobName;
+            if (urlObj.hostname === "127.0.0.1" || urlObj.hostname === "localhost") {
+                containerName = pathParts[1];
+                blobName = pathParts.slice(2).join('/');
+            } else {
+                containerName = pathParts[0];
+                blobName = pathParts.slice(1).join('/');
+            }
+
+            if (!containerName || !blobName) {
+                throw new Error(`Invalid image URL for extraction: ${imageUrl}`);
+            }
 
             const imageBuffer = await downloadBlob(containerName, blobName);
             const imageBase64 = imageBuffer.toString('base64');
@@ -241,22 +304,33 @@ const extractController = {
 
             // 4. Update the instruction model and its annotations
             logger.info("Updating instruction fields from AI result...");
-            const updatedInstruction = await instruction.updateFromExtractedData(result);
+            const updatedInstruction = await instruction.updateInstruction(result);
 
             // 5. Update Document Status
-            doc.status = "fieldExtracted";
-            await doc.save();
+            await Document.findByIdAndUpdate(docId, { $set: { status: "fieldExtracted" } });
 
             logger.info(`Fields extracted successfully for document: ${docId}`);
             res.json({
                 message: "Fields extracted and saved successfully",
-                data: result,
                 instructionId: updatedInstruction._id,
+                detectedLanguage: await updatedInstruction.getDetectedLanguage(),
+                data: await Instruction.getInstruction(docId)
             });
 
         } catch (error) {
-            logger.error("extractFields error:", { error: error.message, stack: error.stack });
-            res.status(500).json({ message: "Failed to extract fields", error: error.message });
+            const isConnectionError = error.message?.includes("Ollama service unreachable");
+            logger.error("extractFields error:", {
+                error: error.message,
+                stack: error.stack,
+                type: isConnectionError ? "ConnectionError" : "GeneralError"
+            });
+
+            res.status(isConnectionError ? 503 : 500).json({
+                message: isConnectionError
+                    ? "AI Extraction Service (Ollama) is currently unreachable. Please ensure the service is running."
+                    : "Failed to extract fields",
+                error: error.message
+            });
         }
     },
 
@@ -264,117 +338,38 @@ const extractController = {
         try {
             const { docId } = req.params;
 
-            // 1. Find the instruction for this document
-            const instruction = await Instruction.findOne({ document_id: docId });
+            logger.info(`Fetching instruction data for document: ${docId}`);
+
+            // 1. Find the instruction for this document using the static method (fully populated)
+            const instruction = await Instruction.getInstruction(docId);
 
             if (!instruction) {
+                logger.warn(`Instruction not found for document: ${docId}`);
                 return res.status(404).json({ message: "Instruction data not found for this document" });
             }
 
-            // 2. Populate all annotations and their content
-            // We need a deep populate to get content and translations
-            await instruction.populate([
-                {
-                    path: "header.title header.model_id details.style_no.label details.style_no.value details.factory_code.label details.factory_code.value details.po_no.label details.po_no.value details.quantity.label details.quantity.value requirements.order_type.label requirements.order_type.value requirements.label_instruction.value visuals.sample_image visuals.approval_stamp product_info.style product_info.color product_info.usage product_info.special_note product_info.sizes notes",
-                    populate: {
-                        path: "content",
-                        populate: {
-                            path: "translations"
-                        }
-                    }
-                }
-            ]);
+            // 2. Get detected language
+            const detectedLanguage = await instruction.getDetectedLanguage();
 
-            // Helper to format an annotation into the { english, chinese, khmer } format the UI expects
-            const formatAnnot = (annot) => {
-                if (!annot || !annot.content) return { english: "", chinese: "", khmer: "" };
+            logger.info(`Instruction retrieved successfully: ID=${instruction._id}, DetectedLang=${detectedLanguage}`);
 
-                const content = annot.content;
-                const result = {
-                    english: content.original || "",
-                    chinese: "",
-                    khmer: ""
-                };
-
-                // Fill in translations
-                if (content.translations && Array.isArray(content.translations)) {
-                    content.translations.forEach(t => {
-                        if (t.code === "zh-Hans" || t.code === "zh") result.chinese = t.translated;
-                        if (t.code === "km") result.khmer = t.translated;
-                    });
-                }
-
-                // If original language was not English, we should probably set that correctly.
-                // But the UI seems to expect fixed keys.
-                return result;
-            };
-
-            // 3. Map to the "Legacy" structure expected by GprtTranslationTemplate
-            // This ensures we can use the new model with the existing UI without a massive rewrite.
-            const legacyData = {
-                documentId: docId,
-                instructionId: instruction._id,
-                title: { text: formatAnnot(instruction.header.title) },
-                customer: {
-                    customer_info: { name: "GPRT0007C" }, // HARDCODED for now as requested by user's team check
-                    style: {
-                        code: {
-                            label: formatAnnot(instruction.details.style_no.label),
-                            value: formatAnnot(instruction.details.style_no.value)
-                        },
-                        sample: {
-                            description: "Sample Image",
-                            img: { data: null } // We might need to handle actual image data here if we have it
-                        }
-                    },
-                    purchase: {
-                        order: {
-                            orderNumber: {
-                                label: formatAnnot(instruction.details.po_no.label),
-                                value: formatAnnot(instruction.details.po_no.value)
-                            },
-                            orderType: {
-                                label: formatAnnot(instruction.requirements.order_type.label),
-                                value: formatAnnot(instruction.requirements.order_type.value)
-                            }
-                        },
-                        quantity: {
-                            label: formatAnnot(instruction.details.quantity.label),
-                            value: formatAnnot(instruction.details.quantity.value),
-                            unit: ""
-                        },
-                        specs: [] // Placeholder for specs table
-                    },
-                    packing: {
-                        main: {
-                            label: formatAnnot(instruction.requirements.label_instruction.value),
-                            value: ""
-                        }
-                    },
-                    manufacturingNote: instruction.notes.map(n => formatAnnot(n))
-                },
-                factory: {
-                    factoryID: {
-                        label: formatAnnot(instruction.details.factory_code.label),
-                        value: formatAnnot(instruction.details.factory_code.value)
-                    },
-                    factoryStamp: {
-                        description: "Stamp",
-                        img: { data: null }
-                    }
-                }
-            };
-
-            res.json(legacyData);
+            // 3. Return the populated instruction data
+            res.json({
+                ...instruction.toObject(),
+                detectedLanguage
+            });
 
         } catch (error) {
-            logger.error("getInstruction error:", { error: error.message, stack: error.stack });
+            logger.error("getInstruction error:", {
+                docId,
+                error: error.message,
+                stack: error.stack
+            });
             res.status(500).json({ message: "Failed to fetch instruction data", error: error.message });
         }
     },
 
-
-}
+};
 
 const translationController = {
     generateHtmlFromEntries: (contents) => {
@@ -397,6 +392,28 @@ const translationController = {
         </body>
         </html>
         `;
+    },
+    getHTMLFile: async (req, res) => {
+        try {
+            const { instructionId } = req.params;
+
+            // 1. Get Instruction and all associated contents
+            const instruction = await Instruction.findById(instructionId);
+            if (!instruction) {
+                return res.status(404).json({ message: "Instruction not found" });
+            }
+
+            const contents = await instruction.getAllContents();
+            if (!contents || contents.length === 0) {
+                return res.status(400).json({ message: "No content found in this instruction to translate" });
+            }
+
+            const htmlContent = translationController.generateHtmlFromEntries(contents);
+            res.send(htmlContent);
+        } catch (error) {
+            logger.error("getHTMLFile error:", { error: error.message, stack: error.stack });
+            res.status(500).json({ message: "Failed to fetch HTML file", error: error.message });
+        }
     },
     translate: async (req, res) => {
         try {
@@ -428,7 +445,8 @@ const translationController = {
 
             // 3. Submit Batch Translation Job to Azure
             logger.info("Submitting translation job to Azure...");
-            const jobId = await AzureTranslatorService.submitTranslationJob(userId, files, targetLanguages);
+            const sourceLnague = await instruction.getDetectedLanguage();
+            const jobId = await AzureTranslatorService.submitTranslationJob(userId, files, targetLanguages, sourceLnague);
 
             // 4. Poll for Completion
             logger.info(`Job submitted. ID: ${jobId}. Polling for status...`);
@@ -446,9 +464,10 @@ const translationController = {
                 const toLang = result.toLang;
 
                 for (const contentDoc of contents) {
-                    const translatedText = $(`p[id="${contentDoc._id}"]`).text().trim();
+                    let translatedText = $(`p[id="${contentDoc._id}"]`).text().trim();
 
                     if (translatedText) {
+                        logger.info(`Saving translation for content ${contentDoc._id}, lang: ${toLang}`);
                         await Translation.updateOne(
                             { content: contentDoc._id, code: toLang },
                             {
@@ -460,8 +479,18 @@ const translationController = {
                             },
                             { upsert: true }
                         );
+
+                        // Mark content as translated if not already
+                        if (!contentDoc.translated) {
+                            logger.info(`Marking content ${contentDoc._id} as translated.`);
+                            await Content.updateOne(
+                                { _id: contentDoc._id },
+                                { $set: { translated: true } }
+                            );
+                        }
                     }
                 }
+                logger.info(`Finished processing translations for result with target lang: ${toLang}`);
             }
 
             logger.info(`Translation workflow completed for Instruction: ${instructionId}`);
@@ -546,28 +575,108 @@ const translationController = {
     updateInstruction: async (req, res) => {
         try {
             const { docId } = req.params;
-            const { userId, data } = req.body;
+            const { userId, sections } = req.body;
 
             const instruction = await Instruction.findOne({ document_id: docId });
             if (!instruction) {
                 return res.status(404).json({ message: "Instruction not found" });
             }
 
-            // Simple implementation: for now, we only update the fields that are passed
-            // In a real scenario, we might want to update nested contents/annotations
-            // For GprtTemplate, it mostly updates top-level fields like title, customer, factory
-            if (data.title) instruction.title = { ...instruction.title.toObject(), ...data.title };
-            if (data.customer) instruction.customer = { ...instruction.customer.toObject(), ...data.customer };
-            if (data.factory) instruction.factory = { ...instruction.factory.toObject(), ...data.factory };
+            if (!sections || !Array.isArray(sections)) {
+                return res.status(400).json({ message: "Sections array is required" });
+            }
 
-            await instruction.save();
+            // Implementation for dynamic updates
+            // 1. Loop through sections and fields to update content
+            for (const section of sections) {
+                const existingSection = instruction.sections.find(s => s.id === section.id);
+                if (!existingSection) {
+                    // Logic to handle newly added sections could go here
+                    continue;
+                }
 
-            logger.info(`Instruction updated for document: ${docId}`);
-            res.json({ message: "Instruction updated successfully", data: instruction });
+                for (const field of section.fields) {
+                    const existingField = existingSection.fields.find(f => f.key === field.key);
+                    if (!existingField) continue;
+
+                    // Update Original Text for Value (and Label if needed)
+                    if (field.value && typeof field.value === 'object') {
+                        const annot = await Annotation.findById(existingField.value);
+                        if (annot) await annot.updateOriginalText(field.value.english);
+                    }
+                    if (field.label && typeof field.label === 'object') {
+                        const annot = await Annotation.findById(existingField.label);
+                        if (annot) await annot.updateOriginalText(field.label.english);
+                    }
+                }
+            }
+
+            // Note: This is an incremental update. Full section list synchronization (add/delete)
+            // would require more complex diffing logic.
+
+            logger.info(`Instruction annotations updated for document: ${docId}`);
+            res.json({ message: "Instruction updated successfully" });
 
         } catch (error) {
             logger.error("updateInstruction error:", error);
-            res.status(500).json({ message: "Failed to update instruction" });
+            res.status(500).json({ message: "Failed to update instruction", error: error.message });
+        }
+    },
+    getInstructionTranslated: async (req, res) => {
+        try {
+            const { instructionId, languageCode } = req.params;
+
+            if (!mongoose.Types.ObjectId.isValid(instructionId)) {
+                return res.status(400).json({ message: "Invalid instructionId" });
+            }
+
+            const instruction = await Instruction.findById(instructionId);
+
+            if (!instruction) {
+                return res.status(404).json({ message: "Instruction not found" });
+            }
+
+            // Get data translated to the specific language
+            const result = await instruction.getTranslatedInstruction(languageCode);
+
+            // Return flattened structure matching the new schema
+            res.json({
+                ...result, // This contains the full instruction structure with translated values
+                language: languageCode
+            });
+
+        } catch (error) {
+            logger.error("getInstructionTranslated error:", error);
+            res.status(500).json({ message: "Failed to fetch translated instruction", error: error.message });
+        }
+    },
+    getInstructionById: async (req, res) => {
+        try {
+            const { instructionId } = req.params;
+
+            if (!mongoose.Types.ObjectId.isValid(instructionId)) {
+                return res.status(400).json({ message: "Invalid instructionId" });
+            }
+
+            const instruction = await Instruction.findById(instructionId);
+
+            if (!instruction) {
+                return res.status(404).json({ message: "Instruction not found" });
+            }
+
+            // Get full hydrated structure (original + all translations)
+            const result = await instruction.getFormattedData();
+
+            res.json({
+                instructionId: instruction._id,
+                documentId: instruction.document_id,
+                detectedLanguage: instruction.detected_language,
+                ...result
+            });
+
+        } catch (error) {
+            logger.error("getInstructionById error:", error);
+            res.status(500).json({ message: "Failed to fetch instruction", error: error.message });
         }
     }
 };
@@ -640,17 +749,23 @@ const documentController = {
             const blob = await uploadBlob(user_id, blobName, fileBuffer, { userId: user_id });
 
             // Update source AFTER upload
-            doc.source = blob;
-            doc.active = true;
-            doc.hash = hash;
-            doc.file_name = file.originalname;
-            await doc.save();
+            const updatedDoc = await Document.findByIdAndUpdate(doc._id, {
+                $set: {
+                    source: blob,
+                    active: true,
+                    hash: hash,
+                    file_name: file.originalname
+                }
+            }, { new: true }); // Return updated document
+
+            logger.info(`Initializing instruction structure for document: ${doc._id}`);
+            await Instruction.initialize(doc._id, file.originalname);
 
             logger.info(`Document uploaded successfully: ID=${doc._id}, Source=${blob}`);
 
             return res.status(201).json({
                 message: "Document uploaded successfully",
-                document: doc
+                document: updatedDoc
             });
 
         } catch (error) {
@@ -715,38 +830,42 @@ const documentController = {
                 return res.status(400).json({ message: "Invalid userId" });
             }
 
-            // 1. Delete all blobs in user's container (PDFs and image folders)
-            try {
-                const blobs = await listBlobs(userId);
-                if (blobs && blobs.length > 0) {
-                    await Promise.allSettled(blobs.map(b => deleteBlob(userId, b.name)));
-                    logger.info(`Bulk deleted ${blobs.length} blobs for user ${userId}`);
-                }
-            } catch (blobError) {
-                logger.error("Bulk blob deletion error:", { error: blobError.message });
-            }
-
-            // 2. Find all documents for this user
+            // 1. Find all documents for this user
             const userDocs = await Document.find({ user_id: userId }).select("_id");
             const docIds = userDocs.map(d => d._id);
 
             if (docIds.length > 0) {
-                // 3. Find all instructions for these documents
+                // 2. Find all instructions for these documents
                 const instructions = await Instruction.find({ document_id: { $in: docIds } });
 
-                // 4. Recursively delete AI data for each instruction
+                // 3. Delete DB Data (Recursive)
                 for (const inst of instructions) {
                     try {
+                        const instructionId = inst._id;
                         await inst.deleteRelated();
+
+                        // Also clean up translation containers for each instruction
+                        await deleteBlobsByPrefix(CONFIG.STORAGE.SOURCE_CONTAINER, `${userId}/instruction_${instructionId}`);
+                        await deleteBlobsByPrefix(CONFIG.STORAGE.TARGET_CONTAINER, `${userId}/instruction_${instructionId}`);
                     } catch (instError) {
                         logger.error(`Recursive delete failed for instruction ${inst._id}:`, instError);
                     }
                 }
 
-                // 5. Cleanup remaining documents and progress
+                // 4. Cleanup remaining database records
                 const { Progress } = await import("../../models/instruction/index.js");
                 await Progress.deleteMany({ document_id: { $in: docIds } });
                 await Document.deleteMany({ user_id: userId });
+
+                // 5. Cleanup primary storage container (user's PDF and images)
+                try {
+                    const blobs = await listBlobs(userId);
+                    if (blobs && blobs.length > 0) {
+                        await Promise.allSettled(blobs.map(b => deleteBlob(userId, b.name)));
+                    }
+                } catch (blobError) {
+                    logger.error("Bulk primary blob deletion error:", { error: blobError.message });
+                }
 
                 logger.info(`Bulk cleanup complete for user ${userId}. ${docIds.length} documents removed.`);
             }
@@ -780,24 +899,14 @@ const documentController = {
                 return res.status(404).json({ message: "Document not found." });
             }
 
-            // 2. Delete all blobs related to this document (PDF and images)
-            // PDF is docId.pdf, images are in folder docId/
-            const basePrefix = docId.toString();
-            try {
-                const relatedBlobs = await listBlobs(userId, basePrefix);
-                if (relatedBlobs && relatedBlobs.length > 0) {
-                    await Promise.allSettled(relatedBlobs.map(b => deleteBlob(userId, b.name)));
-                    logger.info(`Deleted ${relatedBlobs.length} related blobs for document ${docId}`);
-                }
-            } catch (blobError) {
-                logger.error(`Blob cleanup failed for doc ${docId}, continuing:`, { error: blobError.message });
-            }
-
-            // 3. Delete Instruction and all its recursive dependencies (Annotations, Content, Translations)
+            // 2. Find Associated Instruction
             const instruction = await Instruction.findOne({ document_id: docId });
+            const instructionId = instruction?._id;
+
+            // 3. First, delete DB data (Instruction, Annotations, Contents, Translations)
             if (instruction) {
                 await instruction.deleteRelated();
-                logger.info(`Recursively deleted instruction and AI data for document ${docId}`);
+                logger.info(`Recursively deleted instruction and AI database data for document ${docId}`);
             }
 
             // 4. Delete Progress and Document from MongoDB
@@ -805,8 +914,29 @@ const documentController = {
             await Progress.deleteOne({ document_id: docId });
             await Document.deleteOne({ _id: docId, user_id: userId });
 
-            logger.info(`Document ${docId} and associations deleted for user ${userId}`);
-            return res.status(200).json({ message: "Document deleted successfully." });
+            // 5. Cleanup Azure Storage
+            // 5a. Primary container: delete PDF and images (prefix is docId)
+            const basePrefix = docId.toString();
+            try {
+                await deleteBlobsByPrefix(userId, basePrefix);
+            } catch (blobError) {
+                logger.error(`Primary storage cleanup failed for doc ${docId}, continuing:`, { error: blobError.message });
+            }
+
+            // 5b. Translation process containers (source and output)
+            if (instructionId) {
+                const translationPrefix = `${userId}/instruction_${instructionId}`;
+                try {
+                    await deleteBlobsByPrefix(CONFIG.STORAGE.SOURCE_CONTAINER, translationPrefix);
+                    await deleteBlobsByPrefix(CONFIG.STORAGE.TARGET_CONTAINER, translationPrefix);
+                    logger.info(`Cleaned up translation source and target blobs for instruction ${instructionId}`);
+                } catch (transBlobError) {
+                    logger.error(`Translation storage cleanup failed for instruction ${instructionId}:`, { error: transBlobError.message });
+                }
+            }
+
+            logger.info(`Document ${docId} and all associations deleted for user ${userId}`);
+            return res.status(200).json({ message: "Document and all related assets deleted successfully." });
 
         } catch (error) {
             logger.error("deleteOneByUser error:", { error: error.message, userId, docId });

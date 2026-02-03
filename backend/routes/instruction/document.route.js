@@ -23,6 +23,10 @@ router.patch("/instruction/:docId", documentController.translate.updateInstructi
 // Resource-specific routes with parameters
 router.post("/:userId/convert/:docId", documentController.extract.convertPdfToImage);
 router.get("/:userId/instruction/:docId", documentController.extract.getInstruction);
+
+// New Instruction Endpoints
+router.get("/instruction/:instructionId/html", documentController.translate.getHTMLFile);
+router.get("/instruction/:instructionId/translated/:languageCode", documentController.translate.getInstructionTranslated);
 router.patch("/:userId/active/:docId", documentController.setActiveDocument);
 
 // Generic User routes last

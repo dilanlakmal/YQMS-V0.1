@@ -41,6 +41,16 @@ const progressSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: "User",
     required: true
+  },
+  source_language: {
+    type: String, // e.g. "en"
+    default: "en"
+  },
+  target_languages: [{
+    type: String // e.g. ["zh", "fr"]
+  }],
+  team: {
+    type: String
   }
 });
 
@@ -132,7 +142,10 @@ progressSchema.statics.getByUserId = async function (userId) {
     language:
       res.title?.language?.code === res.description?.language?.code
         ? res.title?.language?.code
-        : "en"
+        : "en",
+    source_language: res.source_language || "en",
+    target_languages: res.target_languages || [],
+    team: res.team || null
   }));
 };
 
@@ -196,7 +209,10 @@ progressSchema.statics.translateAllContent = async function (userId, toLanguage)
     order: p.order,
     icon: p.icon,
     status: p.status,
-    language: toLanguage
+    language: toLanguage, // Legacy fallback
+    source_language: p.source_language || "en",
+    target_languages: p.target_languages || [],
+    team: p.team || null
   }));
 };
 

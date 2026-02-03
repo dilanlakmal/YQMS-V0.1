@@ -89,14 +89,18 @@ const getBlobSasUrl = async (containerName, blobName, permissions = "r", expiryM
         const containerClient = await ensureContainerExists(containerName);
         const blobClient = containerClient.getBlobClient(blobName);
 
-        const sasToken = await blobClient.generateSasUrl({
-            permissions: BlobSASPermissions.parse(permissions),
-            startsOn: new Date(new Date().valueOf() - 5 * 60 * 1000), // Allow 5 mins clock skew
-            expiresOn: new Date(new Date().valueOf() + expiryMinutes * 60 * 1000),
+        const sasPermissions = BlobSASPermissions.parse(permissions);
+        const startsOn = new Date(Date.now() - 5 * 60 * 1000); // Allow 5 mins clock skew
+        const expiresOn = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+        const sasUrl = await blobClient.generateSasUrl({
+            permissions: sasPermissions,
+            startsOn,
+            expiresOn,
         });
 
-        logger.debug(`Generated Source SAS: ${sasToken}`);
-        return sasToken;
+        logger.debug(`Generated Blob SAS URL: ${sasUrl}`);
+        return sasUrl;
     } catch (error) {
         logger.error(`Failed to generate SAS for blob ${blobName}`, { error: error.message });
         throw error;
@@ -127,7 +131,7 @@ const getContainerSasUrl = async (containerName, folderName = "") => {
             finalUrl = `${baseUrl}/${folderName}?${query}`;
         }
 
-        logger.debug(`Generated Target SAS: ${finalUrl}`);
+        logger.log(`Generated Target SAS: ${finalUrl}`);
         return finalUrl;
     } catch (error) {
         logger.error(`Failed to generate SAS for container ${containerName}`, { error: error.message });
@@ -202,6 +206,74 @@ const streamToString = async (readableStream) => {
     });
 };
 
+/**
+ * Downloads blob content as a Buffer.
+ * @param {string} containerName - The container name.
+ * @param {string} blobName - The blob name.
+ * @returns {Promise<Buffer>} The file content as a Buffer.
+ * @throws {Error} If download fails.
+ */
+const downloadBlob = async (containerName, blobName, retries = 3) => {
+    let lastError;
+    for (let i = 0; i < retries; i++) {
+        try {
+            const containerClient = blobServiceClient.getContainerClient(containerName);
+            const blobClient = containerClient.getBlobClient(blobName);
+
+            // Set a timeout for the download call
+            const downloadBlockBlobResponse = await blobClient.download(0, undefined, {
+                abortSignal: AbortSignal.timeout(30000) // 30 second timeout per block
+            });
+
+            const downloaded = await streamToString(downloadBlockBlobResponse.readableStreamBody);
+            return downloaded;
+        } catch (error) {
+            lastError = error;
+            const isAbort = error.name === 'AbortError' || error.message?.includes('aborted');
+
+            logger.warn(`Download attempt ${i + 1} failed for ${blobName}: ${error.message}`);
+
+            if (i < retries - 1 && (isAbort || error.code === 'ECONNRESET')) {
+                // Wait a bit before retrying
+                await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+                continue;
+            }
+            break;
+        }
+    }
+    logger.error(`Failed to download blob ${blobName} after ${retries} attempts`, lastError.message);
+    throw lastError;
+};
+
+/**
+ * Deletes all blobs in a container that match a given prefix.
+ * @param {string} containerName - The name of the container.
+ * @param {string} prefix - The prefix to match.
+ * @returns {Promise<number>} Number of blobs attempted to delete.
+ */
+const deleteBlobsByPrefix = async (containerName, prefix) => {
+    try {
+        const containerClient = await ensureContainerExists(containerName);
+        let count = 0;
+
+        const results = [];
+        for await (const blob of containerClient.listBlobsFlat({ prefix })) {
+            results.push(containerClient.deleteBlob(blob.name));
+            count++;
+        }
+
+        if (results.length > 0) {
+            await Promise.allSettled(results);
+            logger.info(`Bulk deleted ${results.length} blobs from ${containerName} with prefix ${prefix}`);
+        }
+
+        return count;
+    } catch (error) {
+        logger.error(`Failed to bulk delete blobs in ${containerName} with prefix ${prefix}`, { error: error.message });
+        throw error;
+    }
+};
+
 export {
     uploadBlob,
     getBlobSasUrl,
@@ -210,25 +282,6 @@ export {
     downloadBlobToString,
     ensureContainerExists,
     deleteBlob,
-    downloadBlob
-};
-
-/**
- * Downloads blob content as a Buffer.
- * @param {string} containerName - The container name.
- * @param {string} blobName - The blob name.
- * @returns {Promise<Buffer>} The file content as a Buffer.
- * @throws {Error} If download fails.
- */
-const downloadBlob = async (containerName, blobName) => {
-    try {
-        const containerClient = blobServiceClient.getContainerClient(containerName);
-        const blobClient = containerClient.getBlobClient(blobName);
-        const downloadBlockBlobResponse = await blobClient.download();
-        const downloaded = await streamToString(downloadBlockBlobResponse.readableStreamBody);
-        return downloaded;
-    } catch (error) {
-        logger.error(`Failed to download blob ${blobName}`, { error: error.message });
-        throw error;
-    }
+    downloadBlob,
+    deleteBlobsByPrefix
 };

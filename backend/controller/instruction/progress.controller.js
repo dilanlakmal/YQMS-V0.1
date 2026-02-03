@@ -112,6 +112,51 @@ const ProgressController = {
             });
             return res.status(500).json({ message: "Failed to update status" });
         }
+    },
+
+    /**
+     * Generic update for progress items (status, languages, team, etc.)
+     * @param {Object} req 
+     * @param {Object} res 
+     */
+    updateProgress: async (req, res) => {
+        const { userId, progressId } = req.params;
+        const updates = req.body; // e.g., { status, team, source_language, target_languages }
+
+        if (!userId || !progressId) {
+            return res.status(400).json({ message: "userId and progressId are required" });
+        }
+
+        try {
+            // Handle status exclusivity if status is being updated to 'active'
+            if (updates.status === "active") {
+                await ProgressModel.updateMany(
+                    { user_id: userId, _id: { $ne: progressId } },
+                    { $set: { status: "inactive" } }
+                );
+            }
+
+            const { matchedCount } = await ProgressModel.updateOne(
+                { user_id: userId, _id: progressId },
+                { $set: updates }
+            );
+
+            if (matchedCount === 0) {
+                return res.status(404).json({ message: "Progress not found" });
+            }
+
+            return res.status(200).json({
+                message: "Progress updated successfully"
+            });
+        } catch (error) {
+            logger.error("Failed to update progress", {
+                userId,
+                progressId,
+                updates,
+                error: error.message
+            });
+            return res.status(500).json({ message: "Failed to update progress" });
+        }
     }
 
 };

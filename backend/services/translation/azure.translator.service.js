@@ -5,17 +5,18 @@ import {
     CONSTANTS,
     constructSource,
     constructTarget,
-    constructBatchRequest
+    constructBatchRequest,
+    constructGlossary
 } from "../../Config/translation.config.js";
 import {
     uploadBlob,
     getBlobSasUrl,
     getContainerSasUrl,
     listBlobs,
-    downloadBlobToString
+    downloadBlobToString,
+    deleteBlob
 } from "../../storage/azure.blob.storage.js";
-import { LANGUAGE_MAP } from "../../Utils/translation/language.validator.js";
-
+import { Glossary } from "../../models/translation/index.js";
 /**
  * Service to handle Azure Document and Text Translation interactions.
  */
@@ -28,13 +29,14 @@ const AzureTranslatorService = {
      * @param {string[]} targetLanguages - List of target language codes (e.g., ['fr', 'de']).
      * @returns {Promise<string>} - The Job ID.
      */
-    submitTranslationJob: async (customerId, files, targetLanguages) => {
+    submitTranslationJob: async (customerId, files, targetLanguages, suorceLanguage) => {
         logger.info("Starting translation job submission", { customerId, fileCount: files.length, targetLanguages });
 
         try {
             const inputs = [];
             const sourceContainer = CONFIG.STORAGE.SOURCE_CONTAINER;
             const targetContainer = CONFIG.STORAGE.TARGET_CONTAINER;
+            const glossaryContainer = CONFIG.STORAGE.GLOSSARY_CONTAINER;
 
             // 1. Prepare files and uploads
             for (const file of files) {
@@ -45,13 +47,50 @@ const AzureTranslatorService = {
 
                 // Generate SAS for source (Read access for specific blob)
                 const sourceUrl = await getBlobSasUrl(sourceContainer, blobName);
-                const source = constructSource(sourceUrl, ""); // Source language auto-detection or param
+                const source = constructSource(sourceUrl, suorceLanguage);
 
                 // Generate SAS for target (Write access for container + specific output blob)
                 const targets = await Promise.all(targetLanguages.map(async (lang) => {
                     const targetBlobName = `${customerId}/${file.pageName}-${lang}.html`;
+                    logger.info(`[Step 1] Target blob name generated: ${targetBlobName}`);
+
+                    await deleteBlob(targetContainer, targetBlobName);
+
                     const targetUrl = await getContainerSasUrl(targetContainer, targetBlobName);
-                    return constructTarget(targetUrl, lang);
+                    logger.info(`[Step 2] Target SAS URL generated for lang: ${lang}`);
+
+                    const blobGlossaryName = `${customerId}/${suorceLanguage}-${lang}.tsv`;
+                    logger.info(`[Step 3] Glossary blob name generated: ${blobGlossaryName}`);
+
+                    const glossaryItems = await Glossary.getGlossaryItems(suorceLanguage, lang);
+                    logger.info(`[Step 5] Retrieved ${glossaryItems.length} glossary items`);
+
+                    let glossary = null;
+                    if (glossaryItems.length > 0) {
+                        const glossaryContent = glossaryItems.map(g => {
+                            // Debug check: IS this source string present in the file content?
+                            if (!file.content.includes(g.source)) {
+                                logger.warn(`[Glossary Warning] Source term "${g.source}" NOT found in HTML content for file ${file.pageName}`);
+                            }
+                            return `${g.source}\t${g.target}`;
+                        }).join("\n");
+
+                        logger.info(`[Step 6] Glossary content prepared (First 50 chars): ${glossaryContent.substring(0, 50).replace(/\n/g, "\\n")}`);
+
+                        await uploadBlob(glossaryContainer, blobGlossaryName, glossaryContent);
+                        logger.info(`[Step 7] Glossary uploaded successfully`);
+
+                        const glossaryUrl = await getBlobSasUrl(glossaryContainer, blobGlossaryName);
+                        logger.info(`[Step 8] Glossary SAS URL generated`);
+
+                        glossary = constructGlossary(glossaryUrl);
+                        logger.info(`[Step 9] Glossary object constructed`);
+                    } else {
+                        logger.info(`[Step 6] No glossary items found for ${lang}, skipping glossary attachment.`);
+                    }
+
+                    const targetConfig = constructTarget(targetUrl, lang, glossary ? [glossary] : []);
+                    return targetConfig;
                 }));
 
                 inputs.push({ source, targets, storageType: "File" });
@@ -136,11 +175,12 @@ const AzureTranslatorService = {
         for (const file of originalFiles) {
             for (const lang of languages) {
                 // Heuristic matching: looking for filename that contains pageName, lang code, and ends in .html
-                const match = allBlobs.find(b =>
-                    b.includes(file.pageName) &&
-                    b.toLowerCase().includes(lang.toLowerCase()) &&
-                    b.endsWith(".html")
-                );
+                const match = allBlobs.find(b => {
+                    const blobName = b.name || "";
+                    return blobName.includes(file.pageName) &&
+                        blobName.toLowerCase().includes(lang.toLowerCase()) &&
+                        blobName.endsWith(".html");
+                });
 
                 if (match) {
                     const content = await downloadBlobToString(targetContainer, match.name);

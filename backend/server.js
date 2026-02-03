@@ -301,7 +301,9 @@ import QCOutputRoute from "./routes/QCOutput/QCOutputRoute.js";
   Chatbot Output Imports
 ------------------------------ */
 import InstructionRoutes from "./routes/instruction/index.route.js"
+import GlossaryRoutes from "./routes/translation/glossary.routes.js";
 app.use("/api/instruction/translation", InstructionRoutes);
+app.use("/api/glossary", GlossaryRoutes);
 
 import { connectDB } from "./Config/database.js";
 await connectDB();
@@ -663,15 +665,15 @@ app.use((req, res, next) => {
 //   }
 // });
 export const requestLogger = (req, res, next) => {
-    const { method, originalUrl, params, query, body } = req;
-    const timestamp = new Date().toISOString();
+  const { method, originalUrl, params, query, body } = req;
+  const timestamp = new Date().toISOString();
 
-    console.log(`[${timestamp}] ${method} ${originalUrl}`);
-    console.log("Params:", params);
-    console.log("Query:", query);
-    console.log("Body:", body);
+  console.log(`[${timestamp}] ${method} ${originalUrl}`);
+  console.log("Params:", params);
+  console.log("Query:", query);
+  console.log("Body:", body);
 
-    next(); // important to call next() so the request continues
+  next(); // important to call next() so the request continues
 };
 app.use(requestLogger)
 app.get("/api/health", (req, res) => {

@@ -38,15 +38,27 @@ contentSchema.set("toObject", { virtuals: true });
 
 /* -------------------- Statics -------------------- */
 
-/**
- * Creates a new content document by auto-detecting the language of the provided text.
- * @param {Object} params - Parameters object.
- * @param {string} params.originalText - The text to be stored and analyzed.
- * @returns {Promise<mongoose.Document>} The created Content document.
- */
-contentSchema.statics.createWithText = async function ({ originalText }) {
-    const code = await AzureTranslatorService.detectLanguage(originalText);
-    const language = await Language.findOne({ code: code ?? "en" });
+contentSchema.statics.createWithText = async function ({ originalText, code = null }) {
+    if (!code){
+        code = await AzureTranslatorService.detectLanguage(originalText);
+        logger.info(`Detected language code: ${code}`);
+        if (!code){
+            throw new Error("Language code not detected");
+        }
+    }
+
+    let language = await Language.findOne({ code: code });
+    logger.info(`Language: ${language}`);
+
+    // Fallback if the detected language isn't in our DB yet
+    if (!language) {
+        logger.warn(`Language code '${code}' not found in database. Falling back to 'en'.`);
+        language = await Language.findOne({ code: "en" });
+    }
+
+    if (!language) {
+        throw new Error("No supported languages found in database. Please run language seeding.");
+    }
 
     return this.create({
         original: originalText,

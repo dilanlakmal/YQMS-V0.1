@@ -40,6 +40,9 @@ class OllamaProvider extends AIProvider {
             });
             return response;
         } catch (error) {
+            if (error.code === 'ECONNREFUSED' || (error.cause && error.cause.code === 'ECONNREFUSED')) {
+                throw new Error(`Ollama service unreachable at ${this.client.config.host}.`);
+            }
             throw new Error(`Ollama Chat Error: ${error.message}`);
         }
     }
@@ -56,6 +59,9 @@ class OllamaProvider extends AIProvider {
             });
             return response.response; // Ollama 'generate' returns response in .response field
         } catch (error) {
+            if (error.code === 'ECONNREFUSED' || (error.cause && error.cause.code === 'ECONNREFUSED')) {
+                throw new Error(`Ollama service unreachable at ${this.client.config.host}.`);
+            }
             throw new Error(`Ollama Generate Error: ${error.message}`);
         }
     }
@@ -64,14 +70,22 @@ class OllamaProvider extends AIProvider {
      * Specialized method for LLM Extraction similar to current controller
      */
     async extract(text, schema, options = {}) {
+        const { images, model } = options;
         const messages = [
-            { role: "system", content: `You are an extraction assistant. Extract data based on the provided JSON Schema.` },
-            { role: "user", content: `Data: ${text}` }
+            {
+                role: "system",
+                content: `You are an extraction assistant. Extract data based on the provided JSON Schema. If an entity or field is not found in the source content (text or image), set its value to null. Do not hallucinate or guess missing data.`
+            },
+            {
+                role: "user",
+                content: text ? `Data: ${text}` : "Please extract the requested units/data from the provided image.",
+                ...(images && { images })
+            }
         ];
 
         try {
             const response = await this.client.chat({
-                model: options.model || "gpt-oss:20b",
+                model: model || "gpt-oss:20b",
                 messages,
                 format: schema, // Ollama supports JSON schema as format now
                 options: { temperature: 0 }
@@ -116,6 +130,9 @@ class OllamaProvider extends AIProvider {
             return content;
 
         } catch (error) {
+            if (error.code === 'ECONNREFUSED' || (error.cause && error.cause.code === 'ECONNREFUSED')) {
+                throw new Error(`Ollama service unreachable at ${this.client.config.host}.`);
+            }
             throw new Error(`Ollama Vision Error: ${error.message}`);
         }
     }
