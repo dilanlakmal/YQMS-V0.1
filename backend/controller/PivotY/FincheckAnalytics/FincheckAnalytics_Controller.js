@@ -1207,7 +1207,7 @@ export const getStyleMeasurementConclusion = async (req, res) => {
       Order_No: { $regex: new RegExp(`^${styleNo}$`, "i") },
     }).lean();
 
-    // crtical Point variable declarations
+    // Critical Point variable declarations
     const criticalPointNames = new Set();
 
     // Get specs
@@ -1243,7 +1243,7 @@ export const getStyleMeasurementConclusion = async (req, res) => {
       specIdToPointName.set(id, name);
       allPointNames.add(name);
 
-      // Store first occurrence for tolerance values (they're the same for all K values and stages)
+      // Store first occurrence for tolerance values
       if (!pointNameToSpec.has(name)) {
         pointNameToSpec.set(name, {
           name: name,
@@ -1276,8 +1276,7 @@ export const getStyleMeasurementConclusion = async (req, res) => {
       .select("measurementData reportType")
       .lean();
 
-    // 4. Aggregate measurements by MEASUREMENT POINT NAME (not spec ID)
-    // Structure: { [measurementPointName]: { [size]: { points, pass, fail, negTol, posTol } } }
+    // 4. Aggregate measurements
     const aggregatedData = {};
 
     // Helper function to check tolerance
@@ -1322,10 +1321,11 @@ export const getStyleMeasurementConclusion = async (req, res) => {
       }
     };
 
-    // Helper to process measurement entries
+    // --- REFACTORED PROCESSOR: Uses validIndices array ---
     const processMeasurementEntry = (
       specId,
-      pcsData,
+      pcsData, // The object containing { "0": val, "1": val }
+      validIndices, // The array [0, 1, 2] from allEnabledPcs
       size,
       stageFilter,
       measurementStage,
@@ -1355,11 +1355,14 @@ export const getStyleMeasurementConclusion = async (req, res) => {
         };
       }
 
-      // Process each piece measurement
-      Object.entries(pcsData).forEach(([pcsIndex, valObj]) => {
+      // --- ITERATE ONLY VALID INDICES ---
+      validIndices.forEach((pcsIndex) => {
+        const valObj = pcsData[pcsIndex];
+
         if (!valObj || valObj.decimal === undefined) return;
 
         const decimal = parseFloat(valObj.decimal);
+
         const result = checkToleranceAndCategorize(
           decimal,
           specInfo.TolMinus,
@@ -1386,7 +1389,7 @@ export const getStyleMeasurementConclusion = async (req, res) => {
 
     const stageFilter = stage || "All";
 
-    // Process each report
+    // --- MAIN REPORT LOOP ---
     reports.forEach((report) => {
       if (!report.measurementData || !Array.isArray(report.measurementData))
         return;
@@ -1397,12 +1400,22 @@ export const getStyleMeasurementConclusion = async (req, res) => {
         const size = m.size;
         const measurementStage = m.stage || "Before";
 
-        // Process allMeasurements
+        // 1. Extract Valid Indices Arrays
+        // Fallback to empty array if undefined
+        const validAllIndices = Array.isArray(m.allEnabledPcs)
+          ? m.allEnabledPcs
+          : [];
+        const validCritIndices = Array.isArray(m.criticalEnabledPcs)
+          ? m.criticalEnabledPcs
+          : [];
+
+        // 2. Process allMeasurements using validAllIndices
         if (m.allMeasurements && typeof m.allMeasurements === "object") {
           Object.entries(m.allMeasurements).forEach(([specId, pcsData]) => {
             processMeasurementEntry(
               specId,
               pcsData,
+              validAllIndices, // Pass the filter array
               size,
               stageFilter,
               measurementStage,
@@ -1410,7 +1423,7 @@ export const getStyleMeasurementConclusion = async (req, res) => {
           });
         }
 
-        // Process criticalMeasurements
+        // 3. Process criticalMeasurements using validCritIndices
         if (
           m.criticalMeasurements &&
           typeof m.criticalMeasurements === "object"
@@ -1420,6 +1433,7 @@ export const getStyleMeasurementConclusion = async (req, res) => {
               processMeasurementEntry(
                 specId,
                 pcsData,
+                validCritIndices, // Pass the filter array
                 size,
                 stageFilter,
                 measurementStage,
@@ -1454,7 +1468,7 @@ export const getStyleMeasurementConclusion = async (req, res) => {
 
       if (hasMeasurements) {
         specsWithData.push({
-          id: pointName, // Use point name as unique identifier
+          id: pointName,
           measurementPointName: pointName,
           tolMinus: specInfo.TolMinus?.fraction || "-",
           tolPlus: specInfo.TolPlus?.fraction || "-",
@@ -1621,27 +1635,18 @@ export const getStyleMeasurementPointCalc = async (req, res) => {
       .lean();
 
     // 3. Define measurement value buckets (1/16 increments from -1 to 1)
-    // Helper to generate fraction label
     const generateLabel = (sixteenths) => {
       if (sixteenths === 0) return "0";
-
       const sign = sixteenths < 0 ? "-" : "";
       const absVal = Math.abs(sixteenths);
-
       if (absVal === 16) return `${sign}1`;
-
-      // Find GCD to simplify fraction
       const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
       const divisor = gcd(absVal, 16);
-      const numerator = absVal / divisor;
-      const denominator = 16 / divisor;
-
-      return `${sign}${numerator}/${denominator}`;
+      return `${sign}${absVal / divisor}/${16 / divisor}`;
     };
 
     const generateValueBuckets = () => {
       const buckets = [];
-
       // <-1
       buckets.push({
         key: "lt-1",
@@ -1650,7 +1655,6 @@ export const getStyleMeasurementPointCalc = async (req, res) => {
         decimalMax: -1 - 1 / 32,
         order: -17,
       });
-
       // -1 to 1 in 1/16 increments
       for (let i = -16; i <= 16; i++) {
         const decimal = i / 16;
@@ -1664,7 +1668,6 @@ export const getStyleMeasurementPointCalc = async (req, res) => {
           order: i,
         });
       }
-
       // >1
       buckets.push({
         key: "gt1",
@@ -1673,19 +1676,15 @@ export const getStyleMeasurementPointCalc = async (req, res) => {
         decimalMax: Infinity,
         order: 17,
       });
-
       return buckets;
     };
 
     const allBuckets = generateValueBuckets();
 
-    // Function to get bucket key from decimal value
     const getBucketKey = (decimal) => {
       if (decimal < -1 - 1 / 32) return "lt-1";
       if (decimal > 1 + 1 / 32) return "gt1";
-      // Round to nearest 1/16
       const rounded = Math.round(decimal * 16);
-      // Clamp to -16 to 16 range
       const clamped = Math.max(-16, Math.min(16, rounded));
       return `v${clamped}`;
     };
@@ -1693,17 +1692,11 @@ export const getStyleMeasurementPointCalc = async (req, res) => {
     // 4. Aggregate data
     const aggregatedData = {};
     const usedBucketKeys = new Set();
-
     const stageFilter = stage || "All";
 
-    const processMeasurementEntry = (
-      specId,
-      pcsData,
-      size,
-      measurementStage,
-    ) => {
-      if (!pcsData || typeof pcsData !== "object") return;
-      if (stageFilter !== "All" && measurementStage !== stageFilter) return;
+    // --- HELPER: Process a single reading object ---
+    const processSingleReading = (specId, valObj, size) => {
+      if (!valObj || valObj.decimal === undefined) return;
 
       const pointName = specIdToPointName.get(specId);
       if (!pointName) return;
@@ -1711,6 +1704,7 @@ export const getStyleMeasurementPointCalc = async (req, res) => {
       const specInfo = pointNameToSpec.get(pointName);
       if (!specInfo) return;
 
+      // Initialize Aggregation Structure
       if (!aggregatedData[pointName]) {
         aggregatedData[pointName] = {};
       }
@@ -1723,41 +1717,38 @@ export const getStyleMeasurementPointCalc = async (req, res) => {
         };
       }
 
+      const decimal = parseFloat(valObj.decimal);
+      if (isNaN(decimal)) return;
+
       const tolMinus = parseFloat(specInfo.TolMinus?.decimal) || 0;
       const tolPlus = parseFloat(specInfo.TolPlus?.decimal) || 0;
       const lowerLimit = -Math.abs(tolMinus);
       const upperLimit = Math.abs(tolPlus);
 
-      Object.entries(pcsData).forEach(([pcsIndex, valObj]) => {
-        if (!valObj || valObj.decimal === undefined) return;
+      aggregatedData[pointName][size].points += 1;
 
-        const decimal = parseFloat(valObj.decimal);
-        if (isNaN(decimal)) return;
+      // Check tolerance
+      const epsilon = 0.0001;
+      const isWithin =
+        decimal >= lowerLimit - epsilon && decimal <= upperLimit + epsilon;
 
-        aggregatedData[pointName][size].points += 1;
+      if (isWithin) {
+        aggregatedData[pointName][size].pass += 1;
+      } else {
+        aggregatedData[pointName][size].fail += 1;
+      }
 
-        // Check tolerance
-        const epsilon = 0.0001;
-        const isWithin =
-          decimal >= lowerLimit - epsilon && decimal <= upperLimit + epsilon;
+      // Add to bucket
+      const bucketKey = getBucketKey(decimal);
+      usedBucketKeys.add(bucketKey);
 
-        if (isWithin) {
-          aggregatedData[pointName][size].pass += 1;
-        } else {
-          aggregatedData[pointName][size].fail += 1;
-        }
-
-        // Add to bucket
-        const bucketKey = getBucketKey(decimal);
-        usedBucketKeys.add(bucketKey);
-
-        if (!aggregatedData[pointName][size].buckets[bucketKey]) {
-          aggregatedData[pointName][size].buckets[bucketKey] = 0;
-        }
-        aggregatedData[pointName][size].buckets[bucketKey] += 1;
-      });
+      if (!aggregatedData[pointName][size].buckets[bucketKey]) {
+        aggregatedData[pointName][size].buckets[bucketKey] = 0;
+      }
+      aggregatedData[pointName][size].buckets[bucketKey] += 1;
     };
 
+    // --- MAIN REPORT LOOP ---
     reports.forEach((report) => {
       if (!report.measurementData || !Array.isArray(report.measurementData))
         return;
@@ -1768,19 +1759,43 @@ export const getStyleMeasurementPointCalc = async (req, res) => {
         const size = m.size;
         const measurementStage = m.stage || "Before";
 
+        // Filter Stage
+        if (stageFilter !== "All" && measurementStage !== stageFilter) return;
+
+        // 1. Get the lists of enabled indices
+        const validAllIndices = Array.isArray(m.allEnabledPcs)
+          ? m.allEnabledPcs
+          : [];
+        const validCritIndices = Array.isArray(m.criticalEnabledPcs)
+          ? m.criticalEnabledPcs
+          : [];
+
+        // 2. Process All Measurements (Only valid indices)
         if (m.allMeasurements && typeof m.allMeasurements === "object") {
           Object.entries(m.allMeasurements).forEach(([specId, pcsData]) => {
-            processMeasurementEntry(specId, pcsData, size, measurementStage);
+            // pcsData is { "0": {...}, "1": {...} }
+            validAllIndices.forEach((pcsIndex) => {
+              const valObj = pcsData[pcsIndex];
+              if (valObj) {
+                processSingleReading(specId, valObj, size);
+              }
+            });
           });
         }
 
+        // 3. Process Critical Measurements (Only valid indices)
         if (
           m.criticalMeasurements &&
           typeof m.criticalMeasurements === "object"
         ) {
           Object.entries(m.criticalMeasurements).forEach(
             ([specId, pcsData]) => {
-              processMeasurementEntry(specId, pcsData, size, measurementStage);
+              validCritIndices.forEach((pcsIndex) => {
+                const valObj = pcsData[pcsIndex];
+                if (valObj) {
+                  processSingleReading(specId, valObj, size);
+                }
+              });
             },
           );
         }

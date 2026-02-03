@@ -4,6 +4,7 @@ import {
   getInspectionReports,
   getDefectImagesForReport,
   getReportMeasurementSpecs,
+  getReportMeasurementPointCalc,
   checkUserPermission,
   checkApprovalPermission,
   getReportImagesAsBase64,
@@ -58,6 +59,12 @@ router.get(
 router.get(
   "/api/fincheck-reports/:reportId/measurement-specs",
   getReportMeasurementSpecs,
+);
+
+// Measurement Value Distribution for specific report
+router.get(
+  "/api/fincheck-inspection/report/:reportId/measurement-point-calc",
+  getReportMeasurementPointCalc,
 );
 
 // Route to check permission

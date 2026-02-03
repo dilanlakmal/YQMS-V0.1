@@ -41,6 +41,7 @@ import {
   ClipboardList,
   FileSpreadsheet,
   Gavel,
+  Calculator,
 } from "lucide-react";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
 
@@ -54,6 +55,8 @@ import {
   MeasurementSummaryTable,
   OverallMeasurementSummaryTable,
 } from "../QADataCollection/YPivotQAInspectionMeasurementSummary";
+
+import YPivotQAReportMeasurementValueDistribution from "./YPivotQAReportMeasurementValueDistribution";
 
 // Import from Defect Summary
 import {
@@ -887,6 +890,7 @@ const YPivotQAReportFullView = () => {
     header: true,
     photos: true,
     measurement: true,
+    measurementDistribution: false,
     ppSheet: true,
   });
 
@@ -2314,6 +2318,34 @@ const YPivotQAReportFullView = () => {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* --- SECTION: Measurement Value Distribution --- */}
+        {measurementStageData.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mt-4">
+            <div
+              className="bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-2.5 flex justify-between items-center cursor-pointer"
+              onClick={() => toggleSection("measurementDistribution")}
+            >
+              <h2 className="text-white font-bold text-sm flex items-center gap-2">
+                <Calculator className="w-4 h-4" /> Measurement Value
+                Distribution
+              </h2>
+              {expandedSections.measurementDistribution ? (
+                <ChevronUp className="text-white w-4 h-4" />
+              ) : (
+                <ChevronDown className="text-white w-4 h-4" />
+              )}
+            </div>
+
+            {expandedSections.measurementDistribution && (
+              <div className="p-4">
+                <YPivotQAReportMeasurementValueDistribution
+                  reportId={reportId}
+                />
               </div>
             )}
           </div>

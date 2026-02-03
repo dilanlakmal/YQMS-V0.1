@@ -24,8 +24,8 @@ const colors = {
     600: "#4B5563",
     700: "#374151",
     800: "#1F2937",
-    900: "#111827"
-  }
+    900: "#111827",
+  },
 };
 
 const styles = StyleSheet.create({
@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: colors.gray[50],
     borderWidth: 1,
-    borderColor: colors.gray[200]
+    borderColor: colors.gray[200],
   },
 
   // --- HEADERS ---
@@ -44,19 +44,19 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
     color: "#FFFFFF",
     backgroundColor: colors.primary,
-    padding: "8 12"
+    padding: "8 12",
   },
   stageHeader: {
     padding: "6 10",
     marginTop: 12,
     marginBottom: 8,
-    borderRadius: 3
+    borderRadius: 3,
   },
   textStage: {
     fontSize: 9,
     fontFamily: "Helvetica-Bold",
     color: "#FFFFFF",
-    textTransform: "uppercase"
+    textTransform: "uppercase",
   },
   groupHeader: {
     flexDirection: "row",
@@ -64,19 +64,19 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     paddingBottom: 4,
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray[300]
+    borderBottomColor: colors.gray[300],
   },
   textGroup: {
     fontSize: 10,
     fontFamily: "Helvetica-Bold",
-    color: colors.gray[800]
+    color: colors.gray[800],
   },
 
   // --- STATS CARDS ---
   statsRow: {
     flexDirection: "row",
     gap: 5,
-    marginBottom: 10
+    marginBottom: 10,
   },
   statCard: {
     flex: 1,
@@ -85,18 +85,18 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 1,
     borderColor: colors.gray[200],
-    alignItems: "center"
+    alignItems: "center",
   },
   statLabel: {
     fontSize: 5,
     color: colors.gray[500],
     textTransform: "uppercase",
-    marginBottom: 2
+    marginBottom: 2,
   },
   statValue: {
     fontSize: 10,
     fontFamily: "Helvetica-Bold",
-    color: colors.gray[800]
+    color: colors.gray[800],
   },
 
   // --- LEGEND ---
@@ -108,21 +108,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: colors.gray[200],
-    borderRadius: 4
+    borderRadius: 4,
   },
   legendItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3
+    gap: 3,
   },
   legendDot: {
     width: 6,
     height: 6,
-    borderRadius: 3
+    borderRadius: 3,
   },
   legendText: {
     fontSize: 6,
-    color: colors.gray[600]
+    color: colors.gray[600],
   },
 
   // --- MAIN RESULT BANNER ---
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     padding: 8,
     borderWidth: 1,
-    borderRadius: 4
+    borderRadius: 4,
   },
   resultItem: { alignItems: "center" },
   resultLabel: { fontSize: 7, color: colors.gray[500], marginBottom: 2 },
@@ -142,58 +142,58 @@ const styles = StyleSheet.create({
   tableContainer: {
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: colors.gray[300]
+    borderColor: colors.gray[300],
   },
   tableRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[200],
-    minHeight: 14
+    minHeight: 14,
   },
   tableHeaderRow: {
     flexDirection: "row",
     backgroundColor: colors.gray[100],
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray[300]
+    borderBottomColor: colors.gray[300],
   },
 
   // --- SUMMARY TABLE (NEW STYLES) ---
   sumTable: {
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: colors.gray[300]
+    borderColor: colors.gray[300],
   },
   sumHeaderRow: {
     flexDirection: "row",
     backgroundColor: "#334155", // Dark Slate
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray[300]
+    borderBottomColor: colors.gray[300],
   },
   sumHeaderCell: {
     padding: 5,
     justifyContent: "center",
     alignItems: "center",
     borderRightWidth: 1,
-    borderRightColor: "rgba(255,255,255,0.2)"
+    borderRightColor: "rgba(255,255,255,0.2)",
   },
   sumRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[200],
-    minHeight: 16
+    minHeight: 16,
   },
   sumCell: {
     padding: 4,
     justifyContent: "center",
     alignItems: "center",
     borderRightWidth: 1,
-    borderRightColor: colors.gray[200]
+    borderRightColor: colors.gray[200],
   },
   sumTextHeader: {
     fontSize: 7,
     fontFamily: "Helvetica-Bold",
     color: "#FFFFFF",
-    textTransform: "uppercase"
+    textTransform: "uppercase",
   },
   sumText: { fontSize: 7, fontFamily: "Helvetica-Bold" },
 
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     padding: 3,
     borderRightWidth: 1,
     borderRightColor: colors.gray[300],
-    justifyContent: "center"
+    justifyContent: "center",
   },
   colTol: {
     width: 22,
@@ -214,20 +214,20 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: colors.gray[300],
     justifyContent: "center",
-    alignItems: "center"
+    alignItems: "center",
   },
 
   // Size Wrapper
   sizeWrapper: {
     flex: 1,
     borderRightWidth: 1,
-    borderRightColor: colors.gray[300]
+    borderRightColor: colors.gray[300],
   },
   sizeTitleBox: {
     padding: 3,
     backgroundColor: "#e0e7ff", // Indigo 50
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray[300]
+    borderBottomColor: colors.gray[300],
   },
 
   // Sub Columns (Spec, Pcs)
@@ -237,45 +237,45 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: colors.gray[200],
     justifyContent: "center",
-    alignItems: "center"
+    alignItems: "center",
   },
   subColPcs: {
     borderRightWidth: 1,
     borderRightColor: colors.gray[200],
     justifyContent: "center",
-    alignItems: "center"
+    alignItems: "center",
   },
 
   // Text Styles
   textPoint: {
     fontSize: 5,
     fontFamily: "Helvetica-Bold",
-    color: colors.gray[700]
+    color: colors.gray[700],
   },
   textTol: { fontSize: 5, color: colors.gray[500] },
   textTolMinus: {
     fontSize: 5,
     color: colors.danger,
-    fontFamily: "Helvetica-Bold"
+    fontFamily: "Helvetica-Bold",
   },
   textTolPlus: {
     fontSize: 5,
     color: colors.success,
-    fontFamily: "Helvetica-Bold"
+    fontFamily: "Helvetica-Bold",
   },
   textSizeTitle: {
     fontSize: 7,
     fontFamily: "Helvetica-Bold",
     color: colors.gray[800],
-    textAlign: "center"
+    textAlign: "center",
   },
   textSubHeader: {
     fontSize: 5,
     fontFamily: "Helvetica-Bold",
-    color: colors.gray[600]
+    color: colors.gray[600],
   },
   textData: { fontSize: 6, fontFamily: "Helvetica" },
-  textDataBold: { fontSize: 6, fontFamily: "Helvetica-Bold" }
+  textDataBold: { fontSize: 6, fontFamily: "Helvetica-Bold" },
 });
 
 // =============================================================================
@@ -432,7 +432,7 @@ const getSpecDetailsForSize = (rowName, size, allSpecs) => {
   const matchedSpecEntry = allSpecs.find(
     (s) =>
       (s.MeasurementPointEngName || "").trim() === rowName &&
-      s.Specs?.some((sz) => sz.size === size)
+      s.Specs?.some((sz) => sz.size === size),
   );
   if (!matchedSpecEntry)
     return {
@@ -441,7 +441,7 @@ const getSpecDetailsForSize = (rowName, size, allSpecs) => {
       tolPlus: "-",
       tolMinus: "-",
       tolPlusDec: 0,
-      tolMinusDec: 0
+      tolMinusDec: 0,
     };
 
   const targetObj = matchedSpecEntry.Specs.find((s) => s.size === size);
@@ -456,7 +456,7 @@ const getSpecDetailsForSize = (rowName, size, allSpecs) => {
     tolPlus,
     tolMinus,
     tolPlusDec,
-    tolMinusDec
+    tolMinusDec,
   };
 };
 
@@ -509,7 +509,7 @@ const checkTolerance = (measuredValue, tolPlusVal, tolMinusVal) => {
     upperLimit,
     reading,
     tPlus,
-    tMinus
+    tMinus,
   };
 };
 
@@ -532,7 +532,7 @@ const sortSizesByReference = (sizes, sizeList = []) => {
   if (!sizeList || sizeList.length === 0) {
     // Fallback to natural sort if no reference list
     return [...sizes].sort((a, b) =>
-      a.localeCompare(b, undefined, { numeric: true })
+      a.localeCompare(b, undefined, { numeric: true }),
     );
   }
 
@@ -587,10 +587,10 @@ const ConfigSummaryTable = ({ groupedData, sizeList = [] }) => {
             lineName: "",
             tableName: "",
             colorName: "General",
-            measurements: groupedData.noContext
-          }
+            measurements: groupedData.noContext,
+          },
         ]
-      : [])
+      : []),
   ];
 
   // Get all unique sizes
@@ -610,7 +610,7 @@ const ConfigSummaryTable = ({ groupedData, sizeList = [] }) => {
         <View
           style={[
             styles.sumHeaderCell,
-            { flex: 2, alignItems: "flex-start", paddingLeft: 8 }
+            { flex: 2, alignItems: "flex-start", paddingLeft: 8 },
           ]}
         >
           <Text style={styles.sumTextHeader}>Configuration</Text>
@@ -623,7 +623,7 @@ const ConfigSummaryTable = ({ groupedData, sizeList = [] }) => {
         <View
           style={[
             styles.sumHeaderCell,
-            { flex: 1, backgroundColor: "#4338ca" }
+            { flex: 1, backgroundColor: "#4338ca" },
           ]}
         >
           <Text style={styles.sumTextHeader}>Result</Text>
@@ -636,7 +636,7 @@ const ConfigSummaryTable = ({ groupedData, sizeList = [] }) => {
           [
             group.lineName ? `Line ${group.lineName}` : null,
             group.tableName ? `Table ${group.tableName}` : null,
-            group.colorName || null
+            group.colorName || null,
           ]
             .filter(Boolean)
             .join(" / ") || "General";
@@ -648,14 +648,14 @@ const ConfigSummaryTable = ({ groupedData, sizeList = [] }) => {
             key={idx}
             style={[
               styles.sumRow,
-              { backgroundColor: idx % 2 === 0 ? "#FFFFFF" : "#f8fafc" }
+              { backgroundColor: idx % 2 === 0 ? "#FFFFFF" : "#f8fafc" },
             ]}
           >
             {/* Config Name */}
             <View
               style={[
                 styles.sumCell,
-                { flex: 2, alignItems: "flex-start", paddingLeft: 8 }
+                { flex: 2, alignItems: "flex-start", paddingLeft: 8 },
               ]}
             >
               <Text style={[styles.sumText, { color: colors.gray[800] }]}>
@@ -695,8 +695,8 @@ const ConfigSummaryTable = ({ groupedData, sizeList = [] }) => {
                   backgroundColor:
                     overallResult === "PASS"
                       ? colors.successBg
-                      : colors.dangerBg
-                }
+                      : colors.dangerBg,
+                },
               ]}
             >
               <Text
@@ -704,8 +704,8 @@ const ConfigSummaryTable = ({ groupedData, sizeList = [] }) => {
                   styles.sumText,
                   {
                     color:
-                      overallResult === "PASS" ? colors.success : colors.danger
-                  }
+                      overallResult === "PASS" ? colors.success : colors.danger,
+                  },
                 ]}
               >
                 {overallResult}
@@ -744,7 +744,7 @@ const MeasurementTableChunk = ({
   measurements,
   uniqueRows,
   allSpecs,
-  criticalSpecIds = new Set() // NEW: Add this parameter
+  criticalSpecIds = new Set(), // NEW: Add this parameter
 }) => {
   if (!sizeChunk.length || !uniqueRows.length) return null;
 
@@ -752,14 +752,14 @@ const MeasurementTableChunk = ({
     const m = measurements.find((meas) => meas.size === size);
     const allPcs = Array.from(m?.allEnabledPcs || []).sort((a, b) => a - b);
     const critPcs = Array.from(m?.criticalEnabledPcs || []).sort(
-      (a, b) => a - b
+      (a, b) => a - b,
     );
     const columns = [];
     allPcs.forEach((pIdx) => columns.push({ type: "all", idx: pIdx }));
     critPcs.forEach((pIdx) => columns.push({ type: "crit", idx: pIdx }));
     const displayColumns = columns.map((col, i) => ({
       ...col,
-      label: `#${i + 1}`
+      label: `#${i + 1}`,
     }));
     if (displayColumns.length === 0)
       displayColumns.push({ type: "empty", label: "-" });
@@ -788,7 +788,7 @@ const MeasurementTableChunk = ({
                   style={{
                     fontSize: 5,
                     textAlign: "center",
-                    color: colors.primary
+                    color: colors.primary,
                   }}
                 >
                   K: {config.measurement.kValue}
@@ -803,7 +803,7 @@ const MeasurementTableChunk = ({
       <View
         style={[
           styles.tableRow,
-          { backgroundColor: colors.gray[50], minHeight: 12 }
+          { backgroundColor: colors.gray[50], minHeight: 12 },
         ]}
       >
         <View style={styles.colPoint} />
@@ -832,9 +832,9 @@ const MeasurementTableChunk = ({
                         col.type === "all"
                           ? "#f3e8ff"
                           : col.type === "crit"
-                          ? "#ffedd5"
-                          : "transparent"
-                    }
+                            ? "#ffedd5"
+                            : "transparent",
+                    },
                   ]}
                 >
                   <Text style={styles.textSubHeader}>{col.label}</Text>
@@ -854,23 +854,23 @@ const MeasurementTableChunk = ({
         const firstSizeDetails = getSpecDetailsForSize(
           rowSpec.MeasurementPointEngName,
           sizeChunk[0],
-          allSpecs
+          allSpecs,
         );
 
         // Normalize tolerance display values
         const displayTolMinus = normalizeTolMinusDisplay(
-          firstSizeDetails.tolMinus
+          firstSizeDetails.tolMinus,
         );
         const displayTolPlus = normalizeTolPlusDisplay(
-          firstSizeDetails.tolPlus
+          firstSizeDetails.tolPlus,
         );
 
         // Row background color - critical rows get light blue
         const rowBgColor = isCritical
           ? "#dbeafe" // Blue-100 for critical
           : rIdx % 2 === 0
-          ? "#FFFFFF"
-          : "#F9FAFB";
+            ? "#FFFFFF"
+            : "#F9FAFB";
 
         // Point cell background - critical gets slightly different shade
         const pointCellBg = isCritical ? "#bfdbfe" : rowBgColor; // Blue-200 for critical point cell
@@ -888,7 +888,7 @@ const MeasurementTableChunk = ({
                     style={{
                       fontSize: 5,
                       color: "#2563eb",
-                      marginRight: 2
+                      marginRight: 2,
                     }}
                   >
                     ★
@@ -918,7 +918,7 @@ const MeasurementTableChunk = ({
               const details = getSpecDetailsForSize(
                 (rowSpec.MeasurementPointEngName || "").trim(),
                 config.size,
-                allSpecs
+                allSpecs,
               );
 
               // Find the matched spec entry for tolerance decimals
@@ -926,7 +926,7 @@ const MeasurementTableChunk = ({
                 (s) =>
                   (s.MeasurementPointEngName || "").trim() ===
                     (rowSpec.MeasurementPointEngName || "").trim() &&
-                  s.Specs?.some((sz) => sz.size === config.size)
+                  s.Specs?.some((sz) => sz.size === config.size),
               );
 
               const tolPlusDec = matchedSpecEntry?.TolPlus?.decimal;
@@ -973,7 +973,7 @@ const MeasurementTableChunk = ({
                         const check = checkTolerance(
                           reading.decimal,
                           tolPlusDec,
-                          tolMinusDec
+                          tolMinusDec,
                         );
 
                         if (check.isWithin) {
@@ -985,7 +985,7 @@ const MeasurementTableChunk = ({
                           bgStyle = { backgroundColor: colors.dangerBg };
                           textStyle = {
                             color: colors.danger,
-                            fontFamily: "Helvetica-Bold"
+                            fontFamily: "Helvetica-Bold",
                           };
                         }
                       }
@@ -997,7 +997,7 @@ const MeasurementTableChunk = ({
                         style={[
                           styles.subColPcs,
                           bgStyle,
-                          { width: `${colWidthPct}%` }
+                          { width: `${colWidthPct}%` },
                         ]}
                       >
                         <Text style={[styles.textData, textStyle]}>
@@ -1030,7 +1030,7 @@ const calculateGroupStats = (measurements, allSpecs) => {
     const pcsIndices = [...allPcs, ...critPcs];
 
     const applicableSpecs = allSpecs.filter((s) =>
-      s.Specs?.some((sz) => sz.size === m.size)
+      s.Specs?.some((sz) => sz.size === m.size),
     );
 
     pcsIndices.forEach((pcsIndex) => {
@@ -1074,7 +1074,7 @@ const calculateGroupStats = (measurements, allSpecs) => {
     failPcs,
     pointPassRate:
       totalPoints > 0 ? ((passPoints / totalPoints) * 100).toFixed(1) : "0.0",
-    pcsPassRate: totalPcs > 0 ? ((passPcs / totalPcs) * 100).toFixed(1) : "0.0"
+    pcsPassRate: totalPcs > 0 ? ((passPcs / totalPcs) * 100).toFixed(1) : "0.0",
   };
 };
 
@@ -1125,7 +1125,7 @@ const MeasurementStatsCards = ({ stats }) => (
 const MeasurementSectionPDF = ({
   measurementStageData,
   measurementResult,
-  sizeList = [] // NEW: Add sizeList prop
+  sizeList = [], // NEW: Add sizeList prop
 }) => {
   if (!measurementStageData || measurementStageData.length === 0) return null;
 
@@ -1137,7 +1137,8 @@ const MeasurementSectionPDF = ({
         <MeasurementLegend />
 
         {measurementStageData.map((stageData, sIdx) => {
-          const allSpecs = stageData.specs?.full || [];
+          //const allSpecs = stageData.specs?.full || [];
+          const rawSpecs = stageData.specs?.full || [];
           return (
             <View key={sIdx} style={{ marginBottom: 16 }} break={sIdx > 0}>
               <View
@@ -1145,8 +1146,8 @@ const MeasurementSectionPDF = ({
                   styles.stageHeader,
                   {
                     backgroundColor:
-                      stageData.stage === "Before" ? "#8b5cf6" : "#14b8a6"
-                  }
+                      stageData.stage === "Before" ? "#8b5cf6" : "#14b8a6",
+                  },
                 ]}
               >
                 <Text style={styles.textStage}>{stageData.label}</Text>
@@ -1163,30 +1164,57 @@ const MeasurementSectionPDF = ({
                   [
                     group.lineName ? `Line ${group.lineName}` : null,
                     group.tableName ? `Table ${group.tableName}` : null,
-                    group.colorName ? group.colorName.toUpperCase() : null
+                    group.colorName ? group.colorName.toUpperCase() : null,
                   ]
                     .filter(Boolean)
                     .join(" / ") || "General Configuration";
                 const measurements = group.measurements || [];
 
-                // NEW: Use sortSizesByReference for unique sizes
+                // Filter Specs by K-Value
+                // Get K-Value from the first measurement in the group
+                const groupKValue =
+                  measurements.length > 0 ? measurements[0].kValue : null;
+
+                let activeSpecs = rawSpecs;
+
+                // Only apply filter if it is "Before" stage and we have a K-Value
+                if (stageData.stage === "Before") {
+                  if (groupKValue) {
+                    activeSpecs = rawSpecs.filter(
+                      (s) => s.kValue === groupKValue,
+                    );
+                  } else {
+                    // If group has NO K-Value, try to find specs that also have NO K-Value
+                    // (Optional: depending on your DB data, you might just want all specs if no K is defined)
+                    const noKSpecs = rawSpecs.filter((s) => !s.kValue);
+                    if (noKSpecs.length > 0) activeSpecs = noKSpecs;
+                  }
+                }
+
+                // Fallback: If filtering resulted in 0 specs (data mismatch), revert to raw
+                if (activeSpecs.length === 0) activeSpecs = rawSpecs;
+
+                // Use sortSizesByReference for unique sizes
                 const uniqueSizes = [
-                  ...new Set(measurements.map((m) => m.size))
+                  ...new Set(measurements.map((m) => m.size)),
                 ];
                 const sortedUniqueSizes = sortSizesByReference(
                   uniqueSizes,
-                  sizeList
+                  sizeList,
                 );
 
-                const stats = calculateGroupStats(measurements, allSpecs);
-                const uniqueRows = getUniqueRows(allSpecs);
+                const stats = calculateGroupStats(measurements, activeSpecs);
+                const uniqueRows = getUniqueRows(activeSpecs);
+
+                //const stats = calculateGroupStats(measurements, allSpecs);
+                //const uniqueRows = getUniqueRows(allSpecs);
 
                 // Use sorted sizes for chunking (still 2 per chunk)
                 const sizeChunks = chunkArray(sortedUniqueSizes, 2);
 
                 // Build set of critical spec IDs
                 const criticalSpecIds = new Set(
-                  (stageData.specs?.selected || []).map((s) => s.id)
+                  (stageData.specs?.selected || []).map((s) => s.id),
                 );
 
                 return (
@@ -1195,12 +1223,25 @@ const MeasurementSectionPDF = ({
                       <Text style={styles.textGroup}>
                         {cleanText(configLabel)}
                       </Text>
+                      {/* Show K-Value in Header if exists */}
+                      {groupKValue && (
+                        <Text
+                          style={{
+                            fontSize: 9,
+                            color: colors.primary,
+                            marginLeft: 6,
+                            fontFamily: "Helvetica-Bold",
+                          }}
+                        >
+                          (K: {groupKValue})
+                        </Text>
+                      )}
                       {group.qcUser && (
                         <Text
                           style={{
                             fontSize: 8,
                             color: colors.gray[500],
-                            marginLeft: 8
+                            marginLeft: 8,
                           }}
                         >
                           (QC: {cleanText(group.qcUser.eng_name)})
@@ -1215,7 +1256,7 @@ const MeasurementSectionPDF = ({
                             style={{
                               fontSize: 8,
                               color: colors.gray[500],
-                              marginBottom: 4
+                              marginBottom: 4,
                             }}
                           >
                             {cleanText(configLabel)} (Continued...)
@@ -1225,7 +1266,8 @@ const MeasurementSectionPDF = ({
                           sizeChunk={chunk}
                           measurements={measurements}
                           uniqueRows={uniqueRows}
-                          allSpecs={allSpecs}
+                          allSpecs={activeSpecs}
+                          //allSpecs={allSpecs}
                           criticalSpecIds={criticalSpecIds}
                         />
                       </View>

@@ -693,95 +693,6 @@ export const getDefectImagesForReport = async (req, res) => {
 // Get Measurement Specifications Linked to a Report
 // ============================================================
 
-// export const getReportMeasurementSpecs = async (req, res) => {
-//   try {
-//     const { reportId } = req.params;
-
-//     // 1. Fetch the Report to get Order No
-//     const report = await FincheckInspectionReports.findOne({
-//       reportId: parseInt(reportId)
-//     }).select("orderNos");
-
-//     if (!report) {
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "Report not found" });
-//     }
-
-//     const orderNos = report.orderNos;
-//     if (!orderNos || orderNos.length === 0) {
-//       return res.status(200).json({
-//         success: true,
-//         specs: { Before: null, After: null },
-//         sizeList: [] // Return empty size list
-//       });
-//     }
-
-//     // Use the first order number to find specs
-//     const primaryOrderNo = orderNos[0];
-
-//     // 2. Fetch DtOrder to get SizeList for ordering
-//     const dtOrder = await DtOrder.findOne({
-//       Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
-//     })
-//       .select("SizeList")
-//       .lean();
-
-//     const sizeList = dtOrder?.SizeList || [];
-
-//     // 3. Find the Specs in the Specs Collection
-//     const specsRecord = await QASectionsMeasurementSpecs.findOne({
-//       Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
-//     }).lean();
-
-//     const result = {
-//       Before: { full: [], selected: [] },
-//       After: { full: [], selected: [] }
-//     };
-
-//     if (specsRecord) {
-//       // Process Before
-//       result.Before.full = specsRecord.AllBeforeWashSpecs || [];
-//       result.Before.selected =
-//         specsRecord.selectedBeforeWashSpecs &&
-//         specsRecord.selectedBeforeWashSpecs.length > 0
-//           ? specsRecord.selectedBeforeWashSpecs
-//           : specsRecord.AllBeforeWashSpecs || [];
-
-//       // Process After
-//       result.After.full = specsRecord.AllAfterWashSpecs || [];
-//       result.After.selected =
-//         specsRecord.selectedAfterWashSpecs &&
-//         specsRecord.selectedAfterWashSpecs.length > 0
-//           ? specsRecord.selectedAfterWashSpecs
-//           : specsRecord.AllAfterWashSpecs || [];
-//     } else {
-//       // Fallback: Check DtOrder (Legacy - usually only Before)
-//       const dtOrderFull = await DtOrder.findOne({
-//         Order_No: primaryOrderNo
-//       }).lean();
-
-//       if (dtOrderFull && dtOrderFull.BeforeWashSpecs) {
-//         const legacySpecs = dtOrderFull.BeforeWashSpecs.map((s) => ({
-//           ...s,
-//           id: s._id ? s._id.toString() : s.id
-//         }));
-//         result.Before.full = legacySpecs;
-//         result.Before.selected = legacySpecs;
-//       }
-//     }
-
-//     return res.status(200).json({
-//       success: true,
-//       specs: result,
-//       sizeList: sizeList // NEW: Include size list in response
-//     });
-//   } catch (error) {
-//     console.error("Error fetching report measurement specs:", error);
-//     return res.status(500).json({ success: false, error: error.message });
-//   }
-// };
-
 export const getReportMeasurementSpecs = async (req, res) => {
   try {
     const { reportId } = req.params;
@@ -899,6 +810,288 @@ export const getReportMeasurementSpecs = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching report measurement specs:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// GET: Report Measurement Value Distribution (Point Calc)
+// ============================================================
+
+export const getReportMeasurementPointCalc = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    // 1. Fetch Report (Lean)
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId),
+    }).lean();
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found" });
+    }
+
+    if (!report.measurementData || report.measurementData.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: { specs: [], sizeList: [], valueBuckets: [] },
+      });
+    }
+
+    // 2. Fetch Specs & Size List
+    const orderNo = report.orderNos?.[0];
+    const dtOrder = await DtOrder.findOne({
+      Order_No: { $regex: new RegExp(`^${orderNo}$`, "i") },
+    })
+      .select("SizeList")
+      .lean();
+
+    const sizeList = dtOrder?.SizeList || [];
+
+    const specsRecord = await QASectionsMeasurementSpecs.findOne({
+      Order_No: { $regex: new RegExp(`^${orderNo}$`, "i") },
+    }).lean();
+
+    // Combine Before and After specs for lookup
+    const allSpecs = [
+      ...(specsRecord?.AllBeforeWashSpecs || []),
+      ...(specsRecord?.AllAfterWashSpecs || []),
+      ...(specsRecord?.selectedBeforeWashSpecs || []),
+      ...(specsRecord?.selectedAfterWashSpecs || []),
+    ];
+
+    // Build lookup maps
+    const specIdToPointName = new Map();
+    const pointNameToSpec = new Map();
+    const criticalPointNames = new Set();
+
+    // Helper to mark criticals
+    [
+      ...(specsRecord?.selectedBeforeWashSpecs || []),
+      ...(specsRecord?.selectedAfterWashSpecs || []),
+    ].forEach((s) => {
+      const name = (s.MeasurementPointEngName || s.name || "").trim();
+      if (name) criticalPointNames.add(name);
+    });
+
+    allSpecs.forEach((s) => {
+      const id = s.id || s._id?.toString();
+      const name = (s.MeasurementPointEngName || s.name || "").trim();
+      if (!name) return;
+
+      specIdToPointName.set(id, name);
+
+      // Store spec details (Tolerance) if not exists
+      if (!pointNameToSpec.has(name)) {
+        pointNameToSpec.set(name, {
+          name: name,
+          TolMinus: s.TolMinus,
+          TolPlus: s.TolPlus,
+        });
+      }
+    });
+
+    // 3. Define Buckets
+    const generateLabel = (sixteenths) => {
+      if (sixteenths === 0) return "0";
+      const sign = sixteenths < 0 ? "-" : "";
+      const absVal = Math.abs(sixteenths);
+      if (absVal === 16) return `${sign}1`;
+      const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+      const divisor = gcd(absVal, 16);
+      return `${sign}${absVal / divisor}/${16 / divisor}`;
+    };
+
+    const buckets = [];
+    buckets.push({ key: "lt-1", label: "<-1", order: -17 });
+    for (let i = -16; i <= 16; i++) {
+      buckets.push({ key: `v${i}`, label: generateLabel(i), order: i });
+    }
+    buckets.push({ key: "gt1", label: ">1", order: 17 });
+
+    const getBucketKey = (decimal) => {
+      if (decimal < -1 - 1 / 32) return "lt-1";
+      if (decimal > 1 + 1 / 32) return "gt1";
+      const rounded = Math.round(decimal * 16);
+      return `v${Math.max(-16, Math.min(16, rounded))}`;
+    };
+
+    // 4. Aggregate Data
+    const aggregatedData = {};
+    const usedBucketKeys = new Set();
+
+    // --- REFACTORED PROCESSOR: Handles a single value object ---
+    const processSingleValue = (specId, valObj, size) => {
+      if (!valObj || valObj.decimal === undefined) return;
+
+      const pointName = specIdToPointName.get(specId);
+      if (!pointName) return;
+
+      const specInfo = pointNameToSpec.get(pointName);
+      if (!specInfo) return;
+
+      // Init Structure
+      if (!aggregatedData[pointName]) aggregatedData[pointName] = {};
+      if (!aggregatedData[pointName][size]) {
+        aggregatedData[pointName][size] = {
+          points: 0,
+          pass: 0,
+          fail: 0,
+          negTol: 0,
+          posTol: 0,
+          buckets: {},
+        };
+      }
+
+      const decimal = parseFloat(valObj.decimal);
+      if (isNaN(decimal)) return;
+
+      const tolMinus = parseFloat(specInfo.TolMinus?.decimal) || 0;
+      const tolPlus = parseFloat(specInfo.TolPlus?.decimal) || 0;
+      const lowerLimit = -Math.abs(tolMinus);
+      const upperLimit = Math.abs(tolPlus);
+      const epsilon = 0.0001;
+
+      const entry = aggregatedData[pointName][size];
+      entry.points += 1;
+
+      // Tolerance Check
+      if (decimal >= lowerLimit - epsilon && decimal <= upperLimit + epsilon) {
+        entry.pass += 1;
+      } else {
+        entry.fail += 1;
+        if (decimal < lowerLimit) entry.negTol += 1;
+        if (decimal > upperLimit) entry.posTol += 1;
+      }
+
+      // Bucket
+      const bKey = getBucketKey(decimal);
+      usedBucketKeys.add(bKey);
+      entry.buckets[bKey] = (entry.buckets[bKey] || 0) + 1;
+    };
+
+    // --- MAIN ITERATION LOOP (FIXED) ---
+    report.measurementData.forEach((m) => {
+      if (m.size === "Manual_Entry") return;
+
+      // A. Get Valid Indices from the arrays (Default to empty if missing)
+      const validAllIndices = Array.isArray(m.allEnabledPcs)
+        ? m.allEnabledPcs
+        : [];
+      const validCritIndices = Array.isArray(m.criticalEnabledPcs)
+        ? m.criticalEnabledPcs
+        : [];
+
+      // B. Process "All Measurements" - ONLY for validAllIndices
+      if (m.allMeasurements) {
+        Object.entries(m.allMeasurements).forEach(([specId, pcsData]) => {
+          // pcsData is an object like { "0": {...}, "1": {...} }
+          // Iterate the valid indices (e.g., 0, 1, 2) and pick from pcsData
+          validAllIndices.forEach((pcsIndex) => {
+            const valObj = pcsData[pcsIndex];
+            if (valObj) {
+              processSingleValue(specId, valObj, m.size);
+            }
+          });
+        });
+      }
+
+      // C. Process "Critical Measurements" - ONLY for validCritIndices
+      if (m.criticalMeasurements) {
+        Object.entries(m.criticalMeasurements).forEach(([specId, pcsData]) => {
+          validCritIndices.forEach((pcsIndex) => {
+            const valObj = pcsData[pcsIndex];
+            if (valObj) {
+              processSingleValue(specId, valObj, m.size);
+            }
+          });
+        });
+      }
+    });
+
+    // 5. Format Response
+    const usedBuckets = buckets
+      .filter((b) => usedBucketKeys.has(b.key))
+      .sort((a, b) => a.order - b.order);
+
+    const specsWithData = [];
+    const sortedPointNames = Array.from(pointNameToSpec.keys()).sort();
+
+    sortedPointNames.forEach((pointName) => {
+      const dataForPoint = aggregatedData[pointName];
+      if (!dataForPoint) return;
+
+      const specInfo = pointNameToSpec.get(pointName);
+      const sizeData = {};
+      const allSizeTotals = {
+        points: 0,
+        pass: 0,
+        fail: 0,
+        negTol: 0,
+        posTol: 0,
+        buckets: {},
+      };
+      let hasData = false;
+
+      sizeList.forEach((size) => {
+        const d = dataForPoint[size];
+        if (d) {
+          hasData = true;
+          sizeData[size] = d;
+
+          allSizeTotals.points += d.points;
+          allSizeTotals.pass += d.pass;
+          allSizeTotals.fail += d.fail;
+          allSizeTotals.negTol += d.negTol;
+          allSizeTotals.posTol += d.posTol;
+          Object.entries(d.buckets).forEach(([k, v]) => {
+            allSizeTotals.buckets[k] = (allSizeTotals.buckets[k] || 0) + v;
+          });
+        }
+      });
+
+      if (hasData) {
+        specsWithData.push({
+          measurementPointName: pointName,
+          tolMinus: specInfo.TolMinus?.fraction || "-",
+          tolPlus: specInfo.TolPlus?.fraction || "-",
+          isCritical: criticalPointNames.has(pointName),
+          sizeData,
+          allSizeTotals,
+        });
+      }
+    });
+
+    const filteredSizeList = sizeList.filter((size) =>
+      specsWithData.some((s) => s.sizeData[size]),
+    );
+
+    const grandTotals = { points: 0, pass: 0, fail: 0, negTol: 0, posTol: 0 };
+    specsWithData.forEach((s) => {
+      grandTotals.points += s.allSizeTotals.points;
+      grandTotals.pass += s.allSizeTotals.pass;
+      grandTotals.fail += s.allSizeTotals.fail;
+      grandTotals.negTol += s.allSizeTotals.negTol;
+      grandTotals.posTol += s.allSizeTotals.posTol;
+    });
+    grandTotals.passRate =
+      grandTotals.points > 0
+        ? ((grandTotals.pass / grandTotals.points) * 100).toFixed(1)
+        : "0.0";
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        specs: specsWithData,
+        sizeList: filteredSizeList,
+        valueBuckets: usedBuckets,
+        grandTotals,
+      },
+    });
+  } catch (error) {
+    console.error("Error calculating report measurement distribution:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };
