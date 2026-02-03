@@ -54,6 +54,22 @@ const YPivotQAReportMeasurementValueDistribution = ({ reportId }) => {
     return "text-red-600";
   };
 
+  // --- NEW: Check if a bucket value is outside spec tolerance ---
+  const isOutOfTolerance = (spec, bucket) => {
+    // If we don't have decimal limits, assume pass
+    if (spec.tolMinusDecimal === undefined || spec.tolPlusDecimal === undefined)
+      return false;
+
+    const val = bucket.decimal;
+    const min = spec.tolMinusDecimal;
+    const max = spec.tolPlusDecimal;
+    const epsilon = 0.0001;
+
+    // Logic: lowerLimit <= value <= upperLimit
+    // So Fail if: value < lower - eps OR value > upper + eps
+    return val < min - epsilon || val > max + epsilon;
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center p-8 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
@@ -63,7 +79,7 @@ const YPivotQAReportMeasurementValueDistribution = ({ reportId }) => {
   }
 
   if (error || !data || data.specs.length === 0) {
-    return null; // Don't render if no data (optional: show empty state)
+    return null;
   }
 
   const { specs, sizeList, valueBuckets, grandTotals } = data;
@@ -304,14 +320,31 @@ const YPivotQAReportMeasurementValueDistribution = ({ reportId }) => {
                   </td>
 
                   {/* All Sizes Buckets */}
-                  {valueBuckets.map((bucket) => (
-                    <td
-                      key={`all-${bucket.key}`}
-                      className={`px-1 py-2 text-center text-[10px] ${spec.allSizeTotals.buckets?.[bucket.key] ? "font-bold text-gray-800 dark:text-gray-200" : "text-gray-300"}`}
-                    >
-                      {spec.allSizeTotals.buckets?.[bucket.key] || "-"}
-                    </td>
-                  ))}
+                  {valueBuckets.map((bucket) => {
+                    const count = spec.allSizeTotals.buckets?.[bucket.key] || 0;
+                    const outOfTol = isOutOfTolerance(spec, bucket);
+
+                    // --- COLOR LOGIC ---
+                    let cellClass = "text-gray-300"; // Default empty
+                    if (count > 0) {
+                      if (outOfTol) {
+                        cellClass =
+                          "font-bold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/40";
+                      } else {
+                        cellClass =
+                          "font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/40";
+                      }
+                    }
+
+                    return (
+                      <td
+                        key={`all-${bucket.key}`}
+                        className={`px-1 py-2 text-center text-[10px] ${cellClass}`}
+                      >
+                        {count || "-"}
+                      </td>
+                    );
+                  })}
 
                   {/* Individual Sizes Data */}
                   {sizeList.map((size) => {
@@ -337,14 +370,31 @@ const YPivotQAReportMeasurementValueDistribution = ({ reportId }) => {
                         </td>
 
                         {/* Size Buckets */}
-                        {valueBuckets.map((bucket) => (
-                          <td
-                            key={`${size}-${bucket.key}`}
-                            className={`px-1 py-2 text-center text-[10px] ${sizeData.buckets?.[bucket.key] ? "font-bold text-gray-800 dark:text-gray-200" : "text-gray-300"}`}
-                          >
-                            {sizeData.buckets?.[bucket.key] || "-"}
-                          </td>
-                        ))}
+                        {valueBuckets.map((bucket) => {
+                          const count = sizeData.buckets?.[bucket.key] || 0;
+                          const outOfTol = isOutOfTolerance(spec, bucket);
+
+                          // --- COLOR LOGIC ---
+                          let cellClass = "text-gray-300";
+                          if (count > 0) {
+                            if (outOfTol) {
+                              cellClass =
+                                "font-bold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/40";
+                            } else {
+                              cellClass =
+                                "font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/40";
+                            }
+                          }
+
+                          return (
+                            <td
+                              key={`${size}-${bucket.key}`}
+                              className={`px-1 py-2 text-center text-[10px] ${cellClass}`}
+                            >
+                              {count || "-"}
+                            </td>
+                          );
+                        })}
                       </React.Fragment>
                     );
                   })}

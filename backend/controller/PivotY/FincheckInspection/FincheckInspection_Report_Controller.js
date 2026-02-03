@@ -822,7 +822,7 @@ export const getReportMeasurementPointCalc = async (req, res) => {
   try {
     const { reportId } = req.params;
 
-    // 1. Fetch Report (Lean)
+    // 1. Fetch Report
     const report = await FincheckInspectionReports.findOne({
       reportId: parseInt(reportId),
     }).lean();
@@ -854,7 +854,7 @@ export const getReportMeasurementPointCalc = async (req, res) => {
       Order_No: { $regex: new RegExp(`^${orderNo}$`, "i") },
     }).lean();
 
-    // Combine Before and After specs for lookup
+    // Combine Before and After specs
     const allSpecs = [
       ...(specsRecord?.AllBeforeWashSpecs || []),
       ...(specsRecord?.AllAfterWashSpecs || []),
@@ -867,7 +867,10 @@ export const getReportMeasurementPointCalc = async (req, res) => {
     const pointNameToSpec = new Map();
     const criticalPointNames = new Set();
 
-    // Helper to mark criticals
+    // Order Tracking
+    const uniqueOrderedNames = [];
+    const seenNames = new Set();
+
     [
       ...(specsRecord?.selectedBeforeWashSpecs || []),
       ...(specsRecord?.selectedAfterWashSpecs || []),
@@ -883,8 +886,10 @@ export const getReportMeasurementPointCalc = async (req, res) => {
 
       specIdToPointName.set(id, name);
 
-      // Store spec details (Tolerance) if not exists
-      if (!pointNameToSpec.has(name)) {
+      if (!seenNames.has(name)) {
+        seenNames.add(name);
+        uniqueOrderedNames.push(name);
+
         pointNameToSpec.set(name, {
           name: name,
           TolMinus: s.TolMinus,
@@ -893,7 +898,7 @@ export const getReportMeasurementPointCalc = async (req, res) => {
       }
     });
 
-    // 3. Define Buckets
+    // 3. Define Buckets with DECIMAL values
     const generateLabel = (sixteenths) => {
       if (sixteenths === 0) return "0";
       const sign = sixteenths < 0 ? "-" : "";
@@ -905,11 +910,21 @@ export const getReportMeasurementPointCalc = async (req, res) => {
     };
 
     const buckets = [];
-    buckets.push({ key: "lt-1", label: "<-1", order: -17 });
+    // <-1 (Arbitrary decimal -1.1 for logic)
+    buckets.push({ key: "lt-1", label: "<-1", order: -17, decimal: -1.1 });
+
+    // -1 to 1 in 1/16 increments
     for (let i = -16; i <= 16; i++) {
-      buckets.push({ key: `v${i}`, label: generateLabel(i), order: i });
+      buckets.push({
+        key: `v${i}`,
+        label: generateLabel(i),
+        order: i,
+        decimal: i / 16,
+      });
     }
-    buckets.push({ key: "gt1", label: ">1", order: 17 });
+
+    // >1 (Arbitrary decimal 1.1 for logic)
+    buckets.push({ key: "gt1", label: ">1", order: 17, decimal: 1.1 });
 
     const getBucketKey = (decimal) => {
       if (decimal < -1 - 1 / 32) return "lt-1";
@@ -922,7 +937,6 @@ export const getReportMeasurementPointCalc = async (req, res) => {
     const aggregatedData = {};
     const usedBucketKeys = new Set();
 
-    // --- REFACTORED PROCESSOR: Handles a single value object ---
     const processSingleValue = (specId, valObj, size) => {
       if (!valObj || valObj.decimal === undefined) return;
 
@@ -932,7 +946,6 @@ export const getReportMeasurementPointCalc = async (req, res) => {
       const specInfo = pointNameToSpec.get(pointName);
       if (!specInfo) return;
 
-      // Init Structure
       if (!aggregatedData[pointName]) aggregatedData[pointName] = {};
       if (!aggregatedData[pointName][size]) {
         aggregatedData[pointName][size] = {
@@ -957,7 +970,6 @@ export const getReportMeasurementPointCalc = async (req, res) => {
       const entry = aggregatedData[pointName][size];
       entry.points += 1;
 
-      // Tolerance Check
       if (decimal >= lowerLimit - epsilon && decimal <= upperLimit + epsilon) {
         entry.pass += 1;
       } else {
@@ -966,17 +978,15 @@ export const getReportMeasurementPointCalc = async (req, res) => {
         if (decimal > upperLimit) entry.posTol += 1;
       }
 
-      // Bucket
       const bKey = getBucketKey(decimal);
       usedBucketKeys.add(bKey);
       entry.buckets[bKey] = (entry.buckets[bKey] || 0) + 1;
     };
 
-    // --- MAIN ITERATION LOOP (FIXED) ---
+    // Main Loop
     report.measurementData.forEach((m) => {
       if (m.size === "Manual_Entry") return;
 
-      // A. Get Valid Indices from the arrays (Default to empty if missing)
       const validAllIndices = Array.isArray(m.allEnabledPcs)
         ? m.allEnabledPcs
         : [];
@@ -984,28 +994,20 @@ export const getReportMeasurementPointCalc = async (req, res) => {
         ? m.criticalEnabledPcs
         : [];
 
-      // B. Process "All Measurements" - ONLY for validAllIndices
       if (m.allMeasurements) {
         Object.entries(m.allMeasurements).forEach(([specId, pcsData]) => {
-          // pcsData is an object like { "0": {...}, "1": {...} }
-          // Iterate the valid indices (e.g., 0, 1, 2) and pick from pcsData
           validAllIndices.forEach((pcsIndex) => {
             const valObj = pcsData[pcsIndex];
-            if (valObj) {
-              processSingleValue(specId, valObj, m.size);
-            }
+            if (valObj) processSingleValue(specId, valObj, m.size);
           });
         });
       }
 
-      // C. Process "Critical Measurements" - ONLY for validCritIndices
       if (m.criticalMeasurements) {
         Object.entries(m.criticalMeasurements).forEach(([specId, pcsData]) => {
           validCritIndices.forEach((pcsIndex) => {
             const valObj = pcsData[pcsIndex];
-            if (valObj) {
-              processSingleValue(specId, valObj, m.size);
-            }
+            if (valObj) processSingleValue(specId, valObj, m.size);
           });
         });
       }
@@ -1017,13 +1019,17 @@ export const getReportMeasurementPointCalc = async (req, res) => {
       .sort((a, b) => a.order - b.order);
 
     const specsWithData = [];
-    const sortedPointNames = Array.from(pointNameToSpec.keys()).sort();
 
-    sortedPointNames.forEach((pointName) => {
+    uniqueOrderedNames.forEach((pointName) => {
       const dataForPoint = aggregatedData[pointName];
       if (!dataForPoint) return;
 
       const specInfo = pointNameToSpec.get(pointName);
+
+      // Calculate Limits
+      const tMinus = parseFloat(specInfo.TolMinus?.decimal) || 0;
+      const tPlus = parseFloat(specInfo.TolPlus?.decimal) || 0;
+
       const sizeData = {};
       const allSizeTotals = {
         points: 0,
@@ -1057,6 +1063,9 @@ export const getReportMeasurementPointCalc = async (req, res) => {
           measurementPointName: pointName,
           tolMinus: specInfo.TolMinus?.fraction || "-",
           tolPlus: specInfo.TolPlus?.fraction || "-",
+          // ADDED DECIMAL LIMITS HERE
+          tolMinusDecimal: -Math.abs(tMinus),
+          tolPlusDecimal: Math.abs(tPlus),
           isCritical: criticalPointNames.has(pointName),
           sizeData,
           allSizeTotals,
