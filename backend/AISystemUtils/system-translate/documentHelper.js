@@ -2,7 +2,7 @@ import fs from 'fs';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-extraction');
+const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
 
 /**
