@@ -1,4 +1,11 @@
-import { ReportWashing } from "../MongoDB/dbConnectionController.js";
+import {
+  ReportWashing,
+  ReportHomeWash,
+  ReportGarmentWash,
+  ReportHTTesting,
+  ReportEMBPrinting,
+  ReportPullingTest
+} from "../MongoDB/dbConnectionController.js";
 import { API_BASE_URL, io } from "../../Config/appConfig.js";
 import { washingMachineTestUploadPath } from "../../helpers/helperFunctions.js";
 import { __backendDir } from "../../Config/appConfig.js";
@@ -6,14 +13,40 @@ import sharp from "sharp";
 import path from "path";
 import fs from "fs";
 
+const ASSET_BASE_PATH = path.resolve(__backendDir, "../public/assets/Wash-bold");
+
 /* ------------------------------
    End Points - Report Washing
 ------------------------------ */
+
+// Helper to get model by report type
+const getModelByReportType = (reportType) => {
+  switch (reportType) {
+    case "Home Wash Test": return ReportHomeWash;
+    case "Garment Wash Report": return ReportGarmentWash;
+    case "HT Testing": return ReportHTTesting;
+    case "EMB/Printing Testing": return ReportEMBPrinting;
+    case "EMB Testing": return ReportEMBPrinting; // Legacy support
+    case "Pulling Test": return ReportPullingTest;
+    default: return ReportHomeWash; // Default to Home Wash
+  }
+};
+
+// Helper to find document across all collections
+const findReportById = async (id) => {
+  const models = [ReportHomeWash, ReportGarmentWash, ReportHTTesting, ReportEMBPrinting, ReportPullingTest, ReportWashing];
+  for (const model of models) {
+    const doc = await model.findById(id);
+    if (doc) return { doc, model };
+  }
+  return { doc: null, model: null };
+};
 
 // Save Report Washing data
 export const saveReportWashing = async (req, res) => {
   try {
     const {
+      reportType, // Get reportType from body
       ymStyle,
       buyerStyle,
       color,
@@ -107,9 +140,57 @@ export const saveReportWashing = async (req, res) => {
     const parsedPO = typeof po === "string" ? JSON.parse(po) : po;
     const parsedExFtyDate = typeof exFtyDate === "string" ? JSON.parse(exFtyDate) : exFtyDate;
 
+    // Helper to safely parse JSON fields
+    const safeParseJSON = (data, fallback = []) => {
+      if (!data) return fallback;
+      if (typeof data === 'object') return data;
+      try {
+        return JSON.parse(data);
+      } catch (e) {
+        console.error("Error parsing JSON field:", e);
+        return fallback;
+      }
+    };
+
+    const parsedColorFastnessRows = safeParseJSON(req.body.colorFastnessRows);
+    const parsedColorStainingRows = safeParseJSON(req.body.colorStainingRows);
+    const parsedShrinkageRows = safeParseJSON(req.body.shrinkageRows);
+    const parsedVisualAssessmentRows = safeParseJSON(req.body.visualAssessmentRows);
+
+    // Parse careSymbols if present
+    let parsedCareSymbols = {};
+    if (req.body.careSymbols) {
+      try {
+        parsedCareSymbols = typeof req.body.careSymbols === "string" ? JSON.parse(req.body.careSymbols) : req.body.careSymbols;
+      } catch (e) {
+        console.error("Error parsing careSymbols:", e);
+        parsedCareSymbols = req.body.careSymbols;
+      }
+    }
+
+    // Process careSymbols to create careSymbolsImages (Base64)
+    const careSymbolsImages = {};
+    if (parsedCareSymbols && typeof parsedCareSymbols === 'object') {
+      for (const [key, filename] of Object.entries(parsedCareSymbols)) {
+        if (filename && typeof filename === 'string') {
+          try {
+            const filePath = path.join(ASSET_BASE_PATH, filename);
+            if (fs.existsSync(filePath)) {
+              const fileBuffer = fs.readFileSync(filePath);
+              const base64Image = `data:image/png;base64,${fileBuffer.toString('base64')}`;
+              careSymbolsImages[key] = base64Image;
+            }
+          } catch (err) {
+            console.error(`Error reading asset file ${filename}:`, err);
+          }
+        }
+      }
+    }
+
     // Prepare data - Include all fields from req.body dynamically
     const reportData = {
       ...req.body,
+      reportType: reportType || "Home Wash Test", // Ensure reportType is saved
       ymStyle: ymStyle.trim(),
       buyerStyle: buyerStyle ? buyerStyle.trim() : "",
       color: Array.isArray(parsedColor) ? parsedColor : [parsedColor],
@@ -121,15 +202,30 @@ export const saveReportWashing = async (req, res) => {
       sendToHomeWashingDate: sendToHomeWashingDate ? new Date(sendToHomeWashingDate) : new Date(),
       images: imagePaths, // Store file paths instead of base64
       careLabelImage: careLabelImagePaths,
+      careSymbols: parsedCareSymbols, // Store as Object (filenames)
+      careSymbolsImages: careSymbolsImages, // Store Base64 images data
+
+      // Explicitly set parsed arrays to ensure they are stored as Arrays, not Strings
+      colorFastnessRows: parsedColorFastnessRows,
+      colorStainingRows: parsedColorStainingRows,
+      shrinkageRows: parsedShrinkageRows,
+      visualAssessmentRows: parsedVisualAssessmentRows,
+
       notes: notes ? notes.trim() : "", // Notes field
       userId: userId || "",
       userName: userName || "",
       submittedAt: new Date()
     };
 
+    // Determine Model based on Report Type
+    console.log("Saving Report - Type:", reportData.reportType);
+    const ReportModel = getModelByReportType(reportData.reportType);
+    console.log("Selected Model:", ReportModel.modelName, "Collection:", ReportModel.collection.name);
+
     // Create and save the report
-    const reportWashing = new ReportWashing(reportData);
-    const savedData = await reportWashing.save();
+    const newReport = new ReportModel(reportData);
+    const savedData = await newReport.save();
+    console.log("Data Saved Successfully to ID:", savedData._id);
 
     // Emit socket event for real-time updates
     io.emit("washing-report-created", savedData);
@@ -158,7 +254,7 @@ export const saveReportWashing = async (req, res) => {
 // Get all Report Washing data
 export const getReportWashing = async (req, res) => {
   try {
-    const { ymStyle, factory, startDate, endDate, limit = 10, page = 1 } = req.query;
+    const { ymStyle, factory, startDate, endDate, limit = 10, page = 1, reportType } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     let query = {};
@@ -195,18 +291,41 @@ export const getReportWashing = async (req, res) => {
       }
     }
 
-    // Get total count for pagination
-    const totalRecords = await ReportWashing.countDocuments(query);
+    // Determine which models to query
+    let modelsToQuery = [];
+    if (reportType) {
+      modelsToQuery = [getModelByReportType(reportType)];
+    } else {
+      // Query all 5 models + legacy
+      modelsToQuery = [ReportHomeWash, ReportGarmentWash, ReportHTTesting, ReportEMBPrinting, ReportPullingTest, ReportWashing];
+    }
 
-    const reports = await ReportWashing.find(query)
-      .sort({ reportDate: -1, createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
+    // Parallel query to all relevant collections
+    const countPromises = modelsToQuery.map(model => model.countDocuments(query));
+    const findPromises = modelsToQuery.map(model =>
+      model.find(query).sort({ reportDate: -1, createdAt: -1 }).lean()
+    );
+
+    const counts = await Promise.all(countPromises);
+    const results = await Promise.all(findPromises);
+
+    // Aggregate results
+    let totalRecords = counts.reduce((sum, count) => sum + count, 0);
+    let allReports = results.flat();
+
+    // Sort aggregated results manually since they came from different collections
+    allReports.sort((a, b) => {
+      const dateA = new Date(a.reportDate || a.createdAt);
+      const dateB = new Date(b.reportDate || b.createdAt);
+      return dateB - dateA; // Descending
+    });
+
+    // Apply pagination to the aggregated list
+    const paginatedReports = allReports.slice(skip, skip + parseInt(limit));
 
     res.status(200).json({
       success: true,
-      data: reports,
+      data: paginatedReports,
       pagination: {
         totalRecords,
         totalPages: Math.ceil(totalRecords / parseInt(limit)),
@@ -229,9 +348,10 @@ export const getReportWashingById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const report = await ReportWashing.findById(id).lean();
+    // Try finding in all collections
+    const { doc } = await findReportById(id);
 
-    if (!report) {
+    if (!doc) {
       return res.status(404).json({
         success: false,
         message: "Report Washing not found"
@@ -240,7 +360,7 @@ export const getReportWashingById = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: report
+      data: doc
     });
   } catch (error) {
     console.error("Error fetching Report Washing by ID:", error);
@@ -258,6 +378,16 @@ export const updateReportWashing = async (req, res) => {
     const { id } = req.params;
     const updateData = { ...req.body };
 
+    // Find the right model and doc
+    const { model: ReportModel, doc: existingReport } = await findReportById(id);
+
+    if (!ReportModel || !existingReport) {
+      return res.status(404).json({
+        success: false,
+        message: "Report Washing not found"
+      });
+    }
+
     // Parse JSON fields if they are strings (from FormData)
     if (updateData.color) {
       try {
@@ -268,6 +398,28 @@ export const updateReportWashing = async (req, res) => {
         // Keep original value if parsing fails
       }
     }
+
+
+
+
+    // Helper to safely parse JSON fields (duplicate of logic in save, consider hoisting if refactoring)
+    const safeParseJSON = (data, fallback = []) => {
+      if (!data) return fallback;
+      if (typeof data === 'object') return data;
+      try {
+        return JSON.parse(data);
+      } catch (e) {
+        console.error("Error parsing JSON field:", e);
+        return fallback;
+      }
+    };
+
+    // Parse complex fields if they exist in updateData
+    if (updateData.colorFastnessRows) updateData.colorFastnessRows = safeParseJSON(updateData.colorFastnessRows);
+    if (updateData.colorStainingRows) updateData.colorStainingRows = safeParseJSON(updateData.colorStainingRows);
+    if (updateData.shrinkageRows) updateData.shrinkageRows = safeParseJSON(updateData.shrinkageRows);
+    if (updateData.visualAssessmentRows) updateData.visualAssessmentRows = safeParseJSON(updateData.visualAssessmentRows);
+
 
     if (updateData.po) {
       try {
@@ -286,6 +438,35 @@ export const updateReportWashing = async (req, res) => {
       } catch (error) {
         console.error("Error parsing exFtyDate:", error);
         // Keep original value if parsing fails
+      }
+    }
+
+    if (updateData.careSymbols) {
+      try {
+        updateData.careSymbols = typeof updateData.careSymbols === "string" ? JSON.parse(updateData.careSymbols) : updateData.careSymbols;
+
+        // Also update careSymbolsImages if careSymbols is being updated
+        const careSymbolsImages = {};
+        if (updateData.careSymbols && typeof updateData.careSymbols === 'object') {
+          for (const [key, filename] of Object.entries(updateData.careSymbols)) {
+            if (filename && typeof filename === 'string') {
+              try {
+                const filePath = path.join(ASSET_BASE_PATH, filename);
+                if (fs.existsSync(filePath)) {
+                  const fileBuffer = fs.readFileSync(filePath);
+                  const base64Image = `data:image/png;base64,${fileBuffer.toString('base64')}`;
+                  careSymbolsImages[key] = base64Image;
+                }
+              } catch (err) {
+                console.error(`Error reading asset file ${filename}:`, err);
+              }
+            }
+          }
+        }
+        updateData.careSymbolsImages = careSymbolsImages;
+
+      } catch (error) {
+        console.error("Error parsing careSymbols:", error);
       }
     }
 
@@ -309,7 +490,6 @@ export const updateReportWashing = async (req, res) => {
       }
     }
 
-    const existingReport = await ReportWashing.findById(id);
     const ymStyle = existingReport?.ymStyle || "unknown";
 
     // Handle initial images if uploaded
@@ -595,8 +775,8 @@ export const updateReportWashing = async (req, res) => {
       }
     }
 
-    // Find and update the report
-    const updatedReport = await ReportWashing.findByIdAndUpdate(
+    // Find and update the report using the correct model
+    const updatedReport = await ReportModel.findByIdAndUpdate(
       id,
       { $set: updateData },
       { new: true, runValidators: true }
@@ -633,9 +813,9 @@ export const deleteReportWashing = async (req, res) => {
     const { id } = req.params;
 
     // Find the report first to get image paths
-    const reportToDelete = await ReportWashing.findById(id);
+    const { model: ReportModel, doc: reportToDelete } = await findReportById(id);
 
-    if (!reportToDelete) {
+    if (!reportToDelete || !ReportModel) {
       return res.status(404).json({
         success: false,
         message: "Report Washing not found"
@@ -673,8 +853,8 @@ export const deleteReportWashing = async (req, res) => {
       }
     }
 
-    // Now delete the report from database
-    const deletedReport = await ReportWashing.findByIdAndDelete(id);
+    // Now delete the report from database using correct Model
+    const deletedReport = await ReportModel.findByIdAndDelete(id);
 
     // Emit socket event for real-time updates
     io.emit("washing-report-deleted", id);
@@ -748,13 +928,27 @@ export const getUniqueStyles = async (req, res) => {
   try {
     const { search = "" } = req.query;
 
-    // Get distinct ymStyle values that match the search term
-    const styles = await ReportWashing.distinct("ymStyle", {
-      ymStyle: { $regex: search, $options: "i" }
-    });
+    // Aggregate unique styles from all collections
+    const models = [ReportHomeWash, ReportGarmentWash, ReportHTTesting, ReportEMBPrinting, ReportPullingTest, ReportWashing];
 
-    // Limit to 10 suggestions
-    const suggestions = styles.slice(0, 10);
+    // We can't easily use distinct on all and merge if lists are huge, 
+    // but for autocomplete we only need top 10.
+    // A more efficient way would be to search each and merge, limiting total.
+
+    let allStyles = new Set();
+
+    for (const model of models) {
+      if (allStyles.size >= 20) break; // Optimization: stop if we have enough
+
+      const styles = await model.distinct("ymStyle", {
+        ymStyle: { $regex: search, $options: "i" }
+      });
+
+      styles.forEach(s => allStyles.add(s));
+    }
+
+    // Convert to array and limit
+    const suggestions = Array.from(allStyles).slice(0, 10);
 
     res.status(200).json({
       success: true,
@@ -775,17 +969,27 @@ export const getUniqueColors = async (req, res) => {
   try {
     const { search = "" } = req.query;
 
-    // Get all reports and extract unique colors from the color arrays
-    const reports = await ReportWashing.find(
-      search ? { color: { $regex: search, $options: "i" } } : {},
-      { color: 1 }
-    ).lean();
+    const models = [ReportHomeWash, ReportGarmentWash, ReportHTTesting, ReportEMBPrinting, ReportPullingTest, ReportWashing];
+    let allColors = new Set();
 
-    // Flatten all color arrays and get unique values
-    const allColors = reports.flatMap(r => r.color || []);
-    const uniqueColors = [...new Set(allColors)];
+    // Limit the search to prevent scanning absolutely everything if possible, 
+    // but regex search on 'color' array is expensive anyway.
 
-    // Filter by search term if provided
+    // We will query each model with a limit to avoid fetching too much
+    for (const model of models) {
+      if (allColors.size >= 20) break;
+
+      const reports = await model.find(
+        search ? { color: { $regex: search, $options: "i" } } : {},
+        { color: 1 }
+      ).limit(20).lean();
+
+      const colors = reports.flatMap(r => r.color || []);
+      colors.forEach(c => allColors.add(c));
+    }
+
+    // Filter by search term if provided (double check since regex was on array)
+    const uniqueColors = Array.from(allColors);
     const filteredColors = search
       ? uniqueColors.filter(c => c.toLowerCase().includes(search.toLowerCase()))
       : uniqueColors;
@@ -798,10 +1002,10 @@ export const getUniqueColors = async (req, res) => {
       data: suggestions
     });
   } catch (error) {
-    console.error("Error fetching unique colors:", error);
+    console.error("Error fetching unique styles:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch colors",
+      message: "Failed to fetch styles",
       error: error.message
     });
   }

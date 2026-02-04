@@ -5,6 +5,7 @@ import { DatePicker as AntDatePicker } from "antd";
 import dayjs from "dayjs";
 import { API_BASE_URL } from "../../../../config.js";
 import ReportCard from "./ReportCard";
+import { getReportTypeOptions } from "./constants/reportTypes";
 
 const ReportsList = ({
   reports,
@@ -38,6 +39,8 @@ const ReportsList = ({
   setFilterFactory,
   filterStatus,
   setFilterStatus,
+  filterReportType,
+  setFilterReportType,
   filterPage,
   setFilterPage,
   filterLimit,
@@ -286,7 +289,7 @@ const ReportsList = ({
       </div>
 
       {/* Filters */}
-      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg">
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg">
         {/* Style Search with Autocomplete */}
         <div className="relative">
           <Select
@@ -316,6 +319,23 @@ const ReportsList = ({
             styles={customStyles}
             className="text-sm"
             noOptionsMessage={() => "Type to search..."}
+          />
+        </div>
+
+        {/* Report Type Filter */}
+        <div>
+          <Select
+            value={filterReportType ? { value: filterReportType, label: filterReportType } : null}
+            onChange={(option) => setFilterReportType && setFilterReportType(option ? option.value : "")}
+            options={[
+              { value: "", label: "All Report Types" },
+              ...getReportTypeOptions()
+            ]}
+            placeholder="Filter Report Type..."
+            isClearable
+            isSearchable={false}
+            styles={customStyles}
+            className="text-sm"
           />
         </div>
 

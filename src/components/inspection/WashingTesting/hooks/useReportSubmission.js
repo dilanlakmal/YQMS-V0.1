@@ -24,7 +24,7 @@ export const useReportSubmission = (user, fetchReports) => {
 
       // Add common form fields
       formDataToSubmit.append("reportType", formData.reportType || "Home Wash Test");
-      formDataToSubmit.append("ymStyle", formData.ymStyle || "");
+      formDataToSubmit.append("ymStyle", formData.ymStyle || formData.style || "");
       formDataToSubmit.append("buyerStyle", formData.buyerStyle || "");
       formDataToSubmit.append("color", JSON.stringify(formData.color || []));
       formDataToSubmit.append("po", JSON.stringify(formData.po || []));
@@ -39,7 +39,13 @@ export const useReportSubmission = (user, fetchReports) => {
       const skipFields = ["reportType", "ymStyle", "buyerStyle", "color", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "notes", "images", "userId", "userName", "careLabelImage"];
       Object.keys(formData).forEach(key => {
         if (!skipFields.includes(key) && formData[key] !== undefined && formData[key] !== null) {
-          if (Array.isArray(formData[key])) {
+          if (key === 'shrinkageRows' && Array.isArray(formData[key])) {
+            // Filter shrinkageRows to only include selected rows
+            const selectedRows = formData[key].filter(row => row.selected);
+            formDataToSubmit.append(key, JSON.stringify(selectedRows));
+          } else if (Array.isArray(formData[key])) {
+            formDataToSubmit.append(key, JSON.stringify(formData[key]));
+          } else if (typeof formData[key] === 'object') {
             formDataToSubmit.append(key, JSON.stringify(formData[key]));
           } else {
             formDataToSubmit.append(key, formData[key]);
@@ -305,7 +311,13 @@ export const useReportSubmission = (user, fetchReports) => {
       const skipFields = ["reportType", "color", "buyerStyle", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "images", "completionNotes", "careLabelImage"];
       Object.keys(editFormData).forEach(key => {
         if (!skipFields.includes(key) && editFormData[key] !== undefined && editFormData[key] !== null) {
-          if (Array.isArray(editFormData[key])) {
+          if (key === 'shrinkageRows' && Array.isArray(editFormData[key])) {
+            // Filter shrinkageRows to only include selected rows
+            const selectedRows = editFormData[key].filter(row => row.selected);
+            formDataToSubmit.append(key, JSON.stringify(selectedRows));
+          } else if (Array.isArray(editFormData[key])) {
+            formDataToSubmit.append(key, JSON.stringify(editFormData[key]));
+          } else if (typeof editFormData[key] === 'object') {
             formDataToSubmit.append(key, JSON.stringify(editFormData[key]));
           } else {
             formDataToSubmit.append(key, editFormData[key]);

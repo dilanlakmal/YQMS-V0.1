@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Upload, Camera, X, Send, RotateCw, Plus, Trash2, Calendar, CheckCircle2, XCircle, Check, Hash, Maximize2 } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Upload, Camera, X, Send, RotateCw, Plus, Trash2, Calendar, CheckCircle2, XCircle, Check, Hash, Maximize2, Save, Edit } from "lucide-react";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import { API_BASE_URL } from "../../../../../config";
+import CareSymbolsSelector from "./CareSymbolsSelector";
 
 /**
  * Garment Wash Report Form Component
@@ -105,6 +107,7 @@ const GarmentWashForm = ({
     // Added for Enhanced Header and specific page functionality
     const [showAll, setShowAll] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
+    const [isShrinkageSaved, setIsShrinkageSaved] = useState(false);
 
     // Measurement specs state (same as MeasurementDetailsSection)
     const [measurementSpecs, setMeasurementSpecs] = useState({
@@ -443,7 +446,8 @@ const GarmentWashForm = ({
 
         if (specsToUse.length > 0) {
             // Check if size changed to determine if we should preserve data
-            const sizeChanged = prevSizeRef.current !== size;
+            // Ignore change if prevSizeRef is empty (initial load)
+            const sizeChanged = prevSizeRef.current !== '' && prevSizeRef.current !== size;
             const currentRows = formData.shrinkageRows || [];
 
             // Get both before and after wash specs
@@ -522,6 +526,7 @@ const GarmentWashForm = ({
                     requirement: existingRow ? existingRow.requirement : '±5%',
                     passFail: passFail,
                     isFromSpec: true,
+                    selected: existingRow ? existingRow.selected : false,
                     id: existingRow ? existingRow.id : Math.random().toString(36).substr(2, 9)
                 };
             });
@@ -729,7 +734,7 @@ const GarmentWashForm = ({
         } else if (field === 'colorStainingRows') {
             newRow = { fabricType: '', color: headerColor, colorStaining: '5', ratingAfterWash: '', requirement: '4-5', passFail: 'PASS' };
         } else if (field === 'shrinkageRows') {
-            newRow = { location: '', beforeWashSpec: '', afterWashSpec: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: '' };
+            newRow = { location: '', beforeWashSpec: '', afterWashSpec: '', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: '', selected: false };
         }
 
         handleInputChange(field, [...rows, newRow]);
@@ -745,6 +750,13 @@ const GarmentWashForm = ({
     const handleKeypadSubmit = (value) => {
         updateRow(keypadTarget.field, keypadTarget.index, keypadTarget.key, value);
         setKeypadOpen(false);
+    };
+
+    const toggleSelectAll = () => {
+        const rows = formData.shrinkageRows || [];
+        const allSelected = rows.length > 0 && rows.every(row => row.selected);
+        const newRows = rows.map(row => ({ ...row, selected: !allSelected }));
+        handleInputChange('shrinkageRows', newRows);
     };
 
     // Fraction Keypad Component
@@ -1156,113 +1168,17 @@ const GarmentWashForm = ({
                             <textarea value={formData.washingMethod || ''} onChange={(e) => handleInputChange("washingMethod", e.target.value)}
                                 rows={2} className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white resize-vertical" required />
                         </div>
-                    </div>
-                </div>
 
-                {/* 2.5 Care Label Info */}
-                <div className="bg-blue-50 dark:bg-gray-700/30 p-4 rounded-md border border-blue-200 dark:border-gray-600 mt-4">
-                    <div className="flex items-center gap-2 mb-3">
-                        <div className="bg-blue-100 dark:bg-blue-900/30 p-1.5 rounded-lg">
-                            <CheckCircle2 size={18} className="text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <h3 className="font-bold text-gray-800 dark:text-white">Care Label Information</h3>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Care Label Image Upload */}
-                        <div className="bg-white dark:bg-gray-800/50 p-4 rounded-lg border border-blue-100 dark:border-gray-600 shadow-sm">
-                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wider">
-                                CARE LABEL PHOTO :
-                            </label>
-
-                            <div className="space-y-4">
-                                {/* 1. Image Gallery area (Appears above buttons) */}
-                                {(Array.isArray(formData.careLabelImage) && formData.careLabelImage.length > 0) && (
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                                        {formData.careLabelImage.map((img, index) => (
-                                            <div key={index} className="relative group aspect-square rounded-xl overflow-hidden border border-blue-100 dark:border-gray-700 shadow-sm bg-gray-50 dark:bg-gray-900 transition-all hover:shadow-md hover:border-blue-300">
-                                                <img
-                                                    src={img instanceof File ? URL.createObjectURL(img) : img}
-                                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                                    alt={`Care Label ${index + 1}`}
-                                                />
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-3 uppercase">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemoveCareLabelImage(index)}
-                                                        className="bg-red-500/90 hover:bg-red-600 text-white p-2 rounded-full shadow-lg backdrop-blur-sm transition-transform hover:scale-110 flex items-center gap-1 text-[10px] font-bold px-3"
-                                                        title="Remove Image"
-                                                    >
-                                                        <X size={14} /> Remove
-                                                    </button>
-                                                </div>
-                                                <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/40 backdrop-blur-md rounded text-[10px] text-white font-medium">
-                                                    LABEL {index + 1}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* 2. Action Area (Always stays at bottom) */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => careLabelCameraInputRef.current?.click()}
-                                        className="relative py-4 border-2 border-dashed border-blue-200 dark:border-gray-700 rounded-xl flex flex-col items-center justify-center bg-blue-50/20 dark:bg-gray-800/40 hover:bg-blue-50/50 dark:hover:bg-gray-800/20 hover:border-blue-400 dark:hover:border-blue-500 transition-all group overflow-hidden"
-                                    >
-                                        <div className="bg-blue-100 dark:bg-blue-900/40 p-2.5 rounded-full mb-1 group-hover:scale-110 transition-transform text-blue-600 dark:text-blue-400">
-                                            <Camera size={20} />
-                                        </div>
-                                        <span className="text-[10px] font-black text-blue-700 dark:text-blue-300 tracking-tight">CAPTURE PHOTO</span>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => careLabelFileInputRef.current?.click()}
-                                        className="relative py-4 border-2 border-dashed border-indigo-200 dark:border-gray-700 rounded-xl flex flex-col items-center justify-center bg-indigo-50/20 dark:bg-gray-800/40 hover:bg-indigo-50/50 dark:hover:bg-gray-800/20 hover:border-indigo-400 dark:hover:border-indigo-500 transition-all group overflow-hidden"
-                                    >
-                                        <div className="bg-indigo-100 dark:bg-indigo-900/40 p-2.5 rounded-full mb-1 group-hover:scale-110 transition-transform text-indigo-600 dark:text-indigo-400">
-                                            <Upload size={20} />
-                                        </div>
-                                        <span className="text-[10px] font-black text-indigo-700 dark:text-indigo-300 tracking-tight">UPLOAD FILES</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <input
-                                ref={careLabelFileInputRef}
-                                type="file"
-                                className="hidden"
-                                accept="image/*"
-                                multiple
-                                onChange={handleCareLabelImageChange}
-                            />
-                            <input
-                                ref={careLabelCameraInputRef}
-                                type="file"
-                                className="hidden"
-                                accept="image/*"
-                                capture="environment"
-                                onChange={handleCareLabelImageChange}
-                            />
-                        </div>
-
-                        {/* Care Label Notes */}
-                        <div className="flex flex-col h-full">
-                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wider">
-                                CARE LABEL NOTES / INSTRUCTIONS :
-                            </label>
-                            <textarea
-                                value={formData.careLabelNotes || ''}
-                                onChange={(e) => handleInputChange("careLabelNotes", e.target.value)}
-                                rows={8}
-                                className="flex-1 w-full px-4 py-3 border border-blue-100 dark:border-gray-600 rounded-lg dark:bg-gray-800/50 dark:text-white resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-shadow"
-                                placeholder="Enter specific care instructions (e.g., Wash 30°C, Do not bleach, Tumble dry low, etc.)..."
+                        {/* Care Symbols Selector */}
+                        <div className="md:col-span-2 mt-2">
+                            <CareSymbolsSelector
+                                value={formData.careSymbols || {}}
+                                onChange={(newSymbols) => handleInputChange('careSymbols', newSymbols)}
                             />
                         </div>
                     </div>
                 </div>
+
 
                 {/* 3. Color Fastness Table (Change) */}
                 <div>
@@ -1438,6 +1354,16 @@ const GarmentWashForm = ({
                         </div>
 
                         <div className="flex items-center gap-3">
+                            {formData.sampleSize && (formData.shrinkageRows || []).length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsShrinkageSaved(!isShrinkageSaved)}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl shadow-md transition-all hover:scale-105 active:scale-95 font-bold text-xs uppercase tracking-wider ${isShrinkageSaved ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                                >
+                                    {isShrinkageSaved ? <Edit size={16} /> : <Save size={16} />}
+                                    {isShrinkageSaved ? "Edit Selection" : "Save"}
+                                </button>
+                            )}
                             {/* Wash Type Button Selector */}
                             <div className="relative group">
                                 <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-xl blur-sm group-hover:blur-md transition-all duration-300 opacity-50"></div>
@@ -1521,6 +1447,7 @@ const GarmentWashForm = ({
                                                                         onClick={() => {
                                                                             handleInputChange('sampleSize', s);
                                                                             setShowSizeDropdown(false);
+                                                                            setIsShrinkageSaved(false);
                                                                         }}
                                                                         className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold transition-all mb-0.5 last:mb-0 flex items-center justify-between group
                                                                         ${formData.sampleSize === s
@@ -1574,7 +1501,21 @@ const GarmentWashForm = ({
                         <table className="w-full text-sm text-left border-collapse">
                             <thead className="sticky top-0 z-10 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur-md text-gray-500 dark:text-gray-400 font-extrabold text-[10px] uppercase tracking-wider shadow-sm">
                                 <tr>
-                                    <th className="p-4 border-b dark:border-gray-700 w-14 text-center first:rounded-tl-xl">NO</th>
+                                    <th className={`p-4 border-b dark:border-gray-700 w-10 text-center first:rounded-tl-xl ${isShrinkageSaved ? 'hidden' : ''}`}>
+                                        <div className="flex items-center justify-center">
+                                            <label className="relative flex items-center justify-center cursor-pointer group">
+                                                <input
+                                                    type="checkbox"
+                                                    className="peer sr-only"
+                                                    checked={(formData.shrinkageRows || []).length > 0 && (formData.shrinkageRows || []).every(r => r.selected)}
+                                                    onChange={toggleSelectAll}
+                                                />
+                                                <div className="w-5 h-5 border-2 border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-all duration-200 ease-out shadow-sm group-hover:border-blue-400 dark:group-hover:border-blue-500"></div>
+                                                <Check size={14} strokeWidth={3} className="absolute text-white opacity-0 peer-checked:opacity-100 transform scale-50 peer-checked:scale-100 transition-all duration-200 ease-out" />
+                                            </label>
+                                        </div>
+                                    </th>
+                                    <th className="p-4 border-b dark:border-gray-700 w-14 text-center">NO</th>
                                     <th className="p-4 border-b dark:border-gray-700">MEASUREMENT POINT</th>
                                     <th className={`p-4 border-b dark:border-gray-700 w-24 text-center transition-all duration-300 ${formData.washType !== 'After Wash' ? 'bg-blue-50/80 dark:bg-blue-900/40 ring-inset ring-2 ring-blue-400/30' : 'opacity-40 grayscale-[0.5]'}`}>
                                         <div className="flex flex-col text-[10px] text-blue-600 dark:text-blue-400">
@@ -1606,7 +1547,7 @@ const GarmentWashForm = ({
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                 {(!formData.sampleSize) ? (
                                     <tr>
-                                        <td colSpan={10} className="p-12 text-center">
+                                        <td colSpan={11} className="p-12 text-center">
                                             <div className="flex flex-col items-center justify-center opacity-40">
                                                 <RotateCw size={40} className="mb-4 text-gray-400" />
                                                 <p className="text-lg font-bold text-gray-500">Select a Test Size to Load Specifications</p>
@@ -1616,7 +1557,7 @@ const GarmentWashForm = ({
                                     </tr>
                                 ) : (formData.shrinkageRows || []).length === 0 && !isLoadingSpecs && !isLoadingMeasurementSpecs ? (
                                     <tr>
-                                        <td colSpan={10} className="p-12 text-center">
+                                        <td colSpan={11} className="p-12 text-center">
                                             <div className="flex flex-col items-center justify-center opacity-40">
                                                 <XCircle size={40} className="mb-4 text-red-400" />
                                                 <p className="text-lg font-bold text-gray-500">No Specifications Found</p>
@@ -1624,7 +1565,21 @@ const GarmentWashForm = ({
                                         </td>
                                     </tr>
                                 ) : (formData.shrinkageRows || []).map((row, index) => (
-                                    <tr key={row.id || index} className="group dark:border-gray-700 border-b border-gray-50 last:border-none hover:bg-blue-50/60 dark:hover:bg-blue-900/10 transition-colors duration-200">
+                                    <tr key={row.id || index} className={`group dark:border-gray-700 border-b border-gray-50 last:border-none hover:bg-blue-50/60 dark:hover:bg-blue-900/10 transition-colors duration-200 ${isShrinkageSaved && !row.selected ? 'hidden' : ''}`}>
+                                        <td className={`p-3 text-center ${isShrinkageSaved ? 'hidden' : ''}`}>
+                                            <div className="flex items-center justify-center">
+                                                <label className="relative flex items-center justify-center cursor-pointer group">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="peer sr-only"
+                                                        checked={!!row.selected}
+                                                        onChange={(e) => updateRow('shrinkageRows', index, 'selected', e.target.checked)}
+                                                    />
+                                                    <div className="w-5 h-5 border-2 border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-all duration-200 ease-out shadow-sm group-hover:border-blue-400 dark:group-hover:border-blue-500"></div>
+                                                    <Check size={14} strokeWidth={3} className="absolute text-white opacity-0 peer-checked:opacity-100 transform scale-50 peer-checked:scale-100 transition-all duration-200 ease-out" />
+                                                </label>
+                                            </div>
+                                        </td>
                                         <td className="p-3 text-center text-gray-400 font-extrabold font-mono text-xs group-hover:text-blue-500 transition-colors">
                                             {row.no || (index + 1)}
                                         </td>
@@ -1978,8 +1933,11 @@ const GarmentWashForm = ({
             {/* Size Comparison Modal */}
             {showSizeComparisonModal && (() => {
                 const comparisonData = getAllSizeSpecs();
-                return (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                return createPortal(
+                    <div className="fixed inset-0 z-[9999] h-screen w-screen flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={(e) => {
+                        e.stopPropagation();
+                    }}>
+                        <div className="absolute inset-0 z-[-1]" onClick={() => setShowSizeComparisonModal(false)}></div>
                         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-700 flex flex-col animate-in zoom-in-95 duration-200">
                             {/* Modal Header */}
                             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30">
@@ -2076,7 +2034,8 @@ const GarmentWashForm = ({
                                 </button>
                             </div>
                         </div>
-                    </div>
+                    </div>,
+                    document.body
                 );
             })()}
         </div>

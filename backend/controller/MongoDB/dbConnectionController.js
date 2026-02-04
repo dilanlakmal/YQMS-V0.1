@@ -266,7 +266,12 @@ export const SubconSewingQc1Report =
 export const CuttingInlineOrders = CuttingInlineOrdersModel(ymProdConnection);
 export const PlanPackingList = createPlanPackingListModel(ymProdConnection);
 export const YorksysOrders = createYorksysOrdersModel(ymProdConnection);
-export const ReportWashing = createReportWashingModel(ymProdConnection);
+export const ReportWashing = createReportWashingModel(ymProdConnection, "report_washing");
+export const ReportHomeWash = createReportWashingModel(ymProdConnection, "report_home_wash");
+export const ReportGarmentWash = createReportWashingModel(ymProdConnection, "report_garment_wash");
+export const ReportHTTesting = createReportWashingModel(ymProdConnection, "report_ht_testing");
+export const ReportEMBPrinting = createReportWashingModel(ymProdConnection, "report_emb_printing");
+export const ReportPullingTest = createReportWashingModel(ymProdConnection, "report_pulling_test");
 
 export const QASectionsProductType =
   createQASectionsProductType(ymProdConnection);

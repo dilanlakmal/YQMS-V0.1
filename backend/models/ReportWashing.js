@@ -15,6 +15,15 @@ const reportWashingSchema = new mongoose.Schema(
     userId: { type: String, default: "" },
     userName: { type: String, default: "" },
     submittedAt: { type: Date, default: Date.now },
+
+    // Explicit Schema Definitions for Complex Fields
+    careSymbols: { type: Object, default: {} }, // Filename map { "machineWash": "icon.png" }
+    careSymbolsImages: { type: Object, default: {} }, // Base64 map { "machineWash": "data:image..." }
+
+    colorFastnessRows: { type: Array, default: [] },
+    colorStainingRows: { type: Array, default: [] },
+    shrinkageRows: { type: Array, default: [] },
+    visualAssessmentRows: { type: Array, default: [] },
     // QR Scan Status Fields
     status: { type: String, default: "pending", enum: ["pending", "received", "completed"] },
     receivedDate: { type: String, default: null }, // Date string when first scanned
@@ -28,8 +37,7 @@ const reportWashingSchema = new mongoose.Schema(
   },
   {
     strict: false,
-    timestamps: true,
-    collection: "report_washing"
+    timestamps: true
   }
 );
 
@@ -37,7 +45,7 @@ const reportWashingSchema = new mongoose.Schema(
 reportWashingSchema.index({ ymStyle: 1, reportDate: -1 });
 reportWashingSchema.index({ factory: 1, reportDate: -1 });
 
-export default function createReportWashingModel(connection) {
-  return connection.model("ReportWashing", reportWashingSchema);
+export default function createReportWashingModel(connection, collectionName = "report_washing") {
+  return connection.model("ReportWashing_" + collectionName, reportWashingSchema, collectionName);
 }
 

@@ -277,6 +277,40 @@ const ReportCard = ({
             </div>
           </div>
 
+
+          {/* Care Symbols Display */}
+          {(report.careSymbols && (typeof report.careSymbols === 'object' ? Object.keys(report.careSymbols).length > 0 : report.careSymbols.length > 0)) && (
+            <div className="mt-4">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                Care Instructions
+              </p>
+              <div className="flex flex-wrap gap-3 bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                {Object.entries(
+                  typeof report.careSymbols === 'string'
+                    ? (() => { try { return JSON.parse(report.careSymbols) } catch (e) { return {} } })()
+                    : report.careSymbols
+                ).map(([key, iconName]) => {
+                  // Priority: Use Base64 image from DB (careSymbolsImages) if available
+                  // Fallback: Use local asset path
+                  const imageSource = report.careSymbolsImages && report.careSymbolsImages[key]
+                    ? report.careSymbolsImages[key]
+                    : `/assets/Wash-bold/${iconName}`;
+
+                  return (
+                    <div key={key} className="relative group p-1 bg-white rounded-md" title={key}>
+                      <img
+                        src={imageSource}
+                        alt={key}
+                        className="w-8 h-8 object-contain"
+                        onError={(e) => e.target.style.display = 'none'}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Final Results for EMB/HT Testing */}
           {(report.reportType === "EMB/Printing Testing" || report.reportType === "HT Testing") && (report.finalResult || report.checkedBy || report.checkedDate || report.finalResults) && (
             <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
@@ -306,6 +340,68 @@ const ReportCard = ({
             </div>
           )}
 
+          {/* Flat Measurements & Shrinkage Summary */}
+          {report.shrinkageRows && Array.isArray(report.shrinkageRows) && report.shrinkageRows.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                Measurements & Shrinkage
+              </p>
+              <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">
+                    <tr>
+                      <th className="p-2 border-b dark:border-gray-700">Point</th>
+                      <th className="p-2 border-b dark:border-gray-700 text-center">Spec (B)</th>
+                      <th className="p-2 border-b dark:border-gray-700 text-center">G1 (B)</th>
+                      <th className="p-2 border-b dark:border-gray-700 text-center">G2 (A)</th>
+                      <th className="p-2 border-b dark:border-gray-700 text-center">Shrinkage</th>
+                      <th className="p-2 border-b dark:border-gray-700 text-center">Result</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {report.shrinkageRows
+                      .filter(row => row.selected) // Only show selected rows in the summary card!
+                      .map((row, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
+                          <td className="p-2 font-medium text-gray-700 dark:text-gray-300 max-w-[150px] truncate" title={row.location}>
+                            {row.location}
+                          </td>
+                          <td className="p-2 text-center text-blue-600 dark:text-blue-400 font-mono">
+                            {row.beforeWashSpec || "-"}
+                          </td>
+                          <td className="p-2 text-center text-gray-600 dark:text-gray-400">
+                            {row.beforeWash || "-"}
+                          </td>
+                          <td className="p-2 text-center text-gray-600 dark:text-gray-400">
+                            {row.afterWash || "-"}
+                          </td>
+                          <td className={`p-2 text-center font-bold ${parseFloat(row.shrinkage) > 0 ? 'text-green-600' : 'text-blue-600'}`}>
+                            {row.shrinkage || "-"}
+                          </td>
+                          <td className="p-2 text-center">
+                            {row.passFail === 'PASS' ? (
+                              <span className="text-green-600 font-bold text-[10px] px-1.5 py-0.5 bg-green-50 dark:bg-green-900/20 rounded">PASS</span>
+                            ) : row.passFail === 'FAIL' ? (
+                              <span className="text-red-500 font-bold text-[10px] px-1.5 py-0.5 bg-red-50 dark:bg-red-900/20 rounded">FAIL</span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    {report.shrinkageRows.filter(row => row.selected).length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="p-4 text-center text-gray-400 italic">
+                          No measurement points selected.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Timeline View */}
           <ReportTimeline
             report={report}
@@ -316,8 +412,9 @@ const ReportCard = ({
             onEditCompletionImages={onEditCompletionImages}
           />
         </>
-      )}
-    </div>
+      )
+      }
+    </div >
   );
 };
 

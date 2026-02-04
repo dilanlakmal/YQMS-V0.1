@@ -2,7 +2,8 @@ import React from "react";
 import Select from "react-select";
 import { DatePicker as AntDatePicker } from "antd";
 import dayjs from "dayjs";
-import { Calendar, Trash2, RotateCw } from "lucide-react";
+import { Calendar, Trash2, RotateCw, Plus } from "lucide-react";
+import CareSymbolsSelector from "../forms/CareSymbolsSelector";
 
 const EditReportModal = ({
   isOpen,
@@ -468,6 +469,14 @@ const EditReportModal = ({
                     Care Label Information
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Care Symbols Selector - Added to View/Edit */}
+                    <div className="md:col-span-2 mb-2">
+                      <CareSymbolsSelector
+                        value={typeof editFormData.careSymbols === 'string' ? JSON.parse(editFormData.careSymbols || '{}') : (editFormData.careSymbols || {})}
+                        onChange={(newSymbols) => setEditFormData(prev => ({ ...prev, careSymbols: newSymbols }))}
+                      />
+                    </div>
+
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wider">
                         Care Label Gallery

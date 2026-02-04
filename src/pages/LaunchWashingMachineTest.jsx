@@ -160,6 +160,7 @@ const LaundryWashingMachineTest = () => {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterPage, setFilterPage] = useState(1);
   const [filterLimit, setFilterLimit] = useState(10);
+  const [filterReportType, setFilterReportType] = useState("");
 
   // Warehouse Filter states
   const [whFilterStartDate, setWhFilterStartDate] = useState("");
@@ -170,6 +171,7 @@ const LaundryWashingMachineTest = () => {
   const [whFilterStatus, setWhFilterStatus] = useState("");
   const [whFilterPage, setWhFilterPage] = useState(1);
   const [whFilterLimit, setWhFilterLimit] = useState(10);
+  const [whFilterReportType, setWhFilterReportType] = useState("");
 
   // Create a combined fetch function to refresh both or active tab
   const refreshAllReports = useCallback(async () => {
@@ -182,6 +184,7 @@ const LaundryWashingMachineTest = () => {
         color: filterColor,
         factory: filterFactory,
         status: filterStatus,
+        reportType: filterReportType,
         page: filterPage,
         limit: filterLimit,
       }),
@@ -192,13 +195,14 @@ const LaundryWashingMachineTest = () => {
         color: whFilterColor,
         factory: whFilterFactory,
         status: whFilterStatus,
+        reportType: whFilterReportType,
         page: whFilterPage,
         limit: whFilterLimit,
       })
     ]);
   }, [
-    fetchReports, filterStartDate, filterEndDate, filterSearch, filterColor, filterFactory, filterStatus, filterPage, filterLimit,
-    fetchWhReports, whFilterStartDate, whFilterEndDate, whFilterSearch, whFilterColor, whFilterFactory, whFilterStatus, whFilterPage, whFilterLimit
+    fetchReports, filterStartDate, filterEndDate, filterSearch, filterColor, filterFactory, filterStatus, filterReportType, filterPage, filterLimit,
+    fetchWhReports, whFilterStartDate, whFilterEndDate, whFilterSearch, whFilterColor, whFilterFactory, whFilterStatus, whFilterReportType, whFilterPage, whFilterLimit
   ]);
 
   const {
@@ -302,12 +306,12 @@ const LaundryWashingMachineTest = () => {
   // Reset page to 1 when filters (except page) change for standard reports
   useEffect(() => {
     setFilterPage(1);
-  }, [filterStartDate, filterEndDate, filterSearch, filterColor, filterFactory, filterStatus, filterLimit]);
+  }, [filterStartDate, filterEndDate, filterSearch, filterColor, filterFactory, filterStatus, filterReportType, filterLimit]);
 
   // Reset page to 1 when filters (except page) change for warehouse reports
   useEffect(() => {
     setWhFilterPage(1);
-  }, [whFilterStartDate, whFilterEndDate, whFilterSearch, whFilterColor, whFilterFactory, whFilterStatus, whFilterLimit]);
+  }, [whFilterStartDate, whFilterEndDate, whFilterSearch, whFilterColor, whFilterFactory, whFilterStatus, whFilterReportType, whFilterLimit]);
 
   // Fetch standard reports when filters or page change
   useEffect(() => {
@@ -319,12 +323,13 @@ const LaundryWashingMachineTest = () => {
         color: filterColor,
         factory: filterFactory,
         status: filterStatus,
+        reportType: filterReportType,
         page: filterPage,
         limit: filterLimit
       });
     }, 500); // Debounce
     return () => clearTimeout(timer);
-  }, [filterStartDate, filterEndDate, filterSearch, filterColor, filterFactory, filterStatus, filterPage, filterLimit, fetchReports]);
+  }, [filterStartDate, filterEndDate, filterSearch, filterColor, filterFactory, filterStatus, filterReportType, filterPage, filterLimit, fetchReports]);
 
   // Fetch warehouse reports when filters or page change
   useEffect(() => {
@@ -336,12 +341,13 @@ const LaundryWashingMachineTest = () => {
         color: whFilterColor,
         factory: whFilterFactory,
         status: whFilterStatus,
+        reportType: whFilterReportType,
         page: whFilterPage,
         limit: whFilterLimit
       });
     }, 500); // Debounce
     return () => clearTimeout(timer);
-  }, [whFilterStartDate, whFilterEndDate, whFilterSearch, whFilterColor, whFilterFactory, whFilterStatus, whFilterPage, whFilterLimit, fetchWhReports]);
+  }, [whFilterStartDate, whFilterEndDate, whFilterSearch, whFilterColor, whFilterFactory, whFilterStatus, whFilterReportType, whFilterPage, whFilterLimit, fetchWhReports]);
 
   // Dropdown states
   const [showColorDropdown, setShowColorDropdown] = useState(false);
@@ -2103,6 +2109,7 @@ const LaundryWashingMachineTest = () => {
                 color: filterColor,
                 factory: filterFactory,
                 status: filterStatus,
+                reportType: filterReportType,
                 page: filterPage,
                 limit: filterLimit
               })}
@@ -2140,6 +2147,8 @@ const LaundryWashingMachineTest = () => {
               setFilterLimit={setFilterLimit}
               pagination={pagination}
               factories={factories}
+              filterReportType={filterReportType}
+              setFilterReportType={setFilterReportType}
             />
           )}
 
@@ -2156,6 +2165,7 @@ const LaundryWashingMachineTest = () => {
                 color: whFilterColor,
                 factory: whFilterFactory,
                 status: whFilterStatus,
+                reportType: whFilterReportType,
                 page: whFilterPage,
                 limit: whFilterLimit
               })}
@@ -2193,6 +2203,8 @@ const LaundryWashingMachineTest = () => {
               setFilterLimit={setWhFilterLimit}
               pagination={whPagination}
               factories={factories}
+              filterReportType={whFilterReportType}
+              setFilterReportType={setWhFilterReportType}
             />
           )}
 
