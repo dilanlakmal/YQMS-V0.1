@@ -9,6 +9,8 @@ import {
   getStyleMeasurementAnalytics,
   getStyleMeasurementConclusion,
   getStyleMeasurementPointCalc,
+  getBuyerSummaryAnalytics,
+  getBuyerCellDetails,
 } from "../../../controller/PivotY/FincheckAnalytics/FincheckAnalytics_Controller.js";
 
 const router = express.Router();
@@ -39,5 +41,9 @@ router.get(
   "/api/fincheck-analytics/style-measurement-point-calc",
   getStyleMeasurementPointCalc,
 );
+
+// GET: Buyer Analytics
+router.get("/api/fincheck-analytics/buyer-summary", getBuyerSummaryAnalytics);
+router.get("/api/fincheck-analytics/buyer-cell-details", getBuyerCellDetails);
 
 export default router;

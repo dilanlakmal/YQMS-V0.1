@@ -1935,3 +1935,376 @@ export const getStyleMeasurementPointCalc = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// ============================================================
+// GET: Buyer Analytics (Summary & Trend)
+// ============================================================
+export const getBuyerSummaryAnalytics = async (req, res) => {
+  try {
+    const { startDate, endDate, buyers, reportTypes } = req.query;
+
+    const matchStage = { status: { $ne: "cancelled" } };
+
+    // 1. Date Filter
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.inspectionDate = { $gte: start, $lte: end };
+    }
+
+    // 2. Buyer Filter
+    if (buyers && buyers !== "All") {
+      const buyerList = buyers.split(",");
+      if (buyerList.length > 0) matchStage.buyer = { $in: buyerList };
+    }
+
+    // 3. Report Type Filter (NEW)
+    if (reportTypes && reportTypes !== "All") {
+      const rtList = reportTypes.split(",");
+      if (rtList.length > 0) matchStage.reportType = { $in: rtList };
+    }
+
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $addFields: {
+          dateKey: {
+            $dateToString: { format: "%Y-%m-%d", date: "$inspectionDate" },
+          },
+          reportSampleSize: {
+            $cond: [
+              { $eq: ["$inspectionMethod", "AQL"] },
+              { $ifNull: ["$inspectionDetails.aqlSampleSize", 0] },
+              { $ifNull: ["$inspectionConfig.sampleSize", 0] },
+            ],
+          },
+          // Standardized Defect Flattening (Same as previous logic)
+          _tempDefects: {
+            $concatArrays: [
+              {
+                $reduce: {
+                  input: {
+                    $filter: {
+                      input: { $ifNull: ["$defectData", []] },
+                      as: "d",
+                      cond: { $ne: ["$$d.isNoLocation", true] },
+                    },
+                  },
+                  initialValue: [],
+                  in: {
+                    $concatArrays: [
+                      "$$value",
+                      {
+                        $reduce: {
+                          input: { $ifNull: ["$$this.locations", []] },
+                          initialValue: [],
+                          in: {
+                            $concatArrays: [
+                              "$$value",
+                              {
+                                $map: {
+                                  input: { $ifNull: ["$$this.positions", []] },
+                                  as: "pos",
+                                  in: 1,
+                                },
+                              },
+                            ],
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+              {
+                $map: {
+                  input: {
+                    $filter: {
+                      input: { $ifNull: ["$defectData", []] },
+                      as: "d",
+                      cond: { $eq: ["$$d.isNoLocation", true] },
+                    },
+                  },
+                  as: "noLoc",
+                  in: { $ifNull: ["$$noLoc.qty", 1] },
+                },
+              },
+            ],
+          },
+        },
+      },
+      {
+        $addFields: { reportDefectTotal: { $sum: "$_tempDefects" } },
+      },
+      // Grouping
+      {
+        $group: {
+          _id: { buyer: "$buyer", reportType: "$reportType", date: "$dateKey" },
+          dailySample: { $sum: "$reportSampleSize" },
+          dailyDefects: { $sum: "$reportDefectTotal" },
+          reportCount: { $sum: 1 },
+        },
+      },
+      {
+        $group: {
+          _id: "$_id.buyer",
+          reportTypes: {
+            $push: {
+              type: "$_id.reportType",
+              date: "$_id.date",
+              sample: "$dailySample",
+              defects: "$dailyDefects",
+              count: "$reportCount",
+            },
+          },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ];
+
+    const data = await FincheckInspectionReports.aggregate(pipeline);
+
+    // Fetch Filters Data
+    const distinctBuyers = await FincheckInspectionReports.distinct("buyer", {
+      status: { $ne: "cancelled" },
+    });
+    const distinctReportTypes = await FincheckInspectionReports.distinct(
+      "reportType",
+      { status: { $ne: "cancelled" } },
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        analytics: data,
+        availableBuyers: distinctBuyers.sort(),
+        availableReportTypes: distinctReportTypes.sort(),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching buyer analytics:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// GET: Buyer Cell Detail (Drill Down Modal)
+// ============================================================
+
+export const getBuyerCellDetails = async (req, res) => {
+  try {
+    const { buyer, reportType, date } = req.query;
+
+    if (!buyer || !reportType || !date) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing params" });
+    }
+
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+
+    const matchStage = {
+      buyer: buyer,
+      reportType: reportType,
+      inspectionDate: { $gte: start, $lte: end },
+      status: { $ne: "cancelled" },
+    };
+
+    // ========================================
+    // STEP 1: Calculate Total Sample Size
+    // ========================================
+    const samplePipeline = [
+      { $match: matchStage },
+      {
+        $addFields: {
+          reportSampleSize: {
+            $cond: [
+              { $eq: ["$inspectionMethod", "AQL"] },
+              { $ifNull: ["$inspectionDetails.aqlSampleSize", 0] },
+              { $ifNull: ["$inspectionConfig.sampleSize", 0] },
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalSample: { $sum: "$reportSampleSize" },
+        },
+      },
+    ];
+
+    const sampleResult =
+      await FincheckInspectionReports.aggregate(samplePipeline);
+    const totalSample =
+      sampleResult.length > 0 ? sampleResult[0].totalSample : 0;
+
+    // ========================================
+    // STEP 2: Get Defects with Proper Breakdown
+    // ========================================
+    const defectPipeline = [
+      { $match: matchStage },
+
+      // Unwind defectData to process each defect item
+      {
+        $unwind: {
+          path: "$defectData",
+          preserveNullAndEmptyArrays: false,
+        },
+      },
+
+      // Extract defect info at the correct level
+      {
+        $project: {
+          defectName: "$defectData.defectName",
+          defectCode: "$defectData.defectCode",
+          isNoLocation: { $ifNull: ["$defectData.isNoLocation", false] },
+          noLocationStatus: "$defectData.status",
+          noLocationQty: { $ifNull: ["$defectData.qty", 1] },
+          locations: { $ifNull: ["$defectData.locations", []] },
+        },
+      },
+
+      // Use $facet to handle both location-based and no-location defects
+      {
+        $facet: {
+          // -------- A. Location-Based Defects --------
+          locationBased: [
+            { $match: { isNoLocation: { $ne: true } } },
+            // Check if locations array is not empty
+            { $match: { "locations.0": { $exists: true } } },
+            {
+              $unwind: {
+                path: "$locations",
+                preserveNullAndEmptyArrays: false,
+              },
+            },
+            // Check if positions array exists and is not empty
+            { $match: { "locations.positions.0": { $exists: true } } },
+            {
+              $unwind: {
+                path: "$locations.positions",
+                preserveNullAndEmptyArrays: false,
+              },
+            },
+            {
+              $project: {
+                defectName: 1,
+                defectCode: 1,
+                status: "$locations.positions.status",
+                qty: { $literal: 1 },
+              },
+            },
+          ],
+
+          // -------- B. No-Location Defects --------
+          noLocation: [
+            { $match: { isNoLocation: true } },
+            {
+              $project: {
+                defectName: 1,
+                defectCode: 1,
+                status: "$noLocationStatus",
+                qty: "$noLocationQty",
+              },
+            },
+          ],
+        },
+      },
+
+      // Combine both arrays
+      {
+        $project: {
+          combined: { $concatArrays: ["$locationBased", "$noLocation"] },
+        },
+      },
+
+      // Unwind the combined array
+      { $unwind: { path: "$combined", preserveNullAndEmptyArrays: false } },
+
+      // Group by defect name/code with status breakdown
+      {
+        $group: {
+          _id: {
+            name: "$combined.defectName",
+            code: "$combined.defectCode",
+          },
+          totalQty: { $sum: "$combined.qty" },
+          minor: {
+            $sum: {
+              $cond: [
+                { $eq: ["$combined.status", "Minor"] },
+                "$combined.qty",
+                0,
+              ],
+            },
+          },
+          major: {
+            $sum: {
+              $cond: [
+                { $eq: ["$combined.status", "Major"] },
+                "$combined.qty",
+                0,
+              ],
+            },
+          },
+          critical: {
+            $sum: {
+              $cond: [
+                { $eq: ["$combined.status", "Critical"] },
+                "$combined.qty",
+                0,
+              ],
+            },
+          },
+        },
+      },
+
+      // Final formatting
+      {
+        $project: {
+          _id: 0,
+          name: "$_id.name",
+          code: "$_id.code",
+          totalQty: 1,
+          minor: 1,
+          major: 1,
+          critical: 1,
+        },
+      },
+
+      // Sort by highest quantity
+      { $sort: { totalQty: -1 } },
+    ];
+
+    const defectResults =
+      await FincheckInspectionReports.aggregate(defectPipeline);
+
+    // Calculate total defects
+    const totalDefects = defectResults.reduce(
+      (sum, item) => sum + item.totalQty,
+      0,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalSample,
+        totalDefects,
+        defectRate:
+          totalSample > 0
+            ? ((totalDefects / totalSample) * 100).toFixed(2)
+            : "0.00",
+        defects: defectResults,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching cell details:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};

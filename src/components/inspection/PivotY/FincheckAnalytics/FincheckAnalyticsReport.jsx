@@ -5,9 +5,11 @@ import {
   ChevronRight,
   LayoutDashboard,
   PieChart,
+  ShoppingBag,
 } from "lucide-react";
 import FincheckAnalyticsQASummary from "./QASummary/FincheckAnalyticsQASummary";
 import FincheckAnalyticsStyleSummary from "./StyleSummary/FincheckAnalyticsStyleSummary";
+import FincheckAnalyticsBuyerSummary from "./BuyerSummary/FincheckAnalyticsBuyerSummary";
 
 // Placeholder for Style Summary (Unchanged)
 const StyleSummaryPlaceholder = () => (
@@ -44,6 +46,14 @@ const FincheckAnalyticsReport = () => {
       icon: Layers,
       component: <FincheckAnalyticsStyleSummary />,
       color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20",
+    },
+
+    {
+      id: "buyer-summary",
+      label: "Buyer Summary",
+      icon: ShoppingBag, // Changed Icon to distinct from Style
+      component: <FincheckAnalyticsBuyerSummary />, // <--- Connected Component
+      color: "text-blue-600 bg-blue-50 dark:bg-blue-900/20", // Adjusted color
     },
     {
       id: "total-summary",
