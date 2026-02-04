@@ -87,7 +87,7 @@ const processImagesInBatches = async (images, batchSize = 5, onProgress) => {
         const url = img.url || img.imageURL;
         const base64 = await imageUrlToBase64(url);
         return { ...img, base64 };
-      })
+      }),
     );
 
     results.push(...batchResults);
@@ -118,7 +118,7 @@ const processImagesWithProgress = async (images, onProgress) => {
     const base64 = await imageUrlToBase64(img.url || img.imageURL);
     results.push({
       ...img,
-      base64
+      base64,
     });
 
     if (onProgress) {
@@ -169,7 +169,7 @@ const YPivotQAReportPDFGenerator = ({
   sizeList,
   inspectedQty,
   // Trigger ref or callback
-  triggerRef
+  triggerRef,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -229,7 +229,7 @@ const YPivotQAReportPDFGenerator = ({
                 itemName: item.itemName,
                 remarks: item.remarks,
                 ...img,
-                url
+                url,
               });
             });
           });
@@ -252,7 +252,7 @@ const YPivotQAReportPDFGenerator = ({
         // Call the API endpoint you created in the Controller
         // This returns { inspectorImage: "data:image/jpeg;base64,..." }
         const apiRes = await axios.get(
-          `${API_BASE_URL}/api/fincheck-reports/${report.reportId}/images-base64`
+          `${API_BASE_URL}/api/fincheck-reports/${report.reportId}/images-base64`,
         );
 
         if (apiRes.data.success && apiRes.data.data.inspectorImage) {
@@ -282,10 +282,10 @@ const YPivotQAReportPDFGenerator = ({
             setProgress(10 + Math.round(p * 0.3)); // 10-40%
             setStage(
               `Processing defect images (${Math.round(
-                (allDefectImages.length * p) / 100
-              )}/${allDefectImages.length})...`
+                (allDefectImages.length * p) / 100,
+              )}/${allDefectImages.length})...`,
             );
-          }
+          },
         );
       }
 
@@ -304,16 +304,16 @@ const YPivotQAReportPDFGenerator = ({
             setProgress(42 + Math.round(p * 0.15)); // 42-57%
             setStage(
               `Processing checklist images (${Math.round(
-                (allHeaderImages.length * p) / 100
-              )}/${allHeaderImages.length})...`
+                (allHeaderImages.length * p) / 100,
+              )}/${allHeaderImages.length})...`,
             );
-          }
+          },
         );
 
         processedHeaderImages.forEach((img) => {
           headerDataWithImages.capturedImages[img.key] = {
             ...img,
-            base64: img.base64
+            base64: img.base64,
           };
         });
       }
@@ -336,7 +336,7 @@ const YPivotQAReportPDFGenerator = ({
             ...img,
             url: (img.imageURL || img.url || "").startsWith("http")
               ? img.imageURL || img.url
-              : `${API_BASE_URL}${img.imageURL || img.url}`
+              : `${API_BASE_URL}${img.imageURL || img.url}`,
           }));
 
           processedPPImages = await processImagesInBatches(
@@ -344,13 +344,13 @@ const YPivotQAReportPDFGenerator = ({
             5,
             (p) => {
               // Minor progress updates within this micro-stage
-            }
+            },
           );
         }
 
         ppSheetDataWithImages = {
           ...report.ppSheetData,
-          images: processedPPImages // These now contain .base64
+          images: processedPPImages, // These now contain .base64
         };
       }
 
@@ -364,7 +364,7 @@ const YPivotQAReportPDFGenerator = ({
       try {
         // 1. Fetch JSON Data
         const heatmapRes = await axios.get(
-          `${API_BASE_URL}/api/fincheck-inspection/report/${report.reportId}/defect-heatmap`
+          `${API_BASE_URL}/api/fincheck-inspection/report/${report.reportId}/defect-heatmap`,
         );
 
         if (heatmapRes.data.success && heatmapRes.data.data) {
@@ -387,7 +387,7 @@ const YPivotQAReportPDFGenerator = ({
 
           defectHeatmapData = {
             map: mapData,
-            counts: counts
+            counts: counts,
           };
         }
       } catch (err) {
@@ -399,7 +399,7 @@ const YPivotQAReportPDFGenerator = ({
       // STAGE 5C: Process Photo Documentation Images
       // ========================================================================
       setStage(
-        `Processing photo documentation (0/${allPhotoImages.length})...`
+        `Processing photo documentation (0/${allPhotoImages.length})...`,
       );
       setProgress(60);
 
@@ -412,10 +412,10 @@ const YPivotQAReportPDFGenerator = ({
             setProgress(60 + Math.round(p * 0.25)); // 60-85%
             setStage(
               `Processing photo documentation (${Math.round(
-                (allPhotoImages.length * p) / 100
-              )}/${allPhotoImages.length})...`
+                (allPhotoImages.length * p) / 100,
+              )}/${allPhotoImages.length})...`,
             );
-          }
+          },
         );
 
         // Reconstruct photoData structure with base64 images
@@ -426,7 +426,7 @@ const YPivotQAReportPDFGenerator = ({
             photoDataMap[key] = {
               sectionId: img.sectionId,
               sectionName: img.sectionName,
-              items: {}
+              items: {},
             };
           }
           if (!photoDataMap[key].items[img.itemNo]) {
@@ -434,20 +434,50 @@ const YPivotQAReportPDFGenerator = ({
               itemNo: img.itemNo,
               itemName: img.itemName,
               remarks: img.remarks,
-              images: []
+              images: [],
             };
           }
           photoDataMap[key].items[img.itemNo].images.push({
             ...img,
-            base64: img.base64
+            base64: img.base64,
           });
         });
 
         // Convert to array format
         photoDataWithImages = Object.values(photoDataMap).map((section) => ({
           ...section,
-          items: Object.values(section.items)
+          items: Object.values(section.items),
         }));
+      }
+
+      setProgress(70);
+
+      // ========================================================================
+      // STAGE 5D: Fetch Measurement Value Distribution Data (NEW)
+      // ========================================================================
+      let measurementDistributionData = null;
+      setStage("Fetching measurement distribution data...");
+      setProgress(75);
+
+      try {
+        const distRes = await axios.get(
+          `${API_BASE_URL}/api/fincheck-inspection/report/${report.reportId}/measurement-point-calc`,
+        );
+
+        if (distRes.data.success && distRes.data.data) {
+          measurementDistributionData = distRes.data.data;
+          console.log(
+            "Measurement distribution data fetched:",
+            measurementDistributionData.specs?.length,
+            "specs",
+          );
+        }
+      } catch (err) {
+        console.warn(
+          "Could not fetch measurement distribution data for PDF:",
+          err,
+        );
+        // Not critical, continue without distribution data
       }
 
       setProgress(88);
@@ -482,6 +512,7 @@ const YPivotQAReportPDFGenerator = ({
           ppSheetDataWithImages={ppSheetDataWithImages}
           defectHeatmapData={defectHeatmapData}
           sizeList={sizeList}
+          measurementDistributionData={measurementDistributionData}
         />
       );
 
@@ -540,12 +571,12 @@ const YPivotQAReportPDFGenerator = ({
     defectResult,
     isAQLMethod,
     inspectedQty,
-    sizeList
+    sizeList,
   ]);
 
   // Expose generate function via ref if provided
   React.useImperativeHandle(triggerRef, () => ({
-    generatePDF
+    generatePDF,
   }));
 
   // ==========================================================================

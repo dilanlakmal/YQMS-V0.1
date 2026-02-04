@@ -11,6 +11,7 @@ import {
 } from "@react-pdf/renderer";
 
 import MeasurementSectionPDF from "./YPivotQAReportMeasurementPDF";
+import MeasurementValueDistributionPDF from "./YPivotQAReportMeasurementValueDistributionPDF";
 import DefectSectionPDF from "./YPivotQAReportDefectPDF";
 import YPivotQAReportPPSheetPDF from "./YPivotQAReportPPSheetPDF";
 import DefectLocationSummaryPDF from "./DefectLocationSummaryPDF";
@@ -2210,6 +2211,7 @@ const YPivotQAReportPDFDocument = ({
   ppSheetDataWithImages,
   defectHeatmapData,
   sizeList = [],
+  measurementDistributionData,
 }) => {
   const selectedOrders = reportData?.orderNos || [];
   const orderNo = selectedOrders.length > 0 ? selectedOrders[0] : "N/A";
@@ -2286,6 +2288,19 @@ const YPivotQAReportPDFDocument = ({
           pageStyle={styles.page}
         />
       )}
+
+      {/* PAGE 3B: Measurement Value Distribution */}
+      {measurementDistributionData &&
+        measurementDistributionData.specs?.length > 0 && (
+          <MeasurementValueDistributionPDF
+            distributionData={measurementDistributionData}
+            reportData={reportData}
+            orderNo={orderNo}
+            HeaderComponent={Header}
+            FooterComponent={Footer}
+            pageStyle={styles.page}
+          />
+        )}
 
       {/* PAGE 4: Checklist */}
       {definitions?.headers?.length > 0 && (
