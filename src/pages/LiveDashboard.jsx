@@ -131,7 +131,7 @@ const LiveDashboard = () => {
     defectsQty: 0,
     totalBundles: 0,
     defectRate: 0,
-    defectRatio: 0,
+    defectRatio: 0
   });
   const [defectRates, setDefectRates] = useState([]);
   const [moSummaries, setMoSummaries] = useState([]);
@@ -260,7 +260,7 @@ const LiveDashboard = () => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/api/qc2-inspection-summary`,
-        { params: filters },
+        { params: filters }
       );
       setSummaryData(response.data);
     } catch (error) {
@@ -274,7 +274,7 @@ const LiveDashboard = () => {
         defectsQty: 0,
         totalBundles: 0,
         defectRate: 0,
-        defectRatio: 0,
+        defectRatio: 0
       });
     }
   };
@@ -282,7 +282,7 @@ const LiveDashboard = () => {
   const fetchDefectRates = async (filters = {}) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/qc2-defect-rates`, {
-        params: filters,
+        params: filters
       });
       const sorted = response.data.sort((a, b) => b.defectRate - a.defectRate);
       let rank = 1;
@@ -303,7 +303,7 @@ const LiveDashboard = () => {
   const fetchMoSummaries = async (filters = {}) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/qc2-mo-summaries`, {
-        params: { ...filters, groupByMO: "true" },
+        params: { ...filters, groupByMO: "true" }
       });
       setMoSummaries(response.data);
     } catch (error) {
@@ -315,7 +315,7 @@ const LiveDashboard = () => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/api/qc2-defect-rates-by-hour`,
-        { params: filters },
+        { params: filters }
       );
       setHourlyDefectRates(response.data);
     } catch (error) {
@@ -327,7 +327,7 @@ const LiveDashboard = () => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/api/qc2-defect-rates-by-line`,
-        { params: filters },
+        { params: filters }
       );
       setLineDefectRates(response.data);
     } catch (error) {
@@ -338,7 +338,7 @@ const LiveDashboard = () => {
   const fetchInspectors = async (filters = {}) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/qc2-inspection-pass-bundle/filter-options`,
+        `${API_BASE_URL}/api/qc2-inspection-pass-bundle/filter-options`
       );
       const empIds = response.data.emp_id_inspection || [];
       if (filters.emp_id_inspection) {
@@ -384,7 +384,7 @@ const LiveDashboard = () => {
       fetchMoSummaries(filters),
       fetchHourlyDefectRates(filters),
       fetchLineDefectRates(filters),
-      fetchInspectors(filters),
+      fetchInspectors(filters)
     ]);
   };
 
@@ -406,7 +406,7 @@ const LiveDashboard = () => {
       fetchMoSummaries(),
       fetchHourlyDefectRates(),
       fetchLineDefectRates(),
-      fetchInspectors(),
+      fetchInspectors()
     ]);
   };
 
@@ -419,7 +419,7 @@ const LiveDashboard = () => {
         fetchMoSummaries(),
         fetchHourlyDefectRates(),
         fetchLineDefectRates(),
-        fetchInspectors(),
+        fetchInspectors()
       ]);
     };
 
@@ -433,7 +433,7 @@ const LiveDashboard = () => {
         fetchMoSummaries(currentFilters),
         fetchHourlyDefectRates(currentFilters),
         fetchLineDefectRates(currentFilters),
-        fetchInspectors(currentFilters),
+        fetchInspectors(currentFilters)
       ]);
     }, 5000);
 
@@ -458,7 +458,7 @@ const LiveDashboard = () => {
   useEffect(() => {
     const socket = io(`${API_BASE_URL}`, {
       path: "/socket.io",
-      transports: ["websocket"],
+      transports: ["websocket"]
     });
 
     socket.on("qc2_data_updated", async () => {
@@ -470,7 +470,7 @@ const LiveDashboard = () => {
         fetchMoSummaries(currentFilters),
         fetchHourlyDefectRates(currentFilters),
         fetchLineDefectRates(currentFilters),
-        fetchInspectors(currentFilters),
+        fetchInspectors(currentFilters)
       ]);
     });
 
@@ -819,12 +819,50 @@ const LiveDashboard = () => {
                     </div>
                   </div>
 
-                {/* Job Title */}
-                <p className="text-xs font-semibold text-gray-700 mt-2 text-center break-words">
-                  {user.emp_id === "TL04" || user.emp_id === "TL09"
-                    ? "Developer - YQMS"
-                    : user.job_title || "N/A"}
-                </p>
+                  <div className="flex items-center gap-4 text-white/80 dark:text-gray-300 text-sm">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays size={16} />
+                      <span>{currentTime.toLocaleDateString()}</span>
+                    </div>
+                    {/* <div className="flex items-center gap-2">
+                      <Clock size={16} />
+                      <span>{currentTime.toLocaleTimeString()}</span>
+                    </div> */}
+                  </div>
+
+                  <div className="flex items-center gap-2 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl px-4 py-2.5">
+                    <div className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 dark:bg-green-500 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400 dark:bg-green-500"></span>
+                    </div>
+                    <div>
+                      <p className="text-white dark:text-gray-100 font-bold text-sm leading-tight">
+                        {activeTabData?.label}
+                      </p>
+                      <p className="text-indigo-200 dark:text-gray-300 text-xs font-medium leading-tight">
+                        Active Module
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {user && (
+                    <div className="flex items-center gap-3 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl px-4 py-2.5 shadow-xl">
+                      <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 dark:from-yellow-500 dark:to-orange-600 rounded-lg shadow-lg">
+                        <User size={20} className="text-white" />
+                      </div>
+                      <div>
+                        <p className="text-white dark:text-gray-100 font-bold text-sm leading-tight">
+                          {user.job_title || "Operator"}
+                        </p>
+                        <p className="text-indigo-200 dark:text-gray-300 text-xs font-medium leading-tight">
+                          ID: {user.emp_id}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -837,7 +875,7 @@ const LiveDashboard = () => {
           "Line Hr Trend",
           "Daily Summary",
           "Weekly Analysis",
-          "Monthly Analysis",
+          "Monthly Analysis"
         ].includes(activeSection) && (
           <FilterPane
             startDate={startDate}
@@ -1115,7 +1153,7 @@ const LiveDashboard = () => {
                                   totalCheckedQty += hourData.checkedQty || 0;
                                   totalDefectsQty += hourData.defects.reduce(
                                     (sum, defect) => sum + defect.count,
-                                    0,
+                                    0
                                   );
                                 }
                               });
@@ -1124,7 +1162,7 @@ const LiveDashboard = () => {
                           return totalCheckedQty > 0
                             ? totalDefectsQty / totalCheckedQty
                             : 0;
-                        })(),
+                        })()
                       }))
                       .sort((a, b) => b.defectRate - a.defectRate)
                       .map(({ lineNo }) => (
