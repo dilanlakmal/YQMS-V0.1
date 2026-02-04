@@ -396,12 +396,39 @@ const YPivotQAReportPDFGenerator = ({
       }
 
       // ========================================================================
-      // STAGE 5C: Process Photo Documentation Images
+      // STAGE 5C: Fetch QC Defects Data (NEW)
+      // ========================================================================
+      let qcDefectsData = null;
+      setStage("Fetching QC defects data...");
+      setProgress(59);
+
+      try {
+        const qcRes = await axios.get(
+          `${API_BASE_URL}/api/fincheck-inspection/report/${report.reportId}/defects-by-qc`,
+        );
+
+        if (qcRes.data.success && qcRes.data.data) {
+          qcDefectsData = qcRes.data.data;
+          console.log(
+            "QC defects data fetched:",
+            qcDefectsData.length,
+            "inspectors",
+          );
+        }
+      } catch (err) {
+        console.warn("Could not fetch QC defects data for PDF:", err);
+        // Not critical, continue without QC defects data
+      }
+
+      setProgress(61);
+
+      // ========================================================================
+      // STAGE 5D: Process Photo Documentation Images
       // ========================================================================
       setStage(
         `Processing photo documentation (0/${allPhotoImages.length})...`,
       );
-      setProgress(60);
+      setProgress(62);
 
       let photoDataWithImages = [];
       if (allPhotoImages.length > 0) {
@@ -453,7 +480,7 @@ const YPivotQAReportPDFGenerator = ({
       setProgress(70);
 
       // ========================================================================
-      // STAGE 5D: Fetch Measurement Value Distribution Data (NEW)
+      // STAGE 5E: Fetch Measurement Value Distribution Data (NEW)
       // ========================================================================
       let measurementDistributionData = null;
       setStage("Fetching measurement distribution data...");
@@ -513,6 +540,7 @@ const YPivotQAReportPDFGenerator = ({
           defectHeatmapData={defectHeatmapData}
           sizeList={sizeList}
           measurementDistributionData={measurementDistributionData}
+          qcDefectsData={qcDefectsData}
         />
       );
 
