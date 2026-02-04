@@ -4,6 +4,7 @@ import {
   getInspectionReports,
   getDefectImagesForReport,
   getReportMeasurementSpecs,
+  getReportMeasurementPointCalc,
   checkUserPermission,
   checkApprovalPermission,
   getReportImagesAsBase64,
@@ -13,6 +14,7 @@ import {
   autocompleteOrderNo,
   autocompleteCustStyle,
   autocompletePOLine,
+  autocompleteSeason,
   saveUserPreference,
   getUserPreferences,
   deleteUserFilter,
@@ -46,6 +48,7 @@ router.get(
   "/api/fincheck-reports/autocomplete/cust-style",
   autocompleteCustStyle,
 );
+router.get("/api/fincheck-reports/autocomplete/season", autocompleteSeason);
 router.get("/api/fincheck-reports/autocomplete/po-line", autocompletePOLine);
 
 // Route for Defect Images
@@ -58,6 +61,12 @@ router.get(
 router.get(
   "/api/fincheck-reports/:reportId/measurement-specs",
   getReportMeasurementSpecs,
+);
+
+// Measurement Value Distribution for specific report
+router.get(
+  "/api/fincheck-inspection/report/:reportId/measurement-point-calc",
+  getReportMeasurementPointCalc,
 );
 
 // Route to check permission

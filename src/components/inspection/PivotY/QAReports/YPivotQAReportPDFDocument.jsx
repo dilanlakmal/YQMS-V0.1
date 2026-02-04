@@ -2274,15 +2274,17 @@ const YPivotQAReportPDFDocument = ({
 
       {/* PAGE 3: Measurements */}
       {measurementStageData?.length > 0 && (
-        <Page size="A4" style={styles.page} wrap>
-          <Header reportData={reportData} orderNo={orderNo} />
-          <Footer />
-          <MeasurementSectionPDF
-            measurementStageData={measurementStageData}
-            measurementResult={measurementResult}
-            sizeList={sizeList}
-          />
-        </Page>
+        <MeasurementSectionPDF
+          measurementStageData={measurementStageData}
+          measurementResult={measurementResult}
+          sizeList={sizeList}
+          // Pass header/footer props so MeasurementSectionPDF can create its own pages
+          reportData={reportData}
+          orderNo={orderNo}
+          HeaderComponent={Header}
+          FooterComponent={Footer}
+          pageStyle={styles.page}
+        />
       )}
 
       {/* PAGE 4: Checklist */}

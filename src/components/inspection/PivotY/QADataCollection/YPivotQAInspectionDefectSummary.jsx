@@ -14,7 +14,7 @@ import {
   ThumbsDown,
   Loader2,
   MapPin,
-  User
+  User,
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 import { determineBuyerFromOrderNo } from "./YPivotQAInspectionBuyerDetermination";
@@ -26,134 +26,326 @@ import { determineBuyerFromOrderNo } from "./YPivotQAInspectionBuyerDeterminatio
 /**
  * Hook to calculate defect summary data from saved defects
  */
-export const useDefectSummaryData = (savedDefects = [], activeGroup = null) => {
-  return useMemo(() => {
-    if (!savedDefects || savedDefects.length === 0) {
-      return {
-        groups: [],
-        totals: { minor: 0, major: 0, critical: 0, total: 0 },
-        uniqueDefects: 0,
-        defectsList: []
-      };
-    }
 
+// export const useDefectSummaryData = (savedDefects = [], activeGroup = null) => {
+//   return useMemo(() => {
+//     if (!savedDefects || savedDefects.length === 0) {
+//       return {
+//         groups: [],
+//         totals: { minor: 0, major: 0, critical: 0, total: 0 },
+//         uniqueDefects: 0,
+//         defectsList: [],
+//       };
+//     }
+
+//     const groupsMap = {};
+//     const allDefectsMap = {};
+//     const grandTotals = { minor: 0, major: 0, critical: 0, total: 0 };
+//     const uniqueDefectsSet = new Set();
+
+//     savedDefects.forEach((defect) => {
+//       const configKey = defect.groupId || "legacy";
+//       let configLabel = "";
+//       if (defect.lineName) configLabel += `Line ${defect.lineName}`;
+//       if (defect.tableName)
+//         configLabel += (configLabel ? " • " : "") + `Table ${defect.tableName}`;
+//       if (defect.colorName)
+//         configLabel += (configLabel ? " • " : "") + defect.colorName;
+//       if (!configLabel) configLabel = "Unknown";
+
+//       if (!groupsMap[configKey]) {
+//         groupsMap[configKey] = {
+//           configKey,
+//           configLabel,
+//           lineName: defect.lineName,
+//           tableName: defect.tableName,
+//           colorName: defect.colorName,
+//           isActive: activeGroup && activeGroup.id === configKey,
+//           defects: {},
+//           totalRowsInConfig: 0,
+//         };
+//       }
+
+//       const defectKey = defect.defectId || defect.defectName;
+//       uniqueDefectsSet.add(defectKey);
+
+//       if (!groupsMap[configKey].defects[defectKey]) {
+//         groupsMap[configKey].defects[defectKey] = {
+//           defectId: defect.defectId,
+//           defectName: defect.defectName,
+//           defectCode: defect.defectCode,
+//           locations: [],
+//           minorTotal: 0,
+//           majorTotal: 0,
+//           criticalTotal: 0,
+//           grandTotal: 0,
+//         };
+//       }
+
+//       const defectEntry = groupsMap[configKey].defects[defectKey];
+
+//       let rowMinor = 0;
+//       let rowMajor = 0;
+//       let rowCritical = 0;
+//       let rowTotal = 0;
+
+//       if (defect.isNoLocation) {
+//         const status = defect.status?.toLowerCase();
+//         const qty = defect.qty || 1;
+
+//         if (status === "minor") rowMinor += qty;
+//         else if (status === "major") rowMajor += qty;
+//         else if (status === "critical") rowCritical += qty;
+//         rowTotal += qty;
+
+//         defectEntry.locations.push({
+//           display: "No Location",
+//           qcId: defect.qcUser?.emp_id || null,
+//           qty: qty,
+//         });
+//       } else {
+//         if (defect.locations && defect.locations.length > 0) {
+//           defect.locations.forEach((loc) => {
+//             if (loc.positions && loc.positions.length > 0) {
+//               loc.positions.forEach((pos) => {
+//                 const status = pos.status?.toLowerCase();
+//                 if (status === "minor") rowMinor += 1;
+//                 else if (status === "major") rowMajor += 1;
+//                 else if (status === "critical") rowCritical += 1;
+//                 rowTotal += 1;
+//               });
+//             } else {
+//               rowTotal += loc.qty || 1;
+//             }
+
+//             defectEntry.locations.push({
+//               display: `${loc.locationName} (${loc.view})`,
+//               qcId: defect.qcUser?.emp_id || null,
+//               qty: loc.qty || 1,
+//             });
+//           });
+//         }
+//       }
+
+//       defectEntry.minorTotal += rowMinor;
+//       defectEntry.majorTotal += rowMajor;
+//       defectEntry.criticalTotal += rowCritical;
+//       defectEntry.grandTotal += rowTotal;
+
+//       grandTotals.minor += rowMinor;
+//       grandTotals.major += rowMajor;
+//       grandTotals.critical += rowCritical;
+//       grandTotals.total += rowTotal;
+
+//       if (!allDefectsMap[defectKey]) {
+//         allDefectsMap[defectKey] = {
+//           defectId: defect.defectId,
+//           defectName: defect.defectName,
+//           defectCode: defect.defectCode,
+//           minor: 0,
+//           major: 0,
+//           critical: 0,
+//           total: 0,
+//         };
+//       }
+
+//       allDefectsMap[defectKey].minor += rowMinor;
+//       allDefectsMap[defectKey].major += rowMajor;
+//       allDefectsMap[defectKey].critical += rowCritical;
+//       allDefectsMap[defectKey].total += rowTotal;
+//     });
+
+//     const groups = Object.values(groupsMap).map((group) => {
+//       const sortedDefects = Object.values(group.defects).sort((a, b) => {
+//         const codeA = parseFloat(a.defectCode) || 0;
+//         const codeB = parseFloat(b.defectCode) || 0;
+//         return codeA - codeB;
+//       });
+
+//       let totalRows = 0;
+//       sortedDefects.forEach((d) => {
+//         totalRows += d.locations.length;
+//       });
+
+//       return { ...group, defects: sortedDefects, totalRowsInConfig: totalRows };
+//     });
+
+//     const defectsList = Object.values(allDefectsMap).sort((a, b) => {
+//       const codeA = parseFloat(a.defectCode) || 0;
+//       const codeB = parseFloat(b.defectCode) || 0;
+//       return codeA - codeB;
+//     });
+
+//     return {
+//       groups,
+//       totals: grandTotals,
+//       uniqueDefects: uniqueDefectsSet.size,
+//       defectsList,
+//     };
+//   }, [savedDefects, activeGroup]);
+// };
+
+export const useDefectSummaryData = (
+  savedDefects = [],
+  activeGroup = null,
+  reportData = null,
+) => {
+  return useMemo(() => {
     const groupsMap = {};
     const allDefectsMap = {};
     const grandTotals = { minor: 0, major: 0, critical: 0, total: 0 };
     const uniqueDefectsSet = new Set();
 
-    savedDefects.forEach((defect) => {
-      const configKey = defect.groupId || "legacy";
-      let configLabel = "";
-      if (defect.lineName) configLabel += `Line ${defect.lineName}`;
-      if (defect.tableName)
-        configLabel += (configLabel ? " • " : "") + `Table ${defect.tableName}`;
-      if (defect.colorName)
-        configLabel += (configLabel ? " • " : "") + defect.colorName;
-      if (!configLabel) configLabel = "Unknown";
+    // --- STEP 1: Pre-fill Groups from Inspection Config ---
+    if (reportData?.inspectionConfig?.configGroups) {
+      reportData.inspectionConfig.configGroups.forEach((group) => {
+        // Use group.id (if available) or generate a fallback key
+        const configKey = group.id
+          ? String(group.id)
+          : `conf_${group.line || ""}_${group.table || ""}`;
 
-      if (!groupsMap[configKey]) {
+        let configLabel = "";
+        if (group.lineName || group.line)
+          configLabel += `Line ${group.lineName || group.line}`;
+        if (group.tableName || group.table)
+          configLabel +=
+            (configLabel ? " • " : "") +
+            `Table ${group.tableName || group.table}`;
+        if (group.colorName || group.color)
+          configLabel +=
+            (configLabel ? " • " : "") + (group.colorName || group.color);
+
+        if (!configLabel) configLabel = "General";
+
         groupsMap[configKey] = {
           configKey,
           configLabel,
-          lineName: defect.lineName,
-          tableName: defect.tableName,
-          colorName: defect.colorName,
-          isActive: activeGroup && activeGroup.id === configKey,
-          defects: {},
-          totalRowsInConfig: 0
+          lineName: group.lineName || group.line,
+          tableName: group.tableName || group.table,
+          colorName: group.colorName || group.color,
+          isActive: activeGroup && String(activeGroup.id) === String(group.id),
+          defects: {}, // Empty initially
+          totalRowsInConfig: 0, // Will be 1 if no defects (for the "No defects" row)
         };
-      }
+      });
+    }
 
-      const defectKey = defect.defectId || defect.defectName;
-      uniqueDefectsSet.add(defectKey);
+    // --- STEP 2: Process Saved Defects ---
+    if (savedDefects && savedDefects.length > 0) {
+      savedDefects.forEach((defect) => {
+        // Use defect.groupId to match the Config Group ID
+        const configKey = defect.groupId ? String(defect.groupId) : "legacy";
 
-      if (!groupsMap[configKey].defects[defectKey]) {
-        groupsMap[configKey].defects[defectKey] = {
-          defectId: defect.defectId,
-          defectName: defect.defectName,
-          defectCode: defect.defectCode,
-          locations: [],
-          minorTotal: 0,
-          majorTotal: 0,
-          criticalTotal: 0,
-          grandTotal: 0
-        };
-      }
+        // If this group wasn't in the config (e.g. ad-hoc or legacy), create it now
+        if (!groupsMap[configKey]) {
+          let configLabel = "";
+          if (defect.lineName) configLabel += `Line ${defect.lineName}`;
+          if (defect.tableName)
+            configLabel +=
+              (configLabel ? " • " : "") + `Table ${defect.tableName}`;
+          if (defect.colorName)
+            configLabel += (configLabel ? " • " : "") + defect.colorName;
+          if (!configLabel) configLabel = "Unknown";
 
-      const defectEntry = groupsMap[configKey].defects[defectKey];
-
-      let rowMinor = 0;
-      let rowMajor = 0;
-      let rowCritical = 0;
-      let rowTotal = 0;
-
-      if (defect.isNoLocation) {
-        const status = defect.status?.toLowerCase();
-        const qty = defect.qty || 1;
-
-        if (status === "minor") rowMinor += qty;
-        else if (status === "major") rowMajor += qty;
-        else if (status === "critical") rowCritical += qty;
-        rowTotal += qty;
-
-        defectEntry.locations.push({
-          display: "No Location",
-          qcId: defect.qcUser?.emp_id || null,
-          qty: qty
-        });
-      } else {
-        if (defect.locations && defect.locations.length > 0) {
-          defect.locations.forEach((loc) => {
-            if (loc.positions && loc.positions.length > 0) {
-              loc.positions.forEach((pos) => {
-                const status = pos.status?.toLowerCase();
-                if (status === "minor") rowMinor += 1;
-                else if (status === "major") rowMajor += 1;
-                else if (status === "critical") rowCritical += 1;
-                rowTotal += 1;
-              });
-            } else {
-              rowTotal += loc.qty || 1;
-            }
-
-            defectEntry.locations.push({
-              display: `${loc.locationName} (${loc.view})`,
-              qcId: defect.qcUser?.emp_id || null,
-              qty: loc.qty || 1
-            });
-          });
+          groupsMap[configKey] = {
+            configKey,
+            configLabel,
+            lineName: defect.lineName,
+            tableName: defect.tableName,
+            colorName: defect.colorName,
+            isActive: activeGroup && activeGroup.id === configKey,
+            defects: {},
+            totalRowsInConfig: 0,
+          };
         }
-      }
 
-      defectEntry.minorTotal += rowMinor;
-      defectEntry.majorTotal += rowMajor;
-      defectEntry.criticalTotal += rowCritical;
-      defectEntry.grandTotal += rowTotal;
+        const defectKey = defect.defectId || defect.defectName;
+        uniqueDefectsSet.add(defectKey);
 
-      grandTotals.minor += rowMinor;
-      grandTotals.major += rowMajor;
-      grandTotals.critical += rowCritical;
-      grandTotals.total += rowTotal;
+        if (!groupsMap[configKey].defects[defectKey]) {
+          groupsMap[configKey].defects[defectKey] = {
+            defectId: defect.defectId,
+            defectName: defect.defectName,
+            defectCode: defect.defectCode,
+            locations: [],
+            minorTotal: 0,
+            majorTotal: 0,
+            criticalTotal: 0,
+            grandTotal: 0,
+          };
+        }
 
-      if (!allDefectsMap[defectKey]) {
-        allDefectsMap[defectKey] = {
-          defectId: defect.defectId,
-          defectName: defect.defectName,
-          defectCode: defect.defectCode,
-          minor: 0,
-          major: 0,
-          critical: 0,
-          total: 0
-        };
-      }
+        const defectEntry = groupsMap[configKey].defects[defectKey];
 
-      allDefectsMap[defectKey].minor += rowMinor;
-      allDefectsMap[defectKey].major += rowMajor;
-      allDefectsMap[defectKey].critical += rowCritical;
-      allDefectsMap[defectKey].total += rowTotal;
-    });
+        // ... (Keep existing logic for calculating totals inside the defect) ...
+        let rowMinor = 0,
+          rowMajor = 0,
+          rowCritical = 0,
+          rowTotal = 0;
 
+        if (defect.isNoLocation) {
+          const status = defect.status?.toLowerCase();
+          const qty = defect.qty || 1;
+          if (status === "minor") rowMinor += qty;
+          else if (status === "major") rowMajor += qty;
+          else if (status === "critical") rowCritical += qty;
+          rowTotal += qty;
+          defectEntry.locations.push({
+            display: "No Location",
+            qcId: defect.qcUser?.emp_id || null,
+            qty,
+          });
+        } else {
+          if (defect.locations) {
+            defect.locations.forEach((loc) => {
+              if (loc.positions) {
+                loc.positions.forEach((pos) => {
+                  const status = pos.status?.toLowerCase();
+                  if (status === "minor") rowMinor += 1;
+                  else if (status === "major") rowMajor += 1;
+                  else if (status === "critical") rowCritical += 1;
+                  rowTotal += 1;
+                });
+              } else {
+                rowTotal += loc.qty || 1;
+              }
+              defectEntry.locations.push({
+                display: `${loc.locationName} (${loc.view})`,
+                qcId: defect.qcUser?.emp_id || null,
+                qty: loc.qty || 1,
+              });
+            });
+          }
+        }
+
+        defectEntry.minorTotal += rowMinor;
+        defectEntry.majorTotal += rowMajor;
+        defectEntry.criticalTotal += rowCritical;
+        defectEntry.grandTotal += rowTotal;
+
+        grandTotals.minor += rowMinor;
+        grandTotals.major += rowMajor;
+        grandTotals.critical += rowCritical;
+        grandTotals.total += rowTotal;
+
+        // Populate global list map (omitted for brevity, same as before)
+        if (!allDefectsMap[defectKey]) {
+          allDefectsMap[defectKey] = {
+            ...defect,
+            minor: 0,
+            major: 0,
+            critical: 0,
+            total: 0,
+          };
+        }
+        allDefectsMap[defectKey].minor += rowMinor;
+        allDefectsMap[defectKey].major += rowMajor;
+        allDefectsMap[defectKey].critical += rowCritical;
+        allDefectsMap[defectKey].total += rowTotal;
+      });
+    }
+
+    // --- STEP 3: Finalize Groups Array ---
     const groups = Object.values(groupsMap).map((group) => {
       const sortedDefects = Object.values(group.defects).sort((a, b) => {
         const codeA = parseFloat(a.defectCode) || 0;
@@ -162,26 +354,29 @@ export const useDefectSummaryData = (savedDefects = [], activeGroup = null) => {
       });
 
       let totalRows = 0;
-      sortedDefects.forEach((d) => {
-        totalRows += d.locations.length;
-      });
+      if (sortedDefects.length === 0) {
+        totalRows = 1; // We need 1 row to display "No defects recorded"
+      } else {
+        sortedDefects.forEach((d) => {
+          totalRows += d.locations.length;
+        });
+      }
 
       return { ...group, defects: sortedDefects, totalRowsInConfig: totalRows };
     });
 
-    const defectsList = Object.values(allDefectsMap).sort((a, b) => {
-      const codeA = parseFloat(a.defectCode) || 0;
-      const codeB = parseFloat(b.defectCode) || 0;
-      return codeA - codeB;
-    });
+    const defectsList = Object.values(allDefectsMap).sort(
+      (a, b) =>
+        (parseFloat(a.defectCode) || 0) - (parseFloat(b.defectCode) || 0),
+    );
 
     return {
       groups,
       totals: grandTotals,
       uniqueDefects: uniqueDefectsSet.size,
-      defectsList
+      defectsList,
     };
-  }, [savedDefects, activeGroup]);
+  }, [savedDefects, activeGroup, reportData]); // Added reportData to dependencies
 };
 
 /**
@@ -201,7 +396,7 @@ export const useAqlData = (isAQLMethod, determinedBuyer, inspectedQty) => {
       setLoadingAql(true);
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/fincheck-inspection/aql-config?buyer=${determinedBuyer}`
+          `${API_BASE_URL}/api/fincheck-inspection/aql-config?buyer=${determinedBuyer}`,
         );
         if (res.data.success) {
           setAqlConfigs(res.data.data);
@@ -225,7 +420,7 @@ export const useAqlData = (isAQLMethod, determinedBuyer, inspectedQty) => {
     const findMatchingSample = (config) => {
       if (!config?.SampleData) return null;
       return config.SampleData.find(
-        (sample) => inspectedQty >= sample.Min && inspectedQty <= sample.Max
+        (sample) => inspectedQty >= sample.Min && inspectedQty <= sample.Max,
       );
     };
 
@@ -240,7 +435,7 @@ export const useAqlData = (isAQLMethod, determinedBuyer, inspectedQty) => {
       minorConfig,
       majorConfig,
       criticalConfig,
-      baseConfig: minorConfig || majorConfig || criticalConfig
+      baseConfig: minorConfig || majorConfig || criticalConfig,
     };
   }, [aqlConfigs, inspectedQty]);
 
@@ -256,12 +451,12 @@ export const calculateAqlResult = (aqlSampleData, defectTotals) => {
   const {
     minor: minorSample,
     major: majorSample,
-    critical: criticalSample
+    critical: criticalSample,
   } = aqlSampleData;
   const {
     minor: minorCount,
     major: majorCount,
-    critical: criticalCount
+    critical: criticalCount,
   } = defectTotals;
 
   const getStatus = (count, sample) => {
@@ -291,25 +486,25 @@ export const calculateAqlResult = (aqlSampleData, defectTotals) => {
       ...minorResult,
       count: minorCount,
       ac: minorSample?.Ac,
-      re: minorSample?.Re
+      re: minorSample?.Re,
     },
     major: {
       ...majorResult,
       count: majorCount,
       ac: majorSample?.Ac,
-      re: majorSample?.Re
+      re: majorSample?.Re,
     },
     critical: {
       ...criticalResult,
       count: criticalCount,
       ac: criticalSample?.Ac,
-      re: criticalSample?.Re
+      re: criticalSample?.Re,
     },
     final: hasAnyFail ? "FAIL" : "PASS",
     sampleSize: minorSample?.SampleSize || majorSample?.SampleSize || 0,
     batch: minorSample?.BatchName || majorSample?.BatchName || "N/A",
     sampleLetter:
-      minorSample?.SampleLetter || majorSample?.SampleLetter || "N/A"
+      minorSample?.SampleLetter || majorSample?.SampleLetter || "N/A",
   };
 };
 
@@ -695,160 +890,238 @@ export const DefectSummaryTable = ({ groups, totals }) => (
         </tr>
       </thead>
       <tbody>
-        {groups.map((group, groupIndex) => {
-          let groupRenderIndex = 0;
-
-          return group.defects.map((defect) => {
-            const defectLocationRows = defect.locations.length;
-
-            return defect.locations.map((loc, locIndex) => {
-              const isFirstGroupRow = groupRenderIndex === 0;
-              const isFirstDefectRow = locIndex === 0;
-              groupRenderIndex++;
-
+        {groups.length === 0 ? (
+          <tr>
+            <td
+              colSpan={7}
+              className="px-4 py-8 text-center bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex flex-col items-center justify-center text-gray-400">
+                <CheckCircle className="w-8 h-8 mb-2 text-green-500 opacity-50" />
+                <p className="text-sm font-bold text-gray-500">
+                  No configuration or defects found
+                </p>
+              </div>
+            </td>
+          </tr>
+        ) : (
+          groups.map((group, groupIndex) => {
+            // CASE 1: Config exists, but NO DEFECTS recorded
+            if (group.defects.length === 0) {
               return (
                 <tr
-                  key={`${group.configKey}-${defect.defectId}-${locIndex}`}
+                  key={`${group.configKey}-nodefects`}
                   className={`border-b border-gray-100 dark:border-gray-700/50 ${
                     group.isActive
                       ? "bg-green-50/50 dark:bg-green-900/10"
                       : groupIndex % 2 === 0
-                      ? "bg-white dark:bg-gray-800"
-                      : "bg-gray-50/50 dark:bg-gray-800/50"
+                        ? "bg-white dark:bg-gray-800"
+                        : "bg-gray-50/50 dark:bg-gray-800/50"
                   }`}
                 >
-                  {isFirstGroupRow && (
-                    <td
-                      rowSpan={group.totalRowsInConfig}
-                      className={`px-3 py-2 align-top border-r border-gray-200 dark:border-gray-700 ${
-                        group.isActive
-                          ? "bg-green-100/50"
-                          : "bg-gray-50 dark:bg-gray-900/30"
-                      }`}
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-start gap-1.5">
-                          <Layers
-                            className={`w-3 h-3 mt-0.5 ${
-                              group.isActive
-                                ? "text-green-500"
-                                : "text-gray-400"
-                            }`}
-                          />
-                          <div className="min-w-0 text-[10px]">
-                            {group.lineName && (
-                              <p className="font-semibold">
-                                Line {group.lineName}
-                              </p>
-                            )}
-                            {group.tableName && (
-                              <p className="font-semibold">
-                                Table {group.tableName}
-                              </p>
-                            )}
-                            {group.colorName && (
-                              <p className="font-semibold">{group.colorName}</p>
-                            )}
-                          </div>
+                  {/* Config Column */}
+                  <td className="px-3 py-4 align-middle border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
+                    <div className="space-y-1">
+                      <div className="flex items-start gap-1.5">
+                        <Layers
+                          className={`w-3 h-3 mt-0.5 ${group.isActive ? "text-green-500" : "text-gray-400"}`}
+                        />
+                        <div className="min-w-0 text-[10px]">
+                          {group.lineName && (
+                            <p className="font-semibold">
+                              Line {group.lineName}
+                            </p>
+                          )}
+                          {group.tableName && (
+                            <p className="font-semibold">
+                              Table {group.tableName}
+                            </p>
+                          )}
+                          {group.colorName && (
+                            <p className="font-semibold">{group.colorName}</p>
+                          )}
                         </div>
-                        {group.isActive && (
-                          <span className="inline-flex px-1.5 py-0.5 bg-green-500 text-white text-[7px] font-bold rounded uppercase">
-                            Active
-                          </span>
-                        )}
                       </div>
-                    </td>
-                  )}
-
-                  {isFirstDefectRow && (
-                    <td
-                      rowSpan={defectLocationRows}
-                      className="px-3 py-2 align-top border-r border-gray-100 dark:border-gray-700/50"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-[9px] bg-gray-200 dark:bg-gray-700 px-1 rounded">
-                          {defect.defectCode}
-                        </span>
-                        <span className="text-[10px] font-medium text-gray-800 dark:text-gray-200">
-                          {defect.defectName}
-                        </span>
-                      </div>
-                    </td>
-                  )}
-
-                  <td className="px-3 py-1.5 border-r border-gray-100 dark:border-gray-700/50">
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span
-                        className={
-                          loc.display === "No Location"
-                            ? "text-gray-400 italic"
-                            : "font-medium"
-                        }
-                      >
-                        {loc.display}
-                      </span>
-                      {loc.qcId && (
-                        <span className="inline-flex items-center gap-0.5 text-[8px] font-mono bg-blue-50 text-blue-600 px-1 rounded">
-                          <User className="w-2.5 h-2.5" />
-                          {loc.qcId}
+                      {group.isActive && (
+                        <span className="inline-flex px-1.5 py-0.5 bg-green-500 text-white text-[7px] font-bold rounded uppercase">
+                          Active
                         </span>
                       )}
                     </div>
                   </td>
-
-                  {isFirstDefectRow && (
-                    <>
-                      <td
-                        rowSpan={defectLocationRows}
-                        className="px-2 py-2 text-center align-top border-r border-gray-100"
-                      >
-                        {defect.minorTotal > 0 ? (
-                          <span className="font-bold text-green-700">
-                            {defect.minorTotal}
-                          </span>
-                        ) : (
-                          <span className="text-gray-300">-</span>
-                        )}
-                      </td>
-                      <td
-                        rowSpan={defectLocationRows}
-                        className="px-2 py-2 text-center align-top border-r border-gray-100"
-                      >
-                        {defect.majorTotal > 0 ? (
-                          <span className="font-bold text-orange-700">
-                            {defect.majorTotal}
-                          </span>
-                        ) : (
-                          <span className="text-gray-300">-</span>
-                        )}
-                      </td>
-                      <td
-                        rowSpan={defectLocationRows}
-                        className="px-2 py-2 text-center align-top border-r border-gray-100"
-                      >
-                        {defect.criticalTotal > 0 ? (
-                          <span className="font-bold text-red-700">
-                            {defect.criticalTotal}
-                          </span>
-                        ) : (
-                          <span className="text-gray-300">-</span>
-                        )}
-                      </td>
-                      <td
-                        rowSpan={defectLocationRows}
-                        className="px-2 py-2 text-center align-top"
-                      >
-                        <span className="font-bold text-indigo-700">
-                          {defect.grandTotal}
-                        </span>
-                      </td>
-                    </>
-                  )}
+                  {/* Merged "No Defects" Column */}
+                  <td
+                    colSpan={6}
+                    className="px-4 py-2 text-center align-middle"
+                  >
+                    <div className="flex items-center justify-center gap-2 opacity-60">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                        No defects recorded
+                      </span>
+                    </div>
+                  </td>
                 </tr>
               );
+            }
+
+            // CASE 2: Config has Defects
+            let groupRenderIndex = 0;
+
+            return group.defects.map((defect) => {
+              const defectLocationRows = defect.locations.length;
+
+              return defect.locations.map((loc, locIndex) => {
+                const isFirstGroupRow = groupRenderIndex === 0;
+                const isFirstDefectRow = locIndex === 0;
+                groupRenderIndex++;
+
+                return (
+                  <tr
+                    key={`${group.configKey}-${defect.defectId}-${locIndex}`}
+                    className={`border-b border-gray-100 dark:border-gray-700/50 ${
+                      group.isActive
+                        ? "bg-green-50/50 dark:bg-green-900/10"
+                        : groupIndex % 2 === 0
+                          ? "bg-white dark:bg-gray-800"
+                          : "bg-gray-50/50 dark:bg-gray-800/50"
+                    }`}
+                  >
+                    {isFirstGroupRow && (
+                      <td
+                        rowSpan={group.totalRowsInConfig}
+                        className={`px-3 py-2 align-top border-r border-gray-200 dark:border-gray-700 ${
+                          group.isActive
+                            ? "bg-green-100/50"
+                            : "bg-gray-50 dark:bg-gray-900/30"
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-start gap-1.5">
+                            <Layers
+                              className={`w-3 h-3 mt-0.5 ${
+                                group.isActive
+                                  ? "text-green-500"
+                                  : "text-gray-400"
+                              }`}
+                            />
+                            <div className="min-w-0 text-[10px]">
+                              {group.lineName && (
+                                <p className="font-semibold">
+                                  Line {group.lineName}
+                                </p>
+                              )}
+                              {group.tableName && (
+                                <p className="font-semibold">
+                                  Table {group.tableName}
+                                </p>
+                              )}
+                              {group.colorName && (
+                                <p className="font-semibold">
+                                  {group.colorName}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {group.isActive && (
+                            <span className="inline-flex px-1.5 py-0.5 bg-green-500 text-white text-[7px] font-bold rounded uppercase">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    )}
+
+                    {isFirstDefectRow && (
+                      <td
+                        rowSpan={defectLocationRows}
+                        className="px-3 py-2 align-top border-r border-gray-100 dark:border-gray-700/50"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-[9px] bg-gray-200 dark:bg-gray-700 px-1 rounded">
+                            {defect.defectCode}
+                          </span>
+                          <span className="text-[10px] font-medium text-gray-800 dark:text-gray-200">
+                            {defect.defectName}
+                          </span>
+                        </div>
+                      </td>
+                    )}
+
+                    <td className="px-3 py-1.5 border-r border-gray-100 dark:border-gray-700/50">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span
+                          className={
+                            loc.display === "No Location"
+                              ? "text-gray-400 italic"
+                              : "font-medium"
+                          }
+                        >
+                          {loc.display}
+                        </span>
+                        {loc.qcId && (
+                          <span className="inline-flex items-center gap-0.5 text-[8px] font-mono bg-blue-50 text-blue-600 px-1 rounded">
+                            <User className="w-2.5 h-2.5" />
+                            {loc.qcId}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {isFirstDefectRow && (
+                      <>
+                        <td
+                          rowSpan={defectLocationRows}
+                          className="px-2 py-2 text-center align-top border-r border-gray-100"
+                        >
+                          {defect.minorTotal > 0 ? (
+                            <span className="font-bold text-green-700">
+                              {defect.minorTotal}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300">-</span>
+                          )}
+                        </td>
+                        <td
+                          rowSpan={defectLocationRows}
+                          className="px-2 py-2 text-center align-top border-r border-gray-100"
+                        >
+                          {defect.majorTotal > 0 ? (
+                            <span className="font-bold text-orange-700">
+                              {defect.majorTotal}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300">-</span>
+                          )}
+                        </td>
+                        <td
+                          rowSpan={defectLocationRows}
+                          className="px-2 py-2 text-center align-top border-r border-gray-100"
+                        >
+                          {defect.criticalTotal > 0 ? (
+                            <span className="font-bold text-red-700">
+                              {defect.criticalTotal}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300">-</span>
+                          )}
+                        </td>
+                        <td
+                          rowSpan={defectLocationRows}
+                          className="px-2 py-2 text-center align-top"
+                        >
+                          <span className="font-bold text-indigo-700">
+                            {defect.grandTotal}
+                          </span>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                );
+              });
             });
-          });
-        })}
+          })
+        )}
 
         {/* Grand Total */}
         <tr className="bg-gradient-to-r from-gray-800 to-gray-900 text-white">
@@ -905,7 +1178,7 @@ const YPivotQAInspectionDefectSummary = ({
   savedDefects = [],
   activeGroup = null,
   reportData = null,
-  selectedOrders = []
+  selectedOrders = [],
 }) => {
   const isAQLMethod = useMemo(() => {
     return reportData?.selectedTemplate?.InspectedQtyMethod === "AQL";
@@ -920,15 +1193,19 @@ const YPivotQAInspectionDefectSummary = ({
     return parseInt(reportData?.config?.inspectedQty) || 0;
   }, [reportData?.config?.inspectedQty]);
 
-  const summaryData = useDefectSummaryData(savedDefects, activeGroup);
+  const summaryData = useDefectSummaryData(
+    savedDefects,
+    activeGroup,
+    reportData,
+  );
   const { aqlSampleData, loadingAql } = useAqlData(
     isAQLMethod,
     determinedBuyer,
-    inspectedQty
+    inspectedQty,
   );
   const aqlResult = useMemo(
     () => calculateAqlResult(aqlSampleData, summaryData.totals),
-    [aqlSampleData, summaryData.totals]
+    [aqlSampleData, summaryData.totals],
   );
 
   if (!savedDefects || savedDefects.length === 0) {

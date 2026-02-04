@@ -29,6 +29,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
   const [message, setMessage] = useState({ type: "", text: "" });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [unlockedFields, setUnlockedFields] = useState({});
   const [availableColors, setAvailableColors] = useState([]);
   const [colorSearch, setColorSearch] = useState("");
   const [showColorDropdown, setShowColorDropdown] = useState(false);
@@ -44,6 +45,17 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       report.aquaboySpecRibs.toString().trim() !== "" &&
       report.aquaboySpecRibs !== "0") ??
     false;
+
+  const toggleUnlock = (fieldId) => {
+    setUnlockedFields((prev) => ({
+      ...prev,
+      [fieldId]: !prev[fieldId],
+    }));
+  };
+
+  const isRecordLocked = (rec) => {
+    return rec?.top?.pass && rec?.middle?.pass && rec?.bottom?.pass;
+  };
 
   useEffect(() => {
     if (open && report) {
@@ -167,6 +179,8 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
               },
             },
           images: rec.images || [],
+          modified: false,
+          originallyPassed: isRecordLocked(rec),
         };
       });
 
@@ -235,6 +249,8 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
             },
           },
           images: [],
+          modified: false,
+          originallyPassed: false,
         });
       }
 
@@ -430,6 +446,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         }
       }
 
+      updatedRecord.modified = true;
       newRecords[recordIndex] = updatedRecord;
       return { ...prev, inspectionRecords: newRecords };
     });
@@ -440,6 +457,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       const newRecords = [...prev.inspectionRecords];
       newRecords[recordIndex][section].pass = isPass;
       newRecords[recordIndex][section].fail = !isPass;
+      newRecords[recordIndex].modified = true;
       return { ...prev, inspectionRecords: newRecords };
     });
   };
@@ -558,6 +576,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         }
       }
 
+      newRecords[recordIndex].modified = true;
       return { ...prev, inspectionRecords: newRecords };
     });
   };
@@ -600,6 +619,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       const currentImages = newRecords[recordIndex].images || [];
       newRecords[recordIndex] = {
         ...newRecords[recordIndex],
+        modified: true,
         images: [...currentImages, ...newImages],
       };
       return { ...prev, inspectionRecords: newRecords };
@@ -614,6 +634,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       const currentImages = newRecords[recordIndex].images || [];
       newRecords[recordIndex] = {
         ...newRecords[recordIndex],
+        modified: true,
         images: currentImages.filter((img) => img.id !== imageId),
       };
       return { ...prev, inspectionRecords: newRecords };
@@ -635,6 +656,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
             bottom: { body: "", ribs: "", pass: false, fail: false },
           },
           images: [],
+          modified: true,
         },
       ],
     }));
@@ -732,6 +754,9 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
           rec.afterDryRoom ||
           "",
         generalRemark: formData.generalRemark || rec.remark || "",
+        itemName:
+          rec.itemName || `Item ${sourceRecords[index]?.itemName || index + 1}`,
+        modified: rec.modified,
       }));
 
       const previousHistory = { ...(report.history || {}) };
@@ -753,17 +778,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         const newCheckNumber = checkKeys.length + 1;
         const newCheckKey = `Check ${newCheckNumber}`;
 
-        // Simplified change detection: checking if readings changed
-        const isChanged =
-          !latestCheck ||
-          String(rec.top?.body) !== String(latestCheck.top?.body) ||
-          String(rec.middle?.body) !== String(latestCheck.middle?.body) ||
-          String(rec.bottom?.body) !== String(latestCheck.bottom?.body) ||
-          String(rec.top?.ribs) !== String(latestCheck.top?.ribs) ||
-          String(rec.middle?.ribs) !== String(latestCheck.middle?.ribs) ||
-          String(rec.bottom?.ribs) !== String(latestCheck.bottom?.ribs);
-
-        if (isChanged) {
+        if (rec.modified) {
           previousHistory[itemKey] = {
             ...previousChecks,
             [newCheckKey]: {
@@ -804,6 +819,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       const result = await response.json();
       if (response.ok) {
         setMessage({ type: "success", text: "Report updated successfully!" });
+        setUnlockedFields({}); // Clear unlock state on success
         onUpdate();
         setTimeout(() => {
           onCancel();
@@ -1136,16 +1152,38 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                 </button> */}
               </div>
               <div className="space-y-4">
-                {formData.inspectionRecords.map((record, index) => (
-                  <div
-                    key={`record-${index}`}
-                    className="border rounded-lg p-4 bg-gray-50 mb-4"
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-bold text-gray-700">
-                        Record #{index + 1}
-                      </h4>
-                      {/* {formData.inspectionRecords.length > 1 && (
+                {formData.inspectionRecords.map((record, index) => {
+                  if (record.originallyPassed) return null;
+                  return (
+                    <div
+                      key={`record-${index}`}
+                      className="border rounded-lg p-4 bg-gray-50 mb-4"
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-gray-700">
+                            Record #{index + 1}
+                          </h4>
+                          {isRecordLocked(record) && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200 shadow-sm animate-pulse">
+                              <svg
+                                className="w-2.5 h-2.5 mr-1"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2.5}
+                                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                                />
+                              </svg>
+                              RECORD PROTECTED
+                            </span>
+                          )}
+                        </div>
+                        {/* {formData.inspectionRecords.length > 1 && (
                         <button
                           type="button"
                           onClick={() => removeRecord(index)}
@@ -1154,328 +1192,54 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                           Remove record
                         </button>
                       )} */}
-                    </div>
-
-                    <div className="space-y-4">
-                      {["top", "middle", "bottom"].map((section) => (
-                        <div
-                          key={section}
-                          className="flex flex-col md:flex-row gap-4 w-full items-center p-3 rounded-xl shadow-sm bg-white border border-gray-100"
-                        >
-                          <div className="w-20 font-bold capitalize text-gray-700">
-                            {section}
-                          </div>
-
-                          {/* Body Reading + Status */}
-                          <div className="flex flex-1 items-center gap-2 w-full">
-                            <div className="flex-1">
-                              <input
-                                type="number"
-                                placeholder="Body"
-                                value={record[section].body}
-                                onChange={(e) =>
-                                  updateSectionData(
-                                    index,
-                                    section,
-                                    "body",
-                                    e.target.value,
-                                  )
-                                }
-                                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                              />
-                            </div>
-                            {record[section].bodyPass ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
-                                <svg
-                                  className="w-3 h-3 mr-1"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M5 13l4 4L19 7"
-                                  />
-                                </svg>
-                                Pass
-                              </span>
-                            ) : record[section].bodyFail ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
-                                <svg
-                                  className="w-3 h-3 mr-1"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M6 18L18 6M6 6l12 12"
-                                  />
-                                </svg>
-                                Fail
-                              </span>
-                            ) : (
-                              <span className="text-gray-400 text-xs px-2 italic">
-                                N/A
-                              </span>
-                            )}
-                          </div>
-
-                          {ribsAvailable && (
-                            <div className="flex flex-1 items-center gap-2 w-full">
-                              <div className="flex-1">
-                                <input
-                                  type="number"
-                                  placeholder="Ribs"
-                                  value={record[section].ribs}
-                                  onChange={(e) =>
-                                    updateSectionData(
-                                      index,
-                                      section,
-                                      "ribs",
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                />
-                              </div>
-                              {record[section].ribsPass ? (
-                                <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
-                                  <svg
-                                    className="w-3 h-3 mr-1"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M5 13l4 4L19 7"
-                                    />
-                                  </svg>
-                                  Pass
-                                </span>
-                              ) : record[section].ribsFail ? (
-                                <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
-                                  <svg
-                                    className="w-3 h-3 mr-1"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M6 18L18 6M6 6l12 12"
-                                    />
-                                  </svg>
-                                  Fail
-                                </span>
-                              ) : (
-                                <span className="text-gray-400 text-xs px-2 italic">
-                                  N/A
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Images */}
-                    <div className="mt-4 border-t pt-4">
-                      <h5 className="text-sm font-medium text-gray-700 mb-2">
-                        Inspection Photos
-                      </h5>
-                      <div className="space-y-3">
-                        <label className="flex justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer hover:border-blue-400 focus:outline-none hover:bg-gray-50">
-                          <span className="flex items-center space-x-2">
-                            <svg
-                              className="w-6 h-6 text-gray-400"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                              />
-                            </svg>
-                            <span className="font-medium text-gray-600">
-                              Click to upload images
-                            </span>
-                          </span>
-                          <input
-                            type="file"
-                            className="hidden"
-                            multiple
-                            accept="image/*"
-                            onChange={(e) =>
-                              handleImageUpload(index, e.target.files)
-                            }
-                          />
-                        </label>
-                        {record.images?.length > 0 && (
-                          <div className="grid grid-cols-4 gap-4 mt-2">
-                            {record.images.map((img) => (
-                              <div
-                                key={img.id}
-                                className="relative aspect-square"
-                              >
-                                <img
-                                  src={img.preview}
-                                  className="h-full w-full object-cover rounded-lg border"
-                                  alt=""
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => removeImage(index, img.id)}
-                                  className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm"
-                                >
-                                  <svg
-                                    className="w-3 h-3"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth="2"
-                                      d="M6 18L18 6M6 6l12 12"
-                                    />
-                                  </svg>
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
                       </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Additional Readings if applicable */}
-            {(formData.inspectionType === "Pre-Final" ||
-              formData.inspectionType === "Final") && (
-              <div className="border-t pt-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">
-                    Additional Readings
-                  </h3>
-                </div>
-                <div className="space-y-4">
-                  {formData.inspectionRecords.map((record, index) => (
-                    <div
-                      key={`add-${index}`}
-                      className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4"
-                    >
-                      <h4 className="font-bold text-gray-700 mb-3 underline decoration-blue-500/30 underline-offset-4">
-                        Record #{index + 1} Additional
-                      </h4>
 
                       <div className="space-y-4">
-                        {["top", "middle", "bottom"].map((section) => (
-                          <div
-                            key={section}
-                            className="flex flex-col md:flex-row gap-4 w-full items-center p-3 rounded-xl shadow-sm bg-white border border-gray-100"
-                          >
-                            <div className="w-20 font-bold capitalize text-gray-700">
-                              {section}
-                            </div>
-
-                            {/* Body Reading */}
-                            <div className="flex flex-1 items-center gap-2 w-full">
-                              <div className="flex-1">
-                                <input
-                                  type="number"
-                                  placeholder="Body"
-                                  value={
-                                    record.additional?.[section]?.body || ""
-                                  }
-                                  onChange={(e) =>
-                                    updateAdditionalSectionData(
-                                      index,
-                                      section,
-                                      "body",
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
-                                />
+                        {["top", "middle", "bottom"].map((section) => {
+                          const isProtected = isRecordLocked(record);
+                          return (
+                            <div
+                              key={section}
+                              className="flex flex-col md:flex-row gap-4 w-full items-center p-3 rounded-xl shadow-sm bg-white border border-gray-100"
+                            >
+                              <div className="w-20 font-bold capitalize text-gray-700">
+                                {section}
                               </div>
-                              {record.additional?.[section]?.bodyPass ? (
-                                <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
-                                  <svg
-                                    className="w-3 h-3 mr-1"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M5 13l4 4L19 7"
-                                    />
-                                  </svg>
-                                  Pass
-                                </span>
-                              ) : record.additional?.[section]?.bodyFail ? (
-                                <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
-                                  <svg
-                                    className="w-3 h-3 mr-1"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M6 18L18 6M6 6l12 12"
-                                    />
-                                  </svg>
-                                  Fail
-                                </span>
-                              ) : (
-                                <span className="text-gray-400 text-xs px-2 italic">
-                                  N/A
-                                </span>
-                              )}
-                            </div>
 
-                            {ribsAvailable && (
+                              {/* Body Reading + Status */}
                               <div className="flex flex-1 items-center gap-2 w-full">
                                 <div className="flex-1">
                                   <input
                                     type="number"
-                                    placeholder="Ribs"
-                                    value={
-                                      record.additional?.[section]?.ribs || ""
-                                    }
+                                    placeholder="Body"
+                                    value={record[section].body}
                                     onChange={(e) =>
-                                      updateAdditionalSectionData(
+                                      updateSectionData(
                                         index,
                                         section,
-                                        "ribs",
+                                        "body",
                                         e.target.value,
                                       )
                                     }
-                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed transition-all"
+                                    disabled={
+                                      isProtected &&
+                                      !unlockedFields[
+                                        `body-${index}-${section}`
+                                      ]
+                                    }
+                                    onDoubleClick={() =>
+                                      isProtected &&
+                                      toggleUnlock(`body-${index}-${section}`)
+                                    }
+                                    title={
+                                      isProtected
+                                        ? "Double-click to edit (Record Protected)"
+                                        : ""
+                                    }
                                   />
                                 </div>
-                                {record.additional?.[section]?.ribsPass ? (
+                                {record[section].bodyPass ? (
                                   <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
                                     <svg
                                       className="w-3 h-3 mr-1"
@@ -1492,7 +1256,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                     </svg>
                                     Pass
                                   </span>
-                                ) : record.additional?.[section]?.ribsFail ? (
+                                ) : record[section].bodyFail ? (
                                   <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
                                     <svg
                                       className="w-3 h-3 mr-1"
@@ -1515,12 +1279,383 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                   </span>
                                 )}
                               </div>
-                            )}
-                          </div>
-                        ))}
+
+                              {ribsAvailable && (
+                                <div className="flex flex-1 items-center gap-2 w-full">
+                                  <div className="flex-1">
+                                    <input
+                                      type="number"
+                                      placeholder="Ribs"
+                                      value={record[section].ribs}
+                                      onChange={(e) =>
+                                        updateSectionData(
+                                          index,
+                                          section,
+                                          "ribs",
+                                          e.target.value,
+                                        )
+                                      }
+                                      className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed transition-all"
+                                      disabled={
+                                        isProtected &&
+                                        !unlockedFields[
+                                          `ribs-${index}-${section}`
+                                        ]
+                                      }
+                                      onDoubleClick={() =>
+                                        isProtected &&
+                                        toggleUnlock(`ribs-${index}-${section}`)
+                                      }
+                                      title={
+                                        isProtected
+                                          ? "Double-click to edit (Record Protected)"
+                                          : ""
+                                      }
+                                    />
+                                  </div>
+                                  {record[section].ribsPass ? (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
+                                      <svg
+                                        className="w-3 h-3 mr-1"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M5 13l4 4L19 7"
+                                        />
+                                      </svg>
+                                      Pass
+                                    </span>
+                                  ) : record[section].ribsFail ? (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
+                                      <svg
+                                        className="w-3 h-3 mr-1"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M6 18L18 6M6 6l12 12"
+                                        />
+                                      </svg>
+                                      Fail
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400 text-xs px-2 italic">
+                                      N/A
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Images */}
+                      <div className="mt-4 border-t pt-4">
+                        <h5 className="text-sm font-medium text-gray-700 mb-2">
+                          Inspection Photos
+                        </h5>
+                        <div className="space-y-3">
+                          <label className="flex justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer hover:border-blue-400 focus:outline-none hover:bg-gray-50">
+                            <span className="flex items-center space-x-2">
+                              <svg
+                                className="w-6 h-6 text-gray-400"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
+                              </svg>
+                              <span className="font-medium text-gray-600">
+                                Click to upload images
+                              </span>
+                            </span>
+                            <input
+                              type="file"
+                              className="hidden"
+                              multiple
+                              accept="image/*"
+                              onChange={(e) =>
+                                handleImageUpload(index, e.target.files)
+                              }
+                            />
+                          </label>
+                          {record.images?.length > 0 && (
+                            <div className="grid grid-cols-4 gap-4 mt-2">
+                              {record.images.map((img) => (
+                                <div
+                                  key={img.id}
+                                  className="relative aspect-square"
+                                >
+                                  <img
+                                    src={img.preview}
+                                    className="h-full w-full object-cover rounded-lg border"
+                                    alt=""
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeImage(index, img.id)}
+                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm"
+                                  >
+                                    <svg
+                                      className="w-3 h-3"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth="2"
+                                        d="M6 18L18 6M6 6l12 12"
+                                      />
+                                    </svg>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Additional Readings if applicable */}
+            {(formData.inspectionType === "Pre-Final" ||
+              formData.inspectionType === "Final") && (
+              <div className="border-t pt-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Additional Readings
+                  </h3>
+                </div>
+                <div className="space-y-4">
+                  {formData.inspectionRecords.map((record, index) => {
+                    if (record.originallyPassed) return null;
+                    return (
+                      <div
+                        key={`add-${index}`}
+                        className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4"
+                      >
+                        <h4 className="font-bold text-gray-700 mb-3 underline decoration-blue-500/30 underline-offset-4">
+                          Record #{index + 1} Additional
+                        </h4>
+
+                        <div className="space-y-4">
+                          {["top", "middle", "bottom"].map((section) => {
+                            const isProtected =
+                              record.additional?.top?.pass &&
+                              record.additional?.middle?.pass &&
+                              record.additional?.bottom?.pass;
+                            return (
+                              <div
+                                key={section}
+                                className="flex flex-col md:flex-row gap-4 w-full items-center p-3 rounded-xl shadow-sm bg-white border border-gray-100"
+                              >
+                                <div className="w-20 font-bold capitalize text-gray-700">
+                                  {section}
+                                </div>
+
+                                {/* Body Reading */}
+                                <div className="flex flex-1 items-center gap-2 w-full">
+                                  <div className="flex-1">
+                                    <input
+                                      type="number"
+                                      placeholder="Body"
+                                      value={
+                                        record.additional?.[section]?.body || ""
+                                      }
+                                      onChange={(e) =>
+                                        updateAdditionalSectionData(
+                                          index,
+                                          section,
+                                          "body",
+                                          e.target.value,
+                                        )
+                                      }
+                                      className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed transition-all"
+                                      disabled={
+                                        isProtected &&
+                                        !unlockedFields[
+                                          `add-body-${index}-${section}`
+                                        ]
+                                      }
+                                      onDoubleClick={() =>
+                                        isProtected &&
+                                        toggleUnlock(
+                                          `add-body-${index}-${section}`,
+                                        )
+                                      }
+                                      title={
+                                        isProtected
+                                          ? "Double-click to edit (Record Protected)"
+                                          : ""
+                                      }
+                                    />
+                                  </div>
+                                  {record.additional?.[section]?.bodyPass ? (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
+                                      <svg
+                                        className="w-3 h-3 mr-1"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M5 13l4 4L19 7"
+                                        />
+                                      </svg>
+                                      Pass
+                                    </span>
+                                  ) : record.additional?.[section]?.bodyFail ? (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
+                                      <svg
+                                        className="w-3 h-3 mr-1"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M6 18L18 6M6 6l12 12"
+                                        />
+                                      </svg>
+                                      Fail
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400 text-xs px-2 italic">
+                                      N/A
+                                    </span>
+                                  )}
+                                </div>
+
+                                {ribsAvailable && (
+                                  <div className="flex flex-1 items-center gap-2 w-full">
+                                    <div className="flex-1">
+                                      <input
+                                        type="number"
+                                        placeholder="Ribs"
+                                        value={
+                                          record.additional?.[section]?.ribs ||
+                                          ""
+                                        }
+                                        onChange={(e) =>
+                                          updateAdditionalSectionData(
+                                            index,
+                                            section,
+                                            "ribs",
+                                            e.target.value,
+                                          )
+                                        }
+                                        className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed transition-all"
+                                        disabled={
+                                          isProtected &&
+                                          !unlockedFields[
+                                            `add-ribs-${index}-${section}`
+                                          ]
+                                        }
+                                        onDoubleClick={() =>
+                                          isProtected &&
+                                          toggleUnlock(
+                                            `add-ribs-${index}-${section}`,
+                                          )
+                                        }
+                                        title={
+                                          isProtected
+                                            ? "Double-click to edit (Record Protected)"
+                                            : ""
+                                        }
+                                      />
+                                    </div>
+                                    {record.additional?.[section]?.ribsPass ? (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-600 font-semibold text-xs whitespace-nowrap">
+                                        <svg
+                                          className="w-3 h-3 mr-1"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M5 13l4 4L19 7"
+                                          />
+                                        </svg>
+                                        Pass
+                                      </span>
+                                    ) : record.additional?.[section]
+                                        ?.ribsFail ? (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-100 text-red-500 font-semibold text-xs whitespace-nowrap">
+                                        <svg
+                                          className="w-3 h-3 mr-1"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M6 18L18 6M6 6l12 12"
+                                          />
+                                        </svg>
+                                        Fail
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400 text-xs px-2 italic">
+                                        N/A
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {formData.inspectionRecords.every(
+                    (r) => r.originallyPassed,
+                  ) && (
+                    <div className="p-8 text-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                      <div className="flex justify-center mb-3">
+                        <div className="bg-green-100 p-3 rounded-full">
+                          <CheckCircle2 className="w-8 h-8 text-green-600" />
+                        </div>
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-800 mb-1">
+                        All Records Pass
+                      </h3>
+                      <p className="text-gray-500 text-sm">
+                        Everything in this report has already been completed and
+                        passed.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

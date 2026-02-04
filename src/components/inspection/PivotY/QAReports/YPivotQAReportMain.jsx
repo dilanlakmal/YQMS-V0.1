@@ -982,6 +982,7 @@ const ALL_COLUMNS = [
   { id: "status", label: "QA Status" },
   { id: "resubmission", label: "Resubmission" },
   { id: "decision", label: "Leader Decision" },
+  { id: "season", label: "Season" },
   { id: "action", label: "Action", required: true },
 ];
 
@@ -1031,6 +1032,7 @@ const YPivotQAReportMain = () => {
     "status",
     "resubmission",
     "decision",
+    "season",
     "action",
   ]);
 
@@ -1052,6 +1054,7 @@ const YPivotQAReportMain = () => {
     qaStatus: [],
     leaderDecision: [],
     poLines: [],
+    season: [],
   });
 
   // Dynamic Options (for Dropdowns)
@@ -1426,6 +1429,7 @@ const YPivotQAReportMain = () => {
       qaStatus: [],
       leaderDecision: [],
       poLines: [],
+      season: [],
     });
   };
 
@@ -1450,6 +1454,7 @@ const YPivotQAReportMain = () => {
       qaStatus: [],
       leaderDecision: [],
       poLines: [],
+      season: [],
     });
   };
 
@@ -1600,6 +1605,7 @@ const YPivotQAReportMain = () => {
       custStyle: "Style",
       buyer: "Buyer",
       supplier: "Supplier",
+      season: "Season",
     };
 
     const parts = [];
@@ -1891,7 +1897,7 @@ const YPivotQAReportMain = () => {
                   staticOptions={options.subConFactories}
                 />
               </FilterWrapper>
-              {/* --- NEW: QA Status (Mobile/Tablet Only - Hidden on XL) --- */}
+              {/* --- QA Status (Mobile/Tablet Only - Hidden on XL) --- */}
               <div className="xl:hidden">
                 <FilterWrapper label="QA Status" icon={CheckCircle2}>
                   <MultiSelectAutocomplete
@@ -1903,7 +1909,7 @@ const YPivotQAReportMain = () => {
                 </FilterWrapper>
               </div>
 
-              {/* --- NEW: Leader Decision (Mobile/Tablet Only - Hidden on LG) --- */}
+              {/* --- Leader Decision (Mobile/Tablet Only - Hidden on LG) --- */}
               <div className="lg:hidden">
                 <FilterWrapper label="Leader Decision" icon={User}>
                   <MultiSelectAutocomplete
@@ -1913,6 +1919,18 @@ const YPivotQAReportMain = () => {
                     }
                     placeholder="Select Decision..."
                     staticOptions={staticFilterOptions.leaderDecision}
+                  />
+                </FilterWrapper>
+              </div>
+
+              {/* --- Season (Mobile/Tablet Only - Hidden on LG) --- */}
+              <div className="lg:hidden">
+                <FilterWrapper label="Season" icon={Calendar}>
+                  <MultiSelectAutocomplete
+                    selectedItems={filters.season}
+                    onChange={(val) => handleFilterChange("season", val)}
+                    placeholder="Select Season..."
+                    apiEndpoint="/api/fincheck-reports/autocomplete/season"
                   />
                 </FilterWrapper>
               </div>
@@ -1971,7 +1989,7 @@ const YPivotQAReportMain = () => {
                 />
               </div>
 
-              {/* --- NEW: Leader Decision (Desktop Only) --- */}
+              {/* --- Leader Decision (Desktop Only) --- */}
               <div className="hidden lg:block w-[180px]">
                 <MultiSelectAutocomplete
                   selectedItems={filters.leaderDecision}
@@ -1980,7 +1998,16 @@ const YPivotQAReportMain = () => {
                   staticOptions={staticFilterOptions.leaderDecision}
                 />
               </div>
-              {/* --- NEW PO LINE FILTER --- */}
+              {/* --- Season (Desktop Only) --- */}
+              <div className="hidden lg:block w-[140px]">
+                <MultiSelectAutocomplete
+                  selectedItems={filters.season}
+                  onChange={(val) => handleFilterChange("season", val)}
+                  placeholder="Season..."
+                  apiEndpoint="/api/fincheck-reports/autocomplete/season"
+                />
+              </div>
+              {/* --- PO LINE FILTER --- */}
               <div className="w-full max-w-[140px] sm:max-w-[250px]">
                 <MultiSelectAutocomplete
                   selectedItems={filters.poLines || []}
@@ -2040,6 +2067,7 @@ const YPivotQAReportMain = () => {
                     PO Line
                   </th>
                 )}
+
                 {isColumnVisible("orderNo") && (
                   <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
                     Order No
@@ -2053,6 +2081,11 @@ const YPivotQAReportMain = () => {
                 {isColumnVisible("customer") && (
                   <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
                     Customer
+                  </th>
+                )}
+                {isColumnVisible("season") && (
+                  <th className="px-3 sm:px-5 py-3 sm:py-4 whitespace-nowrap">
+                    Season
                   </th>
                 )}
                 {isColumnVisible("reportType") && (
@@ -2288,6 +2321,15 @@ const YPivotQAReportMain = () => {
                       {isColumnVisible("customer") && (
                         <td className="px-3 sm:px-5 py-3 sm:py-4 text-[11px] sm:text-xs font-bold text-gray-700 dark:text-gray-300 capitalize">
                           {report.buyer ? report.buyer.toLowerCase() : "-"}
+                        </td>
+                      )}
+
+                      {/* Season */}
+                      {isColumnVisible("season") && (
+                        <td className="px-3 sm:px-5 py-3 sm:py-4">
+                          <span className="text-[11px] sm:text-xs font-medium text-gray-600 dark:text-gray-300">
+                            {report.season || "-"}
+                          </span>
                         </td>
                       )}
 
