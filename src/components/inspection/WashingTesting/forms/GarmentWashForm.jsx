@@ -89,8 +89,45 @@ const GarmentWashForm = ({
     // ANF Specs
     anfSpecs,
     isLoadingSpecs,
-    fetchAnfSpecs
+    fetchAnfSpecs,
+    causeAssignData, // Added prop
+    assignHistory, // Full history from DB
+    users: parentUsers = [], // Get users from parent
+    isLoadingUsers = false, // Added prop
 }) => {
+    // Use the passed users or fallback
+    const users = parentUsers || [];
+
+    // Filter users based on assignHistory (report_assign_control collection)
+    // If history exists, we only show users that are in the history list for respective fields.
+    const getFilteredOptions = (field) => {
+        if (!assignHistory || assignHistory.length === 0) {
+            // No history configured? Return all users.
+            return users.map(u => ({
+                value: u.name,
+                label: `(${u.emp_id}) ${u.name}`
+            }));
+        }
+
+        // Extract all unique emp_ids for this field from history
+        const allowedEmpIds = new Set(assignHistory.map(item => item[field]).filter(Boolean));
+
+        // Filter users who match the allowed IDs
+        const filteredUsers = users.filter(u => allowedEmpIds.has(u.emp_id));
+
+        // If we found matches, return them. 
+        // If for some reason filtered count is 0 (e.g. data mismatch), fallback to all users? 
+        // User requested "all from collection", so if collection has data but users don't match, list might be empty.
+        // Let's assume data integrity is okay.
+
+        return filteredUsers.map(u => ({
+            value: u.name,
+            label: `(${u.emp_id}) ${u.name}`
+        }));
+    };
+
+    const checkedByOptions = getFilteredOptions('checkedBy');
+    const approvedByOptions = getFilteredOptions('approvedBy');
 
     const colorDropdownRef = useRef(null);
     const sizeDropdownRef = useRef(null);
@@ -110,9 +147,7 @@ const GarmentWashForm = ({
     const [isExporting, setIsExporting] = useState(false);
     const [isShrinkageSaved, setIsShrinkageSaved] = useState(false);
 
-    // Users State
-    const [users, setUsers] = useState([]);
-    const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
 
     // Measurement specs state (same as MeasurementDetailsSection)
     const [measurementSpecs, setMeasurementSpecs] = useState({
@@ -247,23 +282,9 @@ const GarmentWashForm = ({
         }
     }, [formData.reportType]);
 
-    // Fetch Users for Dropdowns
-    useEffect(() => {
-        const fetchUsers = async () => {
-            setIsLoadingUsers(true);
-            try {
-                const response = await axios.get(`${API_BASE_URL}/api/users`);
-                if (response.data) {
-                    setUsers(response.data);
-                }
-            } catch (error) {
-                console.error("Error fetching users:", error);
-            } finally {
-                setIsLoadingUsers(false);
-            }
-        };
-        fetchUsers();
-    }, []);
+
+
+
 
     // Fetch measurement specs from the same API as MeasurementDetailsSection
     const fetchMeasurementSpecs = async (orderNo) => {
@@ -1860,11 +1881,9 @@ const GarmentWashForm = ({
                                 filterOption={(input, option) =>
                                     (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                                 }
-                                options={users.map(u => ({
-                                    value: u.name,
-                                    label: `(${u.emp_id}) ${u.name}`
-                                }))}
+                                options={checkedByOptions}
                                 className="w-full h-[42px]"
+                                loading={isLoadingUsers}
                             />
                         </div>
 
@@ -1880,11 +1899,9 @@ const GarmentWashForm = ({
                                 filterOption={(input, option) =>
                                     (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                                 }
-                                options={users.map(u => ({
-                                    value: u.name,
-                                    label: `(${u.emp_id}) ${u.name}`
-                                }))}
+                                options={approvedByOptions}
                                 className="w-full h-[42px]"
+                                loading={isLoadingUsers}
                             />
                         </div>
 

@@ -61,6 +61,10 @@ const FormSection = ({
   anfSpecs,
   isLoadingSpecs,
   fetchAnfSpecs,
+  causeAssignData, // Added prop
+  assignHistory, // Pass full history
+  users, // Added prop
+  isLoadingUsers, // Added prop
 }) => {
 
   // Common props shared by all forms
@@ -77,6 +81,10 @@ const FormSection = ({
     handleRemoveImage,
     fileInputRef,
     cameraInputRef,
+    causeAssignData, // Pass to all forms
+    assignHistory, // Pass to all forms
+    users, // Pass to all forms
+    isLoadingUsers, // Pass to all forms
   };
 
   // Props specific to HomeWashForm (User Inputs & Yorksys Data)

@@ -87,6 +87,7 @@ import qc1Inspection from "./routes/QC1Inspection/qc1InspectionRoutes.js";
 import QC1SunriseReportRoutes from "./routes/QC1Inspection/QCReportServer.js";
 import QC1SummaryDashboardRoutes from "./routes/QC1Inspection/QC1SummaryDashboard.js";
 import reportWashing from "./routes/ReportWashing/reportWashingRoutes.js";
+import reportAssign from "./routes/ReportWashing/reportAssignRoutes.js";
 
 /* -----------------------------
 QC1 Sunrise Imports
@@ -358,6 +359,7 @@ QC1 Inspection Routes
 ------------------------------ */
 app.use(qc1Inspection);
 app.use(reportWashing);
+app.use(reportAssign);
 app.use(QC1SunriseReportRoutes);
 app.use(QC1SummaryDashboardRoutes);
 

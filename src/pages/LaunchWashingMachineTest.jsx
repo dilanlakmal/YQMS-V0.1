@@ -8,8 +8,11 @@ import {
   MdLocalLaundryService,
   MdOutlineDeviceThermostat,
   MdOutlineImagesearchRoller,
-  MdOutlineExpand
+  MdOutlineExpand,
+  MdAssignmentInd
 } from "react-icons/md";
+import { Select, Checkbox } from "antd";
+import axios from "axios";
 import { API_BASE_URL, QR_CODE_BASE_URL } from "../../config.js";
 import { pdf } from "@react-pdf/renderer";
 import { Html5Qrcode } from "html5-qrcode";
@@ -299,9 +302,61 @@ const LaundryWashingMachineTest = () => {
   // Debounce timer for auto-fetching colors when typing
   const colorFetchTimerRef = useRef(null);
 
+
   // Factory dropdown state
   const [factories, setFactories] = useState([]);
   const [isLoadingFactories, setIsLoadingFactories] = useState(false);
+
+  // Assign Control State
+  const [users, setUsers] = useState([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [assignData, setAssignData] = useState({
+    _id: null,
+    checkedBy: null,
+    approvedBy: null
+  });
+  const [selectedUserForAssign, setSelectedUserForAssign] = useState(null);
+
+  const [causeAssignHistory, setCauseAssignHistory] = useState([]);
+
+  const fetchAssignControl = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/assign-control`);
+      if (response.data && Array.isArray(response.data)) {
+        setCauseAssignHistory(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching assign control:", error);
+    }
+  }, []);
+
+  // Load users and cause assign data
+  useEffect(() => {
+    fetchAssignControl();
+
+    const fetchUsers = async () => {
+      setIsLoadingUsers(true);
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/users`);
+        if (response.data) {
+          setUsers(response.data);
+        }
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        showToast.error("Failed to load users list");
+      } finally {
+        setIsLoadingUsers(false);
+      }
+    };
+    fetchUsers();
+  }, [fetchAssignControl]);
+
+  // Prepare user options for Select
+  const userOptions = users.map(user => ({
+    value: user.emp_id, // Using emp_id as the value
+    label: `(${user.emp_id}) ${user.name || user.eng_name}`, // Format: (ID) Name
+    key: user._id || user.emp_id
+  }));
 
   // Reset page to 1 when filters (except page) change for standard reports
   useEffect(() => {
@@ -2027,6 +2082,19 @@ const LaundryWashingMachineTest = () => {
                   <span className="sm:hidden">Warehouse</span>
                 </span>
               </button>
+              <button
+                onClick={() => setActiveTab("assign_control")}
+                className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "assign_control"
+                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+                  }`}
+              >
+                <span className="flex items-center gap-1.5 sm:gap-2">
+                  <MdAssignmentInd className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "assign_control" ? "text-purple-600" : "text-purple-500/70"}`} />
+                  <span className="hidden sm:inline">Assign Control</span>
+                  <span className="sm:hidden">Assign</span>
+                </span>
+              </button>
             </nav>
           </div>
 
@@ -2091,6 +2159,10 @@ const LaundryWashingMachineTest = () => {
                 { val: "EMB/Printing Testing", icon: <MdOutlineImagesearchRoller /> },
                 { val: "Pulling Test", icon: <MdOutlineExpand /> }
               ]}
+              causeAssignData={assignData}
+              assignHistory={causeAssignHistory}
+              users={users} // Pass users to form
+              isLoadingUsers={isLoadingUsers}
             />
           )}
 
@@ -2211,6 +2283,192 @@ const LaundryWashingMachineTest = () => {
 
 
 
+
+
+          {/* Assign Control Tab */}
+          {activeTab === "assign_control" && (
+            <div className="bg-white p-6 rounded-lg border border-gray-200 dark:border-gray-700 animate-fadeIn">
+              <h2 className="text-xl font-semibold mb-6 text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                <MdAssignmentInd className="w-6 h-6 text-purple-500" />
+                Assign Control
+              </h2>
+
+              <div className="max-w-4xl">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                  {/* User Selection */}
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                        Select User:
+                      </label>
+                      <div className="relative">
+                        <Select
+                          className="w-full h-12"
+                          placeholder="Search and select a user"
+                          loading={isLoadingUsers}
+                          showSearch
+                          optionFilterProp="label"
+                          filterOption={(input, option) =>
+                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                          }
+                          options={userOptions}
+                          value={selectedUserForAssign}
+                          onChange={(value) => setSelectedUserForAssign(value)}
+                          size="large"
+                          style={{ width: '100%', height: '48px' }}
+                          allowClear
+                        />
+                      </div>
+                    </div>
+
+                    {selectedUserForAssign && (
+                      <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800/30 flex flex-col gap-3 animate-slideIn">
+                        <p className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Define Role for Selected User:</p>
+                        <div className="flex gap-8">
+                          <Checkbox
+                            className="text-gray-700 dark:text-gray-300 font-semibold"
+                            checked={assignData.checkedBy === selectedUserForAssign}
+                            onChange={(e) => {
+                              setAssignData(prev => ({
+                                ...prev,
+                                checkedBy: e.target.checked ? selectedUserForAssign : (prev.checkedBy === selectedUserForAssign ? null : prev.checkedBy)
+                              }));
+                            }}
+                          >
+                            CHECKED BY
+                          </Checkbox>
+                          <Checkbox
+                            className="text-gray-700 dark:text-gray-300 font-semibold"
+                            checked={assignData.approvedBy === selectedUserForAssign}
+                            onChange={(e) => {
+                              setAssignData(prev => ({
+                                ...prev,
+                                approvedBy: e.target.checked ? selectedUserForAssign : (prev.approvedBy === selectedUserForAssign ? null : prev.approvedBy)
+                              }));
+                            }}
+                          >
+                            APPROVED BY
+                          </Checkbox>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Current Selection Summary */}
+                  <div className="bg-gray-50 dark:bg-gray-800/40 p-5 rounded-2xl border border-gray-200 dark:border-gray-700/50 h-full flex flex-col justify-center min-h-[160px]">
+                    <h4 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-6 uppercase tracking-widest text-center">Active Assignment View</h4>
+                    <div className="grid grid-cols-1 gap-5">
+                      <div className="flex items-center gap-4 group">
+                        <div className={`w-1 h-10 rounded-full transition-colors ${assignData.checkedBy ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
+                        <div>
+                          <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Checked By</p>
+                          <p className={`text-sm font-bold transition-colors ${assignData.checkedBy ? 'text-gray-800 dark:text-gray-200' : 'text-gray-400 font-normal italic'}`}>
+                            {userOptions.find(u => u.value === assignData.checkedBy)?.label || 'Not assigned'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 group">
+                        <div className={`w-1 h-10 rounded-full transition-colors ${assignData.approvedBy ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
+                        <div>
+                          <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Approved By</p>
+                          <p className={`text-sm font-bold transition-colors ${assignData.approvedBy ? 'text-gray-800 dark:text-gray-200' : 'text-gray-400 font-normal italic'}`}>
+                            {userOptions.find(u => u.value === assignData.approvedBy)?.label || 'Not assigned'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-10 flex justify-end gap-3 pt-6 border-t border-gray-100 dark:border-gray-800">
+                  <button
+                    type="button"
+                    className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg shadow-sm hover:shadow-md transform transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
+                    onClick={() => {
+                      setAssignData({ _id: null, checkedBy: null, approvedBy: null });
+                      setSelectedUserForAssign(null);
+                    }}
+                  >
+                    Clear / New Record
+                  </button>
+                  <button
+                    type="button"
+                    className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium rounded-lg shadow-md hover:shadow-lg transform transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!assignData.checkedBy && !assignData.approvedBy}
+                    onClick={async () => {
+                      if (!assignData.checkedBy && !assignData.approvedBy) {
+                        showToast.error("Please select at least one assignee (Checked By or Approved By).");
+                        return;
+                      }
+
+                      try {
+                        await axios.post(`${API_BASE_URL}/api/assign-control`, assignData);
+                        showToast.success(assignData._id ? "Assignment updated successfully!" : "New assignment created successfully!");
+                        await fetchAssignControl();
+                        setAssignData({ _id: null, checkedBy: null, approvedBy: null });
+                        setSelectedUserForAssign(null);
+                      } catch (error) {
+                        console.error("Error saving assignments:", error);
+                        showToast.error("Failed to save assignments.");
+                      }
+                    }}
+                  >
+                    {assignData._id ? "Update Assignment" : "Save New Assignment"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Assignments History Table */}
+              <div className="mt-10 border-t border-gray-200 dark:border-gray-700 pt-6">
+                <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-200">Assignment History (Click row to edit)</h3>
+                <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-800">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Checked By</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Approved By</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                      {causeAssignHistory.map((item) => (
+                        <tr
+                          key={item._id}
+                          onClick={() => {
+                            setAssignData({
+                              _id: item._id,
+                              checkedBy: item.checkedBy,
+                              approvedBy: item.approvedBy
+                            });
+                            // Default the selection to checkedBy if available, otherwise approvedBy
+                            setSelectedUserForAssign(item.checkedBy || item.approvedBy);
+                          }}
+                          className={`cursor-pointer transition-colors ${assignData._id === item._id ? 'bg-purple-50 dark:bg-purple-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {new Date(item.updatedAt).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            {userOptions.find(u => u.value === item.checkedBy)?.label || item.checkedBy || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            {userOptions.find(u => u.value === item.approvedBy)?.label || item.approvedBy || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                      {causeAssignHistory.length === 0 && (
+                        <tr>
+                          <td colSpan="3" className="px-6 py-4 text-center text-sm text-gray-500">
+                            No history found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Modals */}
           <ReceivedModal
@@ -2415,7 +2673,7 @@ const LaundryWashingMachineTest = () => {
 
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 
