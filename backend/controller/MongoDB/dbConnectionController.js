@@ -137,6 +137,11 @@ import createHumidityModel from "../../models/huminity/HumidityReport.js";
 import createGlossaryTermModel from "../../models/GlossaryTerm.js";
 import createMiningHistoryModel from "../../models/MiningHistory.js";
 
+//Document Intelligence Models
+import createDocumentJobModel from "../../models/DocumentJob.js";
+import createDocumentPageModel from "../../models/DocumentPage.js";
+import createDocumentChunkModel from "../../models/DocumentChunk.js";
+
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
     process.env.MongoDB_URI_ym_prod
@@ -331,6 +336,11 @@ export const HumidityReport = createHumidityModel(ymProdConnection);
 //Glossary Term Exported Model
 export const GlossaryTerm = createGlossaryTermModel(ymProdConnection);
 export const MiningHistory = createMiningHistoryModel(ymProdConnection);
+
+//Document Intelligence Exported Models
+export const DocumentJob = createDocumentJobModel(ymProdConnection);
+export const DocumentPage = createDocumentPageModel(ymProdConnection);
+export const DocumentChunk = createDocumentChunkModel(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

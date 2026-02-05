@@ -115,6 +115,20 @@ RULES:
 }
 
 /**
+ * Get domain-specific stop words to exclude from extraction
+ */
+function getDomainStopWords(domain) {
+    const stopWords = {
+        "Garment Industry": "size, color, style, order, sample, delivery, quantity, number",
+        "Legal": "document, section, page, date, signed, copy, party, article",
+        "Medical": "patient, doctor, hospital, date, time, visit, record",
+        "IT": "system, user, data, file, input, output, click, button",
+        "General": "information, detail, item, thing, part, type, kind"
+    };
+    return stopWords[domain] || stopWords["General"];
+}
+
+/**
  * Extract terms from single document
  * @param {string} text - Document chunk
  * @param {string} sourceLang - Source language code
@@ -122,9 +136,9 @@ RULES:
  * @returns {Promise<Array<{term: string, category: string, confidence: number, evidenceSentence: string}>>}
  */
 export async function extractTerms(text, sourceLang, domain) {
-    const systemPrompt = `You are a terminology extraction expert for ${getLangName(sourceLang)}. Extract domain-specific terms that should be standardized in translations.`;
+    const systemPrompt = `You are a terminology extraction expert for ${getLangName(sourceLang)}. Extract ONLY domain-specific terms that require standardized translations. Never invent terms not present in the text.`;
 
-    const userPrompt = `Extract technical/domain-specific terms from this ${domain} document.
+    const userPrompt = `Extract domain-specific terminology from this ${domain || "General"} document chunk.
 
 DOCUMENT (${getLangName(sourceLang)}):
 ${text}
@@ -133,26 +147,56 @@ OUTPUT FORMAT (strict JSON):
 {
     "terms": [
         {
-            "term": "exact term as found",
-            "category": "noun|verb|phrase|acronym|proper_noun",
+            "term": "exact term as found in text",
+            "category": "noun|phrase|acronym|proper_noun|measurement",
             "confidence": 0.0-1.0,
-            "evidenceSentence": "sentence where term appears"
+            "evidenceSentence": "EXACT sentence from document containing the term"
         }
     ]
 }
 
-RULES:
-1. Extract ONLY domain-specific terminology, NOT common words
-2. Include multi-word terms (e.g., "intellectual property")
-3. Include acronyms with their expansion if found
-4. confidence = how confident this is a glossary-worthy term
-5. evidenceSentence = exact sentence from document containing the term
-6. Return empty array if no domain terms found
-7. Skip: articles, prepositions, common verbs (eg: is, are, have)
-8. Maximum 30 terms per chunk`;
+✅ EXTRACT (include these):
+- Technical terminology specific to ${domain || "the document domain"}
+- Multi-word terms (e.g., "intellectual property", "seam allowance")
+- Acronyms WITH expansion if found (e.g., "SPI (Stitches Per Inch)")
+- Industry-standard measurements and specifications
+- Proper nouns that need consistent translation
+
+❌ EXCLUDE (NEVER extract these):
+- Common words: the, is, are, have, make, do, this, that, and, or, but
+- Generic verbs: use, create, apply, perform, check, get, set
+- Numbers alone (without context/units)
+- Single letters or symbols
+- Words with fewer than 3 characters
+- Terms NOT actually in the text (NO HALLUCINATION!)
+- Domain stop words: ${getDomainStopWords(domain)}
+
+CONFIDENCE SCORING:
+- 0.9+ : Highly domain-specific, appears multiple times
+- 0.7-0.89 : Domain-specific, appears at least once clearly
+- 0.5-0.69 : Possibly domain-specific, needs review
+- <0.5 : Uncertain, skip these
+
+CRITICAL RULES:
+1. Every term MUST have an evidenceSentence that contains that EXACT term
+2. Return empty array if no domain-specific terms found
+3. Maximum 25 terms per chunk
+4. Focus on QUALITY over quantity`;
 
     const result = await callLLM(systemPrompt, userPrompt);
-    return result.terms || [];
+
+    // Post-validation: filter out terms not found in text
+    const terms = result.terms || [];
+    const textLower = text.toLowerCase();
+
+    return terms.filter(term => {
+        const termLower = term.term.toLowerCase();
+        const exists = textLower.includes(termLower);
+        if (!exists) {
+            console.warn(`[LLM] Filtered hallucinated term: "${term.term}"`);
+        }
+        return exists;
+    });
 }
 
 /**

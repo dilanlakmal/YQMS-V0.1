@@ -6,7 +6,7 @@
 import { getReviewerName } from '../../middleware/rbac.js';
 import { mineSingleDocument, mineParallelDocuments } from '../../services/miningService.js';
 import { generateJITGlossary, invalidateGlossaryCache } from '../../services/jitGlossaryService.js';
-import { uploadFileToBlob } from "../../AISystemUtils/system-translate/azureBlobHelper.js";
+import documentIntelligenceService from '../../services/DocumentIntelligenceService.js';
 import llmService from '../../services/llmService.js';
 import fs from 'fs';
 import path from 'path';
@@ -35,24 +35,17 @@ async function getHistoryModel() {
 
 // ========== TEXT EXTRACTION ==========
 
-async function extractText(buffer, fileName) {
-    const ext = path.extname(fileName).toLowerCase();
+// ========== TEXT EXTRACTION ==========
 
-    if (ext === '.pdf') {
-        // Import directly from lib to avoid pdf-parse's problematic debug/test block in index.js
-        const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
-        const data = await pdfParse(buffer);
-        return data.text;
-    } else if (ext === '.docx') {
-        // Dynamic import mammoth
-        const mammoth = (await import('mammoth')).default;
-        const result = await mammoth.extractRawText({ buffer });
-        return result.value;
-    } else if (ext === '.txt') {
-        return buffer.toString('utf-8');
-    } else {
-        throw new Error(`Unsupported file format: ${ext}`);
-    }
+async function extractText(buffer, fileName) {
+    const ext = path.extname(fileName).toLowerCase().replace('.', '');
+
+    // Use the robust Document Intelligence Service for all extraction
+    // This handles PDF (scanned/digital), DOCX, images, and text
+    const result = await documentIntelligenceService.extractDocument(buffer, fileName, ext);
+
+    // Combine all pages into one text for legacy mining service compat
+    return result.pages.map(p => p.cleanText).join('\n\n');
 }
 
 // ========== TERM CRUD ==========
@@ -421,15 +414,10 @@ export async function mineSingleDoc(req, res) {
         const miningBatchId = `single-${randomUUID()}`;
         const fileBuffer = req.file.buffer;
 
-        // 1. Upload source to Azure Blob Storage
-        const blobName = `mining-sources/${miningBatchId}/${req.file.originalname}`;
-        const sourceUrl = await uploadFileToBlob(
-            fileBuffer,
-            blobName,
-            'glossaries',
-            process.env.AZURE_STORAGE_ACCOUNT_NAME,
-            process.env.AZURE_STORAGE_ACCOUNT_KEY
-        );
+        // 1. Skip Blob Upload (Legacy Cleanup)
+        // const blobName = `mining-sources/${miningBatchId}/${req.file.originalname}`;
+        // const sourceUrl = await uploadFileToBlob(...);
+        const sourceUrl = null; // No longer uploading source files to blob
 
         // 2. Mine terms
         const result = await mineSingleDocument({
@@ -487,26 +475,18 @@ export async function mineParallelDocs(req, res) {
         const sourceBuffer = req.files.sourceDoc[0].buffer;
         const targetBuffer = req.files.targetDoc[0].buffer;
 
-        // 1. Upload sources to Azure Blob Storage
+        // 1. Skip Blob Upload (Legacy Cleanup)
+        /*
         const sourceBlobPath = `mining-sources/${miningBatchId}/${req.files.sourceDoc[0].originalname}`;
         const targetBlobPath = `mining-sources/${miningBatchId}/${req.files.targetDoc[0].originalname}`;
 
         const [sourceUrl, targetUrl] = await Promise.all([
-            uploadFileToBlob(
-                sourceBuffer,
-                sourceBlobPath,
-                'glossaries',
-                process.env.AZURE_STORAGE_ACCOUNT_NAME,
-                process.env.AZURE_STORAGE_ACCOUNT_KEY
-            ),
-            uploadFileToBlob(
-                targetBuffer,
-                targetBlobPath,
-                'glossaries',
-                process.env.AZURE_STORAGE_ACCOUNT_NAME,
-                process.env.AZURE_STORAGE_ACCOUNT_KEY
-            )
+            uploadFileToBlob(...),
+            uploadFileToBlob(...)
         ]);
+        */
+        const sourceUrl = null;
+        const targetUrl = null;
 
         // 2. Mine terms
         const result = await mineParallelDocuments({

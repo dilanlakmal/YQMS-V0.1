@@ -17,7 +17,9 @@ export default function GlossaryManager() {
 
   const handleMiningComplete = (result) => {
     // Switch to mining results tab to review extracted terms
-    setSelectedBatchId(result.miningBatchId || null);
+    // Handle both new flow (string ID) and legacy flow (result object)
+    const batchId = typeof result === "string" ? result : result?.miningBatchId;
+    setSelectedBatchId(batchId || null);
     setActiveTab("results");
     setRefreshKey((prev) => prev + 1);
   };

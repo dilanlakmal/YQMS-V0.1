@@ -7,6 +7,7 @@
 import React, { useState, useRef } from "react";
 import { ArrowRightLeft, FileText, Upload, Sparkles } from "lucide-react";
 import LanguageSelector from "../LanguageSelector";
+import DocumentIntelligenceFlow from "./DocumentIntelligenceFlow/DocumentIntelligenceFlow";
 import { API_BASE_URL } from "../../../../config";
 
 const VALID_EXTENSIONS = [".pdf", ".docx", ".txt", ".xlsx", ".xls"];
@@ -263,7 +264,7 @@ export default function MiningUpload({ onMiningComplete }) {
                         : "translator-text-foreground hover:bg-gray-100 dark:hover:bg-gray-700"
                         }`}
                 >
-                    📄 Single Document
+                    📄 Single Document (Azure Intelligence)
                 </button>
                 <button
                     onClick={() => handleModeSwitch("parallel")}
@@ -276,195 +277,166 @@ export default function MiningUpload({ onMiningComplete }) {
                 </button>
             </div>
 
-            {/* Language Selectors */}
-            <div className="flex flex-col md:flex-row bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                <div className="flex-1 min-w-0">
-                    <LanguageSelector
-                        value={sourceLanguage}
-                        onChange={setSourceLanguage}
-                        includeAuto={false}
-                        recentLanguages={['en', 'zh-Hans', 'km']}
-                        variant="tabs"
-                    />
-                </div>
-
-                <div className="hidden md:flex items-center justify-center px-2 border-l border-r border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/30">
-                    <button
-                        onClick={() => {
-                            setSourceLanguage(targetLanguage);
-                            setTargetLanguage(sourceLanguage);
-                        }}
-                        className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-500"
-                        title="Swap languages"
-                    >
-                        <ArrowRightLeft size={20} />
-                    </button>
-                </div>
-
-                <div className="flex-1 min-w-0">
-                    <LanguageSelector
-                        value={targetLanguage}
-                        onChange={setTargetLanguage}
-                        includeAuto={false}
-                        recentLanguages={['en', 'zh-Hans', 'km']}
-                        variant="tabs"
-                    />
-                </div>
-            </div>
-
-            {/* Domain Selector */}
-            <div className="flex items-center gap-4">
-                <label className="text-sm font-semibold translator-text-foreground whitespace-nowrap">Domain:</label>
-                <select
-                    value={domain}
-                    onChange={(e) => setDomain(e.target.value)}
-                    className="flex-1 translator-card translator-border translator-rounded px-3 py-2 text-sm translator-text-foreground"
-                >
-                    {DOMAINS.map(d => (
-                        <option key={d.value} value={d.value}>{d.label}</option>
-                    ))}
-                </select>
-            </div>
-
-            {/* File Upload Areas */}
             {mode === "single" ? (
-                /* Single Document Mode - One file upload */
-                <div className="flex flex-col">
-                    <FileDropZone
-                        file={singleFile}
-                        onFileSelect={(f) => handleFileSelect(f, "source")}
-                        onClear={() => { setSingleFile(null); if (singleInputRef.current) singleInputRef.current.value = ""; }}
-                        label="📄 Document to Mine"
-                        disabled={isMining}
-                        dragActive={dragActiveSource}
-                        inputRef={singleInputRef}
-                        {...createDragHandlers("source")}
-                    />
+                /* New Azure Document Intelligence Flow */
+                <div className="translator-card translator-rounded translator-border p-1">
+                    <DocumentIntelligenceFlow onMiningComplete={onMiningComplete} />
                 </div>
             ) : (
-                /* Parallel Documents Mode - Two file uploads side by side */
-                <div className="flex gap-4 flex-col md:flex-row">
-                    <FileDropZone
-                        file={parallelSourceFile}
-                        onFileSelect={(f) => handleFileSelect(f, "source")}
-                        onClear={() => { setParallelSourceFile(null); if (parallelSourceInputRef.current) parallelSourceInputRef.current.value = ""; }}
-                        label="📄 Source Document"
-                        disabled={isMining}
-                        dragActive={dragActiveSource}
-                        inputRef={parallelSourceInputRef}
-                        {...createDragHandlers("source")}
-                    />
-                    <FileDropZone
-                        file={parallelTargetFile}
-                        onFileSelect={(f) => handleFileSelect(f, "target")}
-                        onClear={() => { setParallelTargetFile(null); if (parallelTargetInputRef.current) parallelTargetInputRef.current.value = ""; }}
-                        label="📄 Target Document (Translated)"
-                        disabled={isMining}
-                        dragActive={dragActiveTarget}
-                        inputRef={parallelTargetInputRef}
-                        {...createDragHandlers("target")}
-                    />
-                </div>
-            )}
-
-            {/* Hidden file inputs */}
-            <input
-                ref={singleInputRef}
-                type="file"
-                accept=".pdf,.docx,.txt,.xlsx,.xls"
-                onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0], "source")}
-                className="hidden"
-                disabled={isMining}
-            />
-            <input
-                ref={parallelSourceInputRef}
-                type="file"
-                accept=".pdf,.docx,.txt,.xlsx,.xls"
-                onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0], "source")}
-                className="hidden"
-                disabled={isMining}
-            />
-            <input
-                ref={parallelTargetInputRef}
-                type="file"
-                accept=".pdf,.docx,.txt,.xlsx,.xls"
-                onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0], "target")}
-                className="hidden"
-                disabled={isMining}
-            />
-
-            {/* Error */}
-            {error && (
-                <div className="translator-rounded translator-border translator-destructive-bg-light p-3 text-sm translator-destructive">
-                    <p className="font-medium">⚠️ Error</p>
-                    <p className="text-xs mt-1">{error}</p>
-                </div>
-            )}
-
-            {/* Result Summary */}
-            {result && (
-                <div className="translator-rounded translator-border p-4 text-sm" style={{ backgroundColor: "oklch(0.9 0.05 150 / 0.15)" }}>
-                    <p className="font-semibold text-base mb-2">✅ Mining Complete!</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                        <div className="translator-card translator-rounded p-2 text-center">
-                            <p className="font-bold text-lg">{result.termsExtracted || 0}</p>
-                            <p className="translator-muted-foreground">Extracted</p>
+                /* Existing Parallel Documents Mode */
+                <>
+                    {/* Language Selectors */}
+                    <div className="flex flex-col md:flex-row bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                        <div className="flex-1 min-w-0">
+                            <LanguageSelector
+                                value={sourceLanguage}
+                                onChange={setSourceLanguage}
+                                includeAuto={false}
+                                recentLanguages={['en', 'zh-Hans', 'km']}
+                                variant="tabs"
+                            />
                         </div>
-                        <div className="translator-card translator-rounded p-2 text-center">
-                            <p className="font-bold text-lg text-green-600">{result.termsInserted || 0}</p>
-                            <p className="translator-muted-foreground">Inserted</p>
+
+                        <div className="hidden md:flex items-center justify-center px-2 border-l border-r border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/30">
+                            <button
+                                onClick={() => {
+                                    setSourceLanguage(targetLanguage);
+                                    setTargetLanguage(sourceLanguage);
+                                }}
+                                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-500"
+                                title="Swap languages"
+                            >
+                                <ArrowRightLeft size={20} />
+                            </button>
                         </div>
-                        <div className="translator-card translator-rounded p-2 text-center">
-                            <p className="font-bold text-lg text-yellow-600">{result.termsDuplicate || 0}</p>
-                            <p className="translator-muted-foreground">Duplicates</p>
-                        </div>
-                        <div className="translator-card translator-rounded p-2 text-center">
-                            <p className="font-bold text-lg text-red-600">{result.termsConflict || 0}</p>
-                            <p className="translator-muted-foreground">Conflicts</p>
+
+                        <div className="flex-1 min-w-0">
+                            <LanguageSelector
+                                value={targetLanguage}
+                                onChange={setTargetLanguage}
+                                includeAuto={false}
+                                recentLanguages={['en', 'zh-Hans', 'km']}
+                                variant="tabs"
+                            />
                         </div>
                     </div>
-                    {result.domain && (
-                        <p className="mt-3 text-xs translator-muted-foreground">
-                            Domain: <span className="font-medium">{result.domain}</span>
-                            {result.domainConfidence && ` (${(result.domainConfidence * 100).toFixed(0)}% confidence)`}
-                        </p>
+
+                    {/* Domain Selector */}
+                    <div className="flex items-center gap-4">
+                        <label className="text-sm font-semibold translator-text-foreground whitespace-nowrap">Domain:</label>
+                        <select
+                            value={domain}
+                            onChange={(e) => setDomain(e.target.value)}
+                            className="flex-1 translator-card translator-border translator-rounded px-3 py-2 text-sm translator-text-foreground"
+                        >
+                            {DOMAINS.map(d => (
+                                <option key={d.value} value={d.value}>{d.label}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Parallel File Uploads */}
+                    <div className="flex gap-4 flex-col md:flex-row">
+                        <FileDropZone
+                            file={parallelSourceFile}
+                            onFileSelect={(f) => handleFileSelect(f, "source")}
+                            onClear={() => { setParallelSourceFile(null); if (parallelSourceInputRef.current) parallelSourceInputRef.current.value = ""; }}
+                            label="📄 Source Document"
+                            disabled={isMining}
+                            dragActive={dragActiveSource}
+                            inputRef={parallelSourceInputRef}
+                            {...createDragHandlers("source")}
+                        />
+                        <FileDropZone
+                            file={parallelTargetFile}
+                            onFileSelect={(f) => handleFileSelect(f, "target")}
+                            onClear={() => { setParallelTargetFile(null); if (parallelTargetInputRef.current) parallelTargetInputRef.current.value = ""; }}
+                            label="📄 Target Document (Translated)"
+                            disabled={isMining}
+                            dragActive={dragActiveTarget}
+                            inputRef={parallelTargetInputRef}
+                            {...createDragHandlers("target")}
+                        />
+                    </div>
+
+                    {/* Result Summary (Legacy for Parallel) */}
+                    {result && (
+                        <div className="translator-rounded translator-border p-4 text-sm" style={{ backgroundColor: "oklch(0.9 0.05 150 / 0.15)" }}>
+                            <p className="font-semibold text-base mb-2">✅ Mining Complete!</p>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                                <div className="translator-card translator-rounded p-2 text-center">
+                                    <p className="font-bold text-lg">{result.termsExtracted || 0}</p>
+                                    <p className="translator-muted-foreground">Extracted</p>
+                                </div>
+                                <div className="translator-card translator-rounded p-2 text-center">
+                                    <p className="font-bold text-lg text-green-600">{result.termsInserted || 0}</p>
+                                    <p className="translator-muted-foreground">Inserted</p>
+                                </div>
+                                <div className="translator-card translator-rounded p-2 text-center">
+                                    <p className="font-bold text-lg text-yellow-600">{result.termsDuplicate || 0}</p>
+                                    <p className="translator-muted-foreground">Duplicates</p>
+                                </div>
+                                <div className="translator-card translator-rounded p-2 text-center">
+                                    <p className="font-bold text-lg text-red-600">{result.termsConflict || 0}</p>
+                                    <p className="translator-muted-foreground">Conflicts</p>
+                                </div>
+                            </div>
+                        </div>
                     )}
-                </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3">
+                        <button
+                            onClick={handleClearAll}
+                            disabled={isMining}
+                            className="translator-rounded translator-border translator-text-foreground px-4 py-3 font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                            Clear
+                        </button>
+                        <button
+                            onClick={handleMine}
+                            disabled={!parallelSourceFile || !parallelTargetFile || isMining}
+                            className="flex-1 translator-rounded translator-primary px-6 py-3 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 flex items-center justify-center gap-2"
+                        >
+                            {isMining ? (
+                                <>
+                                    <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                                    Mining Terms...
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles size={18} />
+                                    Mine Glossary Terms
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    {/* Hidden file inputs for Parallel */}
+                    <input
+                        ref={parallelSourceInputRef}
+                        type="file"
+                        accept=".pdf,.docx,.txt,.xlsx,.xls"
+                        onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0], "source")}
+                        className="hidden"
+                        disabled={isMining}
+                    />
+                    <input
+                        ref={parallelTargetInputRef}
+                        type="file"
+                        accept=".pdf,.docx,.txt,.xlsx,.xls"
+                        onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0], "target")}
+                        className="hidden"
+                        disabled={isMining}
+                    />
+                </>
             )}
 
-            {/* Action Buttons */}
-            <div className="flex gap-3">
-                <button
-                    onClick={handleClearAll}
-                    disabled={isMining || !hasFile}
-                    className="translator-rounded translator-border translator-text-foreground px-4 py-3 font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                    Clear
-                </button>
-                <button
-                    onClick={handleMine}
-                    disabled={!currentSourceFile || (mode === "parallel" && !currentTargetFile) || isMining}
-                    className="flex-1 translator-rounded translator-primary px-6 py-3 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 flex items-center justify-center gap-2"
-                >
-                    {isMining ? (
-                        <>
-                            <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
-                            Mining Terms...
-                        </>
-                    ) : (
-                        <>
-                            <Sparkles size={18} />
-                            Mine Glossary Terms
-                        </>
-                    )}
-                </button>
-            </div>
-
-            {/* Help text */}
+            {/* Shared Help text */}
             <p className="text-xs translator-muted-foreground text-center">
                 {mode === "single"
-                    ? "Upload a source document. AI will extract terms and translate them."
-                    : "Upload matching source and translated documents. AI will extract aligned term pairs."
+                    ? "Advanced Azure AI extraction with preview and page selection."
+                    : "Traditional parallel document mining for aligned Terminology extraction."
                 }
             </p>
         </div>
