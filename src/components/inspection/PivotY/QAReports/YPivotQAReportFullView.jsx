@@ -42,6 +42,10 @@ import {
   FileSpreadsheet,
   Gavel,
   Calculator,
+  Gauge,
+  Activity,
+  PenTool,
+  Zap,
 } from "lucide-react";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
 
@@ -737,6 +741,29 @@ const getProductImageUrl = (url) => {
   return `${baseUrl}${path}`;
 };
 
+// ==============================================================================
+// NEW HELPER: Technical Info Display Card (For EMB/Print)
+// ==============================================================================
+const TechInfoCard = ({ label, value, enabled, icon: Icon }) => (
+  <div
+    className={`flex items-center gap-3 p-3 rounded-lg border ${enabled ? "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700" : "bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 opacity-60"}`}
+  >
+    <div
+      className={`p-2 rounded-full ${enabled ? "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300" : "bg-gray-200 dark:bg-gray-800 text-gray-400"}`}
+    >
+      <Icon size={16} />
+    </div>
+    <div>
+      <p className="text-[9px] font-bold text-gray-500 uppercase">{label}</p>
+      <p
+        className={`text-sm font-bold ${enabled ? "text-gray-800 dark:text-gray-200" : "text-gray-400 italic"}`}
+      >
+        {enabled && value !== "" && value !== null ? value : "Disabled"}
+      </p>
+    </div>
+  </div>
+);
+
 // =============================================================================
 // DATA TRANSFORMATION HELPERS
 // =============================================================================
@@ -892,6 +919,7 @@ const YPivotQAReportFullView = () => {
     measurement: true,
     measurementDistribution: false,
     ppSheet: true,
+    techInfo: true,
   });
 
   const toggleSection = (key) =>
@@ -1152,8 +1180,14 @@ const YPivotQAReportFullView = () => {
       aqlConfig: details.aqlConfig,
       productType: details.productType,
       productTypeId: details.productTypeId,
+      embInfo: details.embInfo,
+      printInfo: details.printInfo,
     };
   }, [report]);
+
+  // Extract for easy access
+  const embInfo = config?.embInfo;
+  const printInfo = config?.printInfo;
 
   const lineTableConfig = useMemo(() => {
     return report?.inspectionConfig?.configGroups || [];
@@ -2749,6 +2783,112 @@ const YPivotQAReportFullView = () => {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* EMB / Print info */}
+        {(embInfo || printInfo) && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div
+              className={`bg-gradient-to-r ${printInfo ? "from-pink-600 to-rose-600" : "from-blue-600 to-indigo-600"} px-4 py-2.5 flex justify-between items-center cursor-pointer`}
+              onClick={() => toggleSection("techInfo")}
+            >
+              <h2 className="text-white font-bold text-sm flex items-center gap-2">
+                {printInfo ? (
+                  <Printer className="w-4 h-4" />
+                ) : (
+                  <Settings className="w-4 h-4" />
+                )}
+                {printInfo ? "Printing Info" : "EMB Info"}
+              </h2>
+              {expandedSections.techInfo ? (
+                <ChevronUp className="text-white w-4 h-4" />
+              ) : (
+                <ChevronDown className="text-white w-4 h-4" />
+              )}
+            </div>
+
+            {expandedSections.techInfo && (
+              <div className="p-4 space-y-3">
+                {/* EMB DISPLAY */}
+                {embInfo && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <TechInfoCard
+                        label="Speed"
+                        value={embInfo.speed?.value}
+                        enabled={embInfo.speed?.enabled}
+                        icon={Gauge}
+                      />
+                      <TechInfoCard
+                        label="Stitch"
+                        value={embInfo.stitch?.value}
+                        enabled={embInfo.stitch?.enabled}
+                        icon={Activity}
+                      />
+                      <TechInfoCard
+                        label="Needle Size"
+                        value={embInfo.needleSize?.value}
+                        enabled={embInfo.needleSize?.enabled}
+                        icon={PenTool}
+                      />
+                    </div>
+                    {embInfo.remarks && (
+                      <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700 flex gap-2">
+                        <MessageSquare className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 uppercase">
+                            Remarks
+                          </p>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">
+                            {embInfo.remarks}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* PRINT DISPLAY */}
+                {printInfo && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <TechInfoCard
+                        label="Machine Type"
+                        value={printInfo.machineType?.value}
+                        enabled={printInfo.machineType?.enabled}
+                        icon={Settings}
+                      />
+                      <TechInfoCard
+                        label="Speed"
+                        value={printInfo.speed?.value}
+                        enabled={printInfo.speed?.enabled}
+                        icon={Zap}
+                      />
+                      <TechInfoCard
+                        label="Pressure"
+                        value={printInfo.pressure?.value}
+                        enabled={printInfo.pressure?.enabled}
+                        icon={Activity}
+                      />
+                    </div>
+                    {printInfo.remarks && (
+                      <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700 flex gap-2">
+                        <MessageSquare className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 uppercase">
+                            Remarks
+                          </p>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">
+                            {printInfo.remarks}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 

@@ -20,7 +20,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ClipboardList,
-  Image
+  Image,
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
@@ -38,7 +38,7 @@ const InfoRow = ({ icon: Icon, label, value, color = "gray" }) => {
     blue: "text-blue-600 dark:text-blue-400",
     pink: "text-pink-600 dark:text-pink-400",
     cyan: "text-cyan-600 dark:text-cyan-400",
-    amber: "text-amber-600 dark:text-amber-400"
+    amber: "text-amber-600 dark:text-amber-400",
   };
 
   return (
@@ -129,15 +129,15 @@ const AQLConfigDisplay = ({ aqlConfig, inspectedQty }) => {
                 item.status === "Minor"
                   ? "bg-blue-50/50 dark:bg-blue-900/10"
                   : item.status === "Major"
-                  ? "bg-orange-50/50 dark:bg-orange-900/10"
-                  : "bg-red-50/50 dark:bg-red-900/10";
+                    ? "bg-orange-50/50 dark:bg-orange-900/10"
+                    : "bg-red-50/50 dark:bg-red-900/10";
 
               const textClass =
                 item.status === "Minor"
                   ? "text-blue-700 dark:text-blue-400"
                   : item.status === "Major"
-                  ? "text-orange-700 dark:text-orange-400"
-                  : "text-red-700 dark:text-red-400";
+                    ? "text-orange-700 dark:text-orange-400"
+                    : "text-red-700 dark:text-red-400";
 
               return (
                 <tr
@@ -196,7 +196,7 @@ const YPivotQAInspectionOrderDataSaveModal = ({
   user,
   orderState,
   reportState,
-  qualityPlanData
+  qualityPlanData,
 }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -260,8 +260,8 @@ const YPivotQAInspectionOrderDataSaveModal = ({
         src.items?.map((item) => ({
           status: item.status,
           ac: parseInt(item.ac) || 0,
-          re: parseInt(item.re) || 0
-        })) || []
+          re: parseInt(item.re) || 0,
+        })) || [],
     };
   };
 
@@ -273,6 +273,17 @@ const YPivotQAInspectionOrderDataSaveModal = ({
     try {
       // Prepare specific AQL payload
       const finalAqlConfig = prepareAqlPayload();
+
+      // DETERMINE IF WE NEED TO SAVE EMB/PRINT DATA
+      const reportTypeName = selectedTemplate?.ReportType || "";
+      const isEMB = reportTypeName.toLowerCase().includes("emb");
+      const isPrinting = reportTypeName.toLowerCase().includes("printing");
+
+      // Only include if relevant to the report type
+      const finalEmbInfo =
+        isEMB && !isPrinting && config.embInfo ? config.embInfo : null;
+      const finalPrintInfo =
+        isPrinting && config.printInfo ? config.printInfo : null;
 
       const payload = {
         inspectionDate,
@@ -313,20 +324,22 @@ const YPivotQAInspectionOrderDataSaveModal = ({
 
           productionStatus: qualityPlanData?.productionStatus || null,
           packingList: qualityPlanData?.packingList || null,
-          qualityPlanEnabled: selectedTemplate?.QualityPlan === "Yes"
-        }
+          qualityPlanEnabled: selectedTemplate?.QualityPlan === "Yes",
+          embInfo: finalEmbInfo,
+          printInfo: finalPrintInfo,
+        },
       };
 
       const response = await axios.post(
         `${API_BASE_URL}/api/fincheck-inspection/create-report`,
-        payload
+        payload,
       );
 
       if (response.data.success) {
         onConfirm({
           reportData: response.data.data,
           isNew: response.data.isNew,
-          message: response.data.message
+          message: response.data.message,
         });
       } else {
         setError(response.data.message || "Failed to save report");
@@ -334,7 +347,7 @@ const YPivotQAInspectionOrderDataSaveModal = ({
     } catch (err) {
       console.error("Save error:", err);
       setError(
-        err.response?.data?.message || "Failed to save inspection report"
+        err.response?.data?.message || "Failed to save inspection report",
       );
     } finally {
       setSaving(false);
@@ -382,7 +395,7 @@ const YPivotQAInspectionOrderDataSaveModal = ({
                     onError={(e) => {
                       e.target.style.display = "none";
                       e.target.parentElement.querySelector(
-                        ".fallback-icon"
+                        ".fallback-icon",
                       ).style.display = "flex";
                     }}
                   />
@@ -657,7 +670,7 @@ const YPivotQAInspectionOrderDataSaveModal = ({
         }
       `}</style>
     </div>,
-    document.body
+    document.body,
   );
 };
 
