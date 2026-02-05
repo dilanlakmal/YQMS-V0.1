@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import EditWord from "../../../utils/EditWord";
 import instructionService from "../../../../../services/instructionService";
-import { Copy, Package, Factory, ShoppingCart, Truck, AlertCircle, FileText, Ruler } from "lucide-react";
+import { Copy, Package, Factory, ShoppingCart, Truck, AlertCircle, FileText, Ruler, Plus } from "lucide-react";
 
 /**
  * Clean & Dynamic GprtFirstPage Template
@@ -42,10 +42,27 @@ const GprtFirstPage = ({
         // Clone deeply to maintain immutability
         const updated = JSON.parse(JSON.stringify(instruction));
 
-        // Helper to find target object by path
-        const getNestedObject = (obj, p) => p.split('.').reduce((acc, part) => acc && acc[part], obj);
+        // Helper to find target object by path, creating it if missing
+        const parts = path.split('.');
+        let current = updated;
 
-        const targetObj = getNestedObject(updated, path);
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+
+            // Check if we are at the last part (the target object itself)
+            if (i === parts.length) break;
+
+            if (!current[part]) {
+                // If next part is a number index, initialize as array, otherwise object
+                const nextPart = parts[i + 1];
+                const isNextIndex = nextPart && /^\d+$/.test(nextPart);
+                current[part] = isNextIndex ? [] : {};
+            }
+            current = current[part];
+        }
+
+        const targetObj = current;
+        // Verify targetObj is valid (it should be unless logic failed)
         if (!targetObj) return;
 
         const propName = isLabel ? 'field_name' : 'annotation_value';
@@ -60,6 +77,7 @@ const GprtFirstPage = ({
                 currentData.english = newValue;
             }
         } else {
+            // Initialize if missing
             targetObj[propName] = newValue;
         }
 
@@ -80,8 +98,10 @@ const GprtFirstPage = ({
     /**
      * Helper to render editable/non-editable fields with enhanced UI
      */
-    const EditableCell = ({ label, value, path, icon: Icon }) => {
+    const EditableCell = ({ label, value, path, icon: Icon, defaultLabel = "Label" }) => {
         const isEditable = step === "Preview" || step === "edit";
+        const labelText = getDisplayText(label) || defaultLabel;
+        const valueText = getDisplayText(value);
 
         return (
             <div className="group relative overflow-hidden rounded-xl bg-slate-50 border border-slate-200 p-4 hover:shadow-md transition-all duration-300">
@@ -89,22 +109,50 @@ const GprtFirstPage = ({
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500">
                         {Icon && <Icon className="w-3.5 h-3.5" />}
                         {isEditable ? (
-                            <EditWord word={getDisplayText(label)} onChange={(val) => handleUpdate(path, true, val)} />
+                            <EditWord word={labelText} onChange={(val) => handleUpdate(path, true, val)} />
                         ) : (
-                            getDisplayText(label) || "LABEL"
+                            labelText
                         )}
                     </div>
                 </div>
                 <div className="text-xl font-bold text-slate-900 break-words leading-tight">
                     {isEditable ? (
-                        <EditWord word={getDisplayText(value)} onChange={(val) => handleUpdate(path, false, val)} />
+                        <EditWord word={valueText || "Click to add"} onChange={(val) => handleUpdate(path, false, val)} />
                     ) : (
-                        getDisplayText(value) || "-"
+                        valueText || "-"
                     )}
                 </div>
                 <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-slate-100/0 to-slate-200/50 rounded-bl-full -mr-8 -mt-8 pointer-events-none" />
             </div>
         );
+    };
+
+    /**
+     * Handler to add a new instruction note
+     */
+    const handleAddNote = async () => {
+        if (!setinstruction || !instruction) return;
+        const updated = JSON.parse(JSON.stringify(instruction));
+
+        if (!updated.instruction_notes) {
+            updated.instruction_notes = [];
+        }
+
+        updated.instruction_notes.push({
+            field_name: "New Point",
+            annotation_value: "Description"
+        });
+
+        setinstruction(updated);
+
+        try {
+            const docId = instruction.document_id || instruction.id || instruction._id;
+            if (docId) {
+                await instructionService.document.updateInstruction(docId, updated);
+            }
+        } catch (error) {
+            console.error("Failed to add note:", error);
+        }
     };
 
     if (!instruction) {
@@ -174,6 +222,7 @@ const GprtFirstPage = ({
                 <div className="lg:col-span-5 flex flex-col gap-4">
                     <EditableCell
                         label={instruction.product_number?.field_name}
+                        defaultLabel="Product Number"
                         value={instruction.product_number?.annotation_value}
                         path="product_number"
                         icon={Copy}
@@ -181,6 +230,7 @@ const GprtFirstPage = ({
 
                     <EditableCell
                         label={instruction.factory?.field_name}
+                        defaultLabel="Factory"
                         value={instruction.factory?.annotation_value}
                         path="factory"
                         icon={Factory}
@@ -189,12 +239,14 @@ const GprtFirstPage = ({
                     <div className="grid grid-cols-2 gap-4">
                         <EditableCell
                             label={instruction.customer?.purchase?.quantity?.field_name}
+                            defaultLabel="Quantity"
                             value={instruction.customer?.purchase?.quantity?.annotation_value}
                             path="customer.purchase.quantity"
                             icon={ShoppingCart}
                         />
                         <EditableCell
                             label={instruction.customer?.purchase?.order_number?.field_name}
+                            defaultLabel="PO Number"
                             value={instruction.customer?.purchase?.order_number?.annotation_value}
                             path="customer.purchase.order_number"
                             icon={FileText}
@@ -203,6 +255,7 @@ const GprtFirstPage = ({
 
                     <EditableCell
                         label={instruction.shipping_remark?.field_name}
+                        defaultLabel="Shipping Remark"
                         value={instruction.shipping_remark?.annotation_value}
                         path="shipping_remark"
                         icon={Truck}
@@ -211,43 +264,56 @@ const GprtFirstPage = ({
             </div>
 
             {/* Instruction Notes Section */}
-            {instruction.instruction_notes?.length > 0 && (
-                <div className="mb-12">
-                    <div className="flex items-center gap-4 mb-6">
-                        <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
-                            <AlertCircle className="w-5 h-5" />
-                        </div>
-                        <h2 className="text-lg font-black uppercase tracking-widest text-slate-800">Production Instructions</h2>
-                        <div className="h-px bg-slate-200 flex-grow" />
+            <div className="mb-12">
+                <div className="flex items-center gap-4 mb-6">
+                    <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
+                        <AlertCircle className="w-5 h-5" />
                     </div>
+                    <h2 className="text-lg font-black uppercase tracking-widest text-slate-800">Production Instructions</h2>
+                    <div className="h-px bg-slate-200 flex-grow" />
+                    {(step === "Preview" || step === "edit") && (
+                        <button
+                            onClick={handleAddNote}
+                            className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white bg-slate-900 rounded-lg hover:bg-slate-700 transition-colors"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Add Point
+                        </button>
+                    )}
+                </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {instruction.instruction_notes.map((note, index) => (
-                            <div key={index} className="flex gap-4 p-4 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200/60 group">
-                                <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold border border-indigo-100">
-                                    {index + 1}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {instruction.instruction_notes?.map((note, index) => (
+                        <div key={index} className="flex gap-4 p-4 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200/60 group">
+                            <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold border border-indigo-100">
+                                {index + 1}
+                            </span>
+                            <div className="flex flex-col flex-grow">
+                                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-1">
+                                    {(step === "Preview" || step === "edit") ? (
+                                        <EditWord word={getDisplayText(note?.field_name)} onChange={(val) => handleUpdate(`instruction_notes.${index}`, true, val)} />
+                                    ) : (
+                                        getDisplayText(note?.field_name) || "POINT"
+                                    )}
                                 </span>
-                                <div className="flex flex-col flex-grow">
-                                    <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-1">
-                                        {(step === "Preview" || step === "edit") ? (
-                                            <EditWord word={getDisplayText(note?.field_name)} onChange={(val) => handleUpdate(`instruction_notes.${index}`, true, val)} />
-                                        ) : (
-                                            getDisplayText(note?.field_name) || "POINT"
-                                        )}
-                                    </span>
-                                    <div className="text-base font-medium text-slate-800 leading-relaxed">
-                                        {(step === "Preview" || step === "edit") ? (
-                                            <EditWord word={getDisplayText(note?.annotation_value)} onChange={(val) => handleUpdate(`instruction_notes.${index}`, false, val)} />
-                                        ) : (
-                                            getDisplayText(note?.annotation_value)
-                                        )}
-                                    </div>
+                                <div className="text-base font-medium text-slate-800 leading-relaxed">
+                                    {(step === "Preview" || step === "edit") ? (
+                                        <EditWord word={getDisplayText(note?.annotation_value)} onChange={(val) => handleUpdate(`instruction_notes.${index}`, false, val)} />
+                                    ) : (
+                                        getDisplayText(note?.annotation_value)
+                                    )}
                                 </div>
                             </div>
-                        ))}
-                    </div>
+                        </div>
+                    ))}
+                    {(!instruction.instruction_notes || instruction.instruction_notes.length === 0) && (
+                        <div className="col-span-full py-8 text-center text-slate-400 text-sm font-medium italic bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                            No production instructions listed.
+                            {(step === "Preview" || step === "edit") && " Click 'Add Point' to create one."}
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
 
             {/* NEW: Measurement Table Section */}
             <div className="mb-16">
@@ -255,7 +321,6 @@ const GprtFirstPage = ({
                     <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
                         <Ruler className="w-5 h-5" />
                     </div>
-                    <h2 className="text-lg font-black uppercase tracking-widest text-slate-800">Measurement Chart / Size Spec</h2>
                     <div className="h-px bg-slate-200 flex-grow" />
                 </div>
 
