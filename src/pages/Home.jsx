@@ -10,7 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/authentication/AuthContext";
 import { useTranslation } from "react-i18next";
 import { API_BASE_URL } from "../../config";
-import { Loader2 } from "lucide-react";
+// import { Loader2 } from "lucide-react";
 
 import {
   Layers,
@@ -748,7 +748,15 @@ function Home() {
             image: "assets/Home/supplier-issues.png",
             title: t("home.supplier-issues"),
             description: "Supplier Issues Sub-Con Fty"
-          }
+          },
+          {
+            path: "/Launch-washing-machine-test",
+            roles: ["QC Washing", "QA"],
+            image: "assets/Home/Launch-washing-machine-test.png",
+            title: "Launch Washing Machine Test",
+            description: "Launch Washing Machine Test",
+            imageSize: "large",
+          },
         ]
       },
       {
