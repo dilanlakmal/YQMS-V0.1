@@ -197,6 +197,59 @@ export const getOrderDetailsWashing = async (req, res) => {
     }
 };
 
+// New Endpoint: Get comprehensive order details (colors, quantities) strictly from dt_orders
+export const getWashingOrderDetailsStrict = async (req, res) => {
+    try {
+        const { moNo } = req.params;
+        // Querying the dt_orders collection using the ymProdConnection (same as ymEco defined in other files)
+
+        const order = await ymProdConnection.db
+            .collection("dt_orders")
+            .findOne({ Order_No: moNo });
+
+        if (!order) {
+            return res
+                .status(404)
+                .json({ error: "Order not found in dt_orders collection." });
+        }
+
+        // Extract unique colors for the dropdown
+        const colorOptions = [
+            ...new Set(order.OrderColors.map((c) => c.Color.trim()))
+        ];
+
+        // Create a map of color to its size quantities
+        const colorQtyBySize = {};
+        order.OrderColors.forEach((colorObj) => {
+            const color = colorObj.Color.trim();
+            colorQtyBySize[color] = {};
+            colorObj.OrderQty.forEach((sizeEntry) => {
+                const sizeName = Object.keys(sizeEntry)[0].split(";")[0].trim();
+                const quantity = sizeEntry[sizeName];
+                if (quantity > 0) {
+                    colorQtyBySize[color][sizeName] = quantity;
+                }
+            });
+        });
+
+        res.json({
+            custStyle: order.CustStyle || "N/A",
+            mode: order.Mode || "N/A",
+            country: order.Country || "N/A",
+            origin: order.Origin || "N/A",
+            totalOrderQty: order.TotalQty,
+            colorOptions: colorOptions.map((c) => ({ value: c, label: c })),
+            colorQtyBySize
+        });
+    } catch (error) {
+        console.error(
+            `Error fetching order details for MO No ${req.params.moNo}:`,
+            error
+        );
+        res.status(500).json({ error: "Failed to fetch order details." });
+    }
+};
+
 // Update /api/order-sizes endpoint
 export const getOrderSizesWashing = async (req, res) => {
     try {
@@ -233,5 +286,151 @@ export const getOrderSizesWashing = async (req, res) => {
         res.json(sizesWithDetails);
     } catch (error) {
         res.status(500).json({ error: "Failed to fetch sizes" });
+    }
+};
+
+// New Endpoint: Get measurement specs for washing testing
+export const getMeasurmentSpecWashing = async (req, res) => {
+    const { orderNo } = req.params;
+    const collection = ymProdConnection.db.collection("dt_orders");
+    const buyerSpecCollection = ymProdConnection.db.collection("buyerspectemplates");
+
+    try {
+        const orders = await collection.find({ Order_No: orderNo }).toArray();
+
+        if (!orders || orders.length === 0) {
+            return res.status(200).json({
+                success: false,
+                message: `Order '${orderNo}' not found.`,
+                beforeWashSpecs: [],
+                afterWashSpecs: [],
+                beforeWashGrouped: {},
+                afterWashGrouped: {}
+            });
+        }
+
+        const order = orders[0];
+        let measurementSpecs = [];
+
+        // Check various possible locations for measurement data
+        if (order.MeasurementSpecs && Array.isArray(order.MeasurementSpecs)) {
+            measurementSpecs = order.MeasurementSpecs;
+        } else if (order.Specs && Array.isArray(order.Specs)) {
+            measurementSpecs = order.Specs;
+        }
+
+        const beforeWashSpecs = [];
+        const afterWashSpecs = [];
+        const beforeWashByK = {};
+        const afterWashByK = {};
+
+        // Process BeforeWashSpecs and AfterWashSpecs arrays
+        if (order.BeforeWashSpecs && Array.isArray(order.BeforeWashSpecs)) {
+            order.BeforeWashSpecs.forEach((spec) => {
+                if (spec.MeasurementPointEngName && spec.Specs && Array.isArray(spec.Specs)) {
+                    const kValue = spec.kValue || "NA";
+                    const pointName = spec.MeasurementPointEngName;
+                    if (!beforeWashByK[kValue]) {
+                        beforeWashByK[kValue] = new Map();
+                    }
+                    if (!beforeWashByK[kValue].has(pointName)) {
+                        beforeWashByK[kValue].set(pointName, {
+                            MeasurementPointEngName: pointName,
+                            Specs: spec.Specs,
+                            ToleranceMinus: spec.TolMinus,
+                            TolerancePlus: spec.TolPlus,
+                            kValue: kValue
+                        });
+                    }
+                }
+            });
+        }
+
+        if (order.AfterWashSpecs && Array.isArray(order.AfterWashSpecs)) {
+            order.AfterWashSpecs.forEach((spec) => {
+                if (spec.MeasurementPointEngName && spec.Specs && Array.isArray(spec.Specs)) {
+                    const kValue = spec.kValue || "NA";
+                    const pointName = spec.MeasurementPointEngName;
+                    if (!afterWashByK[kValue]) {
+                        afterWashByK[kValue] = new Map();
+                    }
+                    if (!afterWashByK[kValue].has(pointName)) {
+                        afterWashByK[kValue].set(pointName, {
+                            MeasurementPointEngName: pointName,
+                            Specs: spec.Specs,
+                            ToleranceMinus: spec.TolMinus,
+                            TolerancePlus: spec.TolPlus,
+                            kValue: kValue
+                        });
+                    }
+                }
+            });
+        }
+
+        // Convert to grouped arrays
+        const beforeWashGrouped = {};
+        const afterWashGrouped = {};
+
+        Object.keys(beforeWashByK).forEach((kValue) => {
+            beforeWashGrouped[kValue] = Array.from(beforeWashByK[kValue].values());
+        });
+
+        Object.keys(afterWashByK).forEach((kValue) => {
+            afterWashGrouped[kValue] = Array.from(afterWashByK[kValue].values());
+        });
+
+        // For backward compatibility, also provide flat arrays
+        Object.values(beforeWashGrouped).forEach((group) => {
+            beforeWashSpecs.push(...group);
+        });
+
+        Object.values(afterWashGrouped).forEach((group) => {
+            afterWashSpecs.push(...group);
+        });
+
+        // Fetch buyerspectemplate data for default measurement points
+        let buyerSpecData = null;
+        try {
+            buyerSpecData = await buyerSpecCollection.findOne({
+                moNo: orderNo
+            });
+
+            if (!buyerSpecData && order.Style) {
+                buyerSpecData = await buyerSpecCollection.findOne({
+                    moNo: order.Style
+                });
+            }
+        } catch (error) {
+            console.log("Error fetching buyerspectemplate for orderNo:", orderNo, error);
+        }
+
+        if (beforeWashSpecs.length === 0 && afterWashSpecs.length === 0) {
+            return res.json({
+                success: true,
+                beforeWashSpecs: [],
+                afterWashSpecs: [],
+                beforeWashGrouped: {},
+                afterWashGrouped: {},
+                buyerSpecData: buyerSpecData,
+                isDefault: true,
+                message: "No measurement points available for this Mono."
+            });
+        } else {
+            return res.json({
+                success: true,
+                beforeWashSpecs: beforeWashSpecs,
+                afterWashSpecs: afterWashSpecs,
+                beforeWashGrouped: beforeWashGrouped,
+                afterWashGrouped: afterWashGrouped,
+                buyerSpecData: buyerSpecData,
+                isDefault: false
+            });
+        }
+    } catch (error) {
+        console.error(`Error fetching measurement specs for Mono ${orderNo} :`, error);
+        res.status(500).json({
+            success: false,
+            message: "Server error while fetching measurement specs."
+        });
     }
 };

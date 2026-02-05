@@ -63,11 +63,11 @@ export const useOrderData = () => {
     }
 
     try {
-      // Always try to fetch sizes from ANF specs as they are most relevant for many reports
-      fetchAnfAvailableSizes(trimmedOrderNo);
+      // Removed fetchAnfAvailableSizes call as per user request to use only strict endpoint logic
+      // fetchAnfAvailableSizes(trimmedOrderNo);
 
       const response = await fetch(
-        `${API_BASE_URL}/api/washing/order-details/${encodeURIComponent(trimmedOrderNo)}`
+        `${API_BASE_URL}/api/washing/strict-order-details/${encodeURIComponent(trimmedOrderNo)}`
       );
 
       if (response.ok) {
@@ -84,9 +84,10 @@ export const useOrderData = () => {
         }
 
         // Extract colors from OrderColors array
-        if (orderData.colors && Array.isArray(orderData.colors)) {
-          const colorNames = orderData.colors
-            .map(c => c.original || c)
+        // Extract colors from colorOptions array (returned by new strict endpoint)
+        if (orderData.colorOptions && Array.isArray(orderData.colorOptions)) {
+          const colorNames = orderData.colorOptions
+            .map(c => c.value || c.label)
             .filter(Boolean);
           const uniqueColors = [...new Set(colorNames)];
           setAvailableColors(uniqueColors);
@@ -94,8 +95,18 @@ export const useOrderData = () => {
           setAvailableColors([]);
         }
 
-        // Extract sizes from sizeList if present
-        if (orderData.sizeList && Array.isArray(orderData.sizeList) && orderData.sizeList.length > 0) {
+        // Extract sizes from colorQtyBySize if available (from strict endpoint)
+        if (orderData.colorQtyBySize) {
+          const allSizes = new Set();
+          Object.values(orderData.colorQtyBySize).forEach(sizesMap => {
+            Object.keys(sizesMap).forEach(size => allSizes.add(size));
+          });
+          if (allSizes.size > 0) {
+            setAvailableSizes([...allSizes]);
+          }
+        }
+        // Fallback to sizeList if present
+        else if (orderData.sizeList && Array.isArray(orderData.sizeList) && orderData.sizeList.length > 0) {
           setAvailableSizes(orderData.sizeList);
         }
 
@@ -228,8 +239,8 @@ export const useOrderData = () => {
             setAvailableSizes(sizes);
           }
 
-          // Also try to fetch sizes from ANF specs
-          fetchAnfAvailableSizes(trimmedOrderNo);
+          // Also try to fetch sizes from ANF specs - Disabled as per user request
+          // fetchAnfAvailableSizes(trimmedOrderNo);
 
           // Build fabrication string from FabricContent array
           if (result.data.FabricContent && Array.isArray(result.data.FabricContent) && result.data.FabricContent.length > 0) {

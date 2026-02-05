@@ -8,11 +8,31 @@ const CARE_CATEGORIES = [
         id: 'machineWash',
         label: 'MACHINE WASH',
         options: [
-            { id: 'wash-tub', icon: 'machine-wash.png', items: ['machine-wash.png', 'machine-wash-permanent-press.png', 'machine-wash-delicate.png', 'hand-wasing.png', 'do-not-wash.png'] },
-            { id: 'temp-30', icon: 'water-temperature30.png', items: ['water-temperature30.png', 'box-30.png', 'box-line1-30.png'] },
-            { id: 'temp-40', icon: 'water-temperature40.png', items: ['water-temperature40.png', 'box-40.png', 'box-line1-40.png'] },
-            { id: 'temp-50', icon: 'water-temperature50.png', items: ['water-temperature50.png', 'box-50.png'] },
-            { id: 'temp-60', icon: 'num60-line2.png', items: ['num60-line2.png', 'box-60.png', 'box-line1-60.png'] },
+            {
+                id: 'wash-type',
+                icon: 'machine-wash.png',
+                items: ['machine-wash.png', 'machine-wash-permanent-press.png', 'machine-wash-delicate.png', 'hand-wasing.png', 'do-not-wash.png']
+            },
+            {
+                id: 'temp-dots',
+                icon: 'water-temperature30.png',
+                items: ['water-temperature30.png', 'water-temperature40.png', 'water-temperature50.png']
+            },
+            {
+                id: 'temp-dots-lines',
+                icon: 'dote1-line1.png',
+                items: ['dote1-line1.png', 'dote2-line1.png', 'dote3-line1.png', 'dote1-line2.png', 'dote2-line2.png', 'dote3-line2.png']
+            },
+            {
+                id: 'temp-numbers',
+                icon: 'box-30.png',
+                items: ['box-30.png', 'box-40.png', 'box-50.png', 'box-60.png', 'box-70.png', 'box-95.png']
+            },
+            {
+                id: 'temp-numbers-lines',
+                icon: 'box-line1-30.png',
+                items: ['box-line1-30.png', 'box-line1-40.png', 'box-line1-60.png', 'num30-line2.png', 'num40-line2.png', 'num60-line2.png']
+            },
         ]
     },
     {
@@ -21,6 +41,7 @@ const CARE_CATEGORIES = [
         options: [
             { id: 'bleach-allowed', icon: 'bleach.png', items: ['bleach.png'] },
             { id: 'non-chlorine', icon: 'non-chlorine-bleach.png', items: ['non-chlorine-bleach.png'] },
+            { id: 'chlorine', icon: 'chlorine.png', items: ['chlorine.png'] },
             { id: 'do-not-bleach', icon: 'not-bleach.png', items: ['not-bleach.png', 'not-bleach1.png'] },
         ]
     },
@@ -28,10 +49,10 @@ const CARE_CATEGORIES = [
         id: 'tumbleDry',
         label: 'TUMBLE DRY',
         options: [
-            { id: 'tumble-normal', icon: 'tumble-dry.png', items: ['tumble-dry.png'] },
-            { id: 'tumble-low', icon: 'tb-dry-gentle-low-heat.png', items: ['tb-dry-gentle-low-heat.png', 'tb-dry-permanent-press-low-heat.png'] },
-            { id: 'tumble-medium', icon: 'tb-dry-gentle-medium-heat.png', items: ['tb-dry-gentle-medium-heat.png', 'tb-dry-permanent-press-medium-heat.png'] },
-            { id: 'tumble-no-heat', icon: 'tb-dry-gentle-no-heat.png', items: ['tb-dry-gentle-no-heat.png', 'tb-dry-permanent-press-no-heat.png'] },
+            { id: 'tumble-normal', icon: 'tumble-dry.png', items: ['tumble-dry.png', 'tb-dry-normal-no-heat.png', 'tb-dry-permanent-press-no-heat.png', 'tb-dry-gentle-no-heat.png', 'low-heat1.png', 'medium-heat.png', 'high-heat.png'] },
+            { id: 'tumble-low', icon: 'tb-dry-gentle-low-heat.png', items: ['tb-dry-permanent-press-low-heat.png', 'tb-dry-permanent-press-medium-heat.png', 'tb-dry-gentle-low-heat.png'] },
+            { id: 'tumble-medium', icon: 'tb-dry-gentle-medium-heat.png', items: ['tb-dry-gentle-medium-heat.png'] },
+            // { id: 'tumble-no-heat', icon: 'tb-dry-gentle-no-heat.png', items: [] },
             { id: 'do-not-tumble', icon: 'do-not-tumble-dry.png', items: ['do-not-tumble-dry.png'] },
         ]
     },
@@ -39,37 +60,125 @@ const CARE_CATEGORIES = [
         id: 'dry',
         label: 'DRY',
         options: [
-            { id: 'line-dry', icon: 'line-dry.png', items: ['line-dry.png'] },
+            { id: 'dry-normal', icon: 'dry.png', items: ['dry.png'] },
+            { id: 'do-not-dry', icon: 'do-not-dry34.png', items: ['do-not-dry34.png'] },
+            { id: 'dry-custom', icon: 'care-label.png', items: ['care-label.png'] }, // Specific care label drying instruction
             { id: 'dry-flat', icon: 'dry-flat.png', items: ['dry-flat.png'] },
-            { id: 'dip-dry', icon: 'dry.png', items: ['dry.png'] }, // Assuming 'dry.png' might be drip dry or generic
-            { id: 'do-not-dry', icon: 'do-not-dry.png', items: ['do-not-dry.png'] },
+            { id: 'line-dry', icon: 'line-dry.png', items: ['line-dry.png'] },
+            { id: 'wring', icon: 'Wring.png', items: ['Wring.png', 'do-not-wring.png'] },
         ]
     },
     {
         id: 'iron',
         label: 'IRON',
         options: [
+            { id: 'iron-any', icon: 'iron-empty.png', items: ['iron-empty.png'] },
             { id: 'iron-low', icon: 'iron-low-temp.png', items: ['iron-low-temp.png'] },
             { id: 'iron-medium', icon: 'iron-medium-temp.png', items: ['iron-medium-temp.png'] },
             { id: 'iron-high', icon: 'iron-hight-temp.png', items: ['iron-hight-temp.png'] },
-            { id: 'no-steam', icon: 'no-steam.png', items: ['no-steam.png', 'no-steam-finishing.png'] },
             { id: 'do-not-iron', icon: 'do-not-iron.png', items: ['do-not-iron.png'] },
+            { id: 'no-steam', icon: 'no-steam.png', items: ['no-steam.png'] },
         ]
     },
     {
         id: 'dryClean',
         label: 'DRY CLEAN',
         options: [
-            { id: 'dry-clean', icon: 'dry-clean.png', items: ['dry-clean.png', 'black-circle.png'] },
-            { id: 'dry-clean-p', icon: 'petroleum-sovent-only.png', items: ['petroleum-sovent-only.png'] },
-            { id: 'dry-clean-f', icon: 'dry-f-002.png', items: ['dry-f-002.png', 'dry-f-003.png'] },
-            { id: 'wet-clean', icon: 'wet-cleaning.png', items: ['wet-cleaning.png'] },
-            { id: 'do-not-dry-clean', icon: 'do-not-dryclean.png', items: ['do-not-dryclean.png'] },
+            {
+                id: 'dry-clean-all',
+                icon: 'dry-clean.png',
+                items: [
+                    'dry-clean.png',
+                    'do-not-dryclean.png',
+                    'do-not-dry.png',
+                    'wet-cleaning.png',
+                    'any-solvent.png',
+                    'petroleum-sovent-only.png',
+                    'Any-sx-tetrachlorethylene.png',
+                    'reduced.png',
+                    'short-cycle.png',
+                    'low-heat.png',
+                    'no-steam-finishing.png',
+                    'gentle-cleaning-pce.png',
+                    'very-gentle-cleaning-pce.png',
+                    'dry.png'
+                ]
+            }
         ]
     }
 ];
 
 // Simplified Grid View for the Dropdown
+
+const DEFAULT_SCALE = 'scale-125';
+
+const CUSTOM_SCALES = {
+    // Machine Wash
+    'machine-wash.png': 'scale-125',
+    'hand-wasing.png': 'scale-125',
+    'do-not-wash.png': 'scale-125',
+
+    // Water Temp
+    'water-temperature30.png': 'scale-125',
+    'water-temperature40.png': 'scale-125',
+    'water-temperature50.png': 'scale-125',
+
+    // Bleach (Triangles often need to be visually larger)
+    'bleach.png': 'scale-[1.0]',
+    'non-chlorine-bleach.png': 'scale-[1.0]',
+    'not-bleach.png': 'scale-[1.0]',
+    'not-bleach1.png': 'scale-[1.0]',
+
+    // Tumble Dry
+    'tumble-dry.png': 'scale-[1.1]',
+    'tb-dry-normal-no-heat.png': 'scale-[1.1]',
+    'tb-dry-permanent-press-no-heat.png': 'scale-[1.2]',
+    'tb-dry-gentle-no-heat.png': 'scale-[1.2]',
+    'low-heat1.png': 'scale-[1.0]',
+    'medium-heat.png': 'scale-[1.0]',
+    'high-heat.png': 'scale-[1.0]',
+    'tb-dry-permanent-press-low-heat.png': 'scale-[1.3]',
+    'tb-dry-permanent-press-medium-heat.png': 'scale-[1.3]',
+    'tb-dry-gentle-low-heat.png': 'scale-[1.3]',
+    'tb-dry-gentle-medium-heat.png': 'scale-[1.3]',
+    'do-not-tumble-dry.png': 'scale-[1.0]',
+
+
+    // Dry
+    'line-dry.png': 'scale-[1.2]',
+    'dry-flat.png': 'scale-[1.2]',
+    'dry.png': 'scale-[1.2]',
+    'do-not-dry.png': 'scale-[1.2]',
+
+
+    // Iron
+    'iron-empty.png': 'scale-[1.5]',
+    'iron-low-temp.png': 'scale-[1.5]',
+    'iron-medium-temp.png': 'scale-[1.5]',
+    'iron-hight-temp.png': 'scale-[1.5]',
+    'no-steam.png': 'scale-[1.5]',
+    'do-not-iron.png': 'scale-[1.5]',
+
+    // Dry Clean
+    'dry-clean.png': 'scale-[0.8]',
+    'do-not-dryclean.png': 'scale-[1.9]',
+    // 'do-not-dry.png': 'scale-[2.4]', // Duplicate removed
+    'wet-cleaning.png': 'scale-[1.1]',
+    'any-solvent.png': 'scale-[1.1]',
+    'petroleum-sovent-only.png': 'scale-[0.9]',
+    'Any-sx-tetrachlorethylene.png': 'scale-[1.0]',
+    'reduced.png': 'scale-[1.0]',
+    'short-cycle.png': 'scale-[1.0]',
+    'low-heat.png': 'scale-[1.0]',
+    'no-steam-finishing.png': 'scale-[1.0]',
+    'gentle-cleaning-pce.png': 'scale-[1.0]',
+    'very-gentle-cleaning-pce.png': 'scale-[1.1]',
+    // 'dry.png': 'scale-[1.0]', // Shared with Dry category - Duplicate removed
+};
+
+const getIconScale = (iconName) => {
+    return CUSTOM_SCALES[iconName] || DEFAULT_SCALE;
+};
 const CareSymbolsSelector = ({ value = {}, onChange }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -122,7 +231,7 @@ const CareSymbolsSelector = ({ value = {}, onChange }) => {
                                 <img
                                     src={`${ASSET_PATH}${icon}`}
                                     alt={category}
-                                    className="w-8 h-8 object-contain"
+                                    className={`w-8 h-8 object-contain transform ${getIconScale(icon)} origin-center`}
                                     onError={(e) => e.target.style.display = 'none'}
                                 />
                             </div>
@@ -163,7 +272,7 @@ const CareSymbolsSelector = ({ value = {}, onChange }) => {
                                                         <img
                                                             src={`${ASSET_PATH}${itemIcon}`}
                                                             alt={itemIcon}
-                                                            className="w-8 h-8 md:w-10 md:h-10 object-contain block mx-auto"
+                                                            className={`w-8 h-8 md:w-10 md:h-10 object-contain block mx-auto transform ${getIconScale(itemIcon)} origin-center transition-transform hover:scale-[1.8]`}
                                                         />
                                                     </button>
                                                 ))}

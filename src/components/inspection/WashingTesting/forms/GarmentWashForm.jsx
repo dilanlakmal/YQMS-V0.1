@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Upload, Camera, X, Send, RotateCw, Plus, Trash2, Calendar, CheckCircle2, XCircle, Check, Hash, Maximize2, Save, Edit } from "lucide-react";
-import { DatePicker } from "antd";
+import { DatePicker, Select } from "antd";
+import axios from "axios";
 import dayjs from "dayjs";
 import { API_BASE_URL } from "../../../../../config";
 import CareSymbolsSelector from "./CareSymbolsSelector";
@@ -109,6 +110,10 @@ const GarmentWashForm = ({
     const [isExporting, setIsExporting] = useState(false);
     const [isShrinkageSaved, setIsShrinkageSaved] = useState(false);
 
+    // Users State
+    const [users, setUsers] = useState([]);
+    const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
     // Measurement specs state (same as MeasurementDetailsSection)
     const [measurementSpecs, setMeasurementSpecs] = useState({
         beforeWash: [],
@@ -125,7 +130,7 @@ const GarmentWashForm = ({
 
     // Derived values for the header
     const filterCriteria = {
-        styleNo: formData.style || 'N/A',
+        styleNo: formData.moNo || 'N/A',
         washType: 'Garment Wash'
     };
     const anfPoints = anfSpecs || [];
@@ -242,6 +247,24 @@ const GarmentWashForm = ({
         }
     }, [formData.reportType]);
 
+    // Fetch Users for Dropdowns
+    useEffect(() => {
+        const fetchUsers = async () => {
+            setIsLoadingUsers(true);
+            try {
+                const response = await axios.get(`${API_BASE_URL}/api/users`);
+                if (response.data) {
+                    setUsers(response.data);
+                }
+            } catch (error) {
+                console.error("Error fetching users:", error);
+            } finally {
+                setIsLoadingUsers(false);
+            }
+        };
+        fetchUsers();
+    }, []);
+
     // Fetch measurement specs from the same API as MeasurementDetailsSection
     const fetchMeasurementSpecs = async (orderNo) => {
         if (!orderNo || orderNo.trim().length < 3) {
@@ -251,7 +274,7 @@ const GarmentWashForm = ({
 
         setIsLoadingMeasurementSpecs(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}`);
+            const response = await fetch(`${API_BASE_URL}/api/washing/measurement-specs/${orderNo}`);
             const data = await response.json();
 
             if (response.ok && data.success) {
@@ -384,18 +407,22 @@ const GarmentWashForm = ({
     // 1. Fetch measurement specs when orderNo (style) is available
     const lastFetchedOrderNoRef = useRef('');
     useEffect(() => {
-        const orderNo = (formData.style || '').trim().toUpperCase();
+        const orderNo = (formData.moNo || '').trim().toUpperCase();
 
-        if (orderNo && orderNo.length >= 3 && orderNo !== lastFetchedOrderNoRef.current) {
-            lastFetchedOrderNoRef.current = orderNo;
-            fetchMeasurementSpecs(orderNo);
-            // Reset sampleSize and shrinkageRows to default when style changes
-            handleInputChange('sampleSize', '');
-            handleInputChange('shrinkageRows', []);
-        } else if (!orderNo || orderNo.length < 3) {
-            setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
-        }
-    }, [formData.style]);
+        const timer = setTimeout(() => {
+            if (orderNo && orderNo.length >= 3 && orderNo !== lastFetchedOrderNoRef.current) {
+                lastFetchedOrderNoRef.current = orderNo;
+                fetchMeasurementSpecs(orderNo);
+                // Reset sampleSize and shrinkageRows to default when style changes
+                handleInputChange('sampleSize', '');
+                handleInputChange('shrinkageRows', []);
+            } else if (!orderNo || orderNo.length < 3) {
+                setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
+            }
+        }, 800);
+
+        return () => clearTimeout(timer);
+    }, [formData.moNo]);
 
     // 1.5. Auto-select wash type based on available specs
     useEffect(() => {
@@ -931,14 +958,14 @@ const GarmentWashForm = ({
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">STYLE :</label>
                         <input
                             type="text"
-                            value={formData.style || ''}
+                            value={formData.moNo || ''}
                             onChange={(e) => {
                                 const newValue = e.target.value;
-                                handleInputChange("style", newValue);
+                                handleInputChange("moNo", newValue);
                             }}
                             onFocus={() => {
-                                if (formData.style && formData.style.length >= 2 && searchOrderNo) {
-                                    searchOrderNo(formData.style);
+                                if (formData.moNo && formData.moNo.length >= 2 && searchOrderNo) {
+                                    searchOrderNo(formData.moNo);
                                 }
                             }}
                             onBlur={() => {
@@ -955,7 +982,7 @@ const GarmentWashForm = ({
                                 // Add Enter key support for quick selection of first suggestion
                                 if (e.key === 'Enter' && showOrderNoSuggestions && orderNoSuggestions?.length > 0) {
                                     e.preventDefault();
-                                    const firstValidSuggestion = orderNoSuggestions.filter(on => on !== formData.style)[0];
+                                    const firstValidSuggestion = orderNoSuggestions.filter(on => on !== formData.moNo)[0];
                                     if (firstValidSuggestion) {
                                         if (handleOrderNoSelect) handleOrderNoSelect(firstValidSuggestion);
                                     }
@@ -976,10 +1003,10 @@ const GarmentWashForm = ({
                         )}
                         {/* Suggestions Dropdown - Filtered to exclude exact matches */}
                         {showOrderNoSuggestions && orderNoSuggestions &&
-                            orderNoSuggestions.filter(on => on !== formData.style).length > 0 && (
+                            orderNoSuggestions.filter(on => on !== formData.moNo).length > 0 && (
                                 <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
                                     {orderNoSuggestions
-                                        .filter(orderNo => orderNo !== formData.style)
+                                        .filter(orderNo => orderNo !== formData.moNo)
                                         .map((orderNo, index) => (
                                             <div
                                                 key={index}
@@ -1013,13 +1040,13 @@ const GarmentWashForm = ({
                             <button
                                 type="button"
                                 onClick={() => setShowColorDropdown && setShowColorDropdown(!showColorDropdown)}
-                                disabled={isSearchingOrderNo || !formData.style || (availableColors && availableColors.length === 0)}
+                                disabled={isSearchingOrderNo || !formData.moNo || (availableColors && availableColors.length === 0)}
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <span className="truncate">
                                     {isSearchingOrderNo
                                         ? "Loading colors..."
-                                        : !formData.style
+                                        : !formData.moNo
                                             ? "Select Style first"
                                             : (!availableColors || availableColors.length === 0)
                                                 ? "No colors available"
@@ -1824,15 +1851,41 @@ const GarmentWashForm = ({
                         {/* Checked By */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">CHECKED BY:</label>
-                            <input type="text" value={formData.checkedBy || ''} onChange={(e) => handleInputChange("checkedBy", e.target.value)}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Name" />
+                            <Select
+                                showSearch
+                                value={formData.checkedBy || undefined}
+                                placeholder="Select User"
+                                optionFilterProp="label"
+                                onChange={(value) => handleInputChange("checkedBy", value)}
+                                filterOption={(input, option) =>
+                                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                }
+                                options={users.map(u => ({
+                                    value: u.name,
+                                    label: `(${u.emp_id}) ${u.name}`
+                                }))}
+                                className="w-full h-[42px]"
+                            />
                         </div>
 
                         {/* Approved By */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">APPROVED BY:</label>
-                            <input type="text" value={formData.approvedBy || ''} onChange={(e) => handleInputChange("approvedBy", e.target.value)}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Name" />
+                            <Select
+                                showSearch
+                                value={formData.approvedBy || undefined}
+                                placeholder="Select User"
+                                optionFilterProp="label"
+                                onChange={(value) => handleInputChange("approvedBy", value)}
+                                filterOption={(input, option) =>
+                                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                }
+                                options={users.map(u => ({
+                                    value: u.name,
+                                    label: `(${u.emp_id}) ${u.name}`
+                                }))}
+                                className="w-full h-[42px]"
+                            />
                         </div>
 
                         {/* Date */}
@@ -1918,7 +1971,7 @@ const GarmentWashForm = ({
                         ) : (
                             <Send className="w-4 h-4" />
                         )}
-                        {isSubmitting ? "Submitting..." : isCompleting ? "Complete Garment Wash Report" : "Submit Garment Wash Report"}
+                        {isSubmitting ? "Submitting..." : isCompleting ? "Complete Report" : "Submit Report"}
                     </button>
                 </div>
             </form>

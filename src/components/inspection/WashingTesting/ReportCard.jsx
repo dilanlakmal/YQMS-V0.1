@@ -2,6 +2,73 @@ import React from "react";
 import { ChevronDown, ChevronUp, Printer, FileText, FileSpreadsheet, Pencil, Trash2, QrCode, CheckCircle } from "lucide-react";
 import ReportTimeline from "./ReportTimeline";
 
+const DEFAULT_SCALE = 'scale-125';
+
+const CUSTOM_SCALES = {
+  // Machine Wash
+  'machine-wash.png': 'scale-125',
+  'hand-wasing.png': 'scale-125',
+  'do-not-wash.png': 'scale-125',
+
+  // Water Temp
+  'water-temperature30.png': 'scale-125',
+  'water-temperature40.png': 'scale-125',
+  'water-temperature50.png': 'scale-125',
+
+  // Bleach
+  'bleach.png': 'scale-[1.0]',
+  'non-chlorine-bleach.png': 'scale-[1.0]',
+  'not-bleach.png': 'scale-[1.0]',
+  'not-bleach1.png': 'scale-[1.0]',
+
+  // Tumble Dry
+  'tumble-dry.png': 'scale-[1.1]',
+  'tb-dry-normal-no-heat.png': 'scale-[1.1]',
+  'tb-dry-permanent-press-no-heat.png': 'scale-[1.2]',
+  'tb-dry-gentle-no-heat.png': 'scale-[1.2]',
+  'low-heat1.png': 'scale-[1.0]',
+  'medium-heat.png': 'scale-[1.0]',
+  'high-heat.png': 'scale-[1.0]',
+  'tb-dry-permanent-press-low-heat.png': 'scale-[1.3]',
+  'tb-dry-permanent-press-medium-heat.png': 'scale-[1.3]',
+  'tb-dry-gentle-low-heat.png': 'scale-[1.3]',
+  'tb-dry-gentle-medium-heat.png': 'scale-[1.3]',
+  'do-not-tumble-dry.png': 'scale-[1.0]',
+
+  // Dry
+  'line-dry.png': 'scale-[1.2]',
+  'dry-flat.png': 'scale-[1.2]',
+  'dry.png': 'scale-[1.2]',
+  'do-not-dry.png': 'scale-[1.2]',
+
+  // Iron
+  'iron-empty.png': 'scale-[1.5]',
+  'iron-low-temp.png': 'scale-[1.5]',
+  'iron-medium-temp.png': 'scale-[1.5]',
+  'iron-hight-temp.png': 'scale-[1.5]',
+  'no-steam.png': 'scale-[1.5]',
+  'do-not-iron.png': 'scale-[1.5]',
+
+  // Dry Clean
+  'dry-clean.png': 'scale-[0.8]',
+  'do-not-dryclean.png': 'scale-[1.2]',
+  // 'do-not-dry.png': 'scale-[1.2]', // Removed duplicate
+  'wet-cleaning.png': 'scale-[1.1]',
+  'any-solvent.png': 'scale-[1.1]',
+  'petroleum-sovent-only.png': 'scale-[0.9]',
+  'Any-sx-tetrachlorethylene.png': 'scale-[1.0]',
+  'reduced.png': 'scale-[1.0]',
+  'short-cycle.png': 'scale-[1.0]',
+  'low-heat.png': 'scale-[1.0]',
+  'no-steam-finishing.png': 'scale-[1.0]',
+  'gentle-cleaning-pce.png': 'scale-[1.0]',
+  'very-gentle-cleaning-pce.png': 'scale-[1.1]',
+};
+
+const getIconScale = (iconName) => {
+  return CUSTOM_SCALES[iconName] || DEFAULT_SCALE;
+};
+
 const ReportCard = ({
   report,
   isExpanded,
@@ -297,11 +364,11 @@ const ReportCard = ({
                     : `/assets/Wash-bold/${iconName}`;
 
                   return (
-                    <div key={key} className="relative group p-1 bg-white rounded-md" title={key}>
+                    <div key={key} className="relative group p-1 bg-white rounded-md flex items-center justify-center w-12 h-12" title={key}>
                       <img
                         src={imageSource}
                         alt={key}
-                        className="w-8 h-8 object-contain"
+                        className={`object-contain transform ${getIconScale(iconName)} w-full h-full`}
                         onError={(e) => e.target.style.display = 'none'}
                       />
                     </div>
