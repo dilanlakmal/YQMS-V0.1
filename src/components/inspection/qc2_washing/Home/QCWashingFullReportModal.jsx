@@ -471,7 +471,7 @@ const getImageUrl = (imagePath) => {
                         <Eye className="w-6 h-6 text-white" />
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-medium text-blue-600 dark:text-blue-300 uppercase tracking-wide mb-1">Checked Qty</p>
+                        <p className="text-xs font-medium text-blue-600 dark:text-blue-300 uppercase tracking-wide mb-1">AQL Sample Size</p>
                         <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{processedReportData.checkedQty}</p>
                       </div>
                     </div>
@@ -482,7 +482,7 @@ const getImageUrl = (imagePath) => {
                         <Package className="w-6 h-6 text-white" />
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-medium text-purple-600 dark:text-purple-300 uppercase tracking-wide mb-1">Total Pcs</p>
+                        <p className="text-xs font-medium text-purple-600 dark:text-purple-300 uppercase tracking-wide mb-1">Total Checked Pcs</p>
                         <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">{processedReportData.totalCheckedPcs}</p>
                       </div>
                     </div>
@@ -509,7 +509,7 @@ const getImageUrl = (imagePath) => {
                         <Target className="w-6 h-6 text-white" />
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-medium text-indigo-600 dark:text-indigo-300 uppercase tracking-wide mb-1">Check Points</p>
+                        <p className="text-xs font-medium text-indigo-600 dark:text-indigo-300 uppercase tracking-wide mb-1">Checked Measurement Points</p>
                         <p className="text-2xl font-bold text-indigo-900 dark:text-indigo-100">{processedReportData.totalCheckedPoint}</p>
                       </div>
                     </div>
@@ -520,7 +520,7 @@ const getImageUrl = (imagePath) => {
                         <CheckCircle className="w-6 h-6 text-white" />
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-medium text-green-600 dark:text-green-300 uppercase tracking-wide mb-1">Total Pass</p>
+                        <p className="text-xs font-medium text-green-600 dark:text-green-300 uppercase tracking-wide mb-1">Total Pass Measurement Points</p>
                         <p className="text-2xl font-bold text-green-900 dark:text-green-100">{processedReportData.totalPass}</p>
                       </div>
                     </div>
@@ -531,7 +531,7 @@ const getImageUrl = (imagePath) => {
                         <XCircle className="w-6 h-6 text-white" />
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-medium text-red-600 dark:text-red-300 uppercase tracking-wide mb-1">Total Fail</p>
+                        <p className="text-xs font-medium text-red-600 dark:text-red-300 uppercase tracking-wide mb-1">Total Fail Measurement Points</p>
                         <p className="text-2xl font-bold text-red-900 dark:text-red-100">{processedReportData.totalFail}</p>
                       </div>
                     </div>
@@ -573,7 +573,7 @@ const getImageUrl = (imagePath) => {
                             : processedReportData.overallFinalResult === 'Fail'
                             ? 'text-rose-600 dark:text-rose-300'
                             : 'text-amber-600 dark:text-amber-300'
-                        }`}>Final Result</p>
+                        }`}>Final Result (Meaurement)</p>
                         <p className={`text-2xl font-bold ${
                           processedReportData.overallFinalResult === 'Pass'
                             ? 'text-emerald-900 dark:text-emerald-100'
@@ -1087,7 +1087,7 @@ const getImageUrl = (imagePath) => {
                                     <div className="flex items-center justify-center mb-2">
                                       <Eye className="w-4 h-4 text-blue-500" />
                                     </div>
-                                    <p className="text-xs text-blue-600 dark:text-blue-400 mb-1 font-medium uppercase tracking-wide">Checked</p>
+                                    <p className="text-xs text-blue-600 dark:text-blue-400 mb-1 font-medium uppercase tracking-wide">Wash QTY</p>
                                     <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{param.checkedQty || 0}</p>
                                   </div>
                                   <div className="bg-white dark:bg-gray-800 rounded-xl p-4 text-center border border-red-100 dark:border-red-800 hover:shadow-sm transition-shadow">
@@ -1496,7 +1496,7 @@ const getImageUrl = (imagePath) => {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-2">
                                 <TrendingUp className="w-3 h-3 text-orange-500" />
-                                <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">Plus Tolerance</span>
+                                <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">Positive Tolerance</span>
                               </div>
                               <span className="font-bold text-orange-800 dark:text-orange-200">{sizeSummary.plusToleranceFailCount}</span>
                             </div>
@@ -1505,7 +1505,7 @@ const getImageUrl = (imagePath) => {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-2">
                                 <TrendingUp className="w-3 h-3 text-amber-500 transform rotate-180" />
-                                <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">Minus Tolerance</span>
+                                <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">Negative Tolerance</span>
                               </div>
                               <span className="font-bold text-amber-800 dark:text-amber-200">{sizeSummary.minusToleranceFailCount}</span>
                             </div>

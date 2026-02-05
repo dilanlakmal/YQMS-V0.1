@@ -387,31 +387,31 @@ const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
 const QualitySummaryCards = ({ recordData }) => (
   <View style={styles.summaryCardGrid}>
     <View style={styles.summaryCard}>
-      <Text style={styles.summaryCardTitle}>Checked Qty</Text>
+      <Text style={styles.summaryCardTitle}>AQL Sample Size</Text>
       <Text style={styles.summaryCardValue}>{recordData.checkedQty || 0}</Text>
     </View>
     <View style={styles.summaryCard}>
-      <Text style={styles.summaryCardTitle}>Total Pcs</Text>
+      <Text style={styles.summaryCardTitle}>Total Checked Pcs</Text>
       <Text style={styles.summaryCardValue}>
         {recordData.totalCheckedPcs || 0}
       </Text>
     </View>
     <View style={styles.summaryCard}>
-      <Text style={styles.summaryCardTitle}>Check Points</Text>
+      <Text style={styles.summaryCardTitle}>Checked Measuremnt Points</Text>
       <Text style={styles.summaryCardValue}>
         {recordData.totalCheckedPoint || 0}
       </Text>
     </View>
     <View style={styles.summaryCard}>
-      <Text style={styles.summaryCardTitle}>Total Pass</Text>
+      <Text style={styles.summaryCardTitle}>Total Pass Measurment Points</Text>
       <Text style={styles.summaryCardValue}>{recordData.totalPass || 0}</Text>
     </View>
     <View style={styles.summaryCard}>
-      <Text style={styles.summaryCardTitle}>Total Fail</Text>
+      <Text style={styles.summaryCardTitle}>Total Fail Measurment points</Text>
       <Text style={styles.summaryCardValue}>{recordData.totalFail || 0}</Text>
     </View>
     <View style={styles.summaryCard}>
-      <Text style={styles.summaryCardTitle}>Pass Rate</Text>
+      <Text style={styles.summaryCardTitle}>Pass Rate (Measurment)</Text>
       <Text style={styles.summaryCardValue}>{recordData.passRate || 0}%</Text>
     </View>
   </View>
@@ -725,21 +725,21 @@ const SizewiseSummaryTable = ({ measurementSizeSummary }) => (
           Checked Pcs
         </Text>
         <Text style={[styles.tableColHeader, { width: "12%" }]}>
-          Check Points
+          Checked Measurment Points
         </Text>
         <Text style={[styles.tableColHeader, { width: "12%" }]}>
-          Total Pass
+          Total Pass Measurment Points
         </Text>
         <Text style={[styles.tableColHeader, { width: "12%" }]}>
-          Total Fail
+          Total Fail Measurment Points
         </Text>
         <Text style={[styles.tableColHeader, { width: "12%" }]}>
-          Plus Tol Fail
+          Positive Tol Fail
         </Text>
         <Text style={[styles.tableColHeader, { width: "12%" }]}>
-          Minus Tol Fail
+          Negative Tol Fail
         </Text>
-        <Text style={[styles.tableColHeader, { width: "13%" }]}>Pass Rate</Text>
+        <Text style={[styles.tableColHeader, { width: "13%" }]}>Pass Rate (Meaurement)</Text>
       </View>
       {measurementSizeSummary.map((sizeSummary, index) => {
         const passRate =
@@ -963,7 +963,7 @@ const InspectionDetailsSection = ({ inspectionDetails, SafeImage }) => {
                 Parameter Name
               </Text>
               <Text style={[styles.tableColHeader, { width: "15%" }]}>
-                Checked Qty
+                Wash Qty
               </Text>
               <Text style={[styles.tableColHeader, { width: "15%" }]}>
                 Defect Qty
