@@ -46,7 +46,7 @@ const QCWashingDashboard = ({ onBack }) => {
       const res = await axios.get(`${API_BASE_URL}/api/qc-washing/dashboard`, { params });
       setDbData(res.data);
     } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+    finally { setLoading(false); }s
   }, [filters, granularity, defectLimit]);
 
   useEffect(() => { fetchData(); }, [fetchData]);

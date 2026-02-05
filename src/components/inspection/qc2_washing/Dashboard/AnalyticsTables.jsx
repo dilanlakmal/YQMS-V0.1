@@ -25,6 +25,13 @@ const AnalyticsTables = ({ dbData, defectLimit, setDefectLimit }) => {
 
   const topFailingPoints = dbData?.pointFailureSummary?.slice(0, pointLimit) || [];
 
+  // Calculate totals for percentage calculations using complete dataset
+  const totalAllDefects = dbData?.summary?.totalDefects ?? dbData?.defectSummary?.reduce((sum, d) => sum + (d.totalDefectQty || 0), 0) ?? 0;
+  const totalAllFails = dbData?.pointFailureSummary?.reduce((sum, p) => sum + (p.totalFail || 0), 0) || 0;
+
+  // Get limited datasets for display
+  const displayedDefects = dbData?.defectSummary?.slice(0, defectLimit) || [];
+
   return (
     <div className="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8 items-stretch">
       {/* 1. LEFT SECTION: TOP DEFECTS (7 Columns) */}
@@ -50,7 +57,7 @@ const AnalyticsTables = ({ dbData, defectLimit, setDefectLimit }) => {
               <button
                 key={num}
                 onClick={() => setDefectLimit(num)}
-                className={`px-4 py-2 text-[10px] font-black rounded-xl transition-all ${
+                className={`px-3 py-2 text-[10px] font-black rounded-xl transition-all ${
                   defectLimit === num
                     ? "bg-white dark:bg-gray-700 text-rose-600 shadow-lg"
                     : "text-slate-400 hover:text-slate-600"
@@ -62,16 +69,16 @@ const AnalyticsTables = ({ dbData, defectLimit, setDefectLimit }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-          <div className="h-[350px]">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="h-[450px]">
             {dbData?.defectSummary && (
               <Bar
                 data={{
-                  labels: dbData.defectSummary.map((d) => d._id),
+                  labels: displayedDefects.map((d) => d._id),
                   datasets: [
                     {
                       label: "Instances",
-                      data: dbData.defectSummary.map((d) => d.totalDefectQty),
+                      data: displayedDefects.map((d) => d.totalDefectQty),
                       backgroundColor: "#fb7185",
                       borderRadius: 10,
                       barThickness: 20,
@@ -92,27 +99,36 @@ const AnalyticsTables = ({ dbData, defectLimit, setDefectLimit }) => {
             )}
           </div>
 
-          <div className="overflow-y-auto max-h-[350px] pr-2 custom-scrollbar">
-            <table className="w-full">
+          <div className="overflow-y-auto max-h-[450px] pr-1 custom-scrollbar border border-slate-200 dark:border-gray-700 rounded-xl">
+            <table className="w-full border-collapse">
               <thead className="sticky top-0 bg-white dark:bg-gray-900 z-10">
-                <tr className="text-sm font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-gray-800">
-                  <th className="pb-3 text-left">Defect</th>
-                  <th className="pb-3 text-center">Pcs</th>
-                  <th className="pb-3 text-right">Qty</th>
+                <tr className="text-xs font-black text-slate-400 uppercase tracking-widest border-b-2 border-slate-200 dark:border-gray-700">
+                  <th className="pb-2 pt-2 px-2 text-left border-r border-slate-200 dark:border-gray-700">Defect</th>
+                  <th className="pb-2 pt-2 px-2 text-center border-r border-slate-200 dark:border-gray-700">Pcs</th>
+                  <th className="pb-2 pt-2 px-2 text-center border-r border-slate-200 dark:border-gray-700">Qty</th>
+                  <th className="pb-2 pt-2 px-2 text-right">% Defect</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 dark:divide-gray-800">
-                {dbData?.defectSummary.map((d, i) => (
-                  <tr key={i} className="group hover:bg-slate-50 dark:hover:bg-gray-800/50 transition-colors">
-                    <td className="py-4 text-sm font-bold text-slate-700 dark:text-gray-300">{d._id}</td>
-                    <td className="py-4 text-center">
-                      <span className="text-sm font-black bg-slate-100 dark:bg-gray-800 px-2 py-1 rounded-lg">
-                        {d.affectedPieces}
-                      </span>
-                    </td>
-                    <td className="py-4 text-right text-sm font-black text-rose-600">{d.totalDefectQty}</td>
-                  </tr>
-                ))}
+              <tbody>
+                {displayedDefects.map((d, i) => {
+                  const defectPercentage = totalAllDefects > 0 ? ((d.totalDefectQty / totalAllDefects) * 100).toFixed(1) : "0.0";
+                  return (
+                    <tr key={i} className="group hover:bg-slate-50 dark:hover:bg-gray-800/50 transition-colors border-b border-slate-100 dark:border-gray-800">
+                      <td className="py-2 px-2 text-sm font-bold text-slate-700 dark:text-gray-300 border-r border-slate-100 dark:border-gray-800">{d._id}</td>
+                      <td className="py-2 px-2 text-center border-r border-slate-100 dark:border-gray-800">
+                        <span className="text-xs font-black bg-slate-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                          {d.affectedPieces}
+                        </span>
+                      </td>
+                      <td className="py-2 px-2 text-center text-sm font-black text-rose-600 border-r border-slate-100 dark:border-gray-800">{d.totalDefectQty}</td>
+                      <td className="py-2 px-2 text-right">
+                        <span className="text-xs font-black text-purple-600 bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded">
+                          {defectPercentage}%
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -160,46 +176,57 @@ const AnalyticsTables = ({ dbData, defectLimit, setDefectLimit }) => {
                 <th className="pb-3 text-left">Measurement Point</th>
                 <th className="pb-3 text-center px-1"><Plus size={10} className="inline mr-1" />Plus</th>
                 <th className="pb-3 text-center px-1"><Minus size={10} className="inline mr-1" />Min</th>
-                <th className="pb-3 text-right"><Sigma size={10} className="inline mr-1" />Total</th>
+                <th className="pb-3 text-center"><Sigma size={10} className="inline mr-1" />Total</th>
+                <th className="pb-3 text-right">% (FAil)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-gray-800">
-              {topFailingPoints.map((p, i) => (
-                <tr key={i} className="hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors">
-                  <td className="py-4 text-sm font-black text-slate-700 dark:text-gray-300">
-                    <span className="block max-w-[250px]" title={p._id}>{p._id}</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {p.affectedSizes?.slice(0, 4).map((sz) => (
-                        <span key={sz} className="text-sm bg-slate-100 dark:bg-gray-800 px-1 rounded text-slate-400 font-bold">{sz}</span>
-                      ))}
-                    </div>
-                  </td>
-                  
-                  {/* Plus Fails */}
-                  <td className="py-4 text-center">
-                    <span className="text-sm font-black text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-lg">
-                      {p.plusFail}
-                    </span>
-                  </td>
+              {topFailingPoints.map((p, i) => {
+                const failPercentage = totalAllFails > 0 ? ((p.totalFail / totalAllFails) * 100).toFixed(1) : "0.0";
+                return (
+                  <tr key={i} className="hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors">
+                    <td className="py-4 text-sm font-black text-slate-700 dark:text-gray-300">
+                      <span className="block max-w-[200px]" title={p._id}>{p._id}</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {p.affectedSizes?.slice(0, 4).map((sz) => (
+                          <span key={sz} className="text-sm bg-slate-100 dark:bg-gray-800 px-1 rounded text-slate-400 font-bold">{sz}</span>
+                        ))}
+                      </div>
+                    </td>
+                    
+                    {/* Plus Fails */}
+                    <td className="py-4 text-center">
+                      <span className="text-sm font-black text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-lg">
+                        {p.plusFail}
+                      </span>
+                    </td>
 
-                  {/* Minus Fails */}
-                  <td className="py-4 text-center">
-                     <span className="text-sm font-black text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded-lg">
-                      {p.minusFail}
-                    </span>
-                  </td>
+                    {/* Minus Fails */}
+                    <td className="py-4 text-center">
+                       <span className="text-sm font-black text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded-lg">
+                        {p.minusFail}
+                      </span>
+                    </td>
 
-                  {/* Total Fails */}
-                  <td className="py-4 text-right">
-                    <span className="text-sm font-black text-rose-600 bg-rose-50 dark:bg-rose-900/20 px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900">
-                      {p.totalFail}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+                    {/* Total Fails */}
+                    <td className="py-4 text-center">
+                      <span className="text-sm font-black text-rose-600 bg-rose-50 dark:bg-rose-900/20 px-2 py-1 rounded-lg">
+                        {p.totalFail}
+                      </span>
+                    </td>
+
+                    {/* Fail Percentage */}
+                    <td className="py-4 text-right">
+                      <span className="text-sm font-black text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg">
+                        {failPercentage}%
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
               {topFailingPoints.length === 0 && (
                 <tr>
-                  <td colSpan="4" className="py-12 text-center text-slate-300 text-xs italic">No measurement failures found</td>
+                  <td colSpan="5" className="py-12 text-center text-slate-300 text-xs italic">No measurement failures found</td>
                 </tr>
               )}
             </tbody>
