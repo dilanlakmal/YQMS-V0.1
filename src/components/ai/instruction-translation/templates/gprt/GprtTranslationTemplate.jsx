@@ -1,28 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import GprtFirstPage from "./GprtFirstPage";
 import { FileText, AlertCircle, SidebarClose, SidebarOpen } from "lucide-react";
-import { html } from "./GprtFirstPage";
+// Ensure no legacy exports are imported
 
-function GprtTranslationTemplate({ editable, step, instruction, setinstruction, currentLanguage, ...props }) {
+function GprtTranslationTemplate({ editable, step, instruction, setinstruction, setCurrentLanguage, currentLanguage, ...props }) {
   const [activePage, setActivePage] = useState(1);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const totalPages = 19;
 
   // Handle legacy prop names
   const data = instruction || props.production;
+
   const setData = setinstruction || props.setProduction;
 
-  logger.log("Rendering GprtTranslationTemplate with step:", step);
-  if (step === "Preview") {
-    const renderedHtml = html(<GprtFirstPage
-      instruction={data}
-      setinstruction={setData}
-      editable={editable}
-      step={step}
-      currentLanguage={currentLanguage}
-    />);
-    logger.log("Preview HTML generated:", renderedHtml.substring(0, 100) + "...");
-  }
+  useEffect(() => {
+    if (data?.detectedLanguage && !currentLanguage && setCurrentLanguage) {
+      setCurrentLanguage(data.detectedLanguage);
+    }
+  }, [data?.detectedLanguage, currentLanguage, setCurrentLanguage]);
 
   return (
     <div className="flex h-full w-full bg-slate-100 relative">
@@ -55,7 +50,7 @@ function GprtTranslationTemplate({ editable, step, instruction, setinstruction, 
             >
               <span className="flex items-center gap-3">
                 <FileText size={16} className={activePage === page ? "text-blue-500" : "text-slate-400"} />
-                Page {page}
+                Page {page} {page === 2 && <span className="text-[10px] ml-1 opacity-60 font-bold tracking-tighter uppercase">(Details)</span>}
               </span>
               {page !== 1 && (
                 <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">V2</span>
@@ -74,7 +69,7 @@ function GprtTranslationTemplate({ editable, step, instruction, setinstruction, 
               setinstruction={setData}
               editable={editable}
               step={step}
-              currentLanguage={currentLanguage}
+              currentLanguage={currentLanguage ?? data?.detectedLanguage}
             />
           ) : (
             <div className="relative overflow-hidden w-full min-h-[600px] bg-slate-900 rounded-2xl flex flex-col items-center justify-center p-12 text-center shadow-2xl border border-white/10">

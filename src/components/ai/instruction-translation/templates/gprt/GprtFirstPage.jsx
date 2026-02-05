@@ -1,362 +1,278 @@
+import { useState, useCallback } from "react";
 import EditWord from "../../../utils/EditWord";
-import { splitChineseWords } from "../../../../../utils/segmenter";
-import { useState, useEffect } from "react";
-import ReactDOMServer from "react-dom/server";
-import { document as docService } from "@/services/instructionService";
+import instructionService from "../../../../../services/instructionService";
+import { Copy, Package, Factory, ShoppingCart, Truck, AlertCircle, FileText, Ruler } from "lucide-react";
 
+/**
+ * Clean & Dynamic GprtFirstPage Template
+ * Uses instruction data directly without restructuring.
+ * Enhanced UI with modern aesthetics, distinct sections, and a measurement table.
+ */
 const GprtFirstPage = ({
     instruction,
     setinstruction,
-    editable,
     step,
-    currentLanguage, // Receives "en", "zh", etc.
-    ...props
+    currentLanguage = ""
 }) => {
-    const [fetchedLang, setFetchedLang] = useState("");
+    // Determine the working language (selected or detected)
+    const workingLang = currentLanguage || instruction?.detectedLanguage || "en";
 
-    // Handle legacy prop names
-    const data = instruction || props.production;
-    const setData = setinstruction || props.setProduction;
+    /**
+     * Helper to get display text from the multilingual object (original + translations)
+     */
+    const getDisplayText = (val) => {
+        if (!val) return "";
+        if (typeof val === "string") return val;
 
-    useEffect(() => {
-        const fetchLang = async () => {
-            if (data?.documentId && !currentLanguage && !fetchedLang) {
-                try {
-                    // Try to use the detectLanguage API if possible
-                    if (data?.title?.text?.english) {
-                        const result = await docService.detectLanguage(data.title.text.english);
-                        if (result && result.code) {
-                            setFetchedLang(result.code.toLowerCase());
-                            return;
-                        }
-                    }
-
-                    // Fallback to extraction service getOriginLangByPage if needed, 
-                    // but we are cleaning up extraction.js, so we assumes the detectLanguage works.
-                } catch (error) {
-                    console.error("Failed to fetch origin language", error);
-                }
-            }
-        };
-        fetchLang();
-    }, [data, currentLanguage, fetchedLang]);
-
-    // Use passed language prop (for Review/Translation mode) or fetched origin lang (for Edit mode)
-    const displayLang = currentLanguage || fetchedLang;
-    const originLang = displayLang || "english";
-
-    // Helper to safely get text, falling back to English or first available key if specific lang is missing
-    const getLocalizedText = (obj, lang) => {
-        if (!obj) return "";
-        if (typeof obj === 'string') return obj;
-
-        // If it's a cell object with specialized 'text' property
-        const data = (obj.text && typeof obj.text === 'object') ? obj.text : obj;
-
-        // Use the passed language name directly (e.g., 'english', 'chinese', 'khmer')
-        if (data[lang] && typeof data[lang] === 'string') return data[lang];
-
-        // Fallback strategy: prioritize english, then chinese, then khmer
-        const fallbacks = ["english", "chinese", "khmer"];
-        for (const fb of fallbacks) {
-            if (data[fb] && typeof data[fb] === 'string') return data[fb];
-        }
-
-        // Final fallback: first string value found that isn't an ID or metadata
-        const keys = Object.keys(data).filter(k => k !== '_id' && k !== 'colSpan' && k !== 'rowSpan');
-        for (const k of keys) {
-            if (typeof data[k] === 'string') return data[k];
-        }
-
-        return "";
+        // Fallback sequence: selected -> detected -> english -> first available value
+        return val[workingLang] ||
+            val[instruction?.detectedLanguage] ||
+            val.english ||
+            val["null"] ||
+            Object.values(val)[0] ||
+            "";
     };
 
-    const title = getLocalizedText(data?.title?.text, originLang);
-    const customer = data?.customer;
-    const factory = data?.factory;
-    const productionSpecifications = customer?.purchase?.specs || [];
-    const sample = customer?.style?.sample || {};
-    const notes = customer?.manufacturingNote || [];
-    const stamp = factory?.factoryStamp;
+    /**
+     * Unified handler for updating instruction fields
+     */
+    const handleUpdate = async (path, isLabel, newValue) => {
+        if (!setinstruction || !instruction) return;
 
-    // blob handling logic (kept as is)
-    if (sample.img?.data) {
-        const blob = new Blob([new Uint8Array(sample.img.data)], { type: "image/png" });
-        const blobUrl = URL.createObjectURL(blob);
-        sample.img = blobUrl;
-        sample.imgId = sample?.description;
-    }
+        // Clone deeply to maintain immutability
+        const updated = JSON.parse(JSON.stringify(instruction));
 
-    if (stamp?.img?.data) {
-        const blob = new Blob([new Uint8Array(stamp.img.data)], { type: "image/png" });
-        const blobUrl = URL.createObjectURL(blob);
-        stamp.img = {
-            src: blobUrl,
-            id: stamp?.description
-        };
-    }
+        // Helper to find target object by path
+        const getNestedObject = (obj, p) => p.split('.').reduce((acc, part) => acc && acc[part], obj);
 
-    const renderContentByStep = (input, onChange) => {
-        const state = step?.toLowerCase();
-        if (state) {
-            switch (state) {
-                case "preview":
-                    return <EditWord word={input} onChange={onChange} />
-                case "glossary":
-                case "complete":
-                case "final":
-                    return input;
-                case "review": // Using review mode for clean text or specialized edit if implemented
-                    return <span className="text-slate-900">{input}</span>
-                case "edit":
-                    return <EditWord word={input} onChange={onChange} />
-                default:
-                    return input
+        const targetObj = getNestedObject(updated, path);
+        if (!targetObj) return;
+
+        const propName = isLabel ? 'field_name' : 'annotation_value';
+        const currentData = targetObj[propName];
+
+        // Apply update based on data type
+        if (typeof currentData === 'string') {
+            targetObj[propName] = newValue;
+        } else if (typeof currentData === 'object' && currentData !== null) {
+            currentData[workingLang] = newValue;
+            if (workingLang === 'en' || !instruction.detectedLanguage) {
+                currentData.english = newValue;
             }
+        } else {
+            targetObj[propName] = newValue;
         }
-        return <p className="text-slate-400 font-mono text-xs">-</p>
+
+        // Optimistic UI Update
+        setinstruction(updated);
+
+        // Persistent Backend Update
+        try {
+            const docId = instruction.document_id || instruction.id || instruction._id;
+            if (docId) {
+                await instructionService.document.updateInstruction(docId, updated);
+            }
+        } catch (error) {
+            console.error("Failed to sync update to backend:", error);
+        }
     };
 
-    function updateLocalData(currentData, updater) {
-        const copy = structuredClone(currentData);
-        updater(copy);
-        setData(copy);
-        return copy;
-    }
+    /**
+     * Helper to render editable/non-editable fields with enhanced UI
+     */
+    const EditableCell = ({ label, value, path, icon: Icon }) => {
+        const isEditable = step === "Preview" || step === "edit";
 
-    const commonCellClass = "border border-slate-300 p-3 text-sm text-slate-700 align-top";
-    const labelClass = "font-semibold text-slate-500 text-xs uppercase tracking-wide mb-1 block";
-
-    return (
-        <div className="w-full bg-white shadow-sm p-4 md:p-6 mx-auto rounded-sm">
-            {/* Header Section */}
-            <header className="mb-4 border-b border-slate-200 pb-3">
-                <h1 className="text-3xl font-bold text-slate-900 text-center">
-                    {renderContentByStep(title, async (newValue) => {
-                        const updatedData = updateLocalData(data, (prod) => {
-                            prod.title.text[originLang] = newValue;
-                        });
-                        await docService.updateInstruction(data.documentId, updatedData);
-                    })}
-                </h1>
-            </header>
-
-            {/* Top Grid Info */}
-            <div className="grid grid-cols-12 gap-0 border border-slate-300 rounded-sm overflow-hidden mb-4">
-                {/* Image Section - Spans 2 rows visually */}
-                <div className="col-span-12 md:col-span-4 row-span-2 border-r border-b md:border-b-0 border-slate-300 p-2 flex items-center justify-center bg-slate-50">
-                    {sample.img ? (
-                        <img
-                            alt={sample.imgId || "Sample"}
-                            src={sample.img}
-                            className="max-h-64 object-contain rounded shadow-sm border border-slate-200 bg-white"
-                        />
+        return (
+            <div className="group relative overflow-hidden rounded-xl bg-slate-50 border border-slate-200 p-4 hover:shadow-md transition-all duration-300">
+                <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500">
+                        {Icon && <Icon className="w-3.5 h-3.5" />}
+                        {isEditable ? (
+                            <EditWord word={getDisplayText(label)} onChange={(val) => handleUpdate(path, true, val)} />
+                        ) : (
+                            getDisplayText(label) || "LABEL"
+                        )}
+                    </div>
+                </div>
+                <div className="text-xl font-bold text-slate-900 break-words leading-tight">
+                    {isEditable ? (
+                        <EditWord word={getDisplayText(value)} onChange={(val) => handleUpdate(path, false, val)} />
                     ) : (
-                        <div className="w-full h-48 flex items-center justify-center text-slate-300 text-sm">No Image</div>
+                        getDisplayText(value) || "-"
                     )}
                 </div>
+                <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-slate-100/0 to-slate-200/50 rounded-bl-full -mr-8 -mt-8 pointer-events-none" />
+            </div>
+        );
+    };
 
-                {/* Info Fields */}
-                <div className="col-span-6 md:col-span-4 p-2 border-r border-b border-slate-300">
-                    {/* <span className={labelClass}>Style Code Label</span> */}
-                    <div>
-                        {renderContentByStep(getLocalizedText(customer?.style.code.label, originLang),
-                            async (newValue) => {
-                                const updatedData = updateLocalData(data, (prod) => {
-                                    prod.customer.style.code.label[originLang] = newValue;
-                                });
-                                await docService.updateInstruction(data.documentId, updatedData);
-                            })}
-                        <span className="font-bold text-slate-900 ml-1">
-                            {renderContentByStep(getLocalizedText(customer?.style.code.value, originLang),
-                                async (newValue) => {
-                                    const updatedData = updateLocalData(data, (prod) => {
-                                        prod.customer.style.code.value[originLang] = newValue;
-                                    });
-                                    await docService.updateInstruction(data.documentId, updatedData);
-                                })}
-                        </span>
-                    </div>
+    if (!instruction) {
+        return (
+            <div className="min-h-[600px] flex items-center justify-center p-12 text-center">
+                <div className="animate-pulse flex flex-col items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-slate-200" />
+                    <div className="text-slate-400 font-medium tracking-wide uppercase">Waiting for instruction stream...</div>
                 </div>
+            </div>
+        );
+    }
 
-                <div className="col-span-6 md:col-span-4 p-2 border-b border-slate-300">
-                    <div>
-                        {renderContentByStep(getLocalizedText(customer?.style.name.label, originLang),
-                            async (newValue) => {
-                                const updatedData = updateLocalData(data, (prod) => {
-                                    prod.customer.style.name.label[originLang] = newValue;
-                                });
-                                await docService.updateInstruction(data.documentId, updatedData);
-                            })}
-                        <span className="font-bold text-slate-900 ml-1">
-                            {renderContentByStep(getLocalizedText(customer?.style.name.value, originLang),
-                                async (newValue) => {
-                                    const updatedData = updateLocalData(data, (prod) => {
-                                        prod.customer.style.name.value[originLang] = newValue;
-                                    });
-                                    await docService.updateInstruction(data.documentId, updatedData);
-                                })}
-                        </span>
-                    </div>
-                </div>
-
-                <div className="col-span-6 md:col-span-4 p-2 border-r border-slate-300">
-                    <div>
-                        {renderContentByStep(getLocalizedText(customer?.purchase.order.label, originLang),
-                            async (newValue) => {
-                                const updatedData = updateLocalData(data, (prod) => {
-                                    prod.customer.purchase.order.label[originLang] = newValue;
-                                });
-                                await docService.updateInstruction(data.documentId, updatedData);
-                            })}
-                        <span className="font-bold text-slate-900 ml-1">
-                            {renderContentByStep(getLocalizedText(customer?.purchase.order.value, originLang),
-                                async (newValue) => {
-                                    const updatedData = updateLocalData(data, (prod) => {
-                                        prod.customer.purchase.order.value[originLang] = newValue;
-                                    });
-                                    await docService.updateInstruction(data.documentId, updatedData);
-                                })}
-                        </span>
-                    </div>
-                </div>
-
-                <div className="col-span-6 md:col-span-4 p-2">
-                    <div>
-                        {renderContentByStep(getLocalizedText(customer?.purchase.contract.label, originLang),
-                            async (newValue) => {
-                                const updatedData = updateLocalData(data, (prod) => {
-                                    prod.customer.purchase.contract.label[originLang] = newValue;
-                                });
-                                await docService.updateInstruction(data.documentId, updatedData);
-                            })}
-                        <span className="font-bold text-slate-900 ml-1">
-                            {renderContentByStep(getLocalizedText(customer?.purchase.contract.value, originLang),
-                                async (newValue) => {
-                                    const updatedData = updateLocalData(data, (prod) => {
-                                        prod.customer.purchase.contract.value[originLang] = newValue;
-                                    });
-                                    await docService.updateInstruction(data.documentId, updatedData);
-                                })}
-                        </span>
+    return (
+        <div className="max-w-5xl mx-auto bg-white min-h-screen pb-20">
+            {/* Header Section */}
+            <div className="mb-8 border-b border-slate-100 pb-8">
+                <div className="flex flex-col items-center text-center space-y-2">
+                    <h1 className="text-5xl md:text-6xl font-black uppercase tracking-tight text-slate-900 leading-none">
+                        {step === "Preview" || step === "edit" ? (
+                            <EditWord
+                                word={getDisplayText(instruction.title?.annotation_value)}
+                                onChange={(val) => handleUpdate("title", false, val)}
+                            />
+                        ) : (
+                            getDisplayText(instruction.title?.annotation_value) || "INSTRUCTION"
+                        )}
+                    </h1>
+                    <div className="text-sm font-bold uppercase tracking-[0.3em] text-indigo-500">
+                        {step === "Preview" || step === "edit" ? (
+                            <EditWord
+                                word={getDisplayText(instruction.title?.field_name)}
+                                onChange={(val) => handleUpdate("title", true, val)}
+                            />
+                        ) : (
+                            getDisplayText(instruction.title?.field_name) || "DOCUMENT TITLE"
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* Specifications Table */}
-            <div className="mb-4">
-                <table className="w-full border-collapse border border-slate-300">
-                    <thead>
-                        <tr className="bg-slate-50">
-                            {productionSpecifications.map((spec, idx) => (
-                                <th key={idx} className="border border-slate-300 p-2 text-xs font-bold text-slate-600 uppercase text-center">
-                                    {renderContentByStep(getLocalizedText(spec.label, originLang),
-                                        async (newValue) => {
-                                            const updatedData = updateLocalData(data, (prod) => {
-                                                prod.customer.purchase.specs[idx].label[originLang] = newValue;
-                                            });
-                                            await docService.updateInstruction(data.documentId, updatedData);
-                                        })}
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            {productionSpecifications.map((spec, idx) => (
-                                <td key={idx} className="border border-slate-300 p-2 text-center font-bold text-slate-900">
-                                    {renderContentByStep(getLocalizedText(spec.value, originLang),
-                                        async (newValue) => {
-                                            const updatedData = updateLocalData(data, (prod) => {
-                                                prod.customer.purchase.specs[idx].value[originLang] = newValue;
-                                            });
-                                            await docService.updateInstruction(data.documentId, updatedData);
-                                        })}
-                                </td>
-                            ))}
-                        </tr>
-                    </tbody>
-                </table>
+            {/* Main Content Grid: Image + Key Details */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
+                {/* Left Column: Image (Span 7) */}
+                <div className="lg:col-span-7">
+                    <div className="h-full rounded-2xl bg-slate-100 overflow-hidden border border-slate-200 relative group min-h-[500px] flex items-center justify-center">
+                        {instruction.imageExtracted?.[0] ? (
+                            <img
+                                src={instruction.imageExtracted[0]}
+                                alt="Product"
+                                className="w-full h-full object-contain p-4 mix-blend-multiply transition-transform duration-500 group-hover:scale-105"
+                            />
+                        ) : (
+                            <div className="flex flex-col items-center opacity-20">
+                                <Package className="w-24 h-24 mb-4" />
+                                <div className="text-xl font-black uppercase tracking-widest text-slate-400">No Image</div>
+                            </div>
+                        )}
+                        {/* Optional overlay tag */}
+                        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold shadow-sm text-slate-500">
+                            PRODUCT IMAGE
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right Column: Details (Span 5) */}
+                <div className="lg:col-span-5 flex flex-col gap-4">
+                    <EditableCell
+                        label={instruction.product_number?.field_name}
+                        value={instruction.product_number?.annotation_value}
+                        path="product_number"
+                        icon={Copy}
+                    />
+
+                    <EditableCell
+                        label={instruction.factory?.field_name}
+                        value={instruction.factory?.annotation_value}
+                        path="factory"
+                        icon={Factory}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <EditableCell
+                            label={instruction.customer?.purchase?.quantity?.field_name}
+                            value={instruction.customer?.purchase?.quantity?.annotation_value}
+                            path="customer.purchase.quantity"
+                            icon={ShoppingCart}
+                        />
+                        <EditableCell
+                            label={instruction.customer?.purchase?.order_number?.field_name}
+                            value={instruction.customer?.purchase?.order_number?.annotation_value}
+                            path="customer.purchase.order_number"
+                            icon={FileText}
+                        />
+                    </div>
+
+                    <EditableCell
+                        label={instruction.shipping_remark?.field_name}
+                        value={instruction.shipping_remark?.annotation_value}
+                        path="shipping_remark"
+                        icon={Truck}
+                    />
+                </div>
             </div>
 
-            {/* Manufacturing Notes & Factory Stamp */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                {/* Notes */}
-                <div className="md:col-span-8 border border-slate-300 rounded-sm p-4">
-                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                        <div className="w-1 h-3 bg-blue-500 rounded-full" />
-                        Manufacturing Notes
-                    </h3>
-                    <div className="space-y-4">
-                        {notes.map((note, idx) => (
-                            <div key={idx} className="border-b border-slate-100 pb-3 last:border-0">
-                                <span className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
-                                    {renderContentByStep(getLocalizedText(note.label, originLang),
-                                        async (newValue) => {
-                                            const updatedData = updateLocalData(data, (prod) => {
-                                                prod.customer.manufacturingNote[idx].label[originLang] = newValue;
-                                            });
-                                            await docService.updateInstruction(data.documentId, updatedData);
-                                        })}
+            {/* Instruction Notes Section */}
+            {instruction.instruction_notes?.length > 0 && (
+                <div className="mb-12">
+                    <div className="flex items-center gap-4 mb-6">
+                        <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
+                            <AlertCircle className="w-5 h-5" />
+                        </div>
+                        <h2 className="text-lg font-black uppercase tracking-widest text-slate-800">Production Instructions</h2>
+                        <div className="h-px bg-slate-200 flex-grow" />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {instruction.instruction_notes.map((note, index) => (
+                            <div key={index} className="flex gap-4 p-4 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200/60 group">
+                                <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold border border-indigo-100">
+                                    {index + 1}
                                 </span>
-                                <div className="text-slate-700 leading-relaxed">
-                                    {renderContentByStep(getLocalizedText(note.value, originLang),
-                                        async (newValue) => {
-                                            const updatedData = updateLocalData(data, (prod) => {
-                                                prod.customer.manufacturingNote[idx].value[originLang] = newValue;
-                                            });
-                                            await docService.updateInstruction(data.documentId, updatedData);
-                                        })}
+                                <div className="flex flex-col flex-grow">
+                                    <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-1">
+                                        {(step === "Preview" || step === "edit") ? (
+                                            <EditWord word={getDisplayText(note?.field_name)} onChange={(val) => handleUpdate(`instruction_notes.${index}`, true, val)} />
+                                        ) : (
+                                            getDisplayText(note?.field_name) || "POINT"
+                                        )}
+                                    </span>
+                                    <div className="text-base font-medium text-slate-800 leading-relaxed">
+                                        {(step === "Preview" || step === "edit") ? (
+                                            <EditWord word={getDisplayText(note?.annotation_value)} onChange={(val) => handleUpdate(`instruction_notes.${index}`, false, val)} />
+                                        ) : (
+                                            getDisplayText(note?.annotation_value)
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))}
                     </div>
                 </div>
+            )}
 
-                {/* Factory Stamp */}
-                <div className="md:col-span-4 border border-slate-300 rounded-sm p-4 bg-slate-50/30 flex flex-col items-center justify-center text-center">
-                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.2em] mb-4">Quality Validation</span>
-                    {stamp?.img?.src ? (
-                        <div className="relative group">
-                            <img
-                                alt={stamp.img.id}
-                                src={stamp.img.src}
-                                className="max-w-[140px] opacity-80 mix-blend-multiply grayscale-[0.2] rotate-[-5deg]"
-                            />
-                            <div className="mt-2 text-[10px] font-bold text-slate-400 italic">
-                                {renderContentByStep(getLocalizedText(stamp?.label, originLang),
-                                    async (newValue) => {
-                                        const updatedData = updateLocalData(data, (prod) => {
-                                            prod.factory.factoryStamp.label[originLang] = newValue;
-                                        });
-                                        await docService.updateInstruction(data.documentId, updatedData);
-                                    })}
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="w-24 h-24 rounded-full border-4 border-dashed border-slate-200 flex items-center justify-center text-slate-200 font-black text-xs uppercase -rotate-12">
-                            Pending
-                        </div>
-                    )}
+            {/* NEW: Measurement Table Section */}
+            <div className="mb-16">
+                <div className="flex items-center gap-4 mb-6">
+                    <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
+                        <Ruler className="w-5 h-5" />
+                    </div>
+                    <h2 className="text-lg font-black uppercase tracking-widest text-slate-800">Measurement Chart / Size Spec</h2>
+                    <div className="h-px bg-slate-200 flex-grow" />
+                </div>
+
+                <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-sm">
+
                 </div>
             </div>
 
-            {/* Footer / Meta */}
-            <footer className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-end text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                <div className="space-y-1">
-                    <p>Document ID: {data?.documentId || "---"}</p>
-                    <p>YAI Synthesis Engine v2.04</p>
+            {/* Footer */}
+            <div className="flex justify-between items-end opacity-40 hover:opacity-100 transition-opacity duration-700">
+                <div className="text-[10px] uppercase font-bold tracking-widest text-slate-300">
+                    Generated by YQMS System
                 </div>
-                <div className="text-right">
-                    <p>© {new Date().getFullYear()} YAI KH Manufacturing</p>
-                </div>
-            </footer>
+                <img src="/pass.png" alt="Factory stamp" className="h-24 mix-blend-multiply grayscale contrast-125" />
+            </div>
         </div>
     );
 };
 
 export default GprtFirstPage;
-
-export function html(component) {
-    return ReactDOMServer.renderToString(component);
-}
