@@ -11,9 +11,36 @@ import {
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 } from "chart.js";
 import { Bar, Line, Doughnut } from "react-chartjs-2";
+
+// Helper to flatten nested history if it's an object/Map
+const getFlattenedHistory = (history) => {
+  if (Array.isArray(history)) return history;
+  if (typeof history !== "object" || history === null) return [];
+
+  return Object.keys(history)
+    .sort((a, b) => {
+      const numA = parseInt(a.replace("Item ", ""));
+      const numB = parseInt(b.replace("Item ", ""));
+      return numA - numB;
+    })
+    .flatMap((itemKey) => {
+      const checks = history[itemKey] || {};
+      return Object.keys(checks)
+        .sort((a, b) => {
+          const numA = parseInt(a.replace("Check ", ""));
+          const numB = parseInt(b.replace("Check ", ""));
+          return numA - numB;
+        })
+        .map((checkKey) => ({
+          ...checks[checkKey],
+          itemName: itemKey,
+          checkName: checkKey,
+        }));
+    });
+};
 
 ChartJS.register(
   CategoryScale,
@@ -25,7 +52,7 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 );
 
 // Enhanced KPI card with gradient and icons
@@ -38,107 +65,58 @@ const KpiCard = ({
   trend,
   percent,
   cornerIcon,
-  cornerBg
+  cornerBg,
 }) => {
   const graphUp =
     trend !== null && trend !== undefined
       ? Number(trend) > 0
       : percent !== null && percent !== undefined
-      ? Number(percent) >= 50
-      : true;
+        ? Number(percent) >= 50
+        : true;
 
   return (
     <div
       className={`relative overflow-hidden rounded-2xl p-6 shadow-lg ${gradient} text-gray-800 transform transition-all duration-300 hover:scale-105 hover:shadow-2xl`}
     >
-      <div className="absolute top-0 right-0 opacity-10">
-        <div className="w-32 h-32 transform translate-x-8 -translate-y-8">
-          {icon}
-        </div>
-      </div>
-      <div className="relative z-10">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-sm font-medium opacity-90">{title}</div>
-          {trend !== null && trend !== undefined && trend !== 0 && (
-            <div
-              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
-                trend > 0 ? "bg-white/20" : "bg-white/10"
-              }`}
-            >
-              <svg
-                className={`w-3 h-3 ${trend > 0 ? "rotate-0" : "rotate-180"}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+      <div className="relative z-10 flex flex-col h-full justify-between">
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-sm font-bold text-gray-500 ">{title}</div>
+            {percent !== null && percent !== undefined && (
+              <div
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+                  percent >= 50
+                    ? "bg-green-50 text-green-600 border border-green-100"
+                    : "bg-red-50 text-red-600 border border-red-100"
+                }`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                />
-              </svg>
-              <span>{Math.abs(trend)}%</span>
+                <svg
+                  className={`w-3 h-3 ${graphUp ? "rotate-0" : "rotate-180"}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                  />
+                </svg>
+                <span>{percent}%</span>
+              </div>
+            )}
+          </div>
+          <div className="text-3xl font-extrabold tracking-tight text-gray-900">
+            {value}
+          </div>
+          {subtitle && (
+            <div className="mt-1 text-xs font-medium text-gray-400">
+              {subtitle}
             </div>
           )}
         </div>
-        <div className="text-4xl font-bold mb-1">{value}</div>
-        {subtitle && <div className="text-xs opacity-80">{subtitle}</div>}
       </div>
-      {cornerIcon && (
-        <div className="absolute top-0 right-0 z-0 pointer-events-none">
-          <div
-            className={`w-24 h-24 rounded-full flex items-center justify-center ${
-              cornerBg || "bg-white/10"
-            } opacity-20 transform translate-x-6 -translate-y-6`}
-          >
-            <div className="w-6 h-6 opacity-60 stroke-current">
-              {cornerIcon}
-            </div>
-          </div>
-        </div>
-      )}
-      {percent !== null && percent !== undefined && (
-        <div className="absolute top-4 right-6 z-20">
-          <div
-            className={`w-10 h-10 rounded-full flex items-center justify-center ${
-              percent >= 50 ? "" : ""
-            } shadow-sm`}
-          >
-            <div className="flex items-center gap-1">
-              <svg
-                className={`w-3 h-3 transform ${
-                  graphUp ? "rotate-0" : "rotate-180"
-                } ${percent >= 50 ? "text-gray-600" : "text-gray-600"}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <polyline
-                  points="3 17 8 12 12 16 21 7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                />
-                <polyline
-                  points="17 7 21 7 21 11"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                />
-              </svg>
-              <span
-                className={`${
-                  percent >= 50 ? "text-gray-600" : "text-gray-600"
-                } text-xs font-semibold`}
-              >
-                {percent}%
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -150,7 +128,7 @@ const StatsCard = ({ label, value, icon, color = "blue" }) => {
     green: "bg-green-50 text-green-600 border-green-200",
     red: "bg-red-50 text-red-600 border-red-200",
     purple: "bg-purple-50 text-purple-600 border-purple-200",
-    orange: "bg-orange-50 text-orange-600 border-orange-200"
+    orange: "bg-orange-50 text-orange-600 border-orange-200",
   };
 
   return (
@@ -183,10 +161,17 @@ export default function Dashboard() {
   const [middleFail, setMiddleFail] = useState(0);
   const [bottomPass, setBottomPass] = useState(0);
   const [bottomFail, setBottomFail] = useState(0);
+  const [topRibsPass, setTopRibsPass] = useState(0);
+  const [topRibsFail, setTopRibsFail] = useState(0);
+  const [middleRibsPass, setMiddleRibsPass] = useState(0);
+  const [middleRibsFail, setMiddleRibsFail] = useState(0);
+  const [bottomRibsPass, setBottomRibsPass] = useState(0);
+  const [bottomRibsFail, setBottomRibsFail] = useState(0);
   const [docsRaw, setDocsRaw] = useState([]);
   const [ordersRaw, setOrdersRaw] = useState([]);
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
+    d.setDate(d.getDate() - 30);
     return d.toISOString().slice(0, 10);
   });
   const [endDate, setEndDate] = useState(() => {
@@ -214,7 +199,7 @@ export default function Dashboard() {
           API_BASE_URL && API_BASE_URL !== ""
             ? API_BASE_URL.replace(/\/$/, "")
             : "";
-        const url = `${base}/api/humidity-reports?limit=0`;
+        const url = `${base}/api/humidity-reports?limit=500`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
         const json = await res.json();
@@ -229,8 +214,8 @@ export default function Dashboard() {
               ordJson && ordJson.data
                 ? ordJson.data
                 : Array.isArray(ordJson)
-                ? ordJson
-                : [];
+                  ? ordJson
+                  : [];
             if (mounted) setOrdersRaw(orders);
           }
         } catch (ordErr) {
@@ -288,7 +273,7 @@ export default function Dashboard() {
             ? API_BASE_URL.replace(/\/$/, "")
             : "";
         const res = await fetch(
-          `${base}/api/yorksys-orders/${encodeURIComponent(factoryStyleFilter)}`
+          `${base}/api/yorksys-orders/${encodeURIComponent(factoryStyleFilter)}`,
         );
         if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
         const json = await res.json();
@@ -316,12 +301,15 @@ export default function Dashboard() {
         if (!dtStr) return false;
         const dt = new Date(dtStr);
         if (isNaN(dt)) return false;
+
         if (startDate) {
           const s = new Date(startDate);
+          s.setHours(0, 0, 0, 0);
           if (dt < s) return false;
         }
         if (endDate) {
           const e = new Date(endDate);
+          e.setHours(23, 59, 59, 999);
           if (dt > e) return false;
         }
       }
@@ -366,7 +354,7 @@ export default function Dashboard() {
     endDate,
     factoryStyleFilter,
     buyerStyleFilter,
-    customerFilter
+    customerFilter,
   ]);
 
   // recompute aggregates when filtered docs change
@@ -385,14 +373,25 @@ export default function Dashboard() {
         mFail = 0;
       let bPass = 0,
         bFail = 0;
+      let trPass = 0,
+        trFail = 0;
+      let mrPass = 0,
+        mrFail = 0;
+      let brPass = 0,
+        brFail = 0;
 
       filtered.forEach((d) => {
         const cust = (d.customer || d.buyer || "Unknown").toString();
         if (!bodyCounts[cust]) bodyCounts[cust] = 0;
         if (!ribsCounts[cust]) ribsCounts[cust] = 0;
 
-        // Process history array instead of inspectionRecords
-        const history = Array.isArray(d.history) ? d.history : [];
+        const specNum =
+          parseFloat(d.aquaboySpec) || parseFloat(d.upperCentisimalIndex) || 0;
+
+        // Process flattened history to support both old and new formats
+        const rawHist = d.history || d.inspectionRecords || [];
+        const history = getFlattenedHistory(rawHist);
+
         history.forEach((check) => {
           ["top", "middle", "bottom"].forEach((sec) => {
             const s = check[sec] || {};
@@ -404,19 +403,38 @@ export default function Dashboard() {
               const bodyStr = String(s.body).trim();
               const bodyNum = parseFloat(bodyStr) || 1;
               bodyCounts[cust] += bodyNum;
-              if (s.status === "pass") totalBPass += bodyNum;
-              else if (s.status === "fail") totalBFail += bodyNum;
 
-              // Record section specific pass/fail
+              // Derive Body Status independently of section status
+              let bStatus = (s.bodyStatus || "").toLowerCase();
+              if (!bStatus) {
+                const bVal = parseFloat(s.body);
+                if (!isNaN(bVal) && specNum > 0) {
+                  bStatus = bVal <= specNum ? "pass" : "fail";
+                }
+              }
+              if (!bStatus) bStatus = (s.status || "").toLowerCase();
+
+              if (bStatus === "pass" || bStatus === "passed")
+                totalBPass += bodyNum;
+              else if (bStatus === "fail" || bStatus === "failed")
+                totalBFail += bodyNum;
+
+              // Record section specific pass/fail (using independent body status)
               if (sec === "top") {
-                if (s.status === "pass") tPass += bodyNum;
-                else if (s.status === "fail") tFail += bodyNum;
+                if (bStatus === "pass" || bStatus === "passed")
+                  tPass += bodyNum;
+                else if (bStatus === "fail" || bStatus === "failed")
+                  tFail += bodyNum;
               } else if (sec === "middle") {
-                if (s.status === "pass") mPass += bodyNum;
-                else if (s.status === "fail") mFail += bodyNum;
+                if (bStatus === "pass" || bStatus === "passed")
+                  mPass += bodyNum;
+                else if (bStatus === "fail" || bStatus === "failed")
+                  mFail += bodyNum;
               } else if (sec === "bottom") {
-                if (s.status === "pass") bPass += bodyNum;
-                else if (s.status === "fail") bFail += bodyNum;
+                if (bStatus === "pass" || bStatus === "passed")
+                  bPass += bodyNum;
+                else if (bStatus === "fail" || bStatus === "failed")
+                  bFail += bodyNum;
               }
             }
             if (
@@ -427,19 +445,47 @@ export default function Dashboard() {
               const ribsStr = String(s.ribs).trim();
               const ribsNum = parseFloat(ribsStr) || 1;
               ribsCounts[cust] += ribsNum;
-              if (s.status === "pass") totalRPass += ribsNum;
-              else if (s.status === "fail") totalRFail += ribsNum;
 
-              // Also count ribs for section metrics
+              // Derive Ribs Status independently
+              let rStatus = (s.ribsStatus || "").toLowerCase();
+              if (!rStatus) {
+                const rVal = parseFloat(s.ribs);
+                if (!isNaN(rVal) && specNum > 0) {
+                  rStatus = rVal <= specNum ? "pass" : "fail";
+                }
+              }
+              if (!rStatus) rStatus = (s.status || "").toLowerCase();
+
+              if (rStatus === "pass" || rStatus === "passed")
+                totalRPass += ribsNum;
+              else if (rStatus === "fail" || rStatus === "failed")
+                totalRFail += ribsNum;
+
+              // Also count ribs for section metrics (using independent ribs status)
               if (sec === "top") {
-                if (s.status === "pass") tPass += ribsNum;
-                else if (s.status === "fail") tFail += ribsNum;
+                if (rStatus === "pass" || rStatus === "passed") {
+                  tPass += ribsNum;
+                  trPass += ribsNum;
+                } else if (rStatus === "fail" || rStatus === "failed") {
+                  tFail += ribsNum;
+                  trFail += ribsNum;
+                }
               } else if (sec === "middle") {
-                if (s.status === "pass") mPass += ribsNum;
-                else if (s.status === "fail") mFail += ribsNum;
+                if (rStatus === "pass" || rStatus === "passed") {
+                  mPass += ribsNum;
+                  mrPass += ribsNum;
+                } else if (rStatus === "fail" || rStatus === "failed") {
+                  mFail += ribsNum;
+                  mrFail += ribsNum;
+                }
               } else if (sec === "bottom") {
-                if (s.status === "pass") bPass += ribsNum;
-                else if (s.status === "fail") bFail += ribsNum;
+                if (rStatus === "pass" || rStatus === "passed") {
+                  bPass += ribsNum;
+                  brPass += ribsNum;
+                } else if (rStatus === "fail" || rStatus === "failed") {
+                  bFail += ribsNum;
+                  brFail += ribsNum;
+                }
               }
             }
           });
@@ -458,6 +504,12 @@ export default function Dashboard() {
       setMiddleFail(mFail);
       setBottomPass(bPass);
       setBottomFail(bFail);
+      setTopRibsPass(trPass);
+      setTopRibsFail(trFail);
+      setMiddleRibsPass(mrPass);
+      setMiddleRibsFail(mrFail);
+      setBottomRibsPass(brPass);
+      setBottomRibsFail(brFail);
     } catch (e) {
       console.error("Error computing aggregates for dashboard filters", e);
     }
@@ -638,43 +690,48 @@ export default function Dashboard() {
 
   // Compute total inspections and styles
   const totalInspections = filteredDocs.reduce((sum, doc) => {
-    const history = Array.isArray(doc.history) ? doc.history : [];
+    const rawHist = doc.history || doc.inspectionRecords || [];
+    const history = getFlattenedHistory(rawHist);
     return sum + history.length;
   }, 0);
 
   const uniqueStyles = new Set(
-    filteredDocs.map((d) => d.factoryStyleNo || d.factoryStyle).filter(Boolean)
+    filteredDocs.map((d) => d.factoryStyleNo || d.factoryStyle).filter(Boolean),
   );
   const totalStyles = uniqueStyles.size;
 
   const uniqueCustomers = new Set(
-    filteredDocs.map((d) => d.customer || d.buyer).filter(Boolean)
+    filteredDocs.map((d) => d.customer || d.buyer).filter(Boolean),
   );
   const totalCustomers = uniqueCustomers.size;
 
   // Recent activity (last 5 reports)
   const recentActivity = useMemo(() => {
-    return filteredDocs.slice(0, 5).map((doc) => ({
-      factoryStyleNo: doc.factoryStyleNo || "N/A",
-      customer: doc.customer || "N/A",
-      date: doc.updatedAt || doc.createdAt,
-      checksCount: Array.isArray(doc.history) ? doc.history.length : 0,
-      latestStatus: (() => {
-        const history = Array.isArray(doc.history) ? doc.history : [];
-        if (history.length === 0) return "pending";
-        const latest = history[history.length - 1];
-        const allPass =
-          latest.top?.status === "pass" &&
-          latest.middle?.status === "pass" &&
-          latest.bottom?.status === "pass";
-        return allPass ? "pass" : "fail";
-      })(),
-      upperCentisimalIndex:
-        doc.upperCentisimalIndex ||
-        (doc.history && doc.history.length > 0
-          ? doc.history[doc.history.length - 1].upperCentisimalIndex
-          : null)
-    }));
+    return filteredDocs.slice(0, 5).map((doc) => {
+      const rawHist = doc.history || doc.inspectionRecords || [];
+      const history = getFlattenedHistory(rawHist);
+
+      return {
+        factoryStyleNo: doc.factoryStyleNo || "N/A",
+        customer: doc.customer || "N/A",
+        date: doc.updatedAt || doc.createdAt,
+        checksCount: history.length,
+        latestStatus: (() => {
+          if (history.length === 0) return "pending";
+          const latest = history[history.length - 1];
+          const allPass =
+            latest.top?.status === "pass" &&
+            latest.middle?.status === "pass" &&
+            latest.bottom?.status === "pass";
+          return allPass ? "pass" : "fail";
+        })(),
+        upperCentisimalIndex:
+          doc.upperCentisimalIndex ||
+          (history.length > 0
+            ? history[history.length - 1].upperCentisimalIndex
+            : null),
+      };
+    });
   }, [filteredDocs]);
 
   if (loading) {
@@ -821,9 +878,7 @@ export default function Dashboard() {
                 onClick={() => setShowStyleDropdown(!showStyleDropdown)}
               >
                 <svg
-                  className={`fill-current h-5 w-5 transition-transform ${
-                    showStyleDropdown ? "rotate-180" : ""
-                  }`}
+                  className={`fill-current h-5 w-5 transition-transform ${showStyleDropdown ? "rotate-180" : ""}`}
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 20 20"
                 >
@@ -859,16 +914,16 @@ export default function Dashboard() {
                                 d.moNo ||
                                 d.style ||
                                 ""
-                              ).toString()
+                              ).toString(),
                             )
                             .filter(Boolean)
-                        : [])
-                    ])
+                        : []),
+                    ]),
                   ]
                     .filter(
                       (f) =>
                         !styleSearch ||
-                        f.toLowerCase().includes(styleSearch.toLowerCase())
+                        f.toLowerCase().includes(styleSearch.toLowerCase()),
                     )
                     .map((f) => (
                       <div
@@ -924,64 +979,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-
-      {/* Selected Order Detailed Info Section */}
-      {/* {factoryStyleFilter && (
-        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="flex items-center gap-2 mb-6 border-b border-gray-50 pb-4">
-            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-800">Order Information</h3>
-              <p className="text-xs text-gray-500 font-medium">Detailed specs for Style: <span className="text-blue-600 font-extrabold">{factoryStyleFilter}</span></p>
-            </div>
-          </div>
-
-          {isOrderLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-8 h-8 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-            </div>
-          ) : selectedOrder ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 ">
-                <div className="text-[13px] uppercase text-gray-800 font-bold tracking-widest mb-1">Customer</div>
-                <div className="text-lg font-extrabold text-gray-800">{selectedOrder.buyer || 'N/A'}</div>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <div className="text-[10px] uppercase text-gray-400 font-bold tracking-widest mb-1">Fabrication</div>
-                <div className="text-sm font-bold text-gray-800 break-words">
-                  {Array.isArray(selectedOrder.FabricContent) && selectedOrder.FabricContent.length > 0
-                    ? selectedOrder.FabricContent.map(f => `${f.fabricName || f.fabric || ''} ${f.percentageValue || ''}%`.trim()).join(', ')
-                    : 'N/A'}
-                </div>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <div className="text-[10px] uppercase text-gray-400 font-bold tracking-widest mb-1">PO Number / Line</div>
-                <div className="text-lg font-extrabold text-gray-800">
-                  {selectedOrder.poNo || 'N/A'}
-                  {selectedOrder.SKUData?.[0]?.POLine ? <span className="text-gray-400 text-sm ml-2">({selectedOrder.SKUData[0].POLine})</span> : ''}
-                </div>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <div className="text-[10px] uppercase text-gray-400 font-bold tracking-widest mb-1">Available Colors</div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {[...new Set([
-                    ...(Array.isArray(selectedOrder.SKUData) ? selectedOrder.SKUData.map(s => s.Color).filter(Boolean) : []),
-                    ...((Array.isArray(selectedOrder.OrderQtyByCountry) ? selectedOrder.OrderQtyByCountry.flatMap(c => (c.ColorQty || []).map(cq => cq.ColorName)) : [])).filter(Boolean)
-                  ])].map((col, idx) => (
-                    <span key={idx} className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-black rounded uppercase tracking-tighter shadow-sm">{col}</span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-6 text-gray-400 italic text-sm font-medium">No extended order details found for this style.</div>
-          )}
-        </div>
-      )} */}
 
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -1089,18 +1086,25 @@ export default function Dashboard() {
         />
         {(() => {
           if (!factoryStyleFilter) return null;
-          const relevantDoc = filteredDocs.find(
-            (d) =>
-              (d.upperCentisimalIndex &&
-                String(d.upperCentisimalIndex).trim() !== "") ||
-              (Array.isArray(d.history) &&
-                d.history.some((h) => h.upperCentisimalIndex))
+          const relevantDoc = filteredDocs.find((d) => {
+            if (
+              d.upperCentisimalIndex &&
+              String(d.upperCentisimalIndex).trim() !== ""
+            )
+              return true;
+            const history = getFlattenedHistory(
+              d.history || d.inspectionRecords || [],
+            );
+            return history.some((h) => h.upperCentisimalIndex);
+          });
+          if (!relevantDoc) return null;
+
+          const history = getFlattenedHistory(
+            relevantDoc.history || relevantDoc.inspectionRecords || [],
           );
-          const uci = relevantDoc
-            ? relevantDoc.upperCentisimalIndex ||
-              relevantDoc.history.find((h) => h.upperCentisimalIndex)
-                ?.upperCentisimalIndex
-            : null;
+          const uci =
+            relevantDoc.upperCentisimalIndex ||
+            history.find((h) => h.upperCentisimalIndex)?.upperCentisimalIndex;
 
           if (!uci) return null;
 
@@ -1136,15 +1140,7 @@ export default function Dashboard() {
           value={totalBody}
           subtitle={`${passPctBody}% pass rate`}
           gradient="bg-gray-50 border-2 border-blue-300"
-          icon={
-            <svg
-              className="w-full h-full text-blue-400"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          }
+          percent={passPctBody}
         />
         <KpiCard
           title="Body Pass"
@@ -1153,36 +1149,6 @@ export default function Dashboard() {
           gradient="bg-gray-50 border-2 border-green-300"
           trend={passPctBody > 50 ? passPctBody : null}
           percent={passPctBody}
-          cornerBg="bg-green-50"
-          cornerIcon={
-            <svg
-              className="w-5 h-5 text-green-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M4 14h3v6H4zM10 10h3v10h-3zM16 6h3v14h-3z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-          icon={
-            <svg
-              className="w-full h-full text-green-400"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
         />
         <KpiCard
           title="Body Fail"
@@ -1191,36 +1157,6 @@ export default function Dashboard() {
           gradient="bg-gray-50 border-2 border-red-300"
           trend={failPctBody < 50 ? -failPctBody : null}
           percent={failPctBody}
-          cornerBg="bg-red-50"
-          cornerIcon={
-            <svg
-              className="w-5 h-5 text-red-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M4 14h3v6H4zM10 10h3v10h-3zM16 6h3v14h-3z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-          icon={
-            <svg
-              className="w-full h-full text-red-400"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
         />
       </div>
 
@@ -1231,96 +1167,21 @@ export default function Dashboard() {
           value={total}
           subtitle={`${passPct}% pass rate`}
           gradient="bg-gray-50 border-2 border-purple-300"
-          icon={
-            <svg
-              className="w-full h-full text-purple-400"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
-              <path d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
-            </svg>
-          }
+          percent={passPct}
         />
         <KpiCard
           title="Ribs Pass"
           value={totalRibsPass}
           subtitle="Passed inspection"
           gradient="bg-gray-50 border-2 border-teal-300"
-          trend={passPct > 50 ? passPct : null}
           percent={passPct}
-          cornerBg="bg-green-50"
-          cornerIcon={
-            <svg
-              className="w-5 h-5 text-teal-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M4 14h3v6H4zM10 10h3v10h-3zM16 6h3v14h-3z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-          icon={
-            <svg
-              className="w-full h-full text-teal-400"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-          }
         />
         <KpiCard
           title="Ribs Fail"
           value={totalRibsFail}
           subtitle="Requires attention"
           gradient="bg-gray-50 border-2 border-orange-300"
-          trend={failPct < 50 ? -failPct : null}
           percent={failPct}
-          cornerBg="bg-red-50"
-          cornerIcon={
-            <svg
-              className="w-5 h-5 text-orange-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M4 14h3v6H4zM10 10h3v10h-3zM16 6h3v14h-3z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-          icon={
-            <svg
-              className="w-full h-full text-orange-400"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                fillRule="evenodd"
-                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                clipRule="evenodd"
-              />
-            </svg>
-          }
         />
       </div>
 
@@ -1329,169 +1190,34 @@ export default function Dashboard() {
         <KpiCard
           title="Top Readings"
           value={topPass + topFail}
-          subtitle={`${
-            topPass + topFail
-              ? Math.round((topPass / (topPass + topFail)) * 100)
-              : 0
-          }% pass rate`}
+          subtitle={`${topPass + topFail ? Math.round((topPass / (topPass + topFail)) * 100) : 0}% pass rate`}
           gradient="bg-gray-50 border-2 border-blue-200"
           percent={
             topPass + topFail
               ? Math.round((topPass / (topPass + topFail)) * 100)
               : 0
           }
-          icon={
-            <svg
-              className="w-5 h-5 text-indigo-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-          cornerBg="bg-blue-50"
-          cornerIcon={
-            <svg
-              className="w-5 h-5 text-blue-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
         />
         <KpiCard
           title="Middle Readings"
           value={middlePass + middleFail}
-          subtitle={`${
-            middlePass + middleFail
-              ? Math.round((middlePass / (middlePass + middleFail)) * 100)
-              : 0
-          }% pass rate`}
+          subtitle={`${middlePass + middleFail ? Math.round((middlePass / (middlePass + middleFail)) * 100) : 0}% pass rate`}
           gradient="bg-gray-50 border-2 border-orange-200"
           percent={
             middlePass + middleFail
               ? Math.round((middlePass / (middlePass + middleFail)) * 100)
               : 0
           }
-          icon={
-            <svg
-              className="w-5 h-5 text-pink-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-          cornerBg="bg-orange-50"
-          cornerIcon={
-            <svg
-              className="w-5 h-5 text-orange-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
         />
         <KpiCard
           title="Bottom Readings"
           value={bottomPass + bottomFail}
-          subtitle={`${
-            bottomPass + bottomFail
-              ? Math.round((bottomPass / (bottomPass + bottomFail)) * 100)
-              : 0
-          }% pass rate`}
+          subtitle={`${bottomPass + bottomFail ? Math.round((bottomPass / (bottomPass + bottomFail)) * 100) : 0}% pass rate`}
           gradient="bg-gray-50 border-2 border-green-200"
           percent={
             bottomPass + bottomFail
               ? Math.round((bottomPass / (bottomPass + bottomFail)) * 100)
               : 0
-          }
-          icon={
-            <svg
-              className="w-5 h-5 text-pink-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          }
-          cornerBg="bg-green-50"
-          cornerIcon={
-            <svg
-              className="w-5 h-5 text-green-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                fill="currentColor"
-              />
-              <path
-                d="M16 6l4-4M20 2v4h-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
           }
         />
       </div>
@@ -1500,25 +1226,27 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Body Chart */}
         <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
-              <svg
-                className="w-6 h-6 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shrink-0">
+                <svg
+                  className="w-6 h-6 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-gray-800">
+                Body Performance
+              </h3>
             </div>
-            <h3 className="text-lg font-semibold text-gray-800">
-              Body Performance
-            </h3>
           </div>
           {totalBodyPass === 0 && totalBodyFail === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-gray-500">
@@ -1550,28 +1278,31 @@ export default function Dashboard() {
               <div className="w-full md:w-2/5">
                 <Doughnut
                   data={{
-                    labels: ["Pass", "Fail"],
+                    labels: [
+                      `Pass (${totalBodyPass + totalBodyFail ? Math.round((totalBodyPass / (totalBodyPass + totalBodyFail)) * 100) : 0}%)`,
+                      `Fail (${totalBodyPass + totalBodyFail ? Math.round((totalBodyFail / (totalBodyPass + totalBodyFail)) * 100) : 0}%)`,
+                    ],
                     datasets: [
                       {
                         data: [totalBodyPass, totalBodyFail],
                         backgroundColor: [
-                          "rgba(173, 216, 230, 0.8)",
-                          "rgba(255, 192, 203, 0.8)"
+                          "rgba(147, 197, 253, 0.8)",
+                          "rgba(255, 192, 203, 0.8)",
                         ],
                         borderColor: [
-                          "rgba(173, 216, 230, 1)",
-                          "rgba(255, 192, 203, 1)"
+                          "rgba(147, 197, 253, 1)",
+                          "rgba(255, 192, 203, 1)",
                         ],
                         borderWidth: 2,
-                        hoverOffset: 8
-                      }
-                    ]
+                        hoverOffset: 8,
+                      },
+                    ],
                   }}
                   options={{
                     cutout: "65%",
                     plugins: {
                       datalabels: {
-                        display: false
+                        display: false,
                       },
                       legend: {
                         display: true,
@@ -1582,24 +1313,18 @@ export default function Dashboard() {
                           boxWidth: 10,
                           boxHeight: 10,
                           padding: 24,
-                          font: { size: 13, weight: 500 }
-                        }
+                          font: { size: 13, weight: 500 },
+                        },
                       },
                       tooltip: {
                         callbacks: {
                           label: function (context) {
-                            const label = context.label || "";
                             const value = context.raw || 0;
-                            const total =
-                              context.chart._metasets[context.datasetIndex]
-                                .total;
-                            const percentage =
-                              Math.round((value / total) * 100) + "%";
-                            return `${label}: ${value} (${percentage})`;
-                          }
-                        }
-                      }
-                    }
+                            return `${value} Readings`;
+                          },
+                        },
+                      },
+                    },
                   }}
                 />
               </div>
@@ -1609,25 +1334,27 @@ export default function Dashboard() {
 
         {/* Ribs Chart */}
         <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-              <svg
-                className="w-6 h-6 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"
-                />
-              </svg>
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
+                <svg
+                  className="w-6 h-6 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-gray-800">
+                Ribs Performance
+              </h3>
             </div>
-            <h3 className="text-lg font-semibold text-gray-800">
-              Ribs Performance
-            </h3>
           </div>
           {totalRibsPass === 0 && totalRibsFail === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-gray-500">
@@ -1659,25 +1386,31 @@ export default function Dashboard() {
               <div className="w-full md:w-2/5">
                 <Doughnut
                   data={{
-                    labels: ["Pass", "Fail"],
+                    labels: [
+                      `Pass (${totalRibsPass + totalRibsFail ? Math.round((totalRibsPass / (totalRibsPass + totalRibsFail)) * 100) : 0}%)`,
+                      `Fail (${totalRibsPass + totalRibsFail ? Math.round((totalRibsFail / (totalRibsPass + totalRibsFail)) * 100) : 0}%)`,
+                    ],
                     datasets: [
                       {
                         data: [totalRibsPass, totalRibsFail],
                         backgroundColor: [
-                          "#B5EAD7", // Pastel Mint (Pass)
-                          "#FF9AA2" // Pastel Salmon (Fail)
+                          "rgba(147, 197, 253, 0.8)",
+                          "rgba(255, 192, 203, 0.8)",
                         ],
-                        borderColor: ["#B5EAD7", "#FF9AA2"],
+                        borderColor: [
+                          "rgba(147, 197, 253, 1)",
+                          "rgba(255, 192, 203, 1)",
+                        ],
                         borderWidth: 2,
-                        hoverOffset: 8
-                      }
-                    ]
+                        hoverOffset: 8,
+                      },
+                    ],
                   }}
                   options={{
                     cutout: "65%",
                     plugins: {
                       datalabels: {
-                        display: false
+                        display: false,
                       },
                       legend: {
                         display: true,
@@ -1688,24 +1421,18 @@ export default function Dashboard() {
                           boxWidth: 10,
                           boxHeight: 10,
                           padding: 24,
-                          font: { size: 13, weight: 500 }
-                        }
+                          font: { size: 13, weight: 500 },
+                        },
                       },
                       tooltip: {
                         callbacks: {
                           label: function (context) {
-                            const label = context.label || "";
                             const value = context.raw || 0;
-                            const total =
-                              context.chart._metasets[context.datasetIndex]
-                                .total;
-                            const percentage =
-                              Math.round((value / total) * 100) + "%";
-                            return `${label}: ${value} (${percentage})`;
-                          }
-                        }
-                      }
-                    }
+                            return `${value} Readings`;
+                          },
+                        },
+                      },
+                    },
                   }}
                 />
               </div>
@@ -1715,28 +1442,32 @@ export default function Dashboard() {
       </div>
 
       {/* Sectional Performance Charts */}
+      <div className="mt-8 mb-4 flex items-center gap-2">
+        <div className="h-6 w-1 rounded-full bg-indigo-500" />
+        <h2 className="text-xl font-bold text-gray-800">Body Only</h2>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Top Section Chart */}
         <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-              <svg
-                className="w-5 h-5 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 15l7-7 7 7"
-                />
-              </svg>
+          <div className="flex items-start justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                <svg
+                  className="w-5 h-5 text-blue-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M12 19V5M5 12l7-7 7 7"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-md font-bold text-gray-800">Top Body</h3>
             </div>
-            <h3 className="text-md font-semibold text-gray-800">
-              Top Performance
-            </h3>
           </div>
           <div
             className="flex items-center justify-center p-2"
@@ -1769,15 +1500,24 @@ export default function Dashboard() {
               <>
                 <Doughnut
                   data={{
-                    labels: ["Pass", "Fail"],
+                    labels: [
+                      `Pass (${topPass + topFail ? Math.round((topPass / (topPass + topFail)) * 100) : 0}%)`,
+                      `Fail (${topPass + topFail ? Math.round((topFail / (topPass + topFail)) * 100) : 0}%)`,
+                    ],
                     datasets: [
                       {
                         data: [topPass, topFail],
-                        backgroundColor: ["#93c5fd", "#fca5a5"],
-                        borderColor: ["#3b82f6", "#ef4444"],
-                        borderWidth: 1
-                      }
-                    ]
+                        backgroundColor: [
+                          "rgba(147, 197, 253, 0.8)",
+                          "rgba(255, 192, 203, 0.8)",
+                        ],
+                        borderColor: [
+                          "rgba(147, 197, 253, 1)",
+                          "rgba(250, 179, 191, 1)",
+                        ],
+                        borderWidth: 1,
+                      },
+                    ],
                   }}
                   options={{
                     cutout: "70%",
@@ -1786,58 +1526,56 @@ export default function Dashboard() {
                       datalabels: { display: false },
                       tooltip: {
                         callbacks: {
-                          label: (ctx) =>
-                            `${ctx.label}: ${ctx.raw} (${Math.round(
-                              (ctx.raw / (topPass + topFail || 1)) * 100
-                            )}%)`
-                        }
-                      }
-                    }
+                          label: (ctx) => `${ctx.raw} Readings`,
+                        },
+                      },
+                    },
                   }}
                 />
-                <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-xl font-bold text-gray-800">
-                    {topPass + topFail
-                      ? Math.round((topPass / (topPass + topFail)) * 100)
-                      : 0}
-                    %
-                  </span>
-                  <span className="text-[10px] text-gray-500 uppercase font-medium">
-                    Pass
-                  </span>
-                </div>
               </>
             )}
           </div>
           <div className="flex items-center justify-center gap-2 mt-3">
             <div className="w-3 h-3 rounded-full bg-[#93c5fd]" />
-            <span className="text-sm font-medium text-gray-600">Pass</span>
+            <span className="text-sm font-medium text-gray-600">
+              Pass (
+              {topPass + topFail
+                ? Math.round((topPass / (topPass + topFail)) * 100)
+                : 0}
+              %)
+            </span>
             <div className="w-3 h-3 rounded-full bg-[#fca5a5]" />
-            <span className="text-sm font-medium text-gray-600">Fail</span>
+            <span className="text-sm font-medium text-gray-600">
+              Fail (
+              {topPass + topFail
+                ? Math.round((topFail / (topPass + topFail)) * 100)
+                : 0}
+              %)
+            </span>
           </div>
         </div>
 
         {/* Middle Section Chart */}
         <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
-              <svg
-                className="w-5 h-5 text-orange-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M18 12H6"
-                />
-              </svg>
+          <div className="flex items-start justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-pink-100 flex items-center justify-center shrink-0">
+                <svg
+                  className="w-5 h-5 text-pink-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M5 12h14"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-md font-bold text-gray-800">Middle Body</h3>
             </div>
-            <h3 className="text-md font-semibold text-gray-800">
-              Middle Performance
-            </h3>
           </div>
           <div
             className="flex items-center justify-center p-2"
@@ -1870,15 +1608,24 @@ export default function Dashboard() {
               <>
                 <Doughnut
                   data={{
-                    labels: ["Pass", "Fail"],
+                    labels: [
+                      `Pass (${middlePass + middleFail ? Math.round((middlePass / (middlePass + middleFail)) * 100) : 0}%)`,
+                      `Fail (${middlePass + middleFail ? Math.round((middleFail / (middlePass + middleFail)) * 100) : 0}%)`,
+                    ],
                     datasets: [
                       {
                         data: [middlePass, middleFail],
-                        backgroundColor: ["#fde68a", "#fca5a5"],
-                        borderColor: ["#f59e0b", "#ef4444"],
-                        borderWidth: 1
-                      }
-                    ]
+                        backgroundColor: [
+                          "rgba(147, 197, 253, 0.8)",
+                          "rgba(255, 192, 203, 0.8)",
+                        ],
+                        borderColor: [
+                          "rgba(147, 197, 253, 1)",
+                          "rgba(250, 179, 191, 1)",
+                        ],
+                        borderWidth: 1,
+                      },
+                    ],
                   }}
                   options={{
                     cutout: "70%",
@@ -1887,60 +1634,57 @@ export default function Dashboard() {
                       datalabels: { display: false },
                       tooltip: {
                         callbacks: {
-                          label: (ctx) =>
-                            `${ctx.label}: ${ctx.raw} (${Math.round(
-                              (ctx.raw / (middlePass + middleFail || 1)) * 100
-                            )}%)`
-                        }
-                      }
-                    }
+                          label: (ctx) => `${ctx.raw} Readings`,
+                        },
+                      },
+                    },
                   }}
                 />
-                <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-xl font-bold text-gray-800">
-                    {middlePass + middleFail
-                      ? Math.round(
-                          (middlePass / (middlePass + middleFail)) * 100
-                        )
-                      : 0}
-                    %
-                  </span>
-                  <span className="text-[10px] text-gray-500 uppercase font-medium">
-                    Pass
-                  </span>
-                </div>
               </>
             )}
           </div>
           <div className="flex items-center justify-center gap-2 mt-3">
-            <div className="w-3 h-3 rounded-full bg-[#fde68a]" />
-            <span className="text-sm font-medium text-gray-600">Pass</span>
+            <div className="w-3 h-3 rounded-full bg-[#93c5fd]" />
+            <span className="text-sm font-medium text-gray-600">
+              Pass (
+              {middlePass + middleFail
+                ? Math.round((middlePass / (middlePass + middleFail)) * 100)
+                : 0}
+              %)
+            </span>
             <div className="w-3 h-3 rounded-full bg-[#fca5a5]" />
-            <span className="text-sm font-medium text-gray-600">Fail</span>
+            <span className="text-sm font-medium text-gray-600">
+              Fail (
+              {middlePass + middleFail
+                ? Math.round((middleFail / (middlePass + middleFail)) * 100)
+                : 0}
+              %)
+            </span>
           </div>
         </div>
 
         {/* Bottom Section Chart */}
+
         <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-              <svg
-                className="w-5 h-5 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
+          <div className="flex items-start justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-fuchsia-100 flex items-center justify-center shrink-0">
+                <svg
+                  className="w-5 h-5 text-fuchsia-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M12 5v14M5 12l7 7 7-7"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-md font-bold text-gray-800">Bottom Body</h3>
             </div>
-            <h3 className="text-md font-semibold text-gray-800">
-              Bottom Performance
-            </h3>
           </div>
           <div
             className="flex items-center justify-center p-2"
@@ -1973,15 +1717,24 @@ export default function Dashboard() {
               <>
                 <Doughnut
                   data={{
-                    labels: ["Pass", "Fail"],
+                    labels: [
+                      `Pass (${bottomPass + bottomFail ? Math.round((bottomPass / (bottomPass + bottomFail)) * 100) : 0}%)`,
+                      `Fail (${bottomPass + bottomFail ? Math.round((bottomFail / (bottomPass + bottomFail)) * 100) : 0}%)`,
+                    ],
                     datasets: [
                       {
                         data: [bottomPass, bottomFail],
-                        backgroundColor: ["#86efac", "#fca5a5"],
-                        borderColor: ["#22c55e", "#ef4444"],
-                        borderWidth: 1
-                      }
-                    ]
+                        backgroundColor: [
+                          "rgba(147, 197, 253, 0.8)",
+                          "rgba(255, 192, 203, 0.8)",
+                        ],
+                        borderColor: [
+                          "rgba(147, 197, 253, 1)",
+                          "rgba(250, 179, 191, 1)",
+                        ],
+                        borderWidth: 1,
+                      },
+                    ],
                   }}
                   options={{
                     cutout: "70%",
@@ -1990,36 +1743,351 @@ export default function Dashboard() {
                       datalabels: { display: false },
                       tooltip: {
                         callbacks: {
-                          label: (ctx) =>
-                            `${ctx.label}: ${ctx.raw} (${Math.round(
-                              (ctx.raw / (bottomPass + bottomFail || 1)) * 100
-                            )}%)`
-                        }
-                      }
-                    }
+                          label: (ctx) => `${ctx.raw} Readings`,
+                        },
+                      },
+                    },
                   }}
                 />
-                <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-xl font-bold text-gray-800">
-                    {bottomPass + bottomFail
-                      ? Math.round(
-                          (bottomPass / (bottomPass + bottomFail)) * 100
-                        )
-                      : 0}
-                    %
-                  </span>
-                  <span className="text-[10px] text-gray-500 uppercase font-medium">
-                    Pass
-                  </span>
-                </div>
               </>
             )}
           </div>
           <div className="flex items-center justify-center gap-2 mt-3">
-            <div className="w-3 h-3 rounded-full bg-[#86efac]" />
-            <span className="text-sm font-medium text-gray-600">Pass</span>
+            <div className="w-3 h-3 rounded-full bg-[#93c5fd]" />
+            <span className="text-sm font-medium text-gray-600">
+              Pass (
+              {bottomPass + bottomFail
+                ? Math.round((bottomPass / (bottomPass + bottomFail)) * 100)
+                : 0}
+              %)
+            </span>
             <div className="w-3 h-3 rounded-full bg-[#fca5a5]" />
-            <span className="text-sm font-medium text-gray-600">Fail</span>
+            <span className="text-sm font-medium text-gray-600">
+              Fail (
+              {bottomPass + bottomFail
+                ? Math.round((bottomFail / (bottomPass + bottomFail)) * 100)
+                : 0}
+              %)
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Ribs Sectional Performance Charts */}
+      <div className="mt-8 mb-4 flex items-center gap-2">
+        <div className="h-6 w-1 rounded-full bg-indigo-500" />
+        <h2 className="text-xl font-bold text-gray-800">Ribs Only</h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {/* Top Ribs Chart */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 transition-all duration-300 hover:shadow-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+              <svg
+                className="w-5 h-5 text-indigo-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M12 19V5M5 12l7-7 7 7"
+                />
+              </svg>
+            </div>
+            <h3 className="text-md font-bold text-gray-800">Top Ribs</h3>
+          </div>
+          <div
+            className="flex items-center justify-center p-2"
+            style={{ height: 160 }}
+          >
+            {topRibsPass === 0 && topRibsFail === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-gray-500">
+                <svg
+                  className="w-12 h-12 mb-3 text-gray-300"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                  />
+                </svg>
+                <p className="text-sm font-medium">No Top Ribs Data</p>
+              </div>
+            ) : (
+              <>
+                <Doughnut
+                  data={{
+                    labels: [
+                      `Pass (${topRibsPass + topRibsFail ? Math.round((topRibsPass / (topRibsPass + topRibsFail)) * 100) : 0}%)`,
+                      `Fail (${topRibsPass + topRibsFail ? Math.round((topRibsFail / (topRibsPass + topRibsFail)) * 100) : 0}%)`,
+                    ],
+                    datasets: [
+                      {
+                        data: [topRibsPass, topRibsFail],
+                        backgroundColor: [
+                          "rgba(147, 197, 253, 0.8)",
+                          "rgba(255, 192, 203, 0.8)",
+                        ],
+                        borderColor: [
+                          "rgba(147, 197, 253, 1)",
+                          "rgba(250, 179, 191, 1)",
+                        ],
+                        borderWidth: 1,
+                      },
+                    ],
+                  }}
+                  options={{
+                    cutout: "70%",
+                    plugins: {
+                      legend: { display: false },
+                      datalabels: { display: false },
+                      tooltip: {
+                        callbacks: {
+                          label: (ctx) => `${ctx.raw} Readings`,
+                        },
+                      },
+                    },
+                  }}
+                />
+              </>
+            )}
+          </div>
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <div className="w-3 h-3 rounded-full bg-[#93c5fd]" />
+            <span className="text-sm font-medium text-gray-600">
+              Pass (
+              {topRibsPass + topRibsFail
+                ? Math.round((topRibsPass / (topRibsPass + topRibsFail)) * 100)
+                : 0}
+              %)
+            </span>
+            <div className="w-3 h-3 rounded-full bg-[#fca5a5]" />
+            <span className="text-sm font-medium text-gray-600">
+              Fail (
+              {topRibsPass + topRibsFail
+                ? Math.round((topRibsFail / (topRibsPass + topRibsFail)) * 100)
+                : 0}
+              %)
+            </span>
+          </div>
+        </div>
+
+        {/* Middle Ribs Chart */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 transition-all duration-300 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-pink-100 flex items-center justify-center shrink-0">
+                <svg
+                  className="w-5 h-5 text-pink-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M5 12h14"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-md font-bold text-gray-800">Middle Ribs</h3>
+            </div>
+          </div>
+          <div
+            className="flex items-center justify-center p-2"
+            style={{ height: 160 }}
+          >
+            {middleRibsPass === 0 && middleRibsFail === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-gray-500">
+                <svg
+                  className="w-12 h-12 mb-3 text-gray-300"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                  />
+                </svg>
+                <p className="text-sm font-medium">No Middle Ribs Data</p>
+              </div>
+            ) : (
+              <>
+                <Doughnut
+                  data={{
+                    labels: [
+                      `Pass (${middleRibsPass + middleRibsFail ? Math.round((middleRibsPass / (middleRibsPass + middleRibsFail)) * 100) : 0}%)`,
+                      `Fail (${middleRibsPass + middleRibsFail ? Math.round((middleRibsFail / (middleRibsPass + middleRibsFail)) * 100) : 0}%)`,
+                    ],
+                    datasets: [
+                      {
+                        data: [middleRibsPass, middleRibsFail],
+                        backgroundColor: [
+                          "rgba(147, 197, 253, 0.8)",
+                          "rgba(255, 192, 203, 0.8)",
+                        ],
+                        borderColor: [
+                          "rgba(147, 197, 253, 1)",
+                          "rgba(250, 179, 191, 1)",
+                        ],
+                        borderWidth: 1,
+                      },
+                    ],
+                  }}
+                  options={{
+                    cutout: "70%",
+                    plugins: {
+                      legend: { display: false },
+                      datalabels: { display: false },
+                      tooltip: {
+                        callbacks: {
+                          label: (ctx) => `${ctx.raw} Readings`,
+                        },
+                      },
+                    },
+                  }}
+                />
+              </>
+            )}
+          </div>
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <div className="w-3 h-3 rounded-full bg-[#93c5fd]" />
+            <span className="text-sm font-medium text-gray-600">
+              Pass (
+              {middleRibsPass + middleRibsFail
+                ? Math.round(
+                    (middleRibsPass / (middleRibsPass + middleRibsFail)) * 100,
+                  )
+                : 0}
+              %)
+            </span>
+            <div className="w-3 h-3 rounded-full bg-[#fca5a5]" />
+            <span className="text-sm font-medium text-gray-600">
+              Fail (
+              {middleRibsPass + middleRibsFail
+                ? Math.round(
+                    (middleRibsFail / (middleRibsPass + middleRibsFail)) * 100,
+                  )
+                : 0}
+              %)
+            </span>
+          </div>
+        </div>
+
+        {/* Bottom Ribs Chart */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 transition-all duration-300 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-fuchsia-100 flex items-center justify-center shrink-0">
+                <svg
+                  className="w-5 h-5 text-fuchsia-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M12 5v14M5 12l7 7 7-7"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-md font-bold text-gray-800">Bottom Ribs</h3>
+            </div>
+          </div>
+          <div
+            className="flex items-center justify-center p-2"
+            style={{ height: 160 }}
+          >
+            {bottomRibsPass === 0 && bottomRibsFail === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-gray-500">
+                <svg
+                  className="w-12 h-12 mb-3 text-gray-300"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                  />
+                </svg>
+                <p className="text-sm font-medium">No Bottom Ribs Data</p>
+              </div>
+            ) : (
+              <>
+                <Doughnut
+                  data={{
+                    labels: [
+                      `Pass (${bottomRibsPass + bottomRibsFail ? Math.round((bottomRibsPass / (bottomRibsPass + bottomRibsFail)) * 100) : 0}%)`,
+                      `Fail (${bottomRibsPass + bottomRibsFail ? Math.round((bottomRibsFail / (bottomRibsPass + bottomRibsFail)) * 100) : 0}%)`,
+                    ],
+                    datasets: [
+                      {
+                        data: [bottomRibsPass, bottomRibsFail],
+                        backgroundColor: [
+                          "rgba(147, 197, 253, 0.8)",
+                          "rgba(255, 192, 203, 0.8)",
+                        ],
+                        borderColor: [
+                          "rgba(147, 197, 253, 1)",
+                          "rgba(250, 179, 191, 1)",
+                        ],
+                        borderWidth: 1,
+                      },
+                    ],
+                  }}
+                  options={{
+                    cutout: "70%",
+                    plugins: {
+                      legend: { display: false },
+                      datalabels: { display: false },
+                      tooltip: {
+                        callbacks: {
+                          label: (ctx) => `${ctx.raw} Readings`,
+                        },
+                      },
+                    },
+                  }}
+                />
+              </>
+            )}
+          </div>
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <div className="w-3 h-3 rounded-full bg-[#93c5fd]" />
+            <span className="text-sm font-medium text-gray-600">
+              Pass (
+              {bottomRibsPass + bottomRibsFail
+                ? Math.round(
+                    (bottomRibsPass / (bottomRibsPass + bottomRibsFail)) * 100,
+                  )
+                : 0}
+              %)
+            </span>
+            <div className="w-3 h-3 rounded-full bg-[#fca5a5]" />
+            <span className="text-sm font-medium text-gray-600">
+              Fail (
+              {bottomRibsPass + bottomRibsFail
+                ? Math.round(
+                    (bottomRibsFail / (bottomRibsPass + bottomRibsFail)) * 100,
+                  )
+                : 0}
+              %)
+            </span>
           </div>
         </div>
       </div>
@@ -2080,8 +2148,8 @@ export default function Dashboard() {
                       activity.latestStatus === "pass"
                         ? "bg-green-100 text-green-600"
                         : activity.latestStatus === "fail"
-                        ? "bg-red-100 text-red-600"
-                        : "bg-gray-100 text-gray-600"
+                          ? "bg-red-100 text-red-600"
+                          : "bg-gray-100 text-gray-600"
                     }`}
                   >
                     {activity.latestStatus === "pass" ? (
@@ -2163,7 +2231,7 @@ export default function Dashboard() {
                   <div className="text-xs text-gray-500">
                     {new Date(activity.date).toLocaleDateString("en-US", {
                       month: "short",
-                      day: "numeric"
+                      day: "numeric",
                     })}
                   </div>
                 </div>

@@ -30,12 +30,18 @@ import {
   User,
   Save,
   CheckCircle2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Printer,
+  Gauge,
+  Activity,
+  PenTool,
+  Zap,
 } from "lucide-react";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
 import YPivotQAInspectionQRCode from "./YPivotQAInspectionQRCode";
 import { determineBuyerFromOrderNo } from "./YPivotQAInspectionBuyerDetermination";
 import YPivotQAInspectionPPSheetSummary from "./YPivotQAInspectionPPSheetSummary";
+import YPivotQAInspectionDefectVisuals from "./YPivotQAInspectionDefectVisuals";
 import { createPortal } from "react-dom";
 
 // Import from Measurement Summary
@@ -46,7 +52,7 @@ import {
   MeasurementStatsCards,
   MeasurementLegend,
   MeasurementSummaryTable,
-  OverallMeasurementSummaryTable
+  OverallMeasurementSummaryTable,
 } from "./YPivotQAInspectionMeasurementSummary";
 
 // Import from Defect Summary
@@ -57,7 +63,7 @@ import {
   AQLConfigCards,
   AQLResultTable,
   FinalDefectResultBanner,
-  DefectSummaryTable
+  DefectSummaryTable,
 } from "./YPivotQAInspectionDefectSummary";
 
 // ==============================================================================
@@ -101,7 +107,7 @@ const AutoDismissModal = ({ isOpen, onClose, type, message }) => {
         </p>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };
 
@@ -237,6 +243,29 @@ const getInspectorPhotoUrl = (facePhoto) => {
   return `${baseUrl}${cleanPath}`;
 };
 
+// ==============================================================================
+//  HELPER: Technical Info Display Card (For EMB/Print)
+// ==============================================================================
+const TechInfoCard = ({ label, value, enabled, icon: Icon }) => (
+  <div
+    className={`flex items-center gap-3 p-3 rounded-lg border ${enabled ? "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700" : "bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 opacity-60"}`}
+  >
+    <div
+      className={`p-2 rounded-full ${enabled ? "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300" : "bg-gray-200 dark:bg-gray-800 text-gray-400"}`}
+    >
+      <Icon size={16} />
+    </div>
+    <div>
+      <p className="text-[9px] font-bold text-gray-500 uppercase">{label}</p>
+      <p
+        className={`text-sm font-bold ${enabled ? "text-gray-800 dark:text-gray-200" : "text-gray-400 italic"}`}
+      >
+        {enabled && value !== "" && value !== null ? value : "Disabled"}
+      </p>
+    </div>
+  </div>
+);
+
 // --- MAIN COMPONENT ---
 const YPivotQAInspectionSummary = ({
   orderData,
@@ -249,11 +278,15 @@ const YPivotQAInspectionSummary = ({
   getDirtySectionsList = () => [],
   hasUnsavedChanges = false,
   markAllSectionsClean = () => {},
-  onReportSubmitted
+  onReportSubmitted,
 }) => {
   const { selectedOrders, orderData: details } = orderData;
   const { selectedTemplate, config, lineTableConfig, headerData, photoData } =
     reportData;
+
+  // Extract EMB and Print Info
+  const embInfo = config?.embInfo;
+  const printInfo = config?.printInfo;
 
   const [inspectorInfo, setInspectorInfo] = useState(null);
 
@@ -280,7 +313,7 @@ const YPivotQAInspectionSummary = ({
         // 1. Filter measurements for this specific stage
         // (Legacy fallback: if no stage property, assume 'Before')
         const stageMeasurements = savedMeasurements.filter(
-          (m) => m.stage === stage || (!m.stage && stage === "Before")
+          (m) => m.stage === stage || (!m.stage && stage === "Before"),
         );
 
         if (stageMeasurements.length === 0) return null;
@@ -295,7 +328,7 @@ const YPivotQAInspectionSummary = ({
         const suffix = stage === "Before" ? "(B)" : "(A)";
         const measurementsForDisplay = stageMeasurements.map((m) => ({
           ...m,
-          size: `${m.size} ${suffix}` // Appends (B) or (A) to size
+          size: `${m.size} ${suffix}`, // Appends (B) or (A) to size
         }));
 
         // 4. Group data for detailed tables
@@ -303,7 +336,7 @@ const YPivotQAInspectionSummary = ({
 
         // 5. Group data for the Overall Table using the suffixed sizes
         const groupedForOverall = groupMeasurementsByGroupId(
-          measurementsForDisplay
+          measurementsForDisplay,
         );
 
         return {
@@ -312,7 +345,7 @@ const YPivotQAInspectionSummary = ({
           suffix,
           groupedData: grouped, // For detailed cards/tables
           groupedDataForOverall: groupedForOverall, // For top summary table
-          specs: { full: fullSpecs, selected: selectedSpecs } // Specific specs for this stage
+          specs: { full: fullSpecs, selected: selectedSpecs }, // Specific specs for this stage
         };
       })
       .filter(Boolean); // Remove empty stages
@@ -345,13 +378,14 @@ const YPivotQAInspectionSummary = ({
     header: true,
     photos: true,
     measurement: true,
-    ppSheet: true
+    ppSheet: true,
+    techInfo: true,
   });
 
   // Derived values
   const isAQLMethod = useMemo(
     () => selectedTemplate?.InspectedQtyMethod === "AQL",
-    [selectedTemplate]
+    [selectedTemplate],
   );
   const determinedBuyer = useMemo(() => {
     if (!selectedOrders || selectedOrders.length === 0) return "Unknown";
@@ -359,7 +393,7 @@ const YPivotQAInspectionSummary = ({
   }, [selectedOrders]);
   const inspectedQty = useMemo(
     () => parseInt(config?.inspectedQty) || 0,
-    [config?.inspectedQty]
+    [config?.inspectedQty],
   );
 
   // Use exported hooks
@@ -367,11 +401,11 @@ const YPivotQAInspectionSummary = ({
   const { aqlSampleData, loadingAql } = useAqlData(
     isAQLMethod,
     determinedBuyer,
-    inspectedQty
+    inspectedQty,
   );
   const aqlResult = useMemo(
     () => calculateAqlResult(aqlSampleData, summaryData.totals),
-    [aqlSampleData, summaryData.totals]
+    [aqlSampleData, summaryData.totals],
   );
 
   // Final results
@@ -401,7 +435,7 @@ const YPivotQAInspectionSummary = ({
   const [statusModal, setStatusModal] = useState({
     isOpen: false,
     type: "success",
-    message: ""
+    message: "",
   });
 
   useEffect(() => {
@@ -410,7 +444,7 @@ const YPivotQAInspectionSummary = ({
       const fetchInspector = async () => {
         try {
           const res = await axios.get(
-            `${API_BASE_URL}/api/user-details?empId=${empId}`
+            `${API_BASE_URL}/api/user-details?empId=${empId}`,
           );
           if (res.data) {
             setInspectorInfo(res.data);
@@ -420,7 +454,7 @@ const YPivotQAInspectionSummary = ({
           setInspectorInfo({
             emp_id: empId,
             eng_name: reportData?.empName || qrData?.empName,
-            face_photo: null
+            face_photo: null,
           });
         }
       };
@@ -433,11 +467,11 @@ const YPivotQAInspectionSummary = ({
       try {
         const [headersRes, photosRes] = await Promise.all([
           axios.get(`${API_BASE_URL}/api/qa-sections-home`),
-          axios.get(`${API_BASE_URL}/api/qa-sections-photos`)
+          axios.get(`${API_BASE_URL}/api/qa-sections-photos`),
         ]);
         setDefinitions({
           headers: headersRes.data.data,
-          photos: photosRes.data.data
+          photos: photosRes.data.data,
         });
       } catch (error) {
         console.error("Failed to load section definitions", error);
@@ -479,7 +513,7 @@ const YPivotQAInspectionSummary = ({
     )
       return [];
     const allowedIds = selectedTemplate.SelectedPhotoSectionList.map(
-      (i) => i.PhotoSectionID
+      (i) => i.PhotoSectionID,
     );
     return definitions.photos.filter((p) => allowedIds.includes(p._id));
   }, [selectedTemplate, definitions.photos]);
@@ -492,7 +526,7 @@ const YPivotQAInspectionSummary = ({
       setStatusModal({
         isOpen: true,
         type: "error",
-        message: "Report ID missing."
+        message: "Report ID missing.",
       });
       return;
     }
@@ -506,7 +540,7 @@ const YPivotQAInspectionSummary = ({
       // Build payload - only include sections that need updating
       const payload = {
         reportId: qrData.reportId,
-        sectionsToUpdate: sectionsToUpdate
+        sectionsToUpdate: sectionsToUpdate,
       };
 
       // ---------------------------------------------------------
@@ -534,7 +568,7 @@ const YPivotQAInspectionSummary = ({
           subConFactoryId: reportData.config?.selectedSubConFactory,
           aqlSampleSize: reportData.config?.aqlSampleSize,
           totalOrderQty: details?.dtOrder?.totalQty,
-          aqlConfig: reportData.config?.aqlConfig
+          aqlConfig: reportData.config?.aqlConfig,
         };
       }
 
@@ -543,7 +577,7 @@ const YPivotQAInspectionSummary = ({
         payload.headerData = definitions.headers.map((section) => {
           const secId = section._id;
           const sectionImages = Object.keys(
-            reportData.headerData?.capturedImages || {}
+            reportData.headerData?.capturedImages || {},
           )
             .filter((k) => k.startsWith(`${secId}_`))
             .map((k) => {
@@ -560,7 +594,7 @@ const YPivotQAInspectionSummary = ({
               return {
                 id: img.id || k,
                 imageURL: payloadImageURL,
-                imgSrc: payloadImgSrc
+                imgSrc: payloadImgSrc,
               };
             });
 
@@ -570,7 +604,7 @@ const YPivotQAInspectionSummary = ({
             selectedOption:
               (reportData.headerData?.selectedOptions || {})[secId] || "",
             remarks: (reportData.headerData?.remarks || {})[secId] || "",
-            images: sectionImages
+            images: sectionImages,
           };
         });
       }
@@ -586,7 +620,7 @@ const YPivotQAInspectionSummary = ({
                   (reportData.photoData?.remarks || {})[itemKeyBase] || "";
 
                 const itemImages = Object.keys(
-                  reportData.photoData?.capturedImages || {}
+                  reportData.photoData?.capturedImages || {},
                 )
                   .filter((k) => k.startsWith(`${itemKeyBase}_`))
                   .sort((a, b) => {
@@ -608,7 +642,7 @@ const YPivotQAInspectionSummary = ({
                     return {
                       id: img.id || k,
                       imageURL: payloadImageURL,
-                      imgSrc: payloadImgSrc
+                      imgSrc: payloadImgSrc,
                     };
                   });
 
@@ -616,7 +650,7 @@ const YPivotQAInspectionSummary = ({
                   itemNo: item.no,
                   itemName: item.itemName,
                   remarks: itemRemark,
-                  images: itemImages
+                  images: itemImages,
                 };
               })
               .filter((i) => i.remarks || i.images.length > 0);
@@ -624,7 +658,7 @@ const YPivotQAInspectionSummary = ({
             return {
               sectionId: section._id,
               sectionName: section.sectionName,
-              items: processedItems
+              items: processedItems,
             };
           })
           .filter((sec) => sec.items.length > 0);
@@ -642,7 +676,7 @@ const YPivotQAInspectionSummary = ({
           finalSampleSize = groups.reduce((total, group) => {
             const groupTotal = group.assignments.reduce(
               (sum, a) => sum + (parseInt(a.qty) || 0),
-              0
+              0,
             );
             return total + groupTotal;
           }, 0);
@@ -652,7 +686,7 @@ const YPivotQAInspectionSummary = ({
           reportName: selectedTemplate?.ReportType,
           inspectionMethod: selectedTemplate?.InspectedQtyMethod || "Fixed",
           sampleSize: finalSampleSize,
-          configGroups: lineTableConfig || []
+          configGroups: lineTableConfig || [],
         };
       }
 
@@ -669,7 +703,7 @@ const YPivotQAInspectionSummary = ({
       // DEFECT MANUAL DATA
       if (dirtySections.defectManualData) {
         payload.defectManualData = Object.values(
-          reportData?.defectData?.manualDataByGroup || {}
+          reportData?.defectData?.manualDataByGroup || {},
         ).map((item) => ({ ...item, groupId: item.groupId || 0 }));
       }
 
@@ -680,7 +714,7 @@ const YPivotQAInspectionSummary = ({
 
       console.log("Optimized Payload:", {
         sectionsToUpdate: payload.sectionsToUpdate,
-        payloadKeys: Object.keys(payload)
+        payloadKeys: Object.keys(payload),
       });
 
       // ---------------------------------------------------------
@@ -688,7 +722,7 @@ const YPivotQAInspectionSummary = ({
       // ---------------------------------------------------------
       const res = await axios.post(
         `${API_BASE_URL}/api/fincheck-inspection/submit-full-report`,
-        payload
+        payload,
       );
 
       if (res.data.success) {
@@ -714,7 +748,7 @@ const YPivotQAInspectionSummary = ({
           } else {
             // First time submit
             successMessage = `Report Submitted! Updated: ${res.data.updatedSections.join(
-              ", "
+              ", ",
             )}`;
           }
         }
@@ -724,15 +758,15 @@ const YPivotQAInspectionSummary = ({
           type: "success",
           message: res.data.hasChanges
             ? `Report Submitted! Updated: ${res.data.updatedSections.join(
-                ", "
+                ", ",
               )}`
-            : "Report Finalized Successfully!"
+            : "Report Finalized Successfully!",
         });
       } else {
         setStatusModal({
           isOpen: true,
           type: "error",
-          message: res.data.message || "Submission Failed"
+          message: res.data.message || "Submission Failed",
         });
       }
     } catch (err) {
@@ -740,7 +774,8 @@ const YPivotQAInspectionSummary = ({
       setStatusModal({
         isOpen: true,
         type: "error",
-        message: err.response?.data?.message || "Server Error during submission"
+        message:
+          err.response?.data?.message || "Server Error during submission",
       });
     } finally {
       setSubmitting(false);
@@ -793,8 +828,8 @@ const YPivotQAInspectionSummary = ({
             submitting
               ? "bg-gray-400 cursor-not-allowed text-white"
               : hasUnsavedChanges
-              ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
-              : "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+                : "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
           }`}
         >
           {submitting ? (
@@ -835,7 +870,7 @@ const YPivotQAInspectionSummary = ({
                     onError={(e) => {
                       e.target.style.display = "none";
                       e.target.parentElement.querySelector(
-                        ".fallback-icon"
+                        ".fallback-icon",
                       ).style.display = "flex";
                     }}
                   />
@@ -991,10 +1026,13 @@ const YPivotQAInspectionSummary = ({
             )}
           </div>
           {expandedSections.defectSummary && (
-            <DefectSummaryTable
-              groups={summaryData.groups}
-              totals={summaryData.totals}
-            />
+            <>
+              <DefectSummaryTable
+                groups={summaryData.groups}
+                totals={summaryData.totals}
+              />
+              <YPivotQAInspectionDefectVisuals defectData={savedDefects} />
+            </>
           )}
         </div>
       )}
@@ -1045,7 +1083,7 @@ const YPivotQAInspectionSummary = ({
                       [
                         group.lineName ? `Line ${group.lineName}` : null,
                         group.tableName ? `Table ${group.tableName}` : null,
-                        group.colorName || null
+                        group.colorName || null,
                       ]
                         .filter(Boolean)
                         .join(" / ") || "General";
@@ -1054,7 +1092,7 @@ const YPivotQAInspectionSummary = ({
                     const stats = calculateGroupStats(
                       group.measurements,
                       stageData.specs.full,
-                      stageData.specs.selected
+                      stageData.specs.selected,
                     );
 
                     return (
@@ -1340,7 +1378,7 @@ const YPivotQAInspectionSummary = ({
                             {assign.qty || 0}
                           </td>
                         </tr>
-                      ))
+                      )),
                     )}
                   </tbody>
                 </table>
@@ -1352,6 +1390,112 @@ const YPivotQAInspectionSummary = ({
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* EMB or Print Info */}
+      {(embInfo || printInfo) && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div
+            className={`bg-gradient-to-r ${printInfo ? "from-pink-600 to-rose-600" : "from-blue-600 to-indigo-600"} px-4 py-2.5 flex justify-between items-center cursor-pointer`}
+            onClick={() => toggleSection("techInfo")}
+          >
+            <h2 className="text-white font-bold text-sm flex items-center gap-2">
+              {printInfo ? (
+                <Printer className="w-4 h-4" />
+              ) : (
+                <Settings className="w-4 h-4" />
+              )}
+              {printInfo ? "Printing Configuration" : "EMB Configuration"}
+            </h2>
+            {expandedSections.techInfo ? (
+              <ChevronUp className="text-white w-4 h-4" />
+            ) : (
+              <ChevronDown className="text-white w-4 h-4" />
+            )}
+          </div>
+
+          {expandedSections.techInfo && (
+            <div className="p-4 space-y-3">
+              {/* EMB DISPLAY */}
+              {embInfo && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <TechInfoCard
+                      label="Speed"
+                      value={embInfo.speed?.value}
+                      enabled={embInfo.speed?.enabled}
+                      icon={Gauge}
+                    />
+                    <TechInfoCard
+                      label="Stitch"
+                      value={embInfo.stitch?.value}
+                      enabled={embInfo.stitch?.enabled}
+                      icon={Activity}
+                    />
+                    <TechInfoCard
+                      label="Needle Size"
+                      value={embInfo.needleSize?.value}
+                      enabled={embInfo.needleSize?.enabled}
+                      icon={PenTool}
+                    />
+                  </div>
+                  {embInfo.remarks && (
+                    <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700 flex gap-2">
+                      <MessageSquare className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-500 uppercase">
+                          Remarks
+                        </p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                          {embInfo.remarks}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* PRINT DISPLAY */}
+              {printInfo && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <TechInfoCard
+                      label="Machine Type"
+                      value={printInfo.machineType?.value}
+                      enabled={printInfo.machineType?.enabled}
+                      icon={Settings}
+                    />
+                    <TechInfoCard
+                      label="Speed"
+                      value={printInfo.speed?.value}
+                      enabled={printInfo.speed?.enabled}
+                      icon={Zap}
+                    />
+                    <TechInfoCard
+                      label="Pressure"
+                      value={printInfo.pressure?.value}
+                      enabled={printInfo.pressure?.enabled}
+                      icon={Activity}
+                    />
+                  </div>
+                  {printInfo.remarks && (
+                    <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700 flex gap-2">
+                      <MessageSquare className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-500 uppercase">
+                          Remarks
+                        </p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                          {printInfo.remarks}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -1415,7 +1559,7 @@ const YPivotQAInspectionSummary = ({
                             onClick={() =>
                               setPreviewImage({
                                 src: img.url,
-                                alt: section.MainTitle
+                                alt: section.MainTitle,
                               })
                             }
                           >
@@ -1475,7 +1619,7 @@ const YPivotQAInspectionSummary = ({
                           if (photoData?.capturedImages?.[key]) {
                             images.push({
                               ...photoData.capturedImages[key],
-                              key
+                              key,
                             });
                           } else if (images.length > 0 && idx > item.maxCount)
                             break;
@@ -1505,7 +1649,7 @@ const YPivotQAInspectionSummary = ({
                                   onClick={() =>
                                     setPreviewImage({
                                       src: img.url,
-                                      alt: item.itemName
+                                      alt: item.itemName,
                                     })
                                   }
                                 >

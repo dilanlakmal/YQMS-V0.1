@@ -40,7 +40,12 @@ import {
   Clock,
   ClipboardList,
   FileSpreadsheet,
-  Gavel
+  Gavel,
+  Calculator,
+  Gauge,
+  Activity,
+  PenTool,
+  Zap,
 } from "lucide-react";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
 
@@ -52,8 +57,10 @@ import {
   MeasurementStatsCards,
   MeasurementLegend,
   MeasurementSummaryTable,
-  OverallMeasurementSummaryTable
+  OverallMeasurementSummaryTable,
 } from "../QADataCollection/YPivotQAInspectionMeasurementSummary";
+
+import YPivotQAReportMeasurementValueDistribution from "./YPivotQAReportMeasurementValueDistribution";
 
 // Import from Defect Summary
 import {
@@ -63,7 +70,7 @@ import {
   AQLConfigCards,
   AQLResultTable,
   FinalDefectResultBanner,
-  DefectSummaryTable
+  DefectSummaryTable,
 } from "../QADataCollection/YPivotQAInspectionDefectSummary";
 
 import DefectLocationSummary from "./DefectLocationSummary";
@@ -74,6 +81,7 @@ import { useAuth } from "../../../authentication/AuthContext";
 import YPivotQAReportPPSheetSection from "./YPivotQAReportPPSheetSection";
 import YPivotQAReportMeasurementManualDisplay from "./YPivotQAReportMeasurementManualDisplay";
 import YPivotQAInspectionManualDefectDisplay from "./YPivotQAInspectionManualDefectDisplay";
+import YPivotQAInspectionMissingDefectsByQC from "./YPivotQAInspectionMissingDefectsByQC";
 
 import OrderShippingStageBreakdownTable from "./OrderShippingStageBreakdownTable";
 
@@ -239,7 +247,7 @@ const ImagePreviewModal = ({ images, startIndex = 0, onClose }) => {
                   {currentImage.status && (
                     <span
                       className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded border ${getStatusColor(
-                        currentImage.status
+                        currentImage.status,
                       )}`}
                     >
                       {currentImage.status}
@@ -409,7 +417,7 @@ const ProductionStatusSection = ({ inspectionDetails }) => {
                   {Math.round(
                     (packingList.finishedCartons /
                       (packingList.totalCartons || 1)) *
-                      100
+                      100,
                   )}
                   %
                 </span>
@@ -662,10 +670,10 @@ const SKUDataTable = ({ skuData, orderNo }) => {
                 Color
               </th>
               <th className="px-2 py-2 text-center font-bold text-[10px] uppercase">
-                ETD
+                Ex.Fty Date
               </th>
               <th className="px-2 py-2 text-center font-bold text-[10px] uppercase">
-                ETA
+                Buyer.DEL Date
               </th>
               <th className="px-2 py-2 text-right font-bold text-[10px] uppercase">
                 Qty
@@ -733,6 +741,29 @@ const getProductImageUrl = (url) => {
   return `${baseUrl}${path}`;
 };
 
+// ==============================================================================
+// NEW HELPER: Technical Info Display Card (For EMB/Print)
+// ==============================================================================
+const TechInfoCard = ({ label, value, enabled, icon: Icon }) => (
+  <div
+    className={`flex items-center gap-3 p-3 rounded-lg border ${enabled ? "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700" : "bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 opacity-60"}`}
+  >
+    <div
+      className={`p-2 rounded-full ${enabled ? "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300" : "bg-gray-200 dark:bg-gray-800 text-gray-400"}`}
+    >
+      <Icon size={16} />
+    </div>
+    <div>
+      <p className="text-[9px] font-bold text-gray-500 uppercase">{label}</p>
+      <p
+        className={`text-sm font-bold ${enabled ? "text-gray-800 dark:text-gray-200" : "text-gray-400 italic"}`}
+      >
+        {enabled && value !== "" && value !== null ? value : "Disabled"}
+      </p>
+    </div>
+  </div>
+);
+
 // =============================================================================
 // DATA TRANSFORMATION HELPERS
 // =============================================================================
@@ -759,7 +790,7 @@ const transformHeaderDataFromBackend = (backendHeaderData) => {
         const key = img.id || `${headerId}_${index}`;
         capturedImages[key] = {
           id: img.id || key,
-          url: img.imageURL ? `${API_BASE_URL}${img.imageURL}` : img.imgSrc
+          url: img.imageURL ? `${API_BASE_URL}${img.imageURL}` : img.imgSrc,
         };
       });
     }
@@ -788,7 +819,7 @@ const transformPhotoDataFromBackend = (backendPhotoData) => {
             const key = img.id || `${itemKeyBase}_${index}`;
             capturedImages[key] = {
               id: img.id || key,
-              url: img.imageURL ? `${API_BASE_URL}${img.imageURL}` : img.imgSrc
+              url: img.imageURL ? `${API_BASE_URL}${img.imageURL}` : img.imgSrc,
             };
           });
         }
@@ -809,7 +840,7 @@ const transformMeasurementDataFromBackend = (backendMeasurementData) => {
     .map((m) => ({
       ...m,
       allEnabledPcs: new Set(m.allEnabledPcs || []),
-      criticalEnabledPcs: new Set(m.criticalEnabledPcs || [])
+      criticalEnabledPcs: new Set(m.criticalEnabledPcs || []),
     }));
 
   const processedManualDataByGroup = {};
@@ -831,14 +862,14 @@ const transformMeasurementDataFromBackend = (backendMeasurementData) => {
           imgSrc: displayUrl,
           editedImgSrc: displayUrl,
           remark: img.remark || "",
-          history: []
+          history: [],
         };
       });
 
       processedManualDataByGroup[groupId] = {
         remarks: item.manualData.remarks || "",
         status: item.manualData.status || "Pass",
-        images: processedImages
+        images: processedImages,
       };
     }
   });
@@ -846,7 +877,7 @@ const transformMeasurementDataFromBackend = (backendMeasurementData) => {
   return {
     savedMeasurements: processedMeasurements,
     manualDataByGroup: processedManualDataByGroup,
-    isConfigured: processedMeasurements.length > 0
+    isConfigured: processedMeasurements.length > 0,
   };
 };
 
@@ -870,7 +901,7 @@ const YPivotQAReportFullView = () => {
   const [definitions, setDefinitions] = useState({ headers: [], photos: [] });
   const [measurementSpecs, setMeasurementSpecs] = useState({
     Before: { full: [], selected: [] },
-    After: { full: [], selected: [] }
+    After: { full: [], selected: [] },
   });
   const [sizeList, setSizeList] = useState([]);
   const [activeValidColors, setActiveValidColors] = useState([]);
@@ -886,7 +917,9 @@ const YPivotQAReportFullView = () => {
     header: true,
     photos: true,
     measurement: true,
-    ppSheet: true
+    measurementDistribution: false,
+    ppSheet: true,
+    techInfo: true,
   });
 
   const toggleSection = (key) =>
@@ -916,7 +949,7 @@ const YPivotQAReportFullView = () => {
       try {
         // 1. Fetch Report Data
         const reportRes = await axios.get(
-          `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}`
+          `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}`,
         );
 
         if (!reportRes.data.success) {
@@ -933,7 +966,7 @@ const YPivotQAReportFullView = () => {
 
           if (reportData.orderType === "single" || orderNos.length === 1) {
             const orderRes = await axios.get(
-              `${API_BASE_URL}/api/fincheck-inspection/order-details/${orderNos[0]}`
+              `${API_BASE_URL}/api/fincheck-inspection/order-details/${orderNos[0]}`,
             );
             if (orderRes.data.success) {
               orderFetchResult = {
@@ -944,15 +977,15 @@ const YPivotQAReportFullView = () => {
                     orderNo: orderNos[0],
                     totalQty: orderRes.data.data.dtOrder?.totalQty,
                     colorSizeBreakdown: orderRes.data.data.colorSizeBreakdown,
-                    yorksysOrder: orderRes.data.data.yorksysOrder
-                  }
-                ]
+                    yorksysOrder: orderRes.data.data.yorksysOrder,
+                  },
+                ],
               };
             }
           } else {
             const orderRes = await axios.post(
               `${API_BASE_URL}/api/fincheck-inspection/multiple-order-details`,
-              { orderNos }
+              { orderNos },
             );
             if (orderRes.data.success) {
               orderFetchResult = { ...orderRes.data.data, isSingle: false };
@@ -966,7 +999,7 @@ const YPivotQAReportFullView = () => {
         if (reportData.empId) {
           try {
             const inspectorRes = await axios.get(
-              `${API_BASE_URL}/api/user-details?empId=${reportData.empId}`
+              `${API_BASE_URL}/api/user-details?empId=${reportData.empId}`,
             );
             if (inspectorRes.data) {
               setInspectorInfo(inspectorRes.data);
@@ -976,7 +1009,7 @@ const YPivotQAReportFullView = () => {
             setInspectorInfo({
               emp_id: reportData.empId,
               eng_name: reportData.empName,
-              face_photo: null
+              face_photo: null,
             });
           }
         }
@@ -984,11 +1017,11 @@ const YPivotQAReportFullView = () => {
         // 4. Fetch Section Definitions
         const [headersRes, photosRes] = await Promise.all([
           axios.get(`${API_BASE_URL}/api/qa-sections-home`),
-          axios.get(`${API_BASE_URL}/api/qa-sections-photos`)
+          axios.get(`${API_BASE_URL}/api/qa-sections-photos`),
         ]);
         setDefinitions({
           headers: headersRes.data.data || [],
-          photos: photosRes.data.data || []
+          photos: photosRes.data.data || [],
         });
 
         // 5. Fetch Measurement Specs
@@ -998,7 +1031,7 @@ const YPivotQAReportFullView = () => {
         ) {
           try {
             const specsRes = await axios.get(
-              `${API_BASE_URL}/api/fincheck-reports/${reportId}/measurement-specs`
+              `${API_BASE_URL}/api/fincheck-reports/${reportId}/measurement-specs`,
             );
 
             if (specsRes.data.success) {
@@ -1014,7 +1047,7 @@ const YPivotQAReportFullView = () => {
       } catch (err) {
         console.error("Error fetching report data:", err);
         setError(
-          err.response?.data?.message || err.message || "Failed to load report"
+          err.response?.data?.message || err.message || "Failed to load report",
         );
       } finally {
         setLoading(false);
@@ -1030,7 +1063,7 @@ const YPivotQAReportFullView = () => {
       if (user?.emp_id) {
         try {
           const res = await axios.get(
-            `${API_BASE_URL}/api/fincheck-reports/check-permission?empId=${user.emp_id}`
+            `${API_BASE_URL}/api/fincheck-reports/check-permission?empId=${user.emp_id}`,
           );
           if (res.data && res.data.isAdmin) {
             setCanViewReportId(true);
@@ -1055,7 +1088,7 @@ const YPivotQAReportFullView = () => {
         try {
           // Pass both empId AND reportId
           const res = await axios.get(
-            `${API_BASE_URL}/api/fincheck-reports/check-approval-permission?empId=${user.emp_id}&reportId=${report.reportId}`
+            `${API_BASE_URL}/api/fincheck-reports/check-approval-permission?empId=${user.emp_id}&reportId=${report.reportId}`,
           );
 
           if (res.data && res.data.success && res.data.isApprover) {
@@ -1080,7 +1113,7 @@ const YPivotQAReportFullView = () => {
       if (!reportId) return;
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}/defect-heatmap`
+          `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}/defect-heatmap`,
         );
         if (res.data.success) {
           setDefectHeatmap(res.data.data);
@@ -1131,7 +1164,7 @@ const YPivotQAReportFullView = () => {
           report?.inspectionDetails?.measurement || report?.measurementMethod,
         InspectedQtyMethod: report?.inspectionMethod,
         _id: report?.inspectionDetails?.reportTypeId,
-        SelectedPhotoSectionList: []
+        SelectedPhotoSectionList: [],
       }
     );
   }, [report]);
@@ -1146,9 +1179,15 @@ const YPivotQAReportFullView = () => {
       aqlSampleSize: details.aqlSampleSize,
       aqlConfig: details.aqlConfig,
       productType: details.productType,
-      productTypeId: details.productTypeId
+      productTypeId: details.productTypeId,
+      embInfo: details.embInfo,
+      printInfo: details.printInfo,
     };
   }, [report]);
+
+  // Extract for easy access
+  const embInfo = config?.embInfo;
+  const printInfo = config?.printInfo;
 
   const lineTableConfig = useMemo(() => {
     return report?.inspectionConfig?.configGroups || [];
@@ -1175,7 +1214,7 @@ const YPivotQAReportFullView = () => {
       if (reportId && config?.shippingStage) {
         try {
           const res = await axios.get(
-            `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}/shipping-stage-breakdown`
+            `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}/shipping-stage-breakdown`,
           );
           if (res.data.success) {
             setShippingBreakdown(res.data.data);
@@ -1225,29 +1264,32 @@ const YPivotQAReportFullView = () => {
         // Note: measurementSpecs state structure must be { Before:..., After:... }
         const stageSpecs = measurementSpecs[stage] || {
           full: [],
-          selected: []
+          selected: [],
         };
 
         // Create display copies with Suffixes for the Overall Table (e.g. "Size (B)")
         const suffix = stage === "Before" ? "(B)" : "(A)";
         const measurementsForDisplay = stageMeasurements.map((m) => ({
           ...m,
-          size: `${m.size} ${suffix}`
+          size: `${m.size} ${suffix}`,
         }));
 
         // Group data
         const grouped = groupMeasurementsByGroupId(stageMeasurements);
         const groupedForOverall = groupMeasurementsByGroupId(
-          measurementsForDisplay
+          measurementsForDisplay,
         );
 
         return {
           stage,
-          label: stage === "Before" ? "Before Wash" : "After Wash",
+          label:
+            stage === "Before"
+              ? "Before Wash Measurement"
+              : "Buyer Spec Measurement",
           suffix,
           groupedData: grouped,
           groupedDataForOverall: groupedForOverall,
-          specs: stageSpecs
+          specs: stageSpecs,
         };
       })
       .filter(Boolean); // Remove empty stages
@@ -1266,12 +1308,12 @@ const YPivotQAReportFullView = () => {
     () =>
       selectedTemplate?.InspectedQtyMethod === "AQL" ||
       report?.inspectionMethod === "AQL",
-    [selectedTemplate, report]
+    [selectedTemplate, report],
   );
 
   const inspectedQty = useMemo(
     () => parseInt(config?.inspectedQty) || 0,
-    [config?.inspectedQty]
+    [config?.inspectedQty],
   );
 
   // Flatten Defect Images for Display
@@ -1305,7 +1347,7 @@ const YPivotQAReportFullView = () => {
       const configParts = [
         defect.lineName ? `Line ${defect.lineName}` : null,
         defect.tableName ? `Table ${defect.tableName}` : null,
-        defect.colorName ? `Color ${defect.colorName}` : null
+        defect.colorName ? `Color ${defect.colorName}` : null,
       ].filter(Boolean);
       const configLabel =
         configParts.length > 0 ? configParts.join(" • ") : "General";
@@ -1329,7 +1371,7 @@ const YPivotQAReportFullView = () => {
             configLabel: configLabel,
             isMain: true,
             // For No-Location, use the root remark
-            comment: defect.additionalRemark || ""
+            comment: defect.additionalRemark || "",
           });
         });
       } else {
@@ -1348,7 +1390,7 @@ const YPivotQAReportFullView = () => {
               locationText: `${loc.locationName} - ${loc.view}`,
               positionType: pos.position,
               status: pos.status,
-              configLabel: configLabel
+              configLabel: configLabel,
             };
 
             // 1. Required (Main) Image
@@ -1361,7 +1403,7 @@ const YPivotQAReportFullView = () => {
                 ...pos.requiredImage,
                 ...commonProps,
                 isMain: true,
-                comment: mainRemark // Specific to Main
+                comment: mainRemark, // Specific to Main
               });
             }
 
@@ -1373,7 +1415,7 @@ const YPivotQAReportFullView = () => {
                 ...img,
                 ...commonProps,
                 isMain: false,
-                comment: addRemark // Specific to Additional
+                comment: addRemark, // Specific to Additional
               });
             });
           });
@@ -1425,7 +1467,7 @@ const YPivotQAReportFullView = () => {
                 positionType: item.itemName,
 
                 // 3. Remarks -> Mapped to Subtitle/Location text
-                locationText: item.remarks ? item.remarks : ""
+                locationText: item.remarks ? item.remarks : "",
               });
             });
           }
@@ -1436,16 +1478,16 @@ const YPivotQAReportFullView = () => {
     return flatList;
   }, [report?.photoData]);
 
-  const summaryData = useDefectSummaryData(savedDefects, null);
+  const summaryData = useDefectSummaryData(savedDefects, null, report);
   const { aqlSampleData, loadingAql } = useAqlData(
     isAQLMethod,
     determinedBuyer,
-    inspectedQty
+    inspectedQty,
   );
 
   const aqlResult = useMemo(
     () => calculateAqlResult(aqlSampleData, summaryData.totals),
-    [aqlSampleData, summaryData.totals]
+    [aqlSampleData, summaryData.totals],
   );
 
   const defectResult = useMemo(() => {
@@ -1487,7 +1529,7 @@ const YPivotQAReportFullView = () => {
       return definitions.photos; // Show all if not specified
     }
     const allowedIds = selectedTemplate.SelectedPhotoSectionList.map(
-      (i) => i.PhotoSectionID
+      (i) => i.PhotoSectionID,
     );
     return definitions.photos.filter((p) => allowedIds.includes(p._id));
   }, [selectedTemplate, definitions.photos]);
@@ -1675,7 +1717,7 @@ const YPivotQAReportFullView = () => {
                       onError={(e) => {
                         e.target.style.display = "none";
                         e.target.parentElement.querySelector(
-                          ".fallback-icon"
+                          ".fallback-icon",
                         ).style.display = "flex";
                       }}
                     />
@@ -1955,7 +1997,7 @@ const YPivotQAReportFullView = () => {
         )}
 
         {/* 4. Defect Summary */}
-        {(summaryData.groups.length > 0 ||
+        {(summaryData.groups.length >= 0 ||
           (report.defectManualData && report.defectManualData.length > 0)) && (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div
@@ -1993,7 +2035,12 @@ const YPivotQAReportFullView = () => {
                   totals={summaryData.totals}
                 />
 
-                {/* --- NEW: DEFECT LOCATION VISUAL SUMMARY --- */}
+                {/* --- MISSING DEFECTS BY QC INSPECTOR CHART --- */}
+                <div className="px-4 pb-2">
+                  <YPivotQAInspectionMissingDefectsByQC reportId={reportId} />
+                </div>
+
+                {/* --- DEFECT LOCATION VISUAL SUMMARY --- */}
                 {defectHeatmap && (
                   <DefectLocationSummary
                     mapData={defectHeatmap.map}
@@ -2001,7 +2048,7 @@ const YPivotQAReportFullView = () => {
                   />
                 )}
 
-                {/* NEW: Defect Images Grid */}
+                {/* Defect Images Grid */}
                 {defectImages.length > 0 && (
                   <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
                     <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4 flex items-center gap-2">
@@ -2037,12 +2084,12 @@ const YPivotQAReportFullView = () => {
                                   className="relative h-72 cursor-pointer overflow-hidden bg-gray-100"
                                   onClick={() => {
                                     const globalIndex = defectImages.findIndex(
-                                      (x) => x === img
+                                      (x) => x === img,
                                     );
                                     setPreviewImage({
                                       images: defectImages,
                                       startIndex:
-                                        globalIndex !== -1 ? globalIndex : 0
+                                        globalIndex !== -1 ? globalIndex : 0,
                                     });
                                   }}
                                 >
@@ -2082,8 +2129,8 @@ const YPivotQAReportFullView = () => {
                                           img.status === "Minor"
                                             ? "bg-orange-100 text-orange-700 border-orange-200"
                                             : img.status === "Major"
-                                            ? "bg-red-100 text-red-700 border-red-200"
-                                            : "bg-red-600 text-white border-red-700"
+                                              ? "bg-red-100 text-red-700 border-red-200"
+                                              : "bg-red-600 text-white border-red-700"
                                         }`}
                                       >
                                         {img.status}
@@ -2138,7 +2185,7 @@ const YPivotQAReportFullView = () => {
                             ))}
                           </div>
                         </div>
-                      )
+                      ),
                     )}
                   </div>
                 )}
@@ -2218,7 +2265,7 @@ const YPivotQAReportFullView = () => {
                                   : null,
                                 group.colorName
                                   ? group.colorName.toUpperCase()
-                                  : null
+                                  : null,
                               ]
                                 .filter(Boolean)
                                 .join(" / ") || "General Configuration";
@@ -2229,7 +2276,7 @@ const YPivotQAReportFullView = () => {
                                 ? calculateGroupStats(
                                     group.measurements,
                                     stageData.specs.full,
-                                    stageData.specs.selected
+                                    stageData.specs.selected,
                                   )
                                 : {
                                     totalPoints: 0,
@@ -2239,12 +2286,12 @@ const YPivotQAReportFullView = () => {
                                     passPcs: 0,
                                     failPcs: 0,
                                     pointPassRate: "0.0",
-                                    pcsPassRate: "0.0"
+                                    pcsPassRate: "0.0",
                                   };
 
                             // Robustly find manual data
                             let manualData = group.measurements.find(
-                              (m) => m.manualData
+                              (m) => m.manualData,
                             )?.manualData;
 
                             if (
@@ -2305,6 +2352,34 @@ const YPivotQAReportFullView = () => {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* --- SECTION: Measurement Value Distribution --- */}
+        {measurementStageData.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mt-4">
+            <div
+              className="bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-2.5 flex justify-between items-center cursor-pointer"
+              onClick={() => toggleSection("measurementDistribution")}
+            >
+              <h2 className="text-white font-bold text-sm flex items-center gap-2">
+                <Calculator className="w-4 h-4" /> Measurement Value
+                Distribution
+              </h2>
+              {expandedSections.measurementDistribution ? (
+                <ChevronUp className="text-white w-4 h-4" />
+              ) : (
+                <ChevronDown className="text-white w-4 h-4" />
+              )}
+            </div>
+
+            {expandedSections.measurementDistribution && (
+              <div className="p-4">
+                <YPivotQAReportMeasurementValueDistribution
+                  reportId={reportId}
+                />
               </div>
             )}
           </div>
@@ -2495,7 +2570,7 @@ const YPivotQAReportFullView = () => {
                 {/* 3. SKU Details Tables (Full Width, Below Breakdown) */}
                 {orderData.orderBreakdowns &&
                   orderData.orderBreakdowns.some(
-                    (b) => b.yorksysOrder?.skuData?.length > 0
+                    (b) => b.yorksysOrder?.skuData?.length > 0,
                   ) && (
                     <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-700">
                       <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-100 dark:border-gray-700">
@@ -2589,10 +2664,10 @@ const YPivotQAReportFullView = () => {
                           <th className="px-3 py-2">Line</th>
                         )}
                         {lineTableConfig.some(
-                          (g) => g.tableName || g.table
+                          (g) => g.tableName || g.table,
                         ) && <th className="px-3 py-2">Table</th>}
                         {lineTableConfig.some(
-                          (g) => g.colorName || g.color
+                          (g) => g.colorName || g.color,
                         ) && <th className="px-3 py-2">Color</th>}
 
                         {/* 2. CARTON COLUMN (Conditionally displayed) */}
@@ -2617,13 +2692,13 @@ const YPivotQAReportFullView = () => {
                       {lineTableConfig.map((group, idx) => {
                         // Check which config columns are active to ensure alignment
                         const hasLine = lineTableConfig.some(
-                          (g) => g.lineName || g.line
+                          (g) => g.lineName || g.line,
                         );
                         const hasTable = lineTableConfig.some(
-                          (g) => g.tableName || g.table
+                          (g) => g.tableName || g.table,
                         );
                         const hasColor = lineTableConfig.some(
-                          (g) => g.colorName || g.color
+                          (g) => g.colorName || g.color,
                         );
                         const hasCartons = config.cartonQty > 0;
 
@@ -2631,7 +2706,7 @@ const YPivotQAReportFullView = () => {
                         const fixedSampleSize =
                           group.assignments?.reduce(
                             (sum, a) => sum + (a.qty || 0),
-                            0
+                            0,
                           ) || 0;
 
                         return (
@@ -2711,6 +2786,112 @@ const YPivotQAReportFullView = () => {
           </div>
         )}
 
+        {/* EMB / Print info */}
+        {(embInfo || printInfo) && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div
+              className={`bg-gradient-to-r ${printInfo ? "from-pink-600 to-rose-600" : "from-blue-600 to-indigo-600"} px-4 py-2.5 flex justify-between items-center cursor-pointer`}
+              onClick={() => toggleSection("techInfo")}
+            >
+              <h2 className="text-white font-bold text-sm flex items-center gap-2">
+                {printInfo ? (
+                  <Printer className="w-4 h-4" />
+                ) : (
+                  <Settings className="w-4 h-4" />
+                )}
+                {printInfo ? "Printing Info" : "EMB Info"}
+              </h2>
+              {expandedSections.techInfo ? (
+                <ChevronUp className="text-white w-4 h-4" />
+              ) : (
+                <ChevronDown className="text-white w-4 h-4" />
+              )}
+            </div>
+
+            {expandedSections.techInfo && (
+              <div className="p-4 space-y-3">
+                {/* EMB DISPLAY */}
+                {embInfo && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <TechInfoCard
+                        label="Speed"
+                        value={embInfo.speed?.value}
+                        enabled={embInfo.speed?.enabled}
+                        icon={Gauge}
+                      />
+                      <TechInfoCard
+                        label="Stitch"
+                        value={embInfo.stitch?.value}
+                        enabled={embInfo.stitch?.enabled}
+                        icon={Activity}
+                      />
+                      <TechInfoCard
+                        label="Needle Size"
+                        value={embInfo.needleSize?.value}
+                        enabled={embInfo.needleSize?.enabled}
+                        icon={PenTool}
+                      />
+                    </div>
+                    {embInfo.remarks && (
+                      <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700 flex gap-2">
+                        <MessageSquare className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 uppercase">
+                            Remarks
+                          </p>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">
+                            {embInfo.remarks}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* PRINT DISPLAY */}
+                {printInfo && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <TechInfoCard
+                        label="Machine Type"
+                        value={printInfo.machineType?.value}
+                        enabled={printInfo.machineType?.enabled}
+                        icon={Settings}
+                      />
+                      <TechInfoCard
+                        label="Speed"
+                        value={printInfo.speed?.value}
+                        enabled={printInfo.speed?.enabled}
+                        icon={Zap}
+                      />
+                      <TechInfoCard
+                        label="Pressure"
+                        value={printInfo.pressure?.value}
+                        enabled={printInfo.pressure?.enabled}
+                        icon={Activity}
+                      />
+                    </div>
+                    {printInfo.remarks && (
+                      <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700 flex gap-2">
+                        <MessageSquare className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 uppercase">
+                            Remarks
+                          </p>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">
+                            {printInfo.remarks}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 8. Header Inspection */}
         {definitions.headers.length > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -2771,10 +2952,10 @@ const YPivotQAReportFullView = () => {
                     (section) => {
                       const hasRemark = headerData?.remarks?.[section._id];
                       const hasImages = Object.keys(
-                        headerData?.capturedImages || {}
+                        headerData?.capturedImages || {},
                       ).some((k) => k.startsWith(`${section._id}_`));
                       return hasRemark || hasImages;
-                    }
+                    },
                   );
 
                   if (evidenceSections.length === 0) return null;
@@ -2790,12 +2971,12 @@ const YPivotQAReportFullView = () => {
                         {evidenceSections.map((section) => {
                           const remark = headerData?.remarks?.[section._id];
                           const images = Object.keys(
-                            headerData?.capturedImages || {}
+                            headerData?.capturedImages || {},
                           )
                             .filter((k) => k.startsWith(`${section._id}_`))
                             .map((k) => ({
                               ...headerData.capturedImages[k],
-                              key: k
+                              key: k,
                             }));
 
                           return (
@@ -2823,7 +3004,7 @@ const YPivotQAReportFullView = () => {
                                             src: img.url,
                                             alt: `${
                                               section.MainTitle
-                                            } - Image ${idx + 1}`
+                                            } - Image ${idx + 1}`,
                                           })
                                         }
                                       >
@@ -2936,7 +3117,7 @@ const YPivotQAReportFullView = () => {
                                   <div className="space-y-2">
                                     {item.images.map((img, imgIdx) => {
                                       const imgUrl = img.imageURL.startsWith(
-                                        "http"
+                                        "http",
                                       )
                                         ? img.imageURL
                                         : `${API_BASE_URL}${img.imageURL}`;
@@ -2955,14 +3136,14 @@ const YPivotQAReportFullView = () => {
                                                     flatImg.imageId ===
                                                       img.imageId) ||
                                                   flatImg.imageURL ===
-                                                    img.imageURL
+                                                    img.imageURL,
                                               );
 
                                             // 2. Open Modal with the Full Array and the specific Start Index
                                             if (globalIndex !== -1) {
                                               setPreviewImage({
                                                 images: allPhotoDataImages,
-                                                startIndex: globalIndex
+                                                startIndex: globalIndex,
                                               });
                                             }
                                           }}
@@ -3035,7 +3216,7 @@ const YPivotQAReportFullView = () => {
                   if (url) {
                     setPreviewImage({
                       images: [{ url: url, defectName: title }],
-                      startIndex: 0
+                      startIndex: 0,
                     });
                   }
                 }}

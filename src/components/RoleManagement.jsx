@@ -18,7 +18,7 @@ import {
   Loader2,
   Filter,
   Grid3X3,
-  List
+  List,
 } from "lucide-react";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -82,8 +82,8 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
               page === currentPage
                 ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/30"
                 : page === "..."
-                ? "bg-transparent text-gray-400 cursor-default"
-                : "bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-600 border border-gray-200"
+                  ? "bg-transparent text-gray-400 cursor-default"
+                  : "bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-600 border border-gray-200"
             }`}
           >
             {page}
@@ -112,13 +112,13 @@ const UserCard = ({ user, size = "normal" }) => {
   const sizeClasses = {
     small: "w-20",
     normal: "w-28",
-    large: "w-32"
+    large: "w-32",
   };
 
   const imgSizes = {
     small: "w-10 h-10",
     normal: "w-14 h-14",
-    large: "w-16 h-16"
+    large: "w-16 h-16",
   };
 
   return (
@@ -260,7 +260,7 @@ export default function RoleManagement() {
     setLoadingIeRoles(true);
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/ie/role-management/summary`
+        `${API_BASE_URL}/api/ie/role-management/summary`,
       );
       setIeRoleSummary(response.data);
     } catch (error) {
@@ -280,7 +280,7 @@ export default function RoleManagement() {
   const fetchUserRoles = async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/user-roles/${user.emp_id}`
+        `${API_BASE_URL}/api/user-roles/${user.emp_id}`,
       );
       setUserRoles(response.data.roles);
     } catch (error) {
@@ -326,9 +326,9 @@ export default function RoleManagement() {
         {
           params: {
             query: currentSearchQuery,
-            type: currentSearchType
-          }
-        }
+            type: currentSearchType,
+          },
+        },
       );
       setFilteredRoles(response.data);
       setCurrentPage(1);
@@ -372,10 +372,12 @@ export default function RoleManagement() {
       for (const title of existingRole.jobTitles) {
         try {
           const response = await axios.get(
-            `${API_BASE_URL}/api/users-by-job-title?jobTitle=${title}`
+            `${API_BASE_URL}/api/users-by-job-title?jobTitle=${title}`,
           );
           users.push(
-            ...response.data.filter((user) => user.working_status === "Working")
+            ...response.data.filter(
+              (user) => user.working_status === "Working",
+            ),
           );
         } catch (error) {
           console.error("Error fetching users for job title:", title);
@@ -398,15 +400,15 @@ export default function RoleManagement() {
       setSelectedJobTitles(newJobTitles);
       try {
         const response = await axios.get(
-          `${API_BASE_URL}/api/users-by-job-title?jobTitle=${title}`
+          `${API_BASE_URL}/api/users-by-job-title?jobTitle=${title}`,
         );
         const workingUsers = response.data.filter(
-          (user) => user.working_status === "Working"
+          (user) => user.working_status === "Working",
         );
         setMatchingUsers((prev) => {
           const existingEmpIds = new Set(prev.map((u) => u.emp_id));
           const newUsers = workingUsers.filter(
-            (u) => !existingEmpIds.has(u.emp_id)
+            (u) => !existingEmpIds.has(u.emp_id),
           );
           return [...prev, ...newUsers];
         });
@@ -420,11 +422,11 @@ export default function RoleManagement() {
   const handleJobTitleRemove = (title) => {
     setSelectedJobTitles((prev) => prev.filter((t) => t !== title));
     const removedUsers = matchingUsers.filter(
-      (user) => user.job_title === title
+      (user) => user.job_title === title,
     );
     setMatchingUsers((prev) => prev.filter((user) => user.job_title !== title));
     setSelectedUsers((prev) =>
-      prev.filter((empId) => !removedUsers.some((u) => u.emp_id === empId))
+      prev.filter((empId) => !removedUsers.some((u) => u.emp_id === empId)),
     );
   };
 
@@ -432,7 +434,7 @@ export default function RoleManagement() {
     setSelectedUsers((prev) =>
       prev.includes(empId)
         ? prev.filter((id) => id !== empId)
-        : [...prev, empId]
+        : [...prev, empId],
     );
   };
 
@@ -466,11 +468,11 @@ export default function RoleManagement() {
       await axios.post(`${API_BASE_URL}/api/role-management`, {
         role: selectedRole,
         jobTitles: selectedJobTitles,
-        selectedUsers: selectedUsers
+        selectedUsers: selectedUsers,
       });
 
       setSuccessMessage(
-        isEditing ? "Role updated successfully!" : "Role added successfully!"
+        isEditing ? "Role updated successfully!" : "Role added successfully!",
       );
       fetchRoles();
       if (!isEditing) {
@@ -508,7 +510,7 @@ export default function RoleManagement() {
             user.eng_name || "N/A",
             user.job_title || "N/A",
             user.dept_name || "N/A",
-            user.sect_name || "N/A"
+            user.sect_name || "N/A",
           ]);
         });
     });
@@ -520,7 +522,7 @@ export default function RoleManagement() {
       "Eng Name",
       "Job Title",
       "Department",
-      "Section"
+      "Section",
     ];
 
     autoTable(doc, {
@@ -530,7 +532,7 @@ export default function RoleManagement() {
       styles: { fontSize: 8 },
       headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255] },
       alternateRowStyles: { fillColor: [248, 250, 252] },
-      margin: { top: 30 }
+      margin: { top: 30 },
     });
 
     const pdfFileName = filterRole
@@ -573,7 +575,8 @@ export default function RoleManagement() {
     "Fincheck Inspections",
     "Fincheck Reports",
     "P88",
-    "QC Ironing"
+    "QC Ironing",
+    "Humidity QC",
   ].sort();
 
   // User Roles tab data
@@ -596,7 +599,7 @@ export default function RoleManagement() {
   }, [sortedTableData, userRolesPage]);
 
   const totalUserRolesPages = Math.ceil(
-    sortedTableData.length / userRolesPerPage
+    sortedTableData.length / userRolesPerPage,
   );
 
   // Clear errors after 5 seconds
@@ -771,7 +774,7 @@ export default function RoleManagement() {
                                     jobTitle={jobTitle}
                                     users={users}
                                   />
-                                )
+                                ),
                               )}
                             </div>
                           </div>
@@ -855,7 +858,7 @@ export default function RoleManagement() {
                             .filter((title) =>
                               title
                                 .toLowerCase()
-                                .includes(searchQuery.toLowerCase())
+                                .includes(searchQuery.toLowerCase()),
                             )
                             .map((title) => (
                               <div

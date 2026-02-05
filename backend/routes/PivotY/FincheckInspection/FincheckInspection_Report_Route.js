@@ -4,14 +4,17 @@ import {
   getInspectionReports,
   getDefectImagesForReport,
   getReportMeasurementSpecs,
+  getReportMeasurementPointCalc,
   checkUserPermission,
   checkApprovalPermission,
   getReportImagesAsBase64,
   getReportDefectHeatmap,
+  getDefectsByQCInspector,
   getFilterOptions,
   autocompleteOrderNo,
   autocompleteCustStyle,
   autocompletePOLine,
+  autocompleteSeason,
   saveUserPreference,
   getUserPreferences,
   deleteUserFilter,
@@ -19,13 +22,16 @@ import {
   submitLeaderDecision,
   getQANotifications,
   getActionRequiredCount,
-  getShippingStageBreakdown
+  getShippingStageBreakdown,
+  getReportForModification,
+  copyMeasurementDataToGroup,
+  fixMeasurementGroupId,
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Report_Controller.js";
 
 import {
   getVapidPublicKey,
   subscribeUser,
-  verifySubscription
+  verifySubscription,
 } from "../../../controller/PivotY/FincheckInspection/FincheckNotificationController.js";
 
 const router = express.Router();
@@ -40,20 +46,27 @@ router.get("/api/fincheck-reports/filter-options", getFilterOptions);
 router.get("/api/fincheck-reports/autocomplete/order-no", autocompleteOrderNo);
 router.get(
   "/api/fincheck-reports/autocomplete/cust-style",
-  autocompleteCustStyle
+  autocompleteCustStyle,
 );
+router.get("/api/fincheck-reports/autocomplete/season", autocompleteSeason);
 router.get("/api/fincheck-reports/autocomplete/po-line", autocompletePOLine);
 
 // Route for Defect Images
 router.get(
   "/api/fincheck-reports/:reportId/defect-images",
-  getDefectImagesForReport
+  getDefectImagesForReport,
 );
 
 // Get Measurement Specs for a specific Report ID
 router.get(
   "/api/fincheck-reports/:reportId/measurement-specs",
-  getReportMeasurementSpecs
+  getReportMeasurementSpecs,
+);
+
+// Measurement Value Distribution for specific report
+router.get(
+  "/api/fincheck-inspection/report/:reportId/measurement-point-calc",
+  getReportMeasurementPointCalc,
 );
 
 // Route to check permission
@@ -62,19 +75,25 @@ router.get("/api/fincheck-reports/check-permission", checkUserPermission);
 // Route to check Decision/Approval permission
 router.get(
   "/api/fincheck-reports/check-approval-permission",
-  checkApprovalPermission
+  checkApprovalPermission,
 );
 
 // Get all report images as base64 for PDF generation
 router.get(
   "/api/fincheck-reports/:reportId/images-base64",
-  getReportImagesAsBase64
+  getReportImagesAsBase64,
 );
 
 // GET - Defect Heatmap/Visual Summary
 router.get(
   "/api/fincheck-inspection/report/:reportId/defect-heatmap",
-  getReportDefectHeatmap
+  getReportDefectHeatmap,
+);
+
+// Get Defects grouped by QC Inspector
+router.get(
+  "/api/fincheck-inspection/report/:reportId/defects-by-qc",
+  getDefectsByQCInspector,
 );
 
 // User Preferences Routes
@@ -82,7 +101,7 @@ router.post("/api/fincheck-reports/preferences/save", saveUserPreference);
 router.get("/api/fincheck-reports/preferences/get", getUserPreferences);
 router.post(
   "/api/fincheck-reports/preferences/delete-filter",
-  deleteUserFilter
+  deleteUserFilter,
 );
 
 // Get existing decision for a report
@@ -95,11 +114,11 @@ router.post(
   // 1. Middleware: Activates only for this route to parse FormData/Audio
   fileUpload({
     createParentPath: true, // Creates folders if missing
-    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for audio
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit for audio
   }),
 
   // 2. Controller
-  submitLeaderDecision
+  submitLeaderDecision,
 );
 
 // Get Notifications for QA
@@ -111,12 +130,23 @@ router.get("/api/fincheck-reports/action-count", getActionRequiredCount);
 // ROUTE: Shipping Stage Breakdown
 router.get(
   "/api/fincheck-inspection/report/:reportId/shipping-stage-breakdown",
-  getShippingStageBreakdown
+  getShippingStageBreakdown,
 );
 
 // PUSH NOTIFICATION ROUTES
 router.get("/api/fincheck-reports/push/vapid-key", getVapidPublicKey);
 router.post("/api/fincheck-reports/push/subscribe", subscribeUser);
 router.post("/api/fincheck-reports/push/verify", verifySubscription);
+
+// Get Report Details specifically for the Modify Tab
+router.get("/api/fincheck-modify/report/:reportId", getReportForModification);
+
+// Copy Measurement Data
+router.post(
+  "/api/fincheck-modify/copy-measurement",
+  copyMeasurementDataToGroup,
+);
+
+router.post("/api/fincheck-modify/fix-group-id", fixMeasurementGroupId);
 
 export default router;

@@ -128,14 +128,14 @@ import p88failedReportsModel from "../../models/P88/p88failedReports.js";
 
 import normalNotificationSchema from "../../models/NormalNotification.js";
 
-import createHumidityFiberNameModel from "../../models/HumidityFiberName.js";
-
 //YDT Models
 /*------------- Cover page ----------------*/
 import createCoverPageSchema from "../../models/YDT/coverPage.js";
 
 //Humidity Models
 import createHumidityModel from "../../models/huminity/HumidityReport.js";
+import createHumidityFiberNameModel from "../../models/HumidityFiberName.js";
+import createReitmansReportModel from "../../models/huminity/ReitmansReport.js";
 
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
@@ -330,6 +330,7 @@ export const CoverPage = createCoverPageSchema(ymProdConnection);
 
 //Humidity Exported Models
 export const HumidityReport = createHumidityModel(ymProdConnection);
+export const ReitmansReport = createReitmansReportModel(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

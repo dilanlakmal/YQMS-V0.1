@@ -11,7 +11,7 @@ import {
   TrendingUp,
   TrendingDown,
   Percent,
-  Hash
+  Hash,
 } from "lucide-react";
 
 /**
@@ -25,7 +25,7 @@ import {
 export const sortSizesByReference = (sizes, sizeList = []) => {
   if (!sizeList || sizeList.length === 0) {
     return [...sizes].sort((a, b) =>
-      a.localeCompare(b, undefined, { numeric: true })
+      a.localeCompare(b, undefined, { numeric: true }),
     );
   }
 
@@ -188,7 +188,7 @@ export const groupMeasurementsByGroupId = (savedMeasurements) => {
           tableName: m.tableName || m.table,
           colorName: m.colorName || m.color,
           qcUser: m.qcUser,
-          measurements: []
+          measurements: [],
         };
       }
       groups[m.groupId].measurements.push(m);
@@ -205,9 +205,10 @@ export const groupMeasurementsByGroupId = (savedMeasurements) => {
  * @param {Array} measurements - Array of measurement objects
  * @param {Array} sizeList - Reference size order from DtOrder.SizeLis
  */
+
 export const buildTableData = (measurements, sizeList = []) => {
   const validMeasurements = measurements.filter(
-    (m) => m.size !== "Manual_Entry"
+    (m) => m.size !== "Manual_Entry",
   );
   // Get unique sizes and sort by reference list
   const uniqueSizes = [...new Set(validMeasurements.map((m) => m.size))];
@@ -229,7 +230,7 @@ export const buildTableData = (measurements, sizeList = []) => {
             pcsIndex,
             pcsNumber: columns.length + 1,
             isAllMode: true,
-            measurements: m.allMeasurements || {}
+            measurements: m.allMeasurements || {},
           });
         });
 
@@ -241,7 +242,7 @@ export const buildTableData = (measurements, sizeList = []) => {
             pcsIndex,
             pcsNumber: columns.length + 1,
             isAllMode: false,
-            measurements: m.criticalMeasurements || {}
+            measurements: m.criticalMeasurements || {},
           });
         });
 
@@ -249,7 +250,7 @@ export const buildTableData = (measurements, sizeList = []) => {
         size: m.size,
         kValue: m.kValue,
         inspectorDecision: m.inspectorDecision,
-        columns
+        columns,
       };
     })
     .filter(Boolean); // Remove nulls
@@ -261,7 +262,7 @@ export const buildTableData = (measurements, sizeList = []) => {
 export const calculateGroupStats = (
   measurements,
   specsData,
-  selectedSpecsList
+  selectedSpecsList,
 ) => {
   let totalPoints = 0;
   let passPoints = 0;
@@ -306,7 +307,7 @@ export const calculateGroupStats = (
 
       const filteredCriticalSpecs = getFilteredSpecs(
         selectedSpecsList,
-        m.kValue
+        m.kValue,
       );
       filteredCriticalSpecs.forEach((spec) => {
         totalPoints++;
@@ -340,7 +341,7 @@ export const calculateGroupStats = (
     failPcs,
     pointPassRate:
       totalPoints > 0 ? ((passPoints / totalPoints) * 100).toFixed(1) : "0.0",
-    pcsPassRate: totalPcs > 0 ? ((passPcs / totalPcs) * 100).toFixed(1) : "0.0"
+    pcsPassRate: totalPcs > 0 ? ((passPcs / totalPcs) * 100).toFixed(1) : "0.0",
   };
 };
 
@@ -379,38 +380,38 @@ export const MeasurementStatsCards = ({ stats, compact = false }) => {
       label: "Total Points",
       value: stats.totalPoints,
       color: "blue",
-      icon: Hash
+      icon: Hash,
     },
     {
       label: "Fail Points",
       value: stats.failPoints,
       color: "red",
-      icon: XCircle
+      icon: XCircle,
     },
     {
       label: "Point Pass Rate",
       value: `${stats.pointPassRate}%`,
       color: "green",
-      icon: Percent
+      icon: Percent,
     },
     {
       label: "Total Pcs",
       value: stats.totalPcs,
       color: "indigo",
-      icon: Target
+      icon: Target,
     },
     {
       label: "Fail Pcs",
       value: stats.failPcs,
       color: "orange",
-      icon: TrendingDown
+      icon: TrendingDown,
     },
     {
       label: "Pcs Pass Rate",
       value: `${stats.pcsPassRate}%`,
       color: "emerald",
-      icon: TrendingUp
-    }
+      icon: TrendingUp,
+    },
   ];
 
   const colorClasses = {
@@ -423,7 +424,7 @@ export const MeasurementStatsCards = ({ stats, compact = false }) => {
     orange:
       "bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300",
     emerald:
-      "bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300"
+      "bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300",
   };
 
   return (
@@ -549,12 +550,13 @@ export const MeasurementLegend = ({ compact = false }) => (
 /**
  * Measurement Summary Table Component
  */
+
 export const MeasurementSummaryTable = ({
   measurements,
   specsData,
   selectedSpecsList,
   sizeList = [],
-  compact = false
+  compact = false,
 }) => {
   const tableData = buildTableData(measurements, sizeList);
 
@@ -576,13 +578,13 @@ export const MeasurementSummaryTable = ({
   }
 
   const kValuesInMeasurements = new Set(
-    measurements.map((m) => m.kValue).filter(Boolean)
+    measurements.map((m) => m.kValue).filter(Boolean),
   );
 
   let displaySpecs = specsData;
   if (kValuesInMeasurements.size > 0) {
     displaySpecs = specsData.filter(
-      (s) => kValuesInMeasurements.has(s.kValue) || s.kValue === "NA"
+      (s) => kValuesInMeasurements.has(s.kValue) || s.kValue === "NA",
     );
   }
 
@@ -659,7 +661,7 @@ export const MeasurementSummaryTable = ({
                       </div>
                     )}
                   </th>
-                )
+                ),
             )}
           </tr>
 
@@ -735,8 +737,8 @@ export const MeasurementSummaryTable = ({
                   isCritical
                     ? "bg-blue-50 dark:bg-blue-900/20"
                     : specIdx % 2 === 0
-                    ? "bg-white dark:bg-gray-900"
-                    : "bg-gray-50 dark:bg-gray-800/50"
+                      ? "bg-white dark:bg-gray-900"
+                      : "bg-gray-50 dark:bg-gray-800/50"
                 }`}
               >
                 {/* 1. Point Name Cell */}
@@ -747,8 +749,8 @@ export const MeasurementSummaryTable = ({
                     isCritical
                       ? "bg-blue-50 dark:bg-blue-900/30"
                       : specIdx % 2 === 0
-                      ? "bg-white dark:bg-gray-900"
-                      : "bg-gray-50 dark:bg-gray-800/50"
+                        ? "bg-white dark:bg-gray-900"
+                        : "bg-gray-50 dark:bg-gray-800/50"
                   }`}
                 >
                   <div className="flex items-start gap-1">
@@ -792,7 +794,7 @@ export const MeasurementSummaryTable = ({
                 {tableData.map((sizeData, sIdx) => {
                   // Find Spec Value for this specific size and format it
                   const matchingSpec = spec.Specs?.find(
-                    (s) => s.size === sizeData.size
+                    (s) => s.size === sizeData.size,
                   );
                   // Use decimal and convert, or format fraction with space instead of dash
                   const specValue = matchingSpec
@@ -839,7 +841,7 @@ export const MeasurementSummaryTable = ({
                         // Use the checkTolerance function with decimal value
                         const toleranceResult = checkTolerance(
                           spec,
-                          decimalValue
+                          decimalValue,
                         );
 
                         let bgColor, textColor;
@@ -888,7 +890,7 @@ export const MeasurementSummaryTable = ({
  */
 export const OverallMeasurementSummaryTable = ({
   groupedMeasurements,
-  sizeList = []
+  sizeList = [],
 }) => {
   if (
     !groupedMeasurements?.groups?.length &&
@@ -906,10 +908,10 @@ export const OverallMeasurementSummaryTable = ({
             lineName: "",
             tableName: "",
             colorName: "General",
-            measurements: groupedMeasurements.noContext
-          }
+            measurements: groupedMeasurements.noContext,
+          },
         ]
-      : [])
+      : []),
   ];
 
   // Collect all unique sizes across all measurements
@@ -951,7 +953,7 @@ export const OverallMeasurementSummaryTable = ({
               [
                 group.lineName ? `Line ${group.lineName}` : null,
                 group.tableName ? `Table ${group.tableName}` : null,
-                group.colorName || null
+                group.colorName || null,
               ]
                 .filter(Boolean)
                 .join(" / ") || "General";
@@ -972,7 +974,7 @@ export const OverallMeasurementSummaryTable = ({
                 </td>
                 {sortedSizes.map((size) => {
                   const sizeMeasurement = group.measurements.find(
-                    (m) => m.size === size
+                    (m) => m.size === size,
                   );
                   if (!sizeMeasurement) {
                     return (
@@ -1031,11 +1033,11 @@ const YPivotQAInspectionMeasurementSummary = ({
   specsData,
   selectedSpecsList,
   activeGroup,
-  sizeList = []
+  sizeList = [],
 }) => {
   const groupedMeasurements = useMemo(
     () => groupMeasurementsByGroupId(savedMeasurements),
-    [savedMeasurements]
+    [savedMeasurements],
   );
 
   if (!savedMeasurements || savedMeasurements.length === 0) {
@@ -1056,14 +1058,14 @@ const YPivotQAInspectionMeasurementSummary = ({
     const headerParts = [
       group.lineName ? `Line ${group.lineName}` : null,
       group.tableName ? `Table ${group.tableName}` : null,
-      group.colorName ? `Color ${group.colorName}` : null
+      group.colorName ? `Color ${group.colorName}` : null,
     ].filter(Boolean);
     const headerLabel =
       headerParts.length > 0 ? headerParts.join(" / ") : "Inspection Session";
     const stats = calculateGroupStats(
       group.measurements,
       specsData,
-      selectedSpecsList
+      selectedSpecsList,
     );
 
     return (
@@ -1134,12 +1136,12 @@ const YPivotQAInspectionMeasurementSummary = ({
   return (
     <div className="p-3 space-y-4">
       {groupedMeasurements.groups.map((group) =>
-        renderGroupSection(group, activeGroup && activeGroup.id === group.id)
+        renderGroupSection(group, activeGroup && activeGroup.id === group.id),
       )}
       {groupedMeasurements.noContext.length > 0 &&
         renderGroupSection(
           { id: "noContext", measurements: groupedMeasurements.noContext },
-          false
+          false,
         )}
     </div>
   );

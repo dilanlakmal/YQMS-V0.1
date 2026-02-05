@@ -1,765 +1,3 @@
-// import axios from "axios";
-// import React, {
-//   useEffect,
-//   useState,
-//   useCallback,
-//   useMemo,
-//   useRef
-// } from "react";
-// import { useNavigate } from "react-router-dom";
-// import { useAuth } from "../components/authentication/AuthContext";
-// import { useTranslation } from "react-i18next";
-// import { API_BASE_URL } from "../../config";
-// import {
-//   Layers,
-//   Settings,
-//   BarChart3,
-//   Scissors,
-//   CheckSquare,
-//   Shield,
-//   Sun,
-//   Moon,
-//   ClipboardList
-// } from "lucide-react";
-
-// // --- Import Push Manager ---
-// import FincheckPushManager from "../components/inspection/PivotY/QAReports/FincheckPushManager";
-
-// // --- Theme Hook for Dark Mode ---
-// const useTheme = () => {
-//   const [theme, setTheme] = useState(
-//     () => localStorage.getItem("home-theme") || "light"
-//   );
-
-//   useEffect(() => {
-//     const root = window.document.documentElement;
-//     root.classList.remove(theme === "dark" ? "light" : "dark");
-//     root.classList.add(theme);
-//     localStorage.setItem("home-theme", theme);
-//   }, [theme]);
-
-//   const toggleTheme = () =>
-//     setTheme((prev) => (prev === "light" ? "dark" : "light"));
-//   return { theme, toggleTheme };
-// };
-
-// function Home() {
-//   const { t } = useTranslation();
-//   const navigate = useNavigate();
-//   const { user, loading } = useAuth();
-//   const { theme, toggleTheme } = useTheme();
-
-//   const [errorMessage, setErrorMessage] = useState("");
-//   const [userRoles, setUserRoles] = useState([]);
-//   const [roleManagement, setRoleManagement] = useState(null);
-//   const [pageLoading, setPageLoading] = useState(true);
-//   const [accessMap, setAccessMap] = useState({});
-
-//   const [fincheckActionCount, setFincheckActionCount] = useState(0);
-
-//   const sectionRefs = useRef({});
-
-//   const allSections = useMemo(
-//     () => [
-//       /* ... sections array  ... */
-//       {
-//         id: "qc2-system",
-//         title: "QC2 System",
-//         icon: <Layers className="w-5 h-5 mr-2" />,
-//         bgColor: "bg-blue-50 dark:bg-blue-900/20",
-//         items: [
-//           {
-//             path: "/bundle-registration",
-//             pageId: "bundle-registration",
-//             image: "assets/Home/bundle.avif",
-//             title: t("home.bundle_registration"),
-//             description: "Order Registration"
-//           },
-//           {
-//             path: "/washing",
-//             pageId: "washing",
-//             image: "assets/Home/washing.jpg",
-//             title: t("home.washing"),
-//             description: "Scan orders for Washing"
-//           },
-//           {
-//             path: "/opa",
-//             pageId: "opa",
-//             image: "assets/Home/dyeing.png",
-//             title: t("home.opa"),
-//             description: "Scan orders in OPA"
-//           },
-//           {
-//             path: "/ironing",
-//             pageId: "ironing",
-//             image: "assets/Home/ironing.png",
-//             title: t("home.ironing"),
-//             description: "Scan orders for Ironing"
-//           },
-//           {
-//             path: "/qc2-inspection",
-//             pageId: "qc2-inspection",
-//             image: "assets/Home/qc2.png",
-//             title: t("home.qc2_inspection"),
-//             description: "QC2 Inspection Point"
-//           },
-//           {
-//             path: "/qc2-repair-tracking",
-//             pageId: "qc2-inspection",
-//             image: "assets/Home/repair.png",
-//             title: "Defect Tracking",
-//             description: "QC2 Repair Tracking"
-//           },
-//           {
-//             path: "/packing",
-//             pageId: "packing",
-//             image: "assets/Home/packing.webp",
-//             title: t("home.packing"),
-//             description: "Scan orders for Packing"
-//           },
-//           {
-//             path: "/b-grade-defect",
-//             pageId: "qc2-inspection",
-//             image: "assets/Home/bgrade.png",
-//             title: "B-Grade Defects",
-//             description: "Record B-Grade defects"
-//           },
-//           {
-//             path: "/b-grade-stcok",
-//             pageId: "qc2-inspection",
-//             image: "assets/Home/bgrade.png",
-//             title: "B-Grade Stock",
-//             description: "View B-Grade Stock"
-//           }
-//         ]
-//       },
-//       {
-//         id: "fabric-cutting",
-//         title: "Fabric & Cutting",
-//         icon: <Scissors className="w-5 h-5 mr-2" />,
-//         bgColor: "bg-teal-50 dark:bg-teal-900/20",
-//         items: [
-//           {
-//             path: "/Fabric",
-//             roles: ["Fabric"],
-//             image: "assets/Home/fabric-logo.png",
-//             title: t("home.fabric"),
-//             description: "Fabric Inspection"
-//           },
-//           {
-//             path: "/cutting",
-//             roles: ["Cutting"],
-//             image: "assets/Home/cutting.webp",
-//             title: t("home.cutting"),
-//             description: "Cut Panel Inspection"
-//           },
-//           {
-//             path: "/cutting-inline",
-//             roles: ["Cutting"],
-//             image: "assets/Home/cutting-inline.png",
-//             title: t("home.cutting-inline"),
-//             description: "Cutting Inline Inspection"
-//           },
-//           {
-//             path: "/scc",
-//             roles: ["SCC"],
-//             image: "assets/Home/SCCLogo.jpg",
-//             title: t("SCC"),
-//             description: "Spreading & Cutting"
-//           },
-//           {
-//             path: "/qcWashing",
-//             roles: ["QC Washing"],
-//             image: "assets/Home/qcwashing.png",
-//             title: t("home.qcWashing"),
-//             description: "Washing Report"
-//           },
-//           {
-//             path: "/afterIroning",
-//             roles: ["QC Ironing"],
-//             image: "assets/Home/after_ironing.png",
-//             title: t("home.afterIroning"),
-//             description: "After Ironing Report"
-//           },
-//           // {
-//           //   path: "/measurement",
-//           //   roles: ["QC Washing", "QA"],
-//           //   image: "assets/Home/measurement.png",
-//           //   title: t("home.Measurement"),
-//           //   description: "All Style measurements"
-//           // },
-//           // {
-//           //   path: "/upload-beforewash-specs",
-//           //   roles: ["Washing Clerk"],
-//           //   image: "assets/Home/uploadspecs.png",
-//           //   title: t("home.upload_beforewash_specs"),
-//           //   description: "Upload Beforewash Specs"
-//           // },
-//           {
-//             path: "/select-dt-specs",
-//             roles: ["Washing Clerk", "QA Clerk"],
-//             image: "assets/Home/select-specs.png",
-//             title: t("home.select_dt_specs"),
-//             description: "Select After Wash DT Specs"
-//           },
-//           {
-//             path: "/anf-washing",
-//             roles: ["ANF QA"],
-//             image: "assets/Home/anf-washing.png",
-//             title: t("home.anf_washing"),
-//             description: "QC After Wash Measurements"
-//           },
-//           // {
-//           //   path: "/anf-washing-ver2",
-//           //   roles: ["ANF QA"],
-//           //   image: "assets/Home/anf-washing-ver2.png",
-//           //   title: t("home.anf_washing_version2"),
-//           //   description: "QC AW Measurements - Version 2"
-//           // },
-//           {
-//             path: "/supplier-issues",
-//             roles: ["Supplier QC"],
-//             image: "assets/Home/supplier-issues.png",
-//             title: t("home.supplier-issues"),
-//             description: "Supplier Issues Sub-Con Fty"
-//           }
-//         ]
-//       },
-//       {
-//         id: "sewing-qc",
-//         title: "Sewing QC",
-//         icon: <CheckSquare className="w-5 h-5 mr-2" />,
-//         bgColor: "bg-purple-50 dark:bg-purple-900/20",
-//         items: [
-//           {
-//             path: "/roving",
-//             roles: ["QC Roving"],
-//             image: "assets/Home/qcinline.png",
-//             title: "QC Inline Roving",
-//             description: "QC Inline Roving Point"
-//           },
-//           {
-//             path: "/details",
-//             roles: ["QC1 Inspection"],
-//             image: "assets/Home/qcc.png",
-//             title: t("home.qc1_inspection"),
-//             description: "QC1 Inspection Point"
-//           },
-//           {
-//             path: "/sub-con-qc1",
-//             roles: ["QC1 Sub Con"],
-//             image: "assets/Home/sub-con-qc1.png",
-//             title: t("home.qc1_subcon_inspection"),
-//             description: "QC1 Sub Con Inspection"
-//           },
-//           {
-//             path: "/inline-emp",
-//             roles: ["Printing"],
-//             image: "assets/Home/qc2.png",
-//             title: "Print QR",
-//             description: "Sewing Worker QR Code"
-//           },
-//           {
-//             path: "/humidity-report",
-//             roles: ["QA"],
-//             image: "assets/Home/Humidity.jpg",
-//             title: "Humidity Report",
-//             description: "View Humidity Report"
-//           }
-//         ]
-//       },
-//       {
-//         id: "y-pivot",
-//         title: "Fin Check",
-//         icon: <Layers className="w-5 h-5 mr-2" />,
-//         bgColor: "bg-blue-50 dark:bg-blue-900/20",
-//         items: [
-//           {
-//             path: "/qa-sections",
-//             //pageId: "qa-sections",
-//             roles: ["Fincheck Config"],
-//             image: "assets/Home/Fincheck_Setting.png",
-//             title: t("home.qa_sections"),
-//             description: "Configuration"
-//           },
-//           {
-//             path: "/qa-measurements",
-//             //pageId: "qa-measurements",
-//             roles: ["Fincheck Measurement"],
-//             image: "assets/Home/FinCheck_Measurements.png",
-//             title: t("home.qa_measurements"),
-//             description: "Upload/Measurement Settings"
-//           },
-//           {
-//             path: "/qa-templates",
-//             //pageId: "qa-templates",
-//             roles: ["Fincheck Templates"],
-//             image: "assets/Home/Fincheck_Templates.png",
-//             title: t("home.qa_templates"),
-//             description: "..."
-//           },
-//           {
-//             path: "/fincheck-inspection",
-//             //pageId: "y-pivot-inspection",
-//             roles: ["Fincheck Inspections"],
-//             image: "assets/Home/Fincheck_Inspection.png",
-//             title: t("home.y_pivot_inspection"),
-//             description: "..."
-//           },
-//           {
-//             path: "/fincheck-reports",
-//             //pageId: "y-pivot-inspection",
-//             roles: ["Fincheck Reports"],
-//             image: "assets/Home/Fincheck_Reports.png",
-//             title: t("home.y_pivot_report"),
-//             description: "..."
-//           },
-//           {
-//             path: "/P88Legacy",
-//             //pageId: "y-pivot-inspection",
-//             roles: ["P88"],
-//             image: "assets/Home/p88Legacy.png",
-//             title: t("home.p88_Legacy"),
-//             description: "Historical Data",
-//             version: "0"
-//           }
-//         ]
-//       },
-//       {
-//         id: "qa-inspection",
-//         title: "QA Inspection",
-//         icon: <Shield className="w-5 h-5 mr-2" />,
-//         bgColor: "bg-yellow-50 dark:bg-yellow-900/20",
-//         items: [
-//           {
-//             path: "/audit",
-//             roles: ["QA Audit"],
-//             image: "assets/Home/qaa.png",
-//             title: "QMS Audit",
-//             description: "QMS Audit Check Point"
-//           },
-//           {
-//             path: "/qc2-upload-data",
-//             roles: ["Washing Clerk"],
-//             image: "assets/Home/qc2-workers-upload.png",
-//             title: t("home.qc2_upload_data"),
-//             description: "QC2 Upload Data"
-//           },
-//           {
-//             path: "/qc2-washing-upload",
-//             roles: ["Washing Clerk"],
-//             image: "assets/Home/qc2WashingUpload.png",
-//             title: t("home.qc2_washing_data"),
-//             description: "QC2 Washing Data"
-//           },
-//           {
-//             path: "/qc-accuracy",
-//             roles: ["QA"],
-//             image: "assets/Home/qc-accuracy.png",
-//             title: "QA Random Inspection",
-//             description: "QA Random Checks"
-//           },
-//           {
-//             path: "/qc-output",
-//             roles: ["QA"],
-//             image: "assets/Home/qcOutput.png",
-//             title: "QC Output",
-//             description: "QC Output | Sunrise & Old Barcode System"
-//           },
-//           {
-//             path: "/training",
-//             roles: ["System Administration"],
-//             image: "assets/Home/training.jpg",
-//             title: "YQMS Training",
-//             description: "Training Schedule & Progress"
-//           },
-//           {
-//             path: "/exam",
-//             roles: ["System Administration"],
-//             image: "assets/Home/exam.jpg",
-//             title: "YQMS Exam",
-//             description: "Create Exam & Preview"
-//           },
-//           // {
-//           //   path: "/qa-yorksys",
-//           //   roles: ["QA Clerk"],
-//           //   image: "assets/Home/upload-orders.png",
-//           //   title: "Upload Orders",
-//           //   description: "Order data from York-sys"
-//           // },
-//           {
-//             path: "/packing-list",
-//             roles: ["QA Clerk"],
-//             image: "assets/Home/PackingList.png",
-//             title: "Upload Packing List",
-//             description: "Packing List from Shipping Dept"
-//           },
-//           {
-//             path: "/final-inspection",
-//             roles: ["QA"],
-//             image: "assets/Home/qafinal.png",
-//             title: "Final Inspection",
-//             description: "QA Final Inspection"
-//           }
-//         ]
-//       },
-//       {
-//         id: "ce-section",
-//         title: "CE",
-//         icon: <ClipboardList className="w-5 h-5 mr-2" />,
-//         bgColor: "bg-orange-50 dark:bg-orange-900/20",
-//         items: [
-//           {
-//             path: "/master-list",
-//             roles: ["CE"],
-//             image: "assets/Home/CE-System.png",
-//             title: "CE",
-//             description: "Proudction Control & Monitoring"
-//           }
-//         ]
-//       },
-//       {
-//         id: "admin-panel",
-//         title: "Admin Panel",
-//         icon: <Settings className="w-5 h-5 mr-2" />,
-//         bgColor: "bg-gray-100 dark:bg-gray-800/20",
-//         items: [
-//           {
-//             path: "/ieadmin",
-//             roles: ["IE", "System Administration"],
-//             image: "assets/Home/ie.png",
-//             title: t("home.ieadmin"),
-//             description: "IE System Admin"
-//           },
-//           {
-//             path: "/sysadmin",
-//             roles: ["System Administration"],
-//             image: "assets/Home/sysadmin.jpg",
-//             title: t("home.systemadmin"),
-//             description: "Modify Defects"
-//           },
-//           {
-//             path: "/yqms",
-//             roles: ["YQMS"],
-//             image: "assets/Home/yqms.png",
-//             title: t("home.yqms"),
-//             description: "Project Management"
-//           }
-//         ]
-//       },
-//       {
-//         id: "analytics",
-//         title: "Analytics",
-//         icon: <BarChart3 className="w-5 h-5 mr-2" />,
-//         bgColor: "bg-red-50 dark:bg-red-900/20",
-//         items: [
-//           {
-//             path: "/download-data",
-//             roles: ["Download Data"],
-//             image: "assets/Home/download.jpg",
-//             title: t("home.download_data"),
-//             description: "Download Raw Data"
-//           },
-//           {
-//             path: "/live-dashboard",
-//             roles: ["Live Dashboard"],
-//             image: "assets/Home/dash.png",
-//             title: t("home.live_dashboard"),
-//             description: "QC2 Live Dashboard"
-//           },
-//           {
-//             path: "/powerbi",
-//             roles: ["Power BI"],
-//             image: "assets/Home/powerbi.png",
-//             title: "Power BI",
-//             description: "View Power BI Reports"
-//           },
-//           {
-//             path: "/qa-pivot",
-//             roles: ["QA Pivot"],
-//             image: "assets/Home/qalogo.png",
-//             title: "QA Evaluation",
-//             description: "Upload & View Data"
-//           },
-//           {
-//             path: "/qc1-sunrise",
-//             roles: ["QC1 Sunrise"],
-//             image: "assets/Home/sunrise.png",
-//             title: "QC1 Sunrise",
-//             description: "Upload Excel Data"
-//           }
-//         ]
-//       },
-//       {
-//         id: "ydt",
-//         title: "YDT",
-//         icon: <ClipboardList className="w-5 h-5 mr-2" />,
-//         bgColor: "bg-blue-50 dark:bg-blue-900/20",
-//         items: [
-//           {
-//             path: "/production-Sheet",
-//             roles: ["production"],
-//             image: "assets/Home/coverPage.png",
-//             title: "Production Sheet",
-//             description: "Maintain the production sheet",
-//             version: "0"
-//           }
-//         ]
-//       }
-//     ],
-//     [t]
-//   );
-
-//   // STEP 1: Initial check for user authentication
-//   useEffect(() => {
-//     if (!loading && !user) {
-//       navigate("/login");
-//     }
-//   }, [user, loading, navigate]);
-
-//   // STEP 2: Fetch legacy and user-specific roles once user is available
-//   useEffect(() => {
-//     if (user) {
-//       const fetchBaseRoles = async () => {
-//         setPageLoading(true);
-//         setErrorMessage(""); // Clear previous errors
-//         try {
-//           const [roleManagementRes, userRolesRes] = await Promise.all([
-//             axios.get(`${API_BASE_URL}/api/role-management`),
-//             axios.get(`${API_BASE_URL}/api/user-roles/${user.emp_id}`)
-//           ]);
-//           setRoleManagement(roleManagementRes.data);
-//           setUserRoles(userRolesRes.data.roles);
-//         } catch (error) {
-//           console.error("Error fetching base roles:", error);
-//           setErrorMessage("Error loading base page permissions.");
-//           setPageLoading(false); // Stop loading on error
-//         }
-//         // Do not set pageLoading to false here, let the next step do it
-//       };
-//       fetchBaseRoles();
-//     }
-//   }, [user]);
-
-//   // STEP 3: Fetch IE-specific access rights only AFTER legacy roles are loaded
-//   useEffect(() => {
-//     // This effect runs only when `roleManagement` is successfully populated
-//     if (roleManagement) {
-//       const checkAllIEAccess = async () => {
-//         try {
-//           const pageIdsToCheck = [
-//             ...new Set(
-//               allSections
-//                 .flatMap((s) => s.items)
-//                 .filter((item) => item.pageId)
-//                 .map((item) => item.pageId)
-//             )
-//           ];
-
-//           const accessPromises = pageIdsToCheck.map((pageId) =>
-//             axios.get(
-//               `${API_BASE_URL}/api/ie/role-management/access-check?emp_id=${user.emp_id}&page=${pageId}`
-//             )
-//           );
-
-//           const results = await Promise.all(accessPromises);
-
-//           const newAccessMap = {};
-//           results.forEach((res, index) => {
-//             newAccessMap[pageIdsToCheck[index]] = res.data.hasAccess;
-//           });
-
-//           setAccessMap(newAccessMap);
-//         } catch (error) {
-//           console.error("Error fetching IE access rights:", error);
-//           setErrorMessage("Error loading IE page permissions.");
-//         } finally {
-//           // This is the final step, now we can stop the main loading indicator
-//           setPageLoading(false);
-//         }
-//       };
-//       checkAllIEAccess();
-//     }
-//   }, [roleManagement, user, allSections]); // Dependency on roleManagement is key
-
-//   // Hybrid access function remains the same, it will use the state populated by the effects
-//   const hasAccess = useCallback(
-//     (item) => {
-//       if (!user) return false;
-//       const isSuperAdmin = userRoles.includes("Super Admin");
-//       const isAdmin = userRoles.includes("Admin");
-//       if (isSuperAdmin || isAdmin) return true;
-//       if (item.pageId) return accessMap[item.pageId] === true;
-//       if (item.roles && roleManagement && user.job_title) {
-//         return roleManagement.some(
-//           (role) =>
-//             item.roles.includes(role.role) &&
-//             role.jobTitles.includes(user.job_title)
-//         );
-//       }
-//       return false;
-//     },
-//     [user, userRoles, roleManagement, accessMap]
-//   );
-
-//   // Dynamic filtering logic remains the same
-//   const accessibleSections = useMemo(() => {
-//     if (pageLoading || !userRoles) return [];
-//     return allSections
-//       .map((section) => ({
-//         ...section,
-//         items: section.items.filter((item) => hasAccess(item))
-//       }))
-//       .filter((section) => section.items.length > 0);
-//   }, [allSections, hasAccess, pageLoading, userRoles]);
-
-//   const handleNavigation = (item) => {
-//     if (hasAccess(item)) {
-//       navigate(item.path);
-//     } else {
-//       setErrorMessage("Unauthorized Access");
-//       setTimeout(() => setErrorMessage(""), 3000);
-//     }
-//   };
-
-//   const handleTabClick = (sectionId) => {
-//     sectionRefs.current[sectionId]?.scrollIntoView({
-//       behavior: "smooth",
-//       block: "start"
-//     });
-//   };
-
-//   // Fetch Fincheck Action Required Count for Badge
-//   useEffect(() => {
-//     if (!user?.emp_id) return;
-
-//     const fetchActionCount = async () => {
-//       try {
-//         const res = await axios.get(
-//           `${API_BASE_URL}/api/fincheck-reports/action-count?empId=${user.emp_id}`
-//         );
-//         if (res.data.success) {
-//           setFincheckActionCount(res.data.count);
-//         }
-//       } catch (error) {
-//         console.error("Error fetching action count:", error);
-//       }
-//     };
-
-//     fetchActionCount();
-
-//     // Poll every 60 seconds
-//     const interval = setInterval(fetchActionCount, 60000);
-//     return () => clearInterval(interval);
-//   }, [user?.emp_id]);
-
-//   if (loading || pageLoading) {
-//     return (
-//       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-900">
-//         <div className="text-xl text-gray-600 dark:text-gray-300">
-//           Loading...
-//         </div>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div className="min-h-screen bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">
-//       {/* --- Fincheck Push Notification Manager (Invisible) --- */}
-//       {user && <FincheckPushManager user={user} />}
-
-//       <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm">
-//         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
-//           <div className="flex items-center justify-between h-16">
-//             <nav className="flex space-x-1 sm:space-x-4 overflow-x-auto">
-//               {accessibleSections.map((section) => (
-//                 <button
-//                   key={section.id}
-//                   onClick={() => handleTabClick(section.id)}
-//                   className="flex-shrink-0 flex items-center px-3 py-2 text-sm font-semibold rounded-md text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors"
-//                 >
-//                   {section.icon}
-//                   <span>{section.title}</span>
-//                 </button>
-//               ))}
-//             </nav>
-//           </div>
-//         </div>
-//       </header>
-
-//       <main className="max-w-screen-2xl mx-auto p-4 sm:p-6 lg:p-8">
-//         {errorMessage && (
-//           <div className="bg-red-500 text-white text-center py-2 mb-6 rounded-md">
-//             {errorMessage}
-//           </div>
-//         )}
-//         <div className="space-y-12">
-//           {accessibleSections.length > 0 ? (
-//             accessibleSections.map((section) => (
-//               <section
-//                 key={section.id}
-//                 ref={(el) => (sectionRefs.current[section.id] = el)}
-//                 className={`p-6 rounded-2xl ${section.bgColor} transition-colors`}
-//               >
-//                 <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white mb-6 flex items-center">
-//                   {section.icon}
-//                   {section.title}
-//                 </h2>
-//                 <div
-//                   className="grid gap-4"
-//                   style={{
-//                     gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))"
-//                   }}
-//                 >
-//                   {section.items.map((item, itemIndex) => (
-//                     <div
-//                       key={itemIndex}
-//                       onClick={() => handleNavigation(item)}
-//                       className="group relative flex flex-col items-center justify-center p-4 rounded-xl shadow-md transition-all duration-300 bg-white dark:bg-slate-800 cursor-pointer hover:shadow-xl hover:-translate-y-1"
-//                     >
-//                       {/* Notification Badge for Fincheck Inspection */}
-//                       {item.path === "/fincheck-inspection" &&
-//                         fincheckActionCount > 0 && (
-//                           <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 animate-pulse">
-//                             {fincheckActionCount}
-//                           </div>
-//                         )}
-
-//                       <img
-//                         src={item.image}
-//                         alt={item.title}
-//                         className="w-14 h-14 object-contain mb-3"
-//                       />
-//                       <h3 className="text-sm font-bold text-center text-slate-700 dark:text-slate-100">
-//                         {item.title}
-//                       </h3>
-//                       <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1">
-//                         {item.description}
-//                       </p>
-//                     </div>
-//                   ))}
-//                 </div>
-//               </section>
-//             ))
-//           ) : (
-//             <div className="text-center py-20">
-//               <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-300">
-//                 No Accessible Modules
-//               </h2>
-//               <p className="mt-2 text-slate-500">
-//                 Please contact your administrator if you believe you should have
-//                 access.
-//               </p>
-//             </div>
-//           )}
-//         </div>
-//       </main>
-//     </div>
-//   );
-// }
-
-// export default Home;
-
 import axios from "axios";
 import React, {
   useEffect,
@@ -783,13 +21,19 @@ import {
   Shield,
   Sun,
   Moon,
-  ClipboardList
+  ClipboardList,
+  Bell,
+  X,
+  Loader2,
+  AlertCircle,
+  ChevronRight,
+  Home as HomeIcon
 } from "lucide-react";
 
 // --- Theme Hook for Dark Mode ---
 const useTheme = () => {
   const [theme, setTheme] = useState(
-    () => localStorage.getItem("home-theme") || "light"
+    () => localStorage.getItem("home-theme") || "light",
   );
 
   useEffect(() => {
@@ -852,7 +96,7 @@ const SettingsModal = ({
   user,
   isMobile,
   theme,
-  toggleTheme
+  toggleTheme,
 }) => {
   const [permission, setPermission] = useState("default");
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -894,8 +138,8 @@ const SettingsModal = ({
               `${API_BASE_URL}/api/fincheck-reports/push/verify`,
               {
                 empId: user.emp_id,
-                endpoint: browserSubscription.endpoint
-              }
+                endpoint: browserSubscription.endpoint,
+              },
             );
 
             if (response.data.success && response.data.exists) {
@@ -945,7 +189,7 @@ const SettingsModal = ({
 
       if (perm !== "granted") {
         throw new Error(
-          "Permission Denied. Please enable notifications in browser settings."
+          "Permission Denied. Please enable notifications in browser settings.",
         );
       }
 
@@ -962,7 +206,7 @@ const SettingsModal = ({
       let publicVapidKey;
       try {
         const keyRes = await axios.get(
-          `${API_BASE_URL}/api/fincheck-reports/push/vapid-key`
+          `${API_BASE_URL}/api/fincheck-reports/push/vapid-key`,
         );
         publicVapidKey = keyRes.data.publicKey;
       } catch (apiError) {
@@ -985,7 +229,7 @@ const SettingsModal = ({
         const convertedKey = urlBase64ToUint8Array(publicVapidKey);
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: convertedKey
+          applicationServerKey: convertedKey,
         });
       } catch (subError) {
         throw new Error(`PushManager Subscribe Error: ${subError.message}`);
@@ -998,8 +242,8 @@ const SettingsModal = ({
           {
             empId: user.emp_id,
             subscription: subscription,
-            userAgent: navigator.userAgent
-          }
+            userAgent: navigator.userAgent,
+          },
         );
       } catch (backendError) {
         throw new Error(`Backend Save Error: ${backendError.message}`);
@@ -1204,7 +448,7 @@ const MobileBottomNav = ({
   sections,
   activeSection,
   onSectionChange,
-  onSettingsClick
+  onSettingsClick,
 }) => {
   const navRef = useRef(null);
   const activeButtonRef = useRef(null);
@@ -1224,7 +468,7 @@ const MobileBottomNav = ({
         button.scrollIntoView({
           behavior: "smooth",
           inline: "center",
-          block: "nearest"
+          block: "nearest",
         });
       }
     }
@@ -1257,7 +501,7 @@ const MobileBottomNav = ({
             >
               {React.cloneElement(section.icon, {
                 className: "w-5 h-5",
-                style: { margin: 0 }
+                style: { margin: 0 },
               })}
             </div>
             <span className="text-[9px] mt-1 font-medium leading-tight text-center max-w-[60px] truncate">
@@ -1482,7 +726,7 @@ function Home() {
             roles: ["QC Ironing"],
             image: "assets/Home/after_ironing.png",
             title: t("home.afterIroning"),
-            description: "After Ironing Report"
+            description: "After Ironing Report",
           },
           {
             path: "/select-dt-specs",
@@ -1503,27 +747,9 @@ function Home() {
             roles: ["Supplier QC"],
             image: "assets/Home/supplier-issues.png",
             title: t("home.supplier-issues"),
-            description: "Supplier Issues Sub-Con Fty",
-          },
-          // EMB + Printing
-          // {
-          //   path: "/emb-printing",
-          //   roles: ["EMB", "Printing"],
-          //   image: "assets/Home/stitches.png",
-          //   title: t("Emb-Print"),
-          //   description: "EMB + Printing Inspection",
-          // },
-          
-          {
-            path: "/Launch-washing-machine-test",
-            roles: ["QC Washing", "QA"],
-            image: "assets/Home/Launch-washing-machine-test.png",
-            title: "Launch Washing Machine Test",
-            description: "Launch Washing Machine Test",
-            imageSize: "large", // Custom flag for larger image
-          },
-
-        ],
+            description: "Supplier Issues Sub-Con Fty"
+          }
+        ]
       },
       {
         id: "sewing-qc",
@@ -1557,16 +783,16 @@ function Home() {
             roles: ["Printing"],
             image: "assets/Home/qc2.png",
             title: "Print QR",
-            description: "Sewing Worker QR Code"
+            description: "Sewing Worker QR Code",
           },
           {
             path: "/humidity-report",
-            roles: ["QA"],
+            roles: ["Humidity QC"],
             image: "assets/Home/Humidity.jpg",
             title: "Humidity Report",
-            description: "View Humidity Report"
-          }
-        ]
+            description: "View Humidity Report",
+          },
+        ],
       },
       {
         id: "y-pivot",
@@ -1579,35 +805,35 @@ function Home() {
             roles: ["Fincheck Config"],
             image: "assets/Home/Fincheck_Setting.png",
             title: t("home.qa_sections"),
-            description: "Configuration"
+            description: "Configuration",
           },
           {
             path: "/qa-measurements",
             roles: ["Fincheck Measurement"],
             image: "assets/Home/FinCheck_Measurements.png",
             title: t("home.qa_measurements"),
-            description: "Upload/Measurement Settings"
+            description: "Upload/Measurement Settings",
           },
           {
             path: "/qa-templates",
             roles: ["Fincheck Templates"],
             image: "assets/Home/Fincheck_Templates.png",
             title: t("home.qa_templates"),
-            description: "..."
+            description: "...",
           },
           {
             path: "/fincheck-inspection",
             roles: ["Fincheck Inspections"],
             image: "assets/Home/Fincheck_Inspection.png",
             title: t("home.y_pivot_inspection"),
-            description: "..."
+            description: "...",
           },
           {
             path: "/fincheck-reports",
             roles: ["Fincheck Reports"],
             image: "assets/Home/Fincheck_Reports.png",
             title: t("home.y_pivot_report"),
-            description: "..."
+            description: "...",
           },
           {
             path: "/P88Legacy",
@@ -1615,9 +841,9 @@ function Home() {
             image: "assets/Home/p88Legacy.png",
             title: t("home.p88_Legacy"),
             description: "Historical Data",
-            version: "0"
-          }
-        ]
+            version: "0",
+          },
+        ],
       },
       {
         id: "qa-inspection",
@@ -1701,9 +927,9 @@ function Home() {
             roles: ["CE"],
             image: "assets/Home/CE-System.png",
             title: "CE",
-            description: "Production Control & Monitoring"
-          }
-        ]
+            description: "Production Control & Monitoring",
+          },
+        ],
       },
       {
         id: "admin-panel",
@@ -1773,9 +999,9 @@ function Home() {
             roles: ["QC1 Sunrise"],
             image: "assets/Home/sunrise.png",
             title: "QC1 Sunrise",
-            description: "Upload Excel Data"
-          }
-        ]
+            description: "Upload Excel Data",
+          },
+        ],
       },
       {
         id: "ydt",
@@ -1789,12 +1015,12 @@ function Home() {
             image: "assets/Home/coverPage.png",
             title: "Production Sheet",
             description: "Maintain the production sheet",
-            version: "0"
-          }
-        ]
-      }
+            version: "0",
+          },
+        ],
+      },
     ],
-    [t]
+    [t],
   );
 
   // Persist active section to localStorage
@@ -1845,13 +1071,13 @@ function Home() {
                 .flatMap((s) => s.items)
                 .filter((item) => item.pageId)
                 .map((item) => item.pageId)
-            ),
+            )
           ];
 
           const accessPromises = pageIdsToCheck.map((pageId) =>
             axios.get(
-              `${API_BASE_URL}/api/ie/role-management/access-check?emp_id=${user.emp_id}&page=${pageId}`
-            )
+              `${API_BASE_URL}/api/ie/role-management/access-check?emp_id=${user.emp_id}&page=${pageId}`,
+            ),
           );
 
           const results = await Promise.all(accessPromises);
@@ -1885,12 +1111,12 @@ function Home() {
         return roleManagement.some(
           (role) =>
             item.roles.includes(role.role) &&
-            role.jobTitles.includes(user.job_title)
+            role.jobTitles.includes(user.job_title),
         );
       }
       return false;
     },
-    [user, userRoles, roleManagement, accessMap]
+    [user, userRoles, roleManagement, accessMap],
   );
 
   // Dynamic filtering logic
@@ -1910,13 +1136,13 @@ function Home() {
       const savedSection = localStorage.getItem("home-active-section");
       // Check if saved section exists in accessible sections
       const sectionExists = accessibleSections.some(
-        (s) => s.id === savedSection
+        (s) => s.id === savedSection,
       );
 
       if (!activeSection || !sectionExists) {
         // If no active section or saved section is not accessible, use first available
         setActiveSection(
-          sectionExists ? savedSection : accessibleSections[0].id
+          sectionExists ? savedSection : accessibleSections[0].id,
         );
       }
     }
@@ -1956,7 +1182,7 @@ function Home() {
     const fetchActionCount = async () => {
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/fincheck-reports/action-count?empId=${user.emp_id}`
+          `${API_BASE_URL}/api/fincheck-reports/action-count?empId=${user.emp_id}`,
         );
         if (res.data.success) {
           setFincheckActionCount(res.data.count);
@@ -2027,7 +1253,7 @@ function Home() {
                     <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                       {React.cloneElement(currentSection.icon, {
                         className: "w-4 h-4 text-blue-600 dark:text-blue-400",
-                        style: { margin: 0 }
+                        style: { margin: 0 },
                       })}
                     </div>
                     <h1 className="text-sm font-bold text-slate-800 dark:text-white">
@@ -2112,7 +1338,7 @@ function Home() {
                     <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                       {React.cloneElement(currentSection.icon, {
                         className: "w-5 h-5 text-blue-600 dark:text-blue-400",
-                        style: { margin: 0 }
+                        style: { margin: 0 },
                       })}
                     </div>
                     <h1 className="text-base font-bold text-slate-800 dark:text-white">
