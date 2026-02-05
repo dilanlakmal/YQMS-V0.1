@@ -1,8 +1,65 @@
 import {
   QASectionsMeasurementSpecs,
-  DtOrder
+  DtOrder,
 } from "../../MongoDB/dbConnectionController.js";
 import mongoose from "mongoose";
+
+// =========================================================================
+// HELPER: SANITIZER & DECIMAL CALCULATOR
+// =========================================================================
+
+/**
+ * Cleans a measurement string and calculates its decimal value.
+ * Handles: "-1 / 4", "1/ 2", "- 0.5", etc.
+ */
+const sanitizeSpecValue = (inputValue) => {
+  // 1. Extract the string if input is an object, or use raw input
+  let str = "";
+  if (inputValue && typeof inputValue === "object") {
+    str = inputValue.fraction || inputValue.raw || inputValue.value || "";
+  } else {
+    str = String(inputValue || "");
+  }
+
+  // 2. Remove all spaces (fixes "-1 /4" -> "-1/4")
+  const cleanStr = str.replace(/\s+/g, "");
+
+  // 3. Calculate Decimal
+  let decimal = 0;
+
+  if (!cleanStr) {
+    return { fraction: "", decimal: 0 };
+  }
+
+  try {
+    // Check if it's a fraction
+    if (cleanStr.includes("/")) {
+      const parts = cleanStr.split("/");
+      if (parts.length === 2) {
+        const numerator = parseFloat(parts[0]);
+        const denominator = parseFloat(parts[1]);
+        if (denominator !== 0) {
+          decimal = numerator / denominator;
+        }
+      }
+    } else {
+      // It's a standard number or decimal string
+      decimal = parseFloat(cleanStr);
+    }
+  } catch (err) {
+    console.warn(`Failed to parse decimal for value: ${str}`);
+    decimal = 0;
+  }
+
+  // 4. Handle NaN (Not a Number)
+  if (isNaN(decimal)) decimal = 0;
+
+  // 5. Return clean object
+  return {
+    fraction: cleanStr, // Saved as "-1/4" (no spaces)
+    decimal: decimal, // Saved as -0.25
+  };
+};
 
 // =========================================================================
 // BEFORE WASH FUNCTIONS
@@ -13,15 +70,10 @@ export const getQASectionsMeasurementSpecs = async (req, res) => {
   const cleanMoNo = moNo.trim();
 
   try {
-    // 1. Check if data already exists in the QASections collection
     const existingRecord = await QASectionsMeasurementSpecs.findOne({
-      Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") }
+      Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") },
     });
 
-    // CRITICAL CHANGE:
-    // Even if existingRecord is found, we ONLY return it if AllBeforeWashSpecs has data.
-    // If AllBeforeWashSpecs is empty (but AllAfterWashSpecs might have data),
-    // we simply skip this block and fall back to DtOrder.
     if (
       existingRecord &&
       existingRecord.AllBeforeWashSpecs &&
@@ -34,20 +86,19 @@ export const getQASectionsMeasurementSpecs = async (req, res) => {
           AllBeforeWashSpecs: existingRecord.AllBeforeWashSpecs,
           selectedBeforeWashSpecs: existingRecord.selectedBeforeWashSpecs || [],
           isSaveAllBeforeWashSpecs:
-            existingRecord.isSaveAllBeforeWashSpecs || "No"
-        }
+            existingRecord.isSaveAllBeforeWashSpecs || "No",
+        },
       });
     }
 
-    // 2. FALLBACK: Fetch raw data from dt_orders
     const dtOrderData = await DtOrder.findOne(
       { Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") } },
-      { BeforeWashSpecs: 1, Order_No: 1, _id: 0 }
+      { BeforeWashSpecs: 1, Order_No: 1, _id: 0 },
     ).lean();
 
     if (!dtOrderData) {
       return res.status(404).json({
-        message: `Order No '${cleanMoNo}' not found in the database.`
+        message: `Order No '${cleanMoNo}' not found in the database.`,
       });
     }
 
@@ -56,15 +107,17 @@ export const getQASectionsMeasurementSpecs = async (req, res) => {
       dtOrderData.BeforeWashSpecs.length === 0
     ) {
       return res.status(404).json({
-        message:
-          "No 'Before Wash Specs' found in Master Data (dt_orders). Please upload the Washing Spec Excel file."
+        message: "No 'Before Wash Specs' found in Master Data.",
       });
     }
 
-    // 3. Process Data for Frontend (Add IDs)
+    // Process Data (Add IDs)
     const processedSpecs = dtOrderData.BeforeWashSpecs.map((spec) => ({
       ...spec,
-      id: new mongoose.Types.ObjectId().toString()
+      id: new mongoose.Types.ObjectId().toString(),
+      // Optional: Sanitize on Read if DT_Order data is messy
+      TolMinus: sanitizeSpecValue(spec.TolMinus),
+      TolPlus: sanitizeSpecValue(spec.TolPlus),
     }));
 
     return res.status(200).json({
@@ -73,8 +126,8 @@ export const getQASectionsMeasurementSpecs = async (req, res) => {
         Order_No: dtOrderData.Order_No,
         AllBeforeWashSpecs: processedSpecs,
         selectedBeforeWashSpecs: [],
-        isSaveAllBeforeWashSpecs: "No"
-      }
+        isSaveAllBeforeWashSpecs: "No",
+      },
     });
   } catch (error) {
     console.error("Error fetching Before Wash specs:", error);
@@ -90,22 +143,37 @@ export const saveQASectionsMeasurementSpecs = async (req, res) => {
   }
 
   try {
+    // 🟢 SANITIZATION FIX HERE
+    // We map over the incoming specs and clean the Tolerance values
+    const cleanedAllSpecs = allSpecs.map((spec) => ({
+      ...spec,
+      TolMinus: sanitizeSpecValue(spec.TolMinus),
+      TolPlus: sanitizeSpecValue(spec.TolPlus),
+    }));
+
+    // We also need to clean the selectedSpecs to match
+    const cleanedSelectedSpecs = selectedSpecs.map((spec) => ({
+      ...spec,
+      TolMinus: sanitizeSpecValue(spec.TolMinus),
+      TolPlus: sanitizeSpecValue(spec.TolPlus),
+    }));
+
     const updateData = {
       Order_No: moNo,
-      AllBeforeWashSpecs: allSpecs,
-      selectedBeforeWashSpecs: selectedSpecs,
-      isSaveAllBeforeWashSpecs: isSaveAll ? "Yes" : "No"
+      AllBeforeWashSpecs: cleanedAllSpecs,
+      selectedBeforeWashSpecs: cleanedSelectedSpecs,
+      isSaveAllBeforeWashSpecs: isSaveAll ? "Yes" : "No",
     };
 
     const result = await QASectionsMeasurementSpecs.findOneAndUpdate(
       { Order_No: moNo },
       { $set: updateData },
-      { new: true, upsert: true, runValidators: true }
+      { new: true, upsert: true, runValidators: true },
     );
 
     res.status(200).json({
       message: "Before Wash specs saved successfully.",
-      data: result
+      data: result,
     });
   } catch (error) {
     console.error("Error saving Before Wash specs:", error);
@@ -122,14 +190,10 @@ export const getQASectionsMeasurementSpecsAW = async (req, res) => {
   const cleanMoNo = moNo.trim();
 
   try {
-    // 1. Check if data already exists in the QASections collection
     const existingRecord = await QASectionsMeasurementSpecs.findOne({
-      Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") }
+      Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") },
     });
 
-    // CRITICAL CHANGE:
-    // Only return local data if AllAfterWashSpecs is populated.
-    // If only BeforeWash existed in DB, this logic skips and fetches Fresh SizeSpec for AW.
     if (
       existingRecord &&
       existingRecord.AllAfterWashSpecs &&
@@ -140,31 +204,29 @@ export const getQASectionsMeasurementSpecsAW = async (req, res) => {
         data: {
           Order_No: existingRecord.Order_No,
           AllAfterWashSpecs: existingRecord.AllAfterWashSpecs,
-          selectedAfterWashSpecs: existingRecord.selectedAfterWashSpecs || []
-        }
+          selectedAfterWashSpecs: existingRecord.selectedAfterWashSpecs || [],
+        },
       });
     }
 
-    // 2. FALLBACK: Fetch raw SizeSpec from dt_orders
     const dtOrderData = await DtOrder.findOne(
       { Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") } },
-      { SizeSpec: 1, Order_No: 1, _id: 0 }
+      { SizeSpec: 1, Order_No: 1, _id: 0 },
     ).lean();
 
     if (!dtOrderData) {
       return res.status(404).json({
-        message: `Order No '${cleanMoNo}' not found in the database.`
+        message: `Order No '${cleanMoNo}' not found.`,
       });
     }
 
     if (!dtOrderData.SizeSpec || dtOrderData.SizeSpec.length === 0) {
       return res.status(404).json({
-        message:
-          "No 'Size Spec' data found for this order in Master Data (dt_orders)."
+        message: "No 'Size Spec' data found in Master Data.",
       });
     }
 
-    // 3. Transform Data (SizeSpec -> QA Section Schema)
+    // Transform Data & 🟢 APPLY SANITIZER
     const processedSpecs = dtOrderData.SizeSpec.map((item, index) => {
       const transformedSpecsValues = [];
 
@@ -172,30 +234,23 @@ export const getQASectionsMeasurementSpecsAW = async (req, res) => {
         item.Specs.forEach((sizeObj, sIdx) => {
           const sizeKey = Object.keys(sizeObj)[0];
           if (sizeKey) {
-            const rawValue = sizeObj[sizeKey];
-            let fractionStr = "";
-            let decimalVal = 0;
-
-            if (rawValue && typeof rawValue === "object") {
-              fractionStr =
-                rawValue.raw || rawValue.fraction || rawValue.value || "";
-              decimalVal = rawValue.decimal || 0;
-            } else {
-              fractionStr = String(rawValue || "");
-              decimalVal = !isNaN(parseFloat(fractionStr))
-                ? parseFloat(fractionStr)
-                : 0;
-            }
+            // Sanitize the size measurement values too
+            const rawVal = sizeObj[sizeKey];
+            const cleanVal = sanitizeSpecValue(rawVal);
 
             transformedSpecsValues.push({
               index: sIdx + 1,
               size: sizeKey,
-              fraction: fractionStr,
-              decimal: decimalVal
+              fraction: cleanVal.fraction,
+              decimal: cleanVal.decimal,
             });
           }
         });
       }
+
+      // Sanitize Tolerances
+      const cleanTolMinus = sanitizeSpecValue(item.ToleranceMinus);
+      const cleanTolPlus = sanitizeSpecValue(item.TolerancePlus);
 
       return {
         id: new mongoose.Types.ObjectId().toString(),
@@ -203,17 +258,9 @@ export const getQASectionsMeasurementSpecsAW = async (req, res) => {
         kValue: "NA",
         MeasurementPointEngName: item.EnglishRemark || item.Area || "Unknown",
         MeasurementPointChiName: item.ChineseName || "",
-        TolMinus: {
-          fraction:
-            item.ToleranceMinus?.fraction || String(item.ToleranceMinus || ""),
-          decimal: item.ToleranceMinus?.decimal || 0
-        },
-        TolPlus: {
-          fraction:
-            item.TolerancePlus?.fraction || String(item.TolerancePlus || ""),
-          decimal: item.TolerancePlus?.decimal || 0
-        },
-        Specs: transformedSpecsValues
+        TolMinus: cleanTolMinus,
+        TolPlus: cleanTolPlus,
+        Specs: transformedSpecsValues,
       };
     });
 
@@ -222,8 +269,8 @@ export const getQASectionsMeasurementSpecsAW = async (req, res) => {
       data: {
         Order_No: dtOrderData.Order_No,
         AllAfterWashSpecs: processedSpecs,
-        selectedAfterWashSpecs: []
-      }
+        selectedAfterWashSpecs: [],
+      },
     });
   } catch (error) {
     console.error("Error fetching AW measurement specs:", error);
@@ -239,21 +286,50 @@ export const saveQASectionsMeasurementSpecsAW = async (req, res) => {
   }
 
   try {
+    // 🟢 SANITIZE BEFORE SAVING (Just like Before Wash)
+    const cleanedAllSpecs = allSpecs.map((spec) => {
+      // Clean Specs Array (S, M, L values)
+      const cleanSpecsValues = spec.Specs.map((s) => ({
+        ...s,
+        ...sanitizeSpecValue({ fraction: s.fraction }), // Recalculate based on fraction string
+      }));
+
+      return {
+        ...spec,
+        TolMinus: sanitizeSpecValue(spec.TolMinus),
+        TolPlus: sanitizeSpecValue(spec.TolPlus),
+        Specs: cleanSpecsValues,
+      };
+    });
+
+    const cleanedSelectedSpecs = selectedSpecs.map((spec) => {
+      const cleanSpecsValues = spec.Specs.map((s) => ({
+        ...s,
+        ...sanitizeSpecValue({ fraction: s.fraction }),
+      }));
+      return {
+        ...spec,
+        TolMinus: sanitizeSpecValue(spec.TolMinus),
+        TolPlus: sanitizeSpecValue(spec.TolPlus),
+        Specs: cleanSpecsValues,
+      };
+    });
+
     const updateData = {
-      Order_No: moNo, // Ensure MO is set for upsert
-      AllAfterWashSpecs: allSpecs,
-      selectedAfterWashSpecs: selectedSpecs
+      Order_No: moNo,
+      AllAfterWashSpecs: cleanedAllSpecs,
+      selectedAfterWashSpecs: cleanedSelectedSpecs,
     };
 
     const result = await QASectionsMeasurementSpecs.findOneAndUpdate(
       { Order_No: moNo },
       { $set: updateData },
-      { new: true, upsert: true, runValidators: true }
+      { new: true, upsert: true, runValidators: true },
     );
 
     res.status(200).json({
       message: "After Wash specs saved successfully.",
-      data: result
+      data: result,
     });
   } catch (error) {
     console.error("Error saving AW measurement specs:", error);
