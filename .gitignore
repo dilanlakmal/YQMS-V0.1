@@ -55,3 +55,8 @@ public/storage/
 # ==================================
 # Ignore the  files me.
 src/components/inspection/emb_printing/
+
+# Config files
+backend/Config/appConfig.js
+vite.config.js
+
