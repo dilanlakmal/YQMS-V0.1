@@ -49,30 +49,30 @@ const DefectDetailsSection = ({
 
       const batchMap = new Map();
       
-      backendDefects.forEach((pcItem, index) => {
+      backendDefects.forEach(pcItem => {
         const firstDefect = pcItem.pcDefects?.[0];
         const isBatch = pcItem.pcNumber && String(pcItem.pcNumber).startsWith("BATCH-");
          const isMulti = firstDefect && (String(firstDefect.isMulti) === "true" || firstDefect.isMulti === true);
 
         if (isBatch || isMulti) {
-         const batchId = isBatch ? pcItem.pcNumber.replace("BATCH-", "") : `loaded-${Date.now()}-${index}`;
+         const batchId = isBatch ? pcItem.pcNumber.replace("BATCH-", "") : `${Date.now()}`;
           
           // Create the batch object
           batchMap.set(batchId, { 
             id: batchId,
-            selectedDefect: firstDefect?.defectId || '',
-            defectName: firstDefect?.defectName || '',
-            pcCount: parseInt(firstDefect?.pcCount) || 1, // Ensure it's a number
+            selectedDefect: firstDefect.defectId,
+            defectName: firstDefect.defectName,
+            pcCount: parseInt(firstDefect.pcCount) || 1, // Ensure it's a number
             defectQty: 1,
-            defectImages: (firstDefect?.defectImages || []).filter(img => img).map(img => ({
+            defectImages: (firstDefect.defectImages || []).filter(img => img).map(img => ({
               preview: normalizeImageSrc ? normalizeImageSrc(img) : img,
               file: null 
             }))
           });
         } else {
           const pcNum = pcItem.pcNumber;
-          newSingleDefects[pcNum] = (pcItem.pcDefects || []).map((d, dIdx) => ({
-            id: `single-${Date.now()}-${index}-${dIdx}`,
+          newSingleDefects[pcNum] = pcItem.pcDefects.map(d => ({
+            id: Date.now() + Math.random(),
             selectedDefect: d.defectId,
             defectName: d.defectName,
             defectQty: 1,
@@ -104,7 +104,7 @@ const DefectDetailsSection = ({
         setIsEditing(false);
       }
       setHasLoaded(true); // Mark as loaded so we don't overwrite user changes later
-    }
+    } 
   }, [formData.defectDetails, recordId]); // Depend on recordId to allow reloading if the user switches records
 
   // Reset loading guard if recordId changes
