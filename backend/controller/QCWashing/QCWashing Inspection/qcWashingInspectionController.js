@@ -704,67 +704,56 @@ export const saveQCWashingDefectData = async (req, res) => {
     const serverBaseUrl = getServerBaseUrl(req);
     const uploadDir = path.join(__backendDir, "./public/storage/qc_washing_images/defect");
 
+    // 1. Map uploaded files to their fieldnames
     const fileMap = {};
     for (const file of req.files || []) {
-      let fileExtension = path.extname(file.originalname);
-      if (!fileExtension) fileExtension = ".jpg";
-      
+      let fileExtension = path.extname(file.originalname) || ".jpg";
       const newFilename = `defect-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
       const fullFilePath = path.join(uploadDir, newFilename);
       await fs.promises.writeFile(fullFilePath, file.buffer);
       fileMap[file.fieldname] = `${serverBaseUrl}/storage/qc_washing_images/defect/${newFilename}`;
     }
 
-    let singlePcIndex = 0;
-    let multiPcIndex = 0;
-
+    // 2. Process Defects using the absolute index (pcIdx)
     if (defectDetails.defectsByPc) {
-      defectDetails.defectsByPc.forEach((pc) => {
+      defectDetails.defectsByPc.forEach((pc, pcIdx) => {
         const firstDefect = pc.pcDefects && pc.pcDefects[0];
+        // Check if it's a batch or multi-entry
         const isMulti = firstDefect && (firstDefect.isMulti === true || String(firstDefect.isMulti) === "true");
         const isBatch = pc.pcNumber && String(pc.pcNumber).startsWith("BATCH-");
+        const isMultiOrBatch = isMulti || isBatch;
 
         (pc.pcDefects || []).forEach((defect, defectIdx) => {
           if (defect.defectImages) {
             defect.defectImages = defect.defectImages.map((img, imgIdx) => {
-              let fileKey;
-              
-              if (isMulti || isBatch) {
-                fileKey = `defectImages_MULTI_${multiPcIndex}_${defectIdx}_${imgIdx}`;
-              } else {
-                fileKey = `defectImages_${singlePcIndex}_${defectIdx}_${imgIdx}`;
-              }
+              // Standardize the key to match the absolute index from the frontend
+              const fileKey = isMultiOrBatch 
+                ? `defectImages_MULTI_${pcIdx}_${defectIdx}_${imgIdx}`
+                : `defectImages_${pcIdx}_${defectIdx}_${imgIdx}`;
 
               const newImageUrl = fileMap[fileKey];
               if (newImageUrl) return newImageUrl;
 
-              if (typeof img === "string" && (img.startsWith("http") || img.startsWith("./"))) return normalizeInspectionImagePath({ preview: img });
-              return img || "";
-            });
+              // Fallback for existing images
+              if (typeof img === "string") {
+                if (img.startsWith("http") || img.startsWith("./")) return img;
+                return normalizeInspectionImagePath({ preview: img });
+              }
+              if (img?.preview) return img.preview;
+              
+              return "";
+            }).filter(Boolean);
           }
         });
-
-        if (isMulti || isBatch) {
-          multiPcIndex++;
-        } else {
-          singlePcIndex++;
-        }
       });
     }
 
+    // 3. Handle additional general images
     if (defectDetails.additionalImages) {
       defectDetails.additionalImages = defectDetails.additionalImages.map((img, imgIdx) => {
-        const newImageUrl = fileMap[`additionalImages_${imgIdx}`];
-        if (newImageUrl) return newImageUrl;
-        if (typeof img === "string" && (img.startsWith("http://") || img.startsWith("https://"))) return img;
-        if (typeof img === "string" && img.startsWith("./")) return `${serverBaseUrl}${img.replace("./", "/")}`;
-        if (typeof img === "object" && img !== null && img.name) {
-          if (img.name.startsWith("http://") || img.name.startsWith("https://")) return img.name;
-          if (img.name.startsWith("./")) return `${serverBaseUrl}${img.name.replace("./", "/")}`;
-          return img.name;
-        }
-        return img || "";
-      });
+        const fileKey = `additionalImages_${imgIdx}`;
+        return fileMap[fileKey] || (typeof img === 'string' ? img : img?.preview || "");
+      }).filter(Boolean);
     }
 
     const doc = await QCWashing.findByIdAndUpdate(
@@ -781,8 +770,6 @@ export const saveQCWashingDefectData = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
-// --- dbConnectionController.js ---
 
 export const updateQCWashingDefectData = async (req, res) => {
   try {
@@ -824,8 +811,6 @@ export const updateQCWashingDefectData = async (req, res) => {
           };
         });
 
-        // CRITICAL FIX: Deduplicate by pcNumber. If "BATCH-123" exists twice, 
-        // the last one (most updated) will overwrite the previous one in the Map.
         uniqueDefects.set(pc.pcNumber, {
           ...pc,
           pcDefects: updatedPcDefects

@@ -73,7 +73,7 @@ const DefectDetailsSection = ({
         } else {
           const pcNum = pcItem.pcNumber;
           newSingleDefects[pcNum] = pcItem.pcDefects.map(d => ({
-            id: Date.now() + index + Math.random(),
+            id: Date.now() + Math.random(),
             selectedDefect: d.defectId,
             defectName: d.defectName,
             defectQty: 1,
