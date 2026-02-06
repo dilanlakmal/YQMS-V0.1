@@ -12,8 +12,9 @@ import mongoose from "mongoose";
  * Cleans a measurement string and calculates its decimal value.
  * Handles: "-1 / 4", "1/ 2", "- 0.5", etc.
  */
+
 const sanitizeSpecValue = (inputValue) => {
-  // 1. Extract the string if input is an object, or use raw input
+  // 1. Extract the string
   let str = "";
   if (inputValue && typeof inputValue === "object") {
     str = inputValue.fraction || inputValue.raw || inputValue.value || "";
@@ -21,10 +22,15 @@ const sanitizeSpecValue = (inputValue) => {
     str = String(inputValue || "");
   }
 
-  // 2. Remove all spaces (fixes "-1 /4" -> "-1/4")
+  // 2. NORMALIZE SLASHES (Crucial Fix)
+  // Replace Unicode fraction slash (U+2044) and others with standard '/'
+  // This ensures "-1⁄4" becomes "-1/4"
+  str = str.replace(/\u2044/g, "/").replace(/\\/g, "/");
+
+  // 3. Remove all spaces (fixes "- 1 / 4" -> "-1/4")
   const cleanStr = str.replace(/\s+/g, "");
 
-  // 3. Calculate Decimal
+  // 4. Calculate Decimal
   let decimal = 0;
 
   if (!cleanStr) {
@@ -32,13 +38,15 @@ const sanitizeSpecValue = (inputValue) => {
   }
 
   try {
-    // Check if it's a fraction
+    // Check if it's a fraction using the standard slash
     if (cleanStr.includes("/")) {
       const parts = cleanStr.split("/");
       if (parts.length === 2) {
         const numerator = parseFloat(parts[0]);
         const denominator = parseFloat(parts[1]);
-        if (denominator !== 0) {
+
+        // Ensure both parts are valid numbers and denominator is not 0
+        if (!isNaN(numerator) && !isNaN(denominator) && denominator !== 0) {
           decimal = numerator / denominator;
         }
       }
@@ -51,19 +59,15 @@ const sanitizeSpecValue = (inputValue) => {
     decimal = 0;
   }
 
-  // 4. Handle NaN (Not a Number)
+  // 5. Handle NaN (Not a Number)
   if (isNaN(decimal)) decimal = 0;
 
-  // 5. Return clean object
+  // 6. Return clean object
   return {
-    fraction: cleanStr, // Saved as "-1/4" (no spaces)
+    fraction: cleanStr, // Saved as "-1/4"
     decimal: decimal, // Saved as -0.25
   };
 };
-
-// =========================================================================
-// BEFORE WASH FUNCTIONS
-// =========================================================================
 
 export const getQASectionsMeasurementSpecs = async (req, res) => {
   const { moNo } = req.params;
