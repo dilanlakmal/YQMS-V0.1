@@ -699,130 +699,81 @@ export const saveQCWashingDefectData = async (req, res) => {
     const defectDetails = JSON.parse(req.body.defectDetails || "{}");
 
     if (!recordId)
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing recordId" });
-    // Get server base URL
+      return res.status(400).json({ success: false, message: "Missing recordId" });
+    
     const serverBaseUrl = getServerBaseUrl(req);
+    const uploadDir = path.join(__backendDir, "./public/storage/qc_washing_images/defect");
 
-    // Ensure upload directory exists
-    const uploadDir = path.join(
-      __backendDir,
-      "./public/storage/qc_washing_images/defect"
-    );
-
-    // Map uploaded files by fieldname and write them to disk
     const fileMap = {};
     for (const file of req.files || []) {
       let fileExtension = path.extname(file.originalname);
-      if (!fileExtension) {
-        fileExtension = ".jpg";
-      }
-      const newFilename = `defect-${Date.now()}-${Math.round(
-        Math.random() * 1e9
-      )}${fileExtension}`;
+      if (!fileExtension) fileExtension = ".jpg";
+      
+      const newFilename = `defect-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
       const fullFilePath = path.join(uploadDir, newFilename);
       await fs.promises.writeFile(fullFilePath, file.buffer);
-      fileMap[
-        file.fieldname
-      ] = `${serverBaseUrl}/storage/qc_washing_images/defect/${newFilename}`;
+      fileMap[file.fieldname] = `${serverBaseUrl}/storage/qc_washing_images/defect/${newFilename}`;
     }
 
-    // Attach image URLs to defectDetails.defectsByPc and additionalImages
+    let singlePcIndex = 0;
+    let multiPcIndex = 0;
+
     if (defectDetails.defectsByPc) {
-      defectDetails.defectsByPc.forEach((pc, pcIdx) => {
+      defectDetails.defectsByPc.forEach((pc) => {
+        const firstDefect = pc.pcDefects && pc.pcDefects[0];
+        const isMulti = firstDefect && (firstDefect.isMulti === true || String(firstDefect.isMulti) === "true");
+        const isBatch = pc.pcNumber && String(pc.pcNumber).startsWith("BATCH-");
+
         (pc.pcDefects || []).forEach((defect, defectIdx) => {
           if (defect.defectImages) {
             defect.defectImages = defect.defectImages.map((img, imgIdx) => {
-              // Return new uploaded image URL
-              const newImageUrl =
-                fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`];
-              if (newImageUrl) {
-                return newImageUrl;
+              let fileKey;
+              
+              if (isMulti || isBatch) {
+                fileKey = `defectImages_MULTI_${multiPcIndex}_${defectIdx}_${imgIdx}`;
+              } else {
+                fileKey = `defectImages_${singlePcIndex}_${defectIdx}_${imgIdx}`;
               }
 
-              // Handle existing images
-              if (
-                typeof img === "string" &&
-                (img.startsWith("http://") || img.startsWith("https://"))
-              ) {
-                return img; // Already a full URL
-              }
+              const newImageUrl = fileMap[fileKey];
+              if (newImageUrl) return newImageUrl;
 
-              if (typeof img === "string" && img.startsWith("./")) {
-                return `${serverBaseUrl}${img.replace("./", "/")}`;
-              }
-
-              if (typeof img === "object" && img !== null && img.name) {
-                if (
-                  img.name.startsWith("http://") ||
-                  img.name.startsWith("https://")
-                ) {
-                  return img.name;
-                }
-                if (img.name.startsWith("./")) {
-                  return `${serverBaseUrl}${img.name.replace("./", "/")}`;
-                }
-                return img.name;
-              }
-
+              if (typeof img === "string" && (img.startsWith("http") || img.startsWith("./"))) return normalizeInspectionImagePath({ preview: img });
               return img || "";
             });
           }
         });
+
+        if (isMulti || isBatch) {
+          multiPcIndex++;
+        } else {
+          singlePcIndex++;
+        }
       });
     }
 
     if (defectDetails.additionalImages) {
-      defectDetails.additionalImages = defectDetails.additionalImages.map(
-        (img, imgIdx) => {
-          // Return new uploaded image URL
-          const newImageUrl = fileMap[`additionalImages_${imgIdx}`];
-          if (newImageUrl) {
-            return newImageUrl;
-          }
-
-          // Handle existing images
-          if (
-            typeof img === "string" &&
-            (img.startsWith("http://") || img.startsWith("https://"))
-          ) {
-            return img; // Already a full URL
-          }
-
-          if (typeof img === "string" && img.startsWith("./")) {
-            return `${serverBaseUrl}${img.replace("./", "/")}`;
-          }
-
-          if (typeof img === "object" && img !== null && img.name) {
-            if (
-              img.name.startsWith("http://") ||
-              img.name.startsWith("https://")
-            ) {
-              return img.name;
-            }
-            if (img.name.startsWith("./")) {
-              return `${serverBaseUrl}${img.name.replace("./", "/")}`;
-            }
-            return img.name;
-          }
-
-          return img || "";
+      defectDetails.additionalImages = defectDetails.additionalImages.map((img, imgIdx) => {
+        const newImageUrl = fileMap[`additionalImages_${imgIdx}`];
+        if (newImageUrl) return newImageUrl;
+        if (typeof img === "string" && (img.startsWith("http://") || img.startsWith("https://"))) return img;
+        if (typeof img === "string" && img.startsWith("./")) return `${serverBaseUrl}${img.replace("./", "/")}`;
+        if (typeof img === "object" && img !== null && img.name) {
+          if (img.name.startsWith("http://") || img.name.startsWith("https://")) return img.name;
+          if (img.name.startsWith("./")) return `${serverBaseUrl}${img.name.replace("./", "/")}`;
+          return img.name;
         }
-      );
+        return img || "";
+      });
     }
 
-    // Save to DB
     const doc = await QCWashing.findByIdAndUpdate(
       recordId,
       { defectDetails: defectDetails, updatedAt: new Date() },
       { new: true }
     );
 
-    if (!doc)
-      return res
-        .status(404)
-        .json({ success: false, message: "Record not found" });
+    if (!doc) return res.status(404).json({ success: false, message: "Record not found" });
 
     res.json({ success: true, data: doc.defectDetails });
   } catch (err) {
@@ -831,76 +782,69 @@ export const saveQCWashingDefectData = async (req, res) => {
   }
 };
 
+// --- dbConnectionController.js ---
+
 export const updateQCWashingDefectData = async (req, res) => {
   try {
     const { recordId } = req.body;
-    const defectDetails = JSON.parse(req.body.defectDetails || "{}");
-    if (!recordId)
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing recordId" });
+    let defectDetails = JSON.parse(req.body.defectDetails || "{}");
 
-    // Get server base URL
+    if (!recordId) return res.status(400).json({ success: false, message: "Missing recordId" });
+    
     const serverBaseUrl = getServerBaseUrl(req);
+    const uploadDir = path.join(__backendDir, "./public/storage/qc_washing_images/defect");
 
-    // Ensure upload directory exists
-    const uploadDir = path.join(
-      __backendDir,
-      "./public/storage/qc_washing_images/defect"
-    );
-
-    // Map uploaded files by fieldname and write them to disk
     const fileMap = {};
     for (const file of req.files || []) {
-      let fileExtension = path.extname(file.originalname);
-      if (!fileExtension) {
-        // fallback to .jpg if no extension is found
-        fileExtension = ".jpg";
-      }
-      const newFilename = `defect-${Date.now()}-${Math.round(
-        Math.random() * 1e9
-      )}${fileExtension}`;
-      const fullFilePath = path.join(uploadDir, newFilename);
-      await fs.promises.writeFile(fullFilePath, file.buffer);
-      fileMap[
-        file.fieldname
-      ] = `${serverBaseUrl}/storage/qc_washing_images/defect/${newFilename}`;
+      const ext = path.extname(file.originalname) || ".jpg";
+      const newFilename = `defect-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+      await fs.promises.writeFile(path.join(uploadDir, newFilename), file.buffer);
+      fileMap[file.fieldname] = `${serverBaseUrl}/storage/qc_washing_images/defect/${newFilename}`;
     }
 
-    // Attach image URLs to defectDetails.defectsByPc and additionalImages
     if (defectDetails.defectsByPc) {
+      const uniqueDefects = new Map();
+
       defectDetails.defectsByPc.forEach((pc, pcIdx) => {
-        (pc.pcDefects || []).forEach((defect, defectIdx) => {
-          if (defect.defectImages) {
-            defect.defectImages = defect.defectImages.map((img, imgIdx) => {
-              return (
-                fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`] || img
-              );
-            });
-          }
+        const isBatch = String(pc.pcNumber).startsWith("BATCH-");
+        
+        const updatedPcDefects = (pc.pcDefects || []).map((defect, defectIdx) => {
+          const fieldPrefix = isBatch ? `defectImages_MULTI_${pcIdx}` : `defectImages_${pcIdx}`;
+          
+          const defectImages = (defect.defectImages || []).map((img, imgIdx) => {
+            const fileKey = `${fieldPrefix}_${defectIdx}_${imgIdx}`;
+            return fileMap[fileKey] || (typeof img === 'string' ? img : img?.preview);
+          }).filter(Boolean);
+
+          return {
+            ...defect,
+            pcCount: Number(defect.pcCount) || 1,
+            isMulti: isBatch,
+            defectImages: defectImages
+          };
+        });
+
+        // CRITICAL FIX: Deduplicate by pcNumber. If "BATCH-123" exists twice, 
+        // the last one (most updated) will overwrite the previous one in the Map.
+        uniqueDefects.set(pc.pcNumber, {
+          ...pc,
+          pcDefects: updatedPcDefects
         });
       });
-    }
-    if (defectDetails.additionalImages) {
-      defectDetails.additionalImages = defectDetails.additionalImages.map(
-        (img, imgIdx) => {
-          return fileMap[`additionalImages_${imgIdx}`] || img;
-        }
-      );
+
+      // Convert Map back to Array
+      defectDetails.defectsByPc = Array.from(uniqueDefects.values());
     }
 
-    // Save to DB
     const doc = await QCWashing.findByIdAndUpdate(
       recordId,
       { defectDetails: defectDetails, updatedAt: new Date() },
       { new: true }
     );
-    if (!doc)
-      return res
-        .status(404)
-        .json({ success: false, message: "Record not found" });
+
     res.json({ success: true, data: doc.defectDetails });
   } catch (err) {
+    console.error("Defect details update error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -1354,19 +1298,30 @@ export const saveqwashingSummary = async (req, res) => {
     // Calculate defects
     const defectDetails = qcRecord.defectDetails || {};
     if (Array.isArray(defectDetails.defectsByPc)) {
-      rejectedDefectPcs = defectDetails.defectsByPc.length;
-      totalDefectCount = defectDetails.defectsByPc.reduce(
-        (sum, pc) =>
-          sum +
-          (Array.isArray(pc.pcDefects)
-            ? pc.pcDefects.reduce(
-                (defSum, defect) =>
-                  defSum + (parseInt(defect.defectQty, 10) || 0),
-                0
-              )
-            : 0),
-        0
-      );
+     rejectedDefectPcs = defectDetails.defectsByPc.reduce((sum, pc) => {
+        const firstDefect = pc.pcDefects && pc.pcDefects[0];
+        
+        // If it's a multi entry, use the stored pcCount. If single, it's 1.
+        const isMulti = firstDefect && (firstDefect.isMulti === true || String(firstDefect.isMulti) === "true");
+        const count = isMulti ? (parseInt(firstDefect.pcCount) || 1) : 1;
+        
+        return sum + count;
+      }, 0);
+       totalDefectCount = defectDetails.defectsByPc.reduce((sum, pc) => {
+        if (!pc.pcDefects || pc.pcDefects.length === 0) return sum;
+        
+        // For each PC entry, we check if the FIRST defect is marked as multi
+        const firstDefect = pc.pcDefects[0];
+        const isMulti = firstDefect.isMulti === true || String(firstDefect.isMulti) === "true" || String(pc.pcNumber).startsWith("BATCH-");
+        
+        if (isMulti) {
+          // This is the batch count (e.g., 15)
+          return sum + (Number(firstDefect.pcCount) || 1);
+        } else {
+          // This is single PC mode, sum individual defect quantities
+          return sum + pc.pcDefects.reduce((dSum, d) => dSum + (Number(d.defectQty) || 0), 0);
+        }
+      }, 0);
     }
 
     // 3. Calculate pass rate

@@ -253,6 +253,8 @@ const QCWashingSchema = new mongoose.Schema({
         defectId: String,
         defectName: String,
         defectQty: Number,
+        isMulti: { type: Boolean, default: false }, // To distinguish Single vs Multi
+        pcCount: { type: Number, default: 1 },
         remark: String,
         defectImages: [String]
       }]
