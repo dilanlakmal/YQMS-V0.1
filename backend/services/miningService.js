@@ -34,11 +34,13 @@ export async function mineSingleDocument({
     targetLang,
     domain = null,
     project = null,
-    miningBatchId = null
+    miningBatchId = null,
+    onProgress = () => { }
 }) {
     console.log(`[Mining] Starting single doc mining: ${fileName}`);
 
     // 1. Extract text
+    onProgress({ stage: 'Extracting text', percent: 5 });
     const text = await textExtractor(fileBuffer, fileName);
     if (text.length < 30) {
         throw new Error('Document too short for meaningful mining (min 100 chars)');
@@ -48,6 +50,7 @@ export async function mineSingleDocument({
     let detectedDomain = domain;
     let domainConfidence = 1.0;
     if (!domain) {
+        onProgress({ stage: 'Detecting domain', percent: 10 });
         const domainResult = await llmService.detectDomain(text.slice(0, 2000));
         detectedDomain = domainResult.domain;
         domainConfidence = domainResult.confidence;
@@ -59,17 +62,32 @@ export async function mineSingleDocument({
     const allTerms = [];
 
     for (let i = 0; i < chunks.length; i++) {
+        const chunkProgress = 10 + Math.floor(((i + 1) / chunks.length) * 40); // 10% to 50%
+        onProgress({
+            stage: `Extracting terms (chunk ${i + 1}/${chunks.length})`,
+            percent: chunkProgress
+        });
         console.log(`[Mining] Extracting from chunk ${i + 1}/${chunks.length}`);
         const terms = await llmService.extractTerms(chunks[i], sourceLang, detectedDomain);
         allTerms.push(...terms);
     }
 
     // 4. Deduplicate by source
+    onProgress({ stage: 'Deduplicating terms', percent: 55 });
     const uniqueTerms = deduplicateBySource(allTerms);
     console.log(`[Mining] Found ${uniqueTerms.length} unique terms`);
 
     // 5. Translate each term
-    for (const term of uniqueTerms) {
+    const totalTerms = uniqueTerms.length;
+    for (let i = 0; i < totalTerms; i++) {
+        const term = uniqueTerms[i];
+        const translationProgress = 55 + Math.floor(((i + 1) / totalTerms) * 35); // 55% to 90%
+        onProgress({
+            stage: `Translating terms (${i + 1}/${totalTerms}): ${term.source || term.term}`,
+            percent: translationProgress,
+            currentTerm: term.source || term.term
+        });
+
         const translation = await llmService.translateTerm(
             term.source || term.term,
             sourceLang,
@@ -84,6 +102,7 @@ export async function mineSingleDocument({
     }
 
     // 6. Prepare terms for insertion
+    onProgress({ stage: 'Saving terms to database', percent: 95 });
     const projectName = project || fileName.replace(/\.[^.]+$/, '');
     const termsToInsert = uniqueTerms.map(term => ({
         source: term.source,
@@ -115,6 +134,8 @@ export async function mineSingleDocument({
         needsReview: term.confidenceScore < CONFIDENCE_THRESHOLD,
         verificationStatus: 'unverified'
     }));
+
+    onProgress({ stage: 'Completed', percent: 100 });
 
     return {
         success: true,
@@ -151,23 +172,27 @@ export async function mineParallelDocuments({
     targetLang,
     domain = null,
     project = null,
-    miningBatchId = null
+    miningBatchId = null,
+    onProgress = () => { }
 }) {
     console.log(`[Mining] Starting parallel doc mining: ${sourceFileName} + ${targetFileName}`);
 
     // 1. Extract text from both files
+    onProgress({ stage: 'Extracting text', percent: 5 });
     const sourceText = await textExtractor(sourceBuffer, sourceFileName);
     const targetText = await textExtractor(targetBuffer, targetFileName);
 
     // 2. Detect domain if not provided
     let detectedDomain = domain;
     if (!domain) {
+        onProgress({ stage: 'Detecting domain', percent: 10 });
         const domainResult = await llmService.detectDomain(sourceText.slice(0, 2000));
         detectedDomain = domainResult.domain;
         console.log(`[Mining] Detected domain: ${detectedDomain}`);
     }
 
     // 3. Align sentences (if alignment service available)
+    onProgress({ stage: 'Aligning documents', percent: 20 });
     let alignedPairs;
     try {
         alignedPairs = await llmService.alignSentences(sourceText, targetText, sourceLang, targetLang);
@@ -185,6 +210,11 @@ export async function mineParallelDocuments({
     const allTerms = [];
 
     for (let i = 0; i < chunks.length; i++) {
+        const chunkProgress = 20 + Math.floor(((i + 1) / chunks.length) * 60); // 20% to 80%
+        onProgress({
+            stage: `Extracting parallel terms (chunk ${i + 1}/${chunks.length})`,
+            percent: chunkProgress
+        });
         console.log(`[Mining] Extracting pairs from chunk ${i + 1}/${chunks.length}`);
         const sourceChunk = chunks[i].map(p => p.source).join('\n');
         const targetChunk = chunks[i].map(p => p.target).join('\n');
@@ -200,25 +230,44 @@ export async function mineParallelDocuments({
     }
 
     // 5. Deduplicate
+    onProgress({ stage: 'Deduplicating terms', percent: 85 });
     const uniqueTerms = deduplicateBySource(allTerms);
     console.log(`[Mining] Found ${uniqueTerms.length} unique term pairs`);
 
-    // 6. Apply review policy (confidence < 0.70 needs review)
-    for (const term of uniqueTerms) {
-        term.source = term.sourceTerm || term.source;
+    // 6. Apply review policy and "Streamline" terms feedback (suggest ONLY when confidence >= 0.70)
+    const validTerms = uniqueTerms.filter(term => {
+        const score = term.confidence || term.confidenceScore || 0;
+        return score >= CONFIDENCE_THRESHOLD;
+    });
+
+    const totalValid = validTerms.length;
+    for (let i = 0; i < totalValid; i++) {
+        const term = validTerms[i];
+        const streamProgress = 85 + Math.floor(((i + 1) / totalValid) * 10); // 85% to 95%
+
+        onProgress({
+            stage: `Reviewing parallel terms (${i + 1}/${totalValid}): ${term.sourceTerm || term.source || term.term}`,
+            percent: streamProgress,
+            currentTerm: term.sourceTerm || term.source || term.term
+        });
+
+        term.source = term.sourceTerm || term.source || term.term;
         term.target = term.targetTermOriginal || term.target;
-        term.needsReview = term.confidence < CONFIDENCE_THRESHOLD;
-        term.confidenceScore = term.confidence;
-        if (term.needsReview) {
-            term.reviewReason = 'Low confidence score - requires expert verification';
+        term.confidenceScore = term.confidence || term.confidenceScore;
+        term.needsReview = true; // All parallel terms need review as they should never overwrite silently
+
+        // Small delay to allow the "streamline" effect in the UI
+        if (totalValid > 5) {
+            await new Promise(resolve => setTimeout(resolve, 30));
         }
-        // IMPORTANT: Never auto-overwrite target from parallel docs
-        // Always require explicit expert verification
     }
 
+    console.log(`[Mining] Filtered to ${validTerms.length} terms meeting threshold >= ${CONFIDENCE_THRESHOLD}`);
+
     // 7. Prepare for insertion
+    onProgress({ stage: 'Saving terms to database', percent: 95 });
     const projectName = project || sourceFileName.replace(/\.[^.]+$/, '');
-    const termsToInsert = uniqueTerms.map(term => ({
+    const termsToInsert = validTerms.map(term => ({
         source: term.source,
         target: term.target,
         sourceLang,
@@ -241,19 +290,21 @@ export async function mineParallelDocuments({
     // 8. Handle conflicts and insert
     const insertResults = await handleMiningConflicts(GlossaryTerm, termsToInsert);
 
+    onProgress({ stage: 'Completed', percent: 100 });
+
     return {
         success: true,
         miningType: 'parallel',
         domain: detectedDomain,
         alignmentScore,
         termsExtracted: uniqueTerms.length,
+        termsSuggested: validTerms.length,
         termsInserted: insertResults.inserted.length,
         termsDuplicate: insertResults.skipped.length,
         termsConflict: insertResults.conflicts.length,
-        termsWithLowConfidence: uniqueTerms.filter(t => t.needsReview).length,
         insertedIds: insertResults.inserted.map(t => t.termId),
         conflicts: insertResults.conflicts,
-        terms: uniqueTerms.map((term, i) => ({
+        terms: validTerms.map((term, i) => ({
             ...term,
             _id: insertResults.inserted.find(t => t.source === term.source)?.termId,
             verificationStatus: 'unverified'

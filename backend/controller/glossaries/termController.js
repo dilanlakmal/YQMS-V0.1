@@ -400,11 +400,9 @@ export async function bulkVerifyTerms(req, res) {
     }
 }
 
-// ========== MINING ==========
-
 /**
  * POST /api/glossary/mine/single
- * Mine terms from single document
+ * Mine terms from single document with streaming progress
  */
 export async function mineSingleDoc(req, res) {
     try {
@@ -421,7 +419,18 @@ export async function mineSingleDoc(req, res) {
         const miningBatchId = `single-${randomUUID()}`;
         const fileBuffer = req.file.buffer;
 
+        // Set headers for streaming
+        res.setHeader('Content-Type', 'application/x-ndjson');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
+        // Helper to send progress
+        const sendProgress = (data) => {
+            res.write(JSON.stringify({ type: 'progress', ...data }) + '\n');
+        };
+
         // 1. Upload source to Azure Blob Storage
+        sendProgress({ stage: 'Uploading document to storage', percent: 2 });
         const blobName = `mining-sources/${miningBatchId}/${req.file.originalname}`;
         const sourceUrl = await uploadFileToBlob(
             fileBuffer,
@@ -442,7 +451,8 @@ export async function mineSingleDoc(req, res) {
             targetLang: targetLang.toLowerCase(),
             domain,
             project,
-            miningBatchId
+            miningBatchId,
+            onProgress: (p) => sendProgress(p)
         });
 
         // 3. Create history entry
@@ -459,17 +469,26 @@ export async function mineSingleDoc(req, res) {
             createdBy: { reviewerName: getReviewerName(req) }
         });
 
-        // Result already returned above
-        res.json(result);
+        // Send final result
+        res.write(JSON.stringify({ type: 'result', ...result }) + '\n');
+        res.end();
     } catch (error) {
         console.error('[TermController] mineSingleDoc error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        // If headers already sent, we can't send a normal JSON error
+        try {
+            res.write(JSON.stringify({ type: 'error', error: error.message }) + '\n');
+            res.end();
+        } catch (e) {
+            if (!res.headersSent) {
+                res.status(500).json({ success: false, error: error.message });
+            }
+        }
     }
 }
 
 /**
  * POST /api/glossary/mine/parallel
- * Mine terms from parallel documents
+ * Mine terms from parallel documents with streaming progress
  */
 export async function mineParallelDocs(req, res) {
     try {
@@ -487,7 +506,18 @@ export async function mineParallelDocs(req, res) {
         const sourceBuffer = req.files.sourceDoc[0].buffer;
         const targetBuffer = req.files.targetDoc[0].buffer;
 
+        // Set headers for streaming
+        res.setHeader('Content-Type', 'application/x-ndjson');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
+        // Helper to send progress
+        const sendProgress = (data) => {
+            res.write(JSON.stringify({ type: 'progress', ...data }) + '\n');
+        };
+
         // 1. Upload sources to Azure Blob Storage
+        sendProgress({ stage: 'Uploading documents to storage', percent: 2 });
         const sourceBlobPath = `mining-sources/${miningBatchId}/${req.files.sourceDoc[0].originalname}`;
         const targetBlobPath = `mining-sources/${miningBatchId}/${req.files.targetDoc[0].originalname}`;
 
@@ -498,14 +528,20 @@ export async function mineParallelDocs(req, res) {
                 'glossaries',
                 process.env.AZURE_STORAGE_ACCOUNT_NAME,
                 process.env.AZURE_STORAGE_ACCOUNT_KEY
-            ),
+            ).then(url => {
+                sendProgress({ stage: 'Source document uploaded', percent: 3 });
+                return url;
+            }),
             uploadFileToBlob(
                 targetBuffer,
                 targetBlobPath,
                 'glossaries',
                 process.env.AZURE_STORAGE_ACCOUNT_NAME,
                 process.env.AZURE_STORAGE_ACCOUNT_KEY
-            )
+            ).then(url => {
+                sendProgress({ stage: 'Target document uploaded', percent: 4 });
+                return url;
+            })
         ]);
 
         // 2. Mine terms
@@ -521,7 +557,8 @@ export async function mineParallelDocs(req, res) {
             targetLang: targetLang.toLowerCase(),
             domain,
             project,
-            miningBatchId
+            miningBatchId,
+            onProgress: (p) => sendProgress(p)
         });
 
         // 3. Create history entry
@@ -539,10 +576,19 @@ export async function mineParallelDocs(req, res) {
             createdBy: { reviewerName: getReviewerName(req) }
         });
 
-        res.json(result);
+        // Send final result
+        res.write(JSON.stringify({ type: 'result', ...result }) + '\n');
+        res.end();
     } catch (error) {
         console.error('[TermController] mineParallelDocs error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        try {
+            res.write(JSON.stringify({ type: 'error', error: error.message }) + '\n');
+            res.end();
+        } catch (e) {
+            if (!res.headersSent) {
+                res.status(500).json({ success: false, error: error.message });
+            }
+        }
     }
 }
 

@@ -164,10 +164,14 @@ export default function MiningUpload({ onMiningComplete }) {
         }
     });
 
-    // Start mining
+    // Mining Progress State
+    const [miningProgress, setMiningProgress] = useState({ percent: 0, stage: "" });
+
+    // Start mining with streaming progress
     const handleMine = async () => {
         setError("");
         setResult(null);
+        setMiningProgress({ percent: 0, stage: "Starting..." });
 
         // Get current file based on mode
         const currentFile = mode === "single" ? singleFile : parallelSourceFile;
@@ -206,21 +210,53 @@ export default function MiningUpload({ onMiningComplete }) {
                 body: formData
             });
 
-            const data = await response.json();
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `Mining failed with status ${response.status}`);
+            }
 
-            if (data.success) {
-                setResult(data);
-                if (onMiningComplete) {
-                    onMiningComplete(data);
+            // Read the stream
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                // Decode and split by newlines
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop(); // Keep partial line in buffer
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    try {
+                        const data = JSON.parse(line);
+                        if (data.type === "progress") {
+                            setMiningProgress({
+                                percent: data.percent,
+                                stage: data.stage
+                            });
+                        } else if (data.type === "result") {
+                            setResult(data);
+                            if (onMiningComplete) {
+                                onMiningComplete(data);
+                            }
+                        } else if (data.type === "error") {
+                            setError(data.error || "Mining failed.");
+                        }
+                    } catch (e) {
+                        console.warn("Failed to parse progress line:", line, e);
+                    }
                 }
-            } else {
-                setError(data.error || data.message || "Mining failed. Check server logs.");
             }
         } catch (err) {
             console.error("Mining error:", err);
             setError(`Failed to mine terms: ${err.message}`);
         } finally {
             setIsMining(false);
+            setMiningProgress({ percent: 0, stage: "" });
         }
     };
 
@@ -401,34 +437,79 @@ export default function MiningUpload({ onMiningComplete }) {
                 </div>
             )}
 
-            {/* Result Summary */}
-            {result && (
-                <div className="translator-rounded translator-border p-4 text-sm" style={{ backgroundColor: "oklch(0.9 0.05 150 / 0.15)" }}>
-                    <p className="font-semibold text-base mb-2">✅ Mining Complete!</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                        <div className="translator-card translator-rounded p-2 text-center">
-                            <p className="font-bold text-lg">{result.termsExtracted || 0}</p>
-                            <p className="translator-muted-foreground">Extracted</p>
+            {/* Progress Bar */}
+            {isMining && (
+                <div className="translator-rounded translator-border p-4 space-y-3 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm shadow-inner transition-all duration-500 animate-in fade-in slide-in-from-bottom-5">
+                    <div className="flex justify-between items-end mb-1">
+                        <div className="space-y-1">
+                            <p className="text-xs font-semibold translator-primary-text uppercase tracking-wider">AI Mining Progress</p>
+                            <p className="text-sm font-medium translator-text-foreground flex items-center gap-2">
+                                <span className="inline-block w-2 h-2 rounded-full translator-primary animate-pulse"></span>
+                                {miningProgress.stage || "Processing..."}
+                            </p>
                         </div>
-                        <div className="translator-card translator-rounded p-2 text-center">
-                            <p className="font-bold text-lg text-green-600">{result.termsInserted || 0}</p>
-                            <p className="translator-muted-foreground">Inserted</p>
-                        </div>
-                        <div className="translator-card translator-rounded p-2 text-center">
-                            <p className="font-bold text-lg text-yellow-600">{result.termsDuplicate || 0}</p>
-                            <p className="translator-muted-foreground">Duplicates</p>
-                        </div>
-                        <div className="translator-card translator-rounded p-2 text-center">
-                            <p className="font-bold text-lg text-red-600">{result.termsConflict || 0}</p>
-                            <p className="translator-muted-foreground">Conflicts</p>
+                        <p className="text-lg font-bold translator-primary-text">{miningProgress.percent}%</p>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden p-0.5 border border-gray-100 dark:border-gray-800">
+                        <div
+                            className="h-full translator-primary rounded-full transition-all duration-700 ease-out shadow-[0_0_15px_rgba(var(--primary-rgb),0.5)] relative overflow-hidden"
+                            style={{ width: `${miningProgress.percent}%` }}
+                        >
+                            <div className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite] -translate-x-full" style={{ backgroundImage: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)' }}></div>
                         </div>
                     </div>
-                    {result.domain && (
-                        <p className="mt-3 text-xs translator-muted-foreground">
-                            Domain: <span className="font-medium">{result.domain}</span>
-                            {result.domainConfidence && ` (${(result.domainConfidence * 100).toFixed(0)}% confidence)`}
+                    <div className="flex justify-between items-center text-[10px] translator-muted-foreground italic">
+                        <span>Optimizing glossary results...</span>
+                        <span>Do not close this tab</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Result Summary */}
+            {result && (
+                <div className="translator-rounded translator-border p-5 text-sm shadow-lg overflow-hidden relative group transition-all duration-500" style={{ backgroundColor: "oklch(0.9 0.05 150 / 0.15)" }}>
+                    <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Sparkles size={60} />
+                    </div>
+                    <div className="relative z-10">
+                        <p className="font-bold text-lg mb-4 flex items-center gap-2">
+                            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">
+                                ✓
+                            </span>
+                            Mining Complete!
                         </p>
-                    )}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="translator-card translator-rounded p-3 text-center border-b-2 border-primary/20 hover:border-primary transition-colors">
+                                <p className="font-black text-2xl translator-primary-text">{result.termsExtracted || 0}</p>
+                                <p className="text-[10px] translator-muted-foreground uppercase font-bold tracking-tighter">Extracted</p>
+                            </div>
+                            <div className="translator-card translator-rounded p-3 text-center border-b-2 border-green-500/20 hover:border-green-500 transition-colors">
+                                <p className="font-black text-2xl text-green-600">{result.termsInserted || 0}</p>
+                                <p className="text-[10px] translator-muted-foreground uppercase font-bold tracking-tighter">Inserted</p>
+                            </div>
+                            <div className="translator-card translator-rounded p-3 text-center border-b-2 border-yellow-500/20 hover:border-yellow-500 transition-colors">
+                                <p className="font-black text-2xl text-yellow-600">{result.termsDuplicate || 0}</p>
+                                <p className="text-[10px] translator-muted-foreground uppercase font-bold tracking-tighter">Duplicates</p>
+                            </div>
+                            <div className="translator-card translator-rounded p-3 text-center border-b-2 border-red-500/20 hover:border-red-500 transition-colors">
+                                <p className="font-black text-2xl text-red-600">{result.termsConflict || 0}</p>
+                                <p className="text-[10px] translator-muted-foreground uppercase font-bold tracking-tighter">Conflicts</p>
+                            </div>
+                        </div>
+                        {result.domain && (
+                            <div className="mt-5 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center gap-2">
+                                <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary-text text-[10px] font-bold uppercase">Domain</span>
+                                <p className="text-xs font-semibold translator-text-foreground">
+                                    {result.domain}
+                                    {result.domainConfidence && (
+                                        <span className="ml-2 font-normal translator-muted-foreground">
+                                            ({(result.domainConfidence * 100).toFixed(0)}% AI confidence)
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 

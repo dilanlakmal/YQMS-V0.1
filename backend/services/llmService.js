@@ -46,7 +46,7 @@ const MAX_RETRIES = 2;
 /**
  * Call LLM with JSON parsing and retry logic
  */
-async function callLLM(systemPrompt, userPrompt, maxRetries = MAX_RETRIES) {
+async function callLLM(systemPrompt, userPrompt, maxRetries = MAX_RETRIES, maxTokens = 4000) {
     const openai = getClient();
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -58,7 +58,7 @@ async function callLLM(systemPrompt, userPrompt, maxRetries = MAX_RETRIES) {
                     { role: "user", content: userPrompt }
                 ],
                 temperature: 0.1,
-                max_tokens: 2000,
+                max_tokens: maxTokens,
                 response_format: { type: "json_object" }
             });
 

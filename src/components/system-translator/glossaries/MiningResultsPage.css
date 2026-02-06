@@ -496,3 +496,57 @@
     accent-color: #4f46e5;
     cursor: pointer;
 }
+
+/* New Animations for Progressive Mining */
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Shimmer effect utility */
+.animate-shimmer {
+    animation: shimmer 2s infinite linear;
+}
+
+/* Simple fade in/out for progress updates */
+.animate-in {
+    animation-duration: 0.5s;
+    animation-fill-mode: both;
+}
+
+.fade-in {
+    animation-name: fadeIn;
+}
+
+.slide-in-from-bottom-5 {
+    animation-name: slideInBottom;
+}
+
+@keyframes slideInBottom {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
