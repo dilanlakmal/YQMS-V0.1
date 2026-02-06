@@ -2296,7 +2296,9 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
           }
           if (colorData.defectDetails?.additionalImages) {
             setUploadedImages(
-              (colorData.defectDetails.additionalImages || []).map((img) => {
+              (colorData.defectDetails.additionalImages || [])
+              .filter(Boolean)
+              .map((img) => {
                 if (typeof img === "string") {
                   return {
                     file: null,
@@ -2962,7 +2964,9 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
                           ),
                           comment: comment,
                           additionalImages: await Promise.all(
-                            uploadedImages.map((img) => imageToBase64(img))
+                            (uploadedImages || [])
+                              .filter(img => img && (img.file || img.preview))
+                              .map((img) => imageToBase64(img))
                           )
                         },
                         measurementDetails: {
