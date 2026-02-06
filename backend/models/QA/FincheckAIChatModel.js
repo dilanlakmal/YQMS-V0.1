@@ -1,33 +1,3 @@
-// import mongoose from "mongoose";
-
-// const createFincheckAIChatModel = (connection) => {
-//   const MessageSchema = new mongoose.Schema(
-//     {
-//       role: { type: String, enum: ["user", "model"], required: true },
-//       content: { type: String, required: true },
-//       timestamp: { type: Date, default: Date.now },
-//     },
-//     { _id: false },
-//   );
-
-//   const FincheckAIChatSchema = new mongoose.Schema(
-//     {
-//       empId: { type: String, required: true, index: true },
-//       title: { type: String, default: "New Conversation" },
-//       messages: [MessageSchema],
-//       isDeleted: { type: Boolean, default: false },
-//     },
-//     {
-//       timestamps: true,
-//       collection: "fincheck_ai_chats",
-//     },
-//   );
-
-//   return connection.model("FincheckAIChat", FincheckAIChatSchema);
-// };
-
-// export default createFincheckAIChatModel;
-
 import mongoose from "mongoose";
 
 const createFincheckAIChatModel = (connection) => {

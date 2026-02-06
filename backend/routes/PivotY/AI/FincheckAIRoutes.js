@@ -1,24 +1,3 @@
-// import express from "express";
-// import {
-//   createChat,
-//   getUserChats,
-//   getChatById,
-//   sendMessage,
-//   renameChat,
-//   deleteChat,
-// } from "../../../controller/PivotY/AI/FincheckAIController.js";
-
-// const router = express.Router();
-
-// router.post("/api/fincheck-ai/create", createChat);
-// router.get("/api/fincheck-ai/list", getUserChats);
-// router.get("/api/fincheck-ai/chat/:chatId", getChatById);
-// router.post("/api/fincheck-ai/send", sendMessage);
-// router.put("/api/fincheck-ai/rename", renameChat);
-// router.post("/api/fincheck-ai/delete", deleteChat);
-
-// export default router;
-
 import express from "express";
 import {
   createChat,
