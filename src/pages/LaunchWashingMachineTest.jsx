@@ -330,9 +330,18 @@ const LaundryWashingMachineTest = () => {
     }
   }, []);
 
-  // Load users and cause assign data
+  // Load users and cause assign data with polling
   useEffect(() => {
     fetchAssignControl();
+
+    // Poll every 5 seconds for real-time updates
+    const intervalId = setInterval(fetchAssignControl, 5000);
+
+    // Also refetch immediately when window regains focus (user switches tabs)
+    const handleFocus = () => {
+      fetchAssignControl();
+    };
+    window.addEventListener('focus', handleFocus);
 
     const fetchUsers = async () => {
       setIsLoadingUsers(true);
@@ -349,6 +358,12 @@ const LaundryWashingMachineTest = () => {
       }
     };
     fetchUsers();
+
+    // Cleanup
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [fetchAssignControl]);
 
   // Prepare user options for Select
@@ -411,28 +426,15 @@ const LaundryWashingMachineTest = () => {
 
   // Handle input change with order data clearing
   const handleInputChange = (field, value) => {
-    // 1. Handle Report Type Change - RESET EVERYTHING
+    // 1. Handle Report Type Change - ONLY UPDATE THE REPORT TYPE VALUE, DON'T RESET FORM
     if (field === "reportType") {
-      const newReportType = value;
-      // Get fresh initial data for the new report type
-      const newInitialData = getInitialFormData(newReportType);
+      // Just update the reportType field, keep all other form data intact
+      setFormData(prev => ({
+        ...prev,
+        reportType: value
+      }));
 
-      // Reset form data entirely, but keep the new report type
-      setFormData({
-        ...newInitialData,
-        reportType: newReportType
-      });
-
-      // Clear all external state to prevent cross-contamination
-      resetOrderData();
-      setOrderNoSuggestions([]);
-      setShowOrderNoSuggestions(false);
-      setImageRotations({}); // Clear image rotations
-      setShowColorDropdown(false);
-      setShowPODropdown(false);
-      setShowETDDropdown(false);
-
-      // Stop here - we've already set the new state
+      // Stop here - don't reset anything else
       return;
     }
 
@@ -495,9 +497,15 @@ const LaundryWashingMachineTest = () => {
               const exactMatch = suggestions.find(s => s.toUpperCase() === value.toUpperCase());
               handleOrderNoSelect(exactMatch);
             } else {
-              // No auto-select, just fetch data for what we have
-              fetchOrderColors(value, setFormData);
-              fetchYorksysOrderETD(value, setFormData);
+              // Check if the current value is a prefix of any suggestion
+              // If it is, user is likely still typing, so don't fetch yet to avoid 404s
+              const isPrefix = suggestions && suggestions.some(s => s.toUpperCase().startsWith(value.toUpperCase()) && s.length > value.length);
+
+              if (!isPrefix) {
+                // No auto-select, just fetch data for what we have
+                fetchOrderColors(value, setFormData);
+                fetchYorksysOrderETD(value, setFormData);
+              }
             }
           }
         }, 800); // Wait 800ms after user stops typing
@@ -839,7 +847,7 @@ const LaundryWashingMachineTest = () => {
                 // Set completing report state
                 setCompletingReport(currentReport);
 
-                // Populate form data
+                // Populate form data (form will always show HomeWashForm regardless of reportType)
                 setFormData({
                   ...currentReport,
                   reportType: currentReport.reportType || "Home Wash Test",
@@ -979,7 +987,7 @@ const LaundryWashingMachineTest = () => {
         // Second scan - Load report into form for completion
         setCompletingReport(currentReport);
 
-        // Populate form data
+        // Populate form data (form will always show HomeWashForm regardless of reportType)
         setFormData({
           ...currentReport,
           reportType: currentReport.reportType || "Home Wash Test",
@@ -2018,23 +2026,31 @@ const LaundryWashingMachineTest = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-gray-100 p-2 sm:p-4 md:p-6">
       <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-lg">
-        <div className="p-4 md:p-6">
-          {/* Page Title & Report Type Selection */}
-          <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-6 border-b border-gray-200 dark:border-gray-700 pb-5">
-            <div className="flex-1">
-              <h1 className="text-3xl sm:text-4xl font-bold mb-2 text-gray-900 dark:text-white">
-                Launch Washing Machine Test
-              </h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                  <circle cx="10" cy="10" r="3">
-                    <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite" />
-                  </circle>
-                </svg>
-                Report Washing - Enter test details and view submitted reports
-              </p>
-            </div>
+        {/* Page Title & Report Type Selection - Custom Header */}
+        <div className="bg-gradient-to-r from-sky-600 via-blue-700 to-indigo-700 p-6 md:p-8 rounded-t-xl relative overflow-hidden group">
+          {/* Ambient Background Effects - Water Theme */}
+          <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-400/20 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none transition-all duration-700 group-hover:bg-cyan-400/30"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-400/20 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none transition-all duration-700 group-hover:bg-blue-400/30"></div>
+
+          {/* Bubble/Water Accents */}
+          <div className="absolute top-10 right-20 w-4 h-4 bg-white/20 rounded-full blur-sm animate-pulse"></div>
+          <div className="absolute bottom-10 left-32 w-6 h-6 bg-white/10 rounded-full blur-md animate-bounce delay-700"></div>
+
+          <div className="relative z-10">
+            <h1 className="text-3xl sm:text-4xl font-bold mb-3 text-white tracking-tight drop-shadow-md">
+              Launch Washing Machine Test
+            </h1>
+            <p className="text-sm text-blue-100 flex items-center gap-2 font-medium">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-300 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-400"></span>
+              </span>
+              Report Washing - Enter test details and view submitted reports
+            </p>
           </div>
+        </div>
+
+        <div className="p-4 md:p-6">
 
           {/* Tab Navigation - Mobile Optimized */}
           <div className="mb-6 border-b border-gray-200 dark:border-gray-700">

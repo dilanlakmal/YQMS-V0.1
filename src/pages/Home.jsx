@@ -219,13 +219,13 @@ function Home() {
             description: "Supplier Issues Sub-Con Fty",
           },
           // EMB + Printing
-          {
-            path: "/emb-printing",
-            roles: ["EMB", "Printing"],
-            image: "assets/Home/stitches.png",
-            title: t("Emb-Print"),
-            description: "EMB + Printing Inspection",
-          },
+          // {
+          //   path: "/emb-printing",
+          //   roles: ["EMB", "Printing"],
+          //   image: "assets/Home/stitches.png",
+          //   title: t("Emb-Print"),
+          //   description: "EMB + Printing Inspection",
+          // },
           
           {
             path: "/Launch-washing-machine-test",

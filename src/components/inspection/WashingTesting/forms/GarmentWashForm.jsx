@@ -99,7 +99,7 @@ const GarmentWashForm = ({
     const users = parentUsers || [];
 
     // Filter users based on assignHistory (report_assign_control collection)
-    // If history exists, we only show users that are in the history list for respective fields.
+    // Filter users based on assignHistory (report_assign_control collection)
     const getFilteredOptions = (field) => {
         if (!assignHistory || assignHistory.length === 0) {
             // No history configured? Return all users.
@@ -109,16 +109,63 @@ const GarmentWashForm = ({
             }));
         }
 
-        // Extract all unique emp_ids for this field from history
-        const allowedEmpIds = new Set(assignHistory.map(item => item[field]).filter(Boolean));
+        // 1. Process history to find the LATEST state for each user.
+        // Sort chronologically (oldest to newest) to replay inputs
+        const sortedHistory = [...assignHistory].sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt));
+
+        // Map<EmpID, { checkedBy: boolean, approvedBy: boolean }>
+        const userRolesMap = new Map();
+
+        // Helper to extract ID
+        const extractId = (val) => {
+            if (!val) return null;
+            const match = val.match(/\((.*?)\)/);
+            return match ? match[1] : val;
+        };
+
+        sortedHistory.forEach(item => {
+            const checkedId = extractId(item.checkedBy);
+            const approvedId = extractId(item.approvedBy);
+
+            // If this record has a checkedId, update that user's state
+            if (checkedId) {
+                const current = userRolesMap.get(checkedId) || { checkedBy: false, approvedBy: false };
+                current.checkedBy = true;
+               
+                if (extractId(item.approvedBy) !== checkedId) {
+                    current.approvedBy = false; // Revoke approval role if not implicitly granted here
+                } else {
+                    current.approvedBy = true;
+                }
+                userRolesMap.set(checkedId, current);
+            }
+
+            // If approvedId exists and is diff from checkedId (or checkedId was null)
+            if (approvedId && approvedId !== checkedId) {
+                const current = userRolesMap.get(approvedId) || { checkedBy: false, approvedBy: false };
+                current.approvedBy = true;
+                if (extractId(item.checkedBy) !== approvedId) {
+                    current.checkedBy = false; // Revoke checker role if not implicitly granted here
+                } else {
+                    current.checkedBy = true;
+                }
+                userRolesMap.set(approvedId, current);
+            }
+        });
+
+        // 2. Now filter users who have the requested permission in their LATEST state
+        const allowedEmpIds = new Set();
+        userRolesMap.forEach((roles, empId) => {
+            if (roles[field]) {
+                allowedEmpIds.add(empId);
+            }
+        });
+
+        // If no valid IDs found, return empty
+        if (allowedEmpIds.size === 0) return [];
 
         // Filter users who match the allowed IDs
         const filteredUsers = users.filter(u => allowedEmpIds.has(u.emp_id));
-
-        // If we found matches, return them. 
-        // If for some reason filtered count is 0 (e.g. data mismatch), fallback to all users? 
-        // User requested "all from collection", so if collection has data but users don't match, list might be empty.
-        // Let's assume data integrity is okay.
 
         return filteredUsers.map(u => ({
             value: u.name,
@@ -128,6 +175,43 @@ const GarmentWashForm = ({
 
     const checkedByOptions = getFilteredOptions('checkedBy');
     const approvedByOptions = getFilteredOptions('approvedBy');
+
+    // Auto-populate if only one option exists and field is empty
+    useEffect(() => {
+        if (checkedByOptions.length === 1 && (!formData.checkedBy || formData.checkedBy === '')) {
+            handleInputChange('checkedBy', checkedByOptions[0].value);
+        }
+    }, [checkedByOptions, formData.checkedBy]);
+
+    useEffect(() => {
+        if (approvedByOptions.length === 1 && (!formData.approvedBy || formData.approvedBy === '')) {
+            handleInputChange('approvedBy', approvedByOptions[0].value);
+        }
+    }, [approvedByOptions, formData.approvedBy]);
+
+    // Validate current selection against allowed options (Real-time cleanup)
+    // If a user was selected, but their permission is revoked (so they disappear from options),
+    // we should clear the selection.
+    useEffect(() => {
+        // Only run validation if we actually have Users loaded (to avoid clearing during initial load)
+        if (users.length > 0) {
+            // Validate Checked By
+            if (formData.checkedBy) {
+                const isValid = checkedByOptions.some(o => o.value === formData.checkedBy);
+                if (!isValid) {
+                    handleInputChange('checkedBy', '');
+                }
+            }
+
+            // Validate Approved By
+            if (formData.approvedBy) {
+                const isValid = approvedByOptions.some(o => o.value === formData.approvedBy);
+                if (!isValid) {
+                    handleInputChange('approvedBy', '');
+                }
+            }
+        }
+    }, [users.length, checkedByOptions, approvedByOptions, formData.checkedBy, formData.approvedBy]);
 
     const colorDropdownRef = useRef(null);
     const sizeDropdownRef = useRef(null);
@@ -1009,7 +1093,8 @@ const GarmentWashForm = ({
                                     }
                                 }
                             }}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                            disabled={isCompleting}
+                            className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white ${isCompleting ? 'cursor-not-allowed bg-gray-100 dark:bg-gray-800 opacity-60' : ''}`}
                             required
                             placeholder="Search from Yorksys"
                         />

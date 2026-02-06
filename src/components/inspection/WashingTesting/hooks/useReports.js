@@ -31,6 +31,7 @@ export const useReports = () => {
       if (filters.factory) queryParams.append("factory", filters.factory);
       if (filters.color) queryParams.append("color", filters.color);
       if (filters.status) queryParams.append("status", filters.status);
+      if (filters.reportType) queryParams.append("reportType", filters.reportType);
       if (filters.startDate) queryParams.append("startDate", filters.startDate);
       if (filters.endDate) queryParams.append("endDate", filters.endDate);
 

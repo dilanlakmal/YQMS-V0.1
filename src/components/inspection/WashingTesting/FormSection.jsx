@@ -85,6 +85,18 @@ const FormSection = ({
     assignHistory, // Pass to all forms
     users, // Pass to all forms
     isLoadingUsers, // Pass to all forms
+    // Search props
+    searchOrderNo,
+    orderNoSuggestions,
+    showOrderNoSuggestions,
+    setShowOrderNoSuggestions,
+    isSearchingOrderNo,
+    handleOrderNoSelect,
+    // Data props
+    season,
+    styleDescription,
+    custStyle,
+    fabrication,
   };
 
   // Props specific to HomeWashForm (User Inputs & Yorksys Data)
@@ -118,41 +130,49 @@ const FormSection = ({
   };
 
   const renderForm = () => {
-    switch (formData.reportType) {
-      case "HT Testing":
-        return <HTTestingForm {...commonProps} />;
-      case "EMB/Printing Testing":
-      case "EMB Testing": // Handle legacy name if any
-        return <EMBTestingForm {...commonProps} />;
-      case "Pulling Test":
-        return <PullingTestForm {...commonProps} />;
-      case "Garment Wash Report":
-        return <GarmentWashForm {...commonProps}
-          // specific props for GarmentWashForm data fetching
-          searchOrderNo={searchOrderNo}
-          handleOrderNoSelect={handleOrderNoSelect}
-          fetchOrderColors={fetchOrderColors}
-          fetchYorksysOrderETD={fetchYorksysOrderETD}
-          availableColors={availableColors}
-          isLoadingColors={isLoadingColors}
-          showOrderNoSuggestions={showOrderNoSuggestions}
-          setShowOrderNoSuggestions={setShowOrderNoSuggestions}
-          orderNoSuggestions={orderNoSuggestions}
-          isSearchingOrderNo={isSearchingOrderNo}
-          season={season}
-          styleDescription={styleDescription}
-          custStyle={custStyle}
-          fabrication={fabrication}
-          showColorDropdown={showColorDropdown}
-          setShowColorDropdown={setShowColorDropdown}
-          availableSizes={availableSizes}
-          anfSpecs={anfSpecs}
-          isLoadingSpecs={isLoadingSpecs}
-          fetchAnfSpecs={fetchAnfSpecs}
-        />;
-      case "Home Wash Test":
-      default:
-        return <HomeWashForm {...homeWashProps} />;
+    // If completing a scanned report, render the form matching the report's type
+    // Otherwise, always render HomeWashForm (even if user changes report type dropdown)
+    if (isCompleting) {
+      // Completing a scanned report - use the report's actual type
+      switch (formData.reportType) {
+        case "HT Testing":
+          return <HTTestingForm {...commonProps} />;
+        case "EMB/Printing Testing":
+        case "EMB Testing": // Handle legacy name if any
+          return <EMBTestingForm {...commonProps} />;
+        case "Pulling Test":
+          return <PullingTestForm {...commonProps} />;
+        case "Garment Wash Report":
+          return <GarmentWashForm {...commonProps}
+            // specific props for GarmentWashForm data fetching
+            searchOrderNo={searchOrderNo}
+            handleOrderNoSelect={handleOrderNoSelect}
+            fetchOrderColors={fetchOrderColors}
+            fetchYorksysOrderETD={fetchYorksysOrderETD}
+            availableColors={availableColors}
+            isLoadingColors={isLoadingColors}
+            showOrderNoSuggestions={showOrderNoSuggestions}
+            setShowOrderNoSuggestions={setShowOrderNoSuggestions}
+            orderNoSuggestions={orderNoSuggestions}
+            isSearchingOrderNo={isSearchingOrderNo}
+            season={season}
+            styleDescription={styleDescription}
+            custStyle={custStyle}
+            fabrication={fabrication}
+            showColorDropdown={showColorDropdown}
+            setShowColorDropdown={setShowColorDropdown}
+            availableSizes={availableSizes}
+            anfSpecs={anfSpecs}
+            isLoadingSpecs={isLoadingSpecs}
+            fetchAnfSpecs={fetchAnfSpecs}
+          />;
+        case "Home Wash Test":
+        default:
+          return <HomeWashForm {...homeWashProps} />;
+      }
+    } else {
+      // Creating new report or manually changing type - always show HomeWashForm
+      return <HomeWashForm {...homeWashProps} />;
     }
   };
 

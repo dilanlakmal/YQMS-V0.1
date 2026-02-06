@@ -25,9 +25,26 @@ const EMBTestingForm = ({
     triggerFileInput,
     triggerCameraInput,
     handleRemoveImage,
-    fileInputRef,
-    cameraInputRef,
+    // Search & Data Props
+    searchOrderNo,
+    orderNoSuggestions,
+    showOrderNoSuggestions,
+    setShowOrderNoSuggestions,
+    isSearchingOrderNo,
+    handleOrderNoSelect,
+    season,
+    styleDescription,
+    custStyle,
+    fabrication,
 }) => {
+    // Sync fetched data to form
+    React.useEffect(() => {
+        if (season && season !== '' && (!formData.season || formData.season === '')) handleInputChange('season', season);
+        if (styleDescription && styleDescription !== '' && (!formData.styleDescription || formData.styleDescription === '')) handleInputChange('styleDescription', styleDescription);
+        if (custStyle && custStyle !== '' && (!formData.custStyle || formData.custStyle === '')) handleInputChange('custStyle', custStyle);
+        if (fabrication && fabrication !== '' && (!formData.fabrication || formData.fabrication === '')) handleInputChange('fabrication', fabrication);
+    }, [season, styleDescription, custStyle, fabrication]);
+
     return (
         <div className="space-y-8">
 
@@ -38,19 +55,52 @@ const EMBTestingForm = ({
                         Style Information
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {/* Style No. */}
-                        <div>
+                        {/* Style No. with Search */}
+                        <div className="relative">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Style No.
                             </label>
                             <input
                                 type="text"
                                 value={formData.styleNo || ''}
-                                onChange={(e) => handleInputChange("styleNo", e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                onChange={(e) => {
+                                    handleInputChange("styleNo", e.target.value);
+                                    if (e.target.value.length >= 2) {
+                                        searchOrderNo(e.target.value);
+                                    } else {
+                                        setShowOrderNoSuggestions(false);
+                                    }
+                                }}
+                                onFocus={() => {
+                                    if (formData.styleNo && formData.styleNo.length >= 2) {
+                                        searchOrderNo(formData.styleNo);
+                                    }
+                                }}
+                                disabled={isCompleting}
+                                className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white ${isCompleting ? 'cursor-not-allowed bg-gray-100 dark:bg-gray-800 opacity-60' : ''}`}
                                 required
-                                placeholder="e.g., PTCOC376"
+                                placeholder="Search Style (e.g., PTCOC376)"
+                                autoComplete="off"
                             />
+                            {/* Suggestions Dropdown */}
+                            {showOrderNoSuggestions && orderNoSuggestions.length > 0 && (
+                                <ul className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                    {orderNoSuggestions.map((item, index) => (
+                                        <li
+                                            key={index}
+                                            onClick={() => handleOrderNoSelect(item)}
+                                            className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-700 dark:text-gray-200"
+                                        >
+                                            {item}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                            {isSearchingOrderNo && (
+                                <div className="absolute right-3 top-[38px] transform -translate-y-1/2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Cust.Style */}

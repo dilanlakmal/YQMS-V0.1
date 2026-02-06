@@ -65,6 +65,19 @@ const EditReportModal = ({
                 </select>
               </div>
 
+              {/* YM Style - Read Only */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  YM Style
+                </label>
+                <input
+                  type="text"
+                  value={editingReport.ymStyle || editingReport.style || "N/A"}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
+                />
+              </div>
+
               {/* Buyer Style - Read Only */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -74,7 +87,7 @@ const EditReportModal = ({
                   type="text"
                   value={editFormData.buyerStyle}
                   readOnly
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
                 />
               </div>
 

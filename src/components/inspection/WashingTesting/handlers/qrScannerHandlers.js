@@ -120,7 +120,7 @@ export const handleQRCodeFileUpload = async (
     if (!file) return;
 
     try {
-        const html5QrCode = new Html5Qrcode("qr-code-file-reader");
+        const html5QrCode = new Html5Qrcode("qr-code-file-reader", { verbose: false });
 
         const result = await html5QrCode.scanFile(file, true);
 

@@ -192,18 +192,22 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
     // Build the full URL first
     let fullUrl = imageUrl;
 
-    // If already a full URL, use it
-    if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
-      fullUrl = imageUrl;
-    }
     // Extract filename from URL if it contains washing_machine_test
-    else if (imageUrl.includes("/washing_machine_test/")) {
-      const filename = imageUrl.split("/washing_machine_test/")[1];
-      if (filename && apiBaseUrl) {
-        fullUrl = `${apiBaseUrl}/api/report-washing/image/${filename}`;
-      } else if (apiBaseUrl) {
-        fullUrl = `${apiBaseUrl}${imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`}`;
+    if (imageUrl.includes("/washing_machine_test/")) {
+      const parts = imageUrl.split("/washing_machine_test/");
+      if (parts.length > 1 && apiBaseUrl) {
+        // We MUST provide the full URL so the backend can either detect it as local 
+        // (if it matches backend API_BASE_URL) or fetch it via HTTP
+        fullUrl = `${apiBaseUrl}/storage/washing_machine_test/${parts[1]}`;
+      } else if (parts.length > 1) {
+        fullUrl = `/storage/washing_machine_test/${parts[1]}`;
+      } else {
+        fullUrl = imageUrl;
       }
+    }
+    // If already a full URL, use it
+    else if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+      fullUrl = imageUrl;
     }
     // If starts with /storage/, prepend API_BASE_URL
     else if (imageUrl.startsWith("/storage/") && apiBaseUrl) {

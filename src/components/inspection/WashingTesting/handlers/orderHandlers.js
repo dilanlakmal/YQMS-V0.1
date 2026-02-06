@@ -28,7 +28,10 @@ export const handleOrderNoSearch = async (
 
     setIsSearchingOrderNo(true);
     try {
-        const suggestions = await searchOrderNoAPI(searchTerm);
+        // Escape special regex characters to prevent server 500 errors
+        // This allows the user to type them, but safely searches for the literal characters
+        const safeSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const suggestions = await searchOrderNoAPI(safeSearchTerm);
         setOrderNoSuggestions(suggestions);
         setShowOrderNoSuggestions(suggestions.length > 0);
         return suggestions;
@@ -63,8 +66,10 @@ export const handleOrderNoSelection = async (
     fetchYorksysOrderETD,
     resetOrderData
 ) => {
-    // Determine which field we are using: 'ymStyle' (Home Wash/others) or 'style' (Garment Wash)
-    const styleField = formData.style !== undefined ? 'style' : 'ymStyle';
+    // Determine which field we are using: 'ymStyle', 'style', or 'styleNo'
+    let styleField = 'ymStyle';
+    if (formData.style !== undefined) styleField = 'style';
+    else if (formData.styleNo !== undefined) styleField = 'styleNo';
 
     // Use case-insensitive comparison
     const currentStyle = (formData[styleField] || "").trim().toUpperCase();

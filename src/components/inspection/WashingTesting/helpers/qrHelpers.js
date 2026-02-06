@@ -10,22 +10,22 @@
  * @returns {string} - Base URL for QR codes
  */
 export const getQRCodeBaseURL = (QR_CODE_BASE_URL) => {
-    const currentProtocol = window.location.protocol; // Get current protocol (http: or https:)
+    const httpsProtocol = 'https:'; // Force HTTPS for QR codes
 
     if (QR_CODE_BASE_URL) {
-        // This ensures QR codes use the same protocol as the current page (HTTP/HTTPS)
+        // This ensures QR codes always use HTTPS protocol
         try {
             const url = new URL(QR_CODE_BASE_URL);
-            url.protocol = currentProtocol;
+            url.protocol = httpsProtocol;
             return url.toString().replace(/\/$/, ''); // Remove trailing slash if present
         } catch (error) {
             // If URL parsing fails, try simple string replacement
-            const protocolMatch = QR_CODE_BASE_URL.match(/^http?:\/\//);
+            const protocolMatch = QR_CODE_BASE_URL.match(/^https?:\/\//);
             if (protocolMatch) {
-                return QR_CODE_BASE_URL.replace(/^http?:\/\//, `${currentProtocol}//`);
+                return QR_CODE_BASE_URL.replace(/^https?:\/\//, `${httpsProtocol}//`);
             }
             // Fallback: prepend protocol if missing
-            return `${currentProtocol}//${QR_CODE_BASE_URL.replace(/^\/\//, '')}`;
+            return `${httpsProtocol}//${QR_CODE_BASE_URL.replace(/^\/\//, '')}`;
         }
     }
 
@@ -34,7 +34,8 @@ export const getQRCodeBaseURL = (QR_CODE_BASE_URL) => {
     if (hostname === "localhost" || hostname === "127.0.0.1") {
         console.warn("Accessing via localhost - QR codes may not work for network devices. Please set VITE_QR_CODE_BASE_URL in .env file.");
     }
-    return origin;
+    // Force HTTPS even for window.location.origin
+    return origin.replace(/^http:/, 'https:');
 };
 
 /**

@@ -94,7 +94,8 @@ const PullingTestForm = ({
                                 type="text"
                                 value={formData.poNumber || ''}
                                 onChange={(e) => handleInputChange("poNumber", e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                disabled={isCompleting}
+                                className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white ${isCompleting ? 'cursor-not-allowed bg-gray-100 dark:bg-gray-800 opacity-60' : ''}`}
                                 required
                                 placeholder="Enter PO Number"
                             />

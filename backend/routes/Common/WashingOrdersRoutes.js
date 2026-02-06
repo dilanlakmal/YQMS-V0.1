@@ -5,7 +5,7 @@ import {
     getOrderSizesWashing,
     getWashingOrderDetailsStrict,
     getMeasurmentSpecWashing
-} from "../../controller/Common/WashingOrdersController.js";
+} from "../../controller/ReportWashing/WashingOrdersController.js";
 
 const router = express.Router();
 
