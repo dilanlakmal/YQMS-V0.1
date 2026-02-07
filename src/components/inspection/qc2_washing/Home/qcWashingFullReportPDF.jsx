@@ -418,235 +418,112 @@ const QualitySummaryCards = ({ recordData }) => (
   </View>
 );
 
-const DefectAnalysisTable = ({
-  defectsByPc = [],
-  additionalImages = [],
-  SafeImage
-}) => {
-  if (
-    defectsByPc.length === 0 &&
-    (!additionalImages || additionalImages.length === 0)
-  ) {
-    return (
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Defect Analysis</Text>
-        <Text style={{ textAlign: "center", color: "#6b7280", fontSize: 9 }}>
-          No defects recorded for this inspection
-        </Text>
-      </View>
-    );
+const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], SafeImage }) => {
+  if (defectsByPc.length === 0 && additionalImages.length === 0) {
+    return null;
   }
+
+  console.log('🔍 Rendering DefectAnalysisTable with:', {
+    defectsByPc: defectsByPc.length,
+    additionalImages: additionalImages.length
+  });
 
   return (
     <View style={styles.section} wrap={false}>
       <Text style={styles.sectionTitle}>Defect Analysis</Text>
-      {defectsByPc.map((pcDefect, pcIndex) => (
-        <View
-          key={pcIndex}
-          style={{
-            marginBottom: 15,
-            borderWidth: 1,
-            borderColor: "#e5e7eb",
-            padding: 10
-          }}
-        >
-          <Text
-            style={[styles.sectionTitle, { fontSize: 10, marginBottom: 8 }]}
-          >
-            PC {safeString(pcDefect.garmentNo || pcDefect.pcNumber)} (Total Defects: {(pcDefect.pcDefects || []).reduce((sum, d) => {
-              // If isMulti is true, use pcCount. 
-              // If false, use pcCount if available, otherwise 1.
-              const count = d.isMulti 
-                ? (parseInt(d.pcCount) || 0) 
-                : (parseInt(d.pcCount) || 1);
-              return sum + count;
-            }, 0)})
-          </Text>
-          {pcDefect.pcDefects && pcDefect.pcDefects.length > 0 ? (
-            <View style={styles.table}>
-              <View style={styles.tableRow} fixed>
-                <Text
-                  style={[
-                    styles.tableColHeader,
-                    styles.textLeft,
-                    { width: "25%" }
-                  ]}
-                >
-                  Defect Name
-                </Text>
-                <Text style={[styles.tableColHeader, { width: "10%" }]}>
-                  Count
-                </Text>
-                <Text style={[styles.tableColHeader, { width: "65%" }]}>
-                  Images
-                </Text>
-              </View>
-              {pcDefect.pcDefects.map((defect, defectIndex) => (
-                <View key={defectIndex} style={styles.tableRow}>
-                  <Text
-                    style={[styles.tableCol, styles.textLeft, { width: "25%" }]}
-                  >
-                    {safeString(defect.defectName)}
-                  </Text>
-                 <Text style={[styles.tableCol, { width: "10%" }]}>
-                    {/* --- UPDATED LOGIC HERE --- */}
-                    {defect.isMulti 
-                      ? (defect.pcCount || 0) 
-                      : (defect.defectQty || defect.defectCount || 1)}
-                    {/* -------------------------- */}
-                  </Text>
-                  <View
-                    style={[
-                      styles.tableCol,
-                      {
-                        width: "65%",
-                        flexDirection: "row",
-                        flexWrap: "wrap",
-                        alignItems: "flex-start",
-                        minHeight: 80
-                      }
-                    ]}
-                  >
-                    {(() => {
-                      // FIXED: Check multiple possible property names for images
-                      const capturedImages =
-                        defect.defectImages || defect.capturedImages || [];
-                      const uploadedImages =
-                        defect.uploadedImages ||
-                        defect.uploaded_images ||
-                        defect.images ||
-                        [];
-                      // FIXED: Also check if defectImages contains both types
-                      const allImages = [...capturedImages, ...uploadedImages];
-                      if (allImages.length === 0) {
-                        return (
-                          <Text style={{ fontSize: 6, color: "#6b7280" }}>
-                            No images
-                          </Text>
-                        );
-                      }
-                      return (
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            flexWrap: "wrap",
-                            alignItems: "flex-start"
-                          }}
-                        >
-                          {allImages.slice(0, 6).map((img, imgIndex) => {
-                            const isCaptured = imgIndex < capturedImages.length;
-                            const displayIndex = isCaptured
-                              ? imgIndex + 1
-                              : imgIndex - capturedImages.length + 1;
-                            return (
-                              <View
-                                key={`image-${imgIndex}`}
-                                style={{ margin: 2, alignItems: "center" }}
-                              >
-                                <SafeImage
-                                  src={img} // Use the larger inspectionImage style
-                                  style={styles.inspectionImage}
-                                  alt={`Defect ${defect.defectName} - ${
-                                    isCaptured ? "Captured" : "Uploaded"
-                                  } Image ${displayIndex}`}
-                                />
-                                <Text
-                                  style={{
-                                    fontSize: 5,
-                                    color: isCaptured ? "#16a34a" : "#2563eb",
-                                    textAlign: "center",
-                                    marginTop: 1,
-                                    fontWeight: "bold"
-                                  }}
-                                >
-                                  {isCaptured
-                                    ? `C${displayIndex}`
-                                    : `U${displayIndex}`}
-                                </Text>
-                              </View>
-                            );
-                          })}
-                          {allImages.length > 6 && (
-                            <Text
-                              style={{
-                                fontSize: 6,
-                                color: "#6b7280",
-                                alignSelf: "center",
-                                marginLeft: 4
-                              }}
-                            >
-                              +{allImages.length - 6} more
-                            </Text>
-                          )}
-                        </View>
-                      );
-                    })()}
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <Text style={{ fontSize: 8, color: "#6b7280" }}>
-              No defects found
+      
+      {defectsByPc.map((pcDefect, pcIndex) => {
+        console.log(`📋 Processing PC ${pcIndex + 1}:`, pcDefect.pcNumber);
+        
+        return (
+          <View key={pcIndex} style={{ marginBottom: 10, borderWidth: 1, borderColor: "#e5e7eb", padding: 8 }}>
+            <Text style={{ fontSize: 9, fontWeight: "bold", marginBottom: 6 }}>
+              {pcDefect.pcNumber?.toString().includes("BATCH") ? "Batch: " : "PC: "} 
+              {pcDefect.pcNumber}
             </Text>
-          )}
-        </View>
-      ))}
+            
+            <View style={styles.table}>
+              <View style={styles.tableRow}>
+                <Text style={[styles.tableColHeader, { width: "30%", textAlign: 'left' }]}>Defect Name</Text>
+                <Text style={[styles.tableColHeader, { width: "10%" }]}>Qty</Text>
+                <Text style={[styles.tableColHeader, { width: "60%" }]}>Images</Text>
+              </View>
+              
+              {pcDefect.pcDefects?.map((defect, defectIndex) => {
+                console.log(`🐛 Processing defect ${defectIndex + 1}:`, {
+                  name: defect.defectName,
+                  images: defect.defectImages?.length || 0
+                });
+                
+                return (
+                  <View key={defectIndex} style={styles.tableRow}>
+                    <Text style={[styles.tableCol, { width: "30%", textAlign: 'left' }]}>
+                      {safeString(defect.defectName)}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "10%" }]}>
+                      {defect.isMulti ? (defect.pcCount || 0) : (defect.defectQty || 1)}
+                    </Text>
+                    <View style={[styles.tableCol, { width: "60%", flexDirection: 'row', flexWrap: 'wrap' }]}>
+                      {/* Enhanced image rendering */}
+                      {(() => {
+                        const images = defect.defectImages || defect.capturedImages || defect.images || [];
+                        console.log(`🖼️ Rendering ${images.length} images for defect:`, defect.defectName);
+                        
+                        if (!Array.isArray(images) || images.length === 0) {
+                          return (
+                            <Text style={{ fontSize: 6, color: "#6b7280", padding: 4 }}>
+                              No images
+                            </Text>
+                          );
+                        }
+
+                        return images.map((img, imgIdx) => {
+                          console.log(`🖼️ Rendering image ${imgIdx + 1}:`, img);
+                          return (
+                            <View key={imgIdx} style={{ margin: 2, alignItems: 'center' }}>
+                              <SafeImage
+                                src={img}
+                                style={styles.defectImage}
+                                alt={`${defect.defectName} - Image ${imgIdx + 1}`}
+                              />
+                              <Text style={{ fontSize: 4, color: "#6b7280" }}>
+                                C{imgIdx + 1}
+                              </Text>
+                            </View>
+                          );
+                        });
+                      })()}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        );
+      })}
 
       {/* Additional Images Section */}
-      {additionalImages && additionalImages.length > 0 && (
-        <View
-          style={{
-            marginTop: 15,
-            borderWidth: 1,
-            borderColor: "#e5e7eb",
-            padding: 10
-          }}
-        >
-          <Text
-            style={[styles.sectionTitle, { fontSize: 10, marginBottom: 8 }]}
-          >
+      {additionalImages.length > 0 && (
+        <View style={{ marginTop: 10 }}>
+          <Text style={{ fontSize: 9, fontWeight: 'bold' }}>
             Additional Images ({additionalImages.length})
           </Text>
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              alignItems: "flex-start"
-            }}
-          >
-            {additionalImages.slice(0, 8).map((img, imgIndex) => (
-              <View key={imgIndex} style={{ margin: 3, alignItems: "center" }}>
-                <SafeImage
-                  src={img} // Use the larger inspectionImage style
-                  style={styles.inspectionImage}
-                  alt={`Additional Image ${imgIndex + 1}`}
-                />
-                <Text
-                  style={{
-                    fontSize: 5,
-                    color: "#6b7280",
-                    textAlign: "center",
-                    marginTop: 1
-                  }}
-                >
-                  Add {imgIndex + 1}
-                </Text>
-              </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 5 }}>
+            {additionalImages.map((img, idx) => (
+              <SafeImage 
+                key={idx} 
+                src={img} 
+                style={styles.inspectionImage} 
+                alt={`Additional Image ${idx + 1}`} 
+              />
             ))}
-            {additionalImages.length > 8 && (
-              <Text
-                style={{ fontSize: 6, color: "#6b7280", alignSelf: "center" }}
-              >
-                +{additionalImages.length - 8} more
-              </Text>
-            )}
           </View>
         </View>
       )}
     </View>
   );
 };
+
 
 const MeasurementDetailTable = ({ sizeData }) => {
   const measurementPoints = sizeData.pcs[0]?.measurementPoints || [];
@@ -1637,44 +1514,64 @@ const QcWashingFullReportPDF = ({
   const SafeImage = ({ src, style, alt }) => {
   const getImageSource = (imgSrc) => {
     if (!imgSrc) return null;
-    
-    let url = typeof imgSrc === 'string' ? imgSrc.trim() : (imgSrc.originalUrl || imgSrc.url || '');
+
+    let url = '';
+    if (typeof imgSrc === 'string') {
+      url = imgSrc.trim();
+    } else if (typeof imgSrc === 'object' && imgSrc !== null) {
+      url = imgSrc.originalUrl || imgSrc.url || imgSrc.src || imgSrc.path || '';
+    }
+
     if (!url) return null;
 
     // 1. If it's already Base64, return it
     if (url.startsWith('data:')) return url;
 
-    // 2. Check the preloaded cache (this is key for the face_photo)
-    if (preloadedImages && preloadedImages[url]) {
-      return preloadedImages[url];
-    }
-
-    // 3. Handle Absolute URLs (like kottrahr.com)
-    if (url.startsWith('http')) {
-      // If we preloaded it via optimizedImageLoader, it should be in cache
-      return preloadedImages[url] || url; 
-    }
-
-    // 4. Fallback for internal relative paths
-    const variations = [
+    // 2. Check the preloaded cache with multiple variations
+    const urlVariations = [
       url,
       url.startsWith('/') ? url : '/' + url,
-      API_BASE_URL + (url.startsWith('/') ? url : '/' + url)
+      url.replace(/^\/+/, ''),
+      `${API_BASE_URL}/${url.replace(/^\/+/, '')}`,
+      url.replace(API_BASE_URL, '').replace(/^\/+/, ''),
+      `/${url.replace(API_BASE_URL, '').replace(/^\/+/, '')}`
     ];
 
-    for (const v of variations) {
-      if (preloadedImages[v]) return preloadedImages[v];
+    for (const variation of urlVariations) {
+      if (preloadedImages && preloadedImages[variation]) {
+        console.log(`🎯 Found image in cache: ${variation}`);
+        return preloadedImages[variation];
+      }
     }
 
+    console.warn(`⚠️ Image not found in cache: ${url}`);
     return null;
   };
 
   const imageUrl = getImageSource(src);
+
   if (!imageUrl) {
-    return <ImagePlaceholder style={style} text="No Photo" subtext={alt} />;
+    return (
+      <ImagePlaceholder 
+        style={style} 
+        text="Missing" 
+        subtext={`${alt || 'Image'}`} 
+      />
+    );
   }
 
-  return <Image src={imageUrl} style={style} />;
+  try {
+    return <Image src={imageUrl} style={style} />;
+  } catch (error) {
+    console.error('Image render error:', error);
+    return (
+      <ImagePlaceholder 
+        style={style} 
+        text="Error" 
+        subtext={error.message} 
+      />
+    );
+  }
 };
 
   if (isLoading) {
@@ -1841,5 +1738,3 @@ const QcWashingFullReportPDF = ({
 // Export both components for different use cases - MOVED TO TOP LEVEL
 export default QcWashingFullReportPDF;
 export { QcWashingFullReportPDF };
-
-
