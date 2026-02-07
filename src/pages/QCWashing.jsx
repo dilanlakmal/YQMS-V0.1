@@ -59,6 +59,56 @@ const normalizeImageSrc = (src) => {
   return src;
 };
 
+// Helper to separate raw defects into Single (Object) and Multi (Array)
+function separateDefects(savedDefectsByPc) {
+  const singleDefects = {};
+  const multiDefects = [];
+
+  if (Array.isArray(savedDefectsByPc)) {
+    savedDefectsByPc.forEach(pcData => {
+       const isBatch = String(pcData.pcNumber).startsWith("BATCH-");
+       const firstDefect = pcData.pcDefects?.[0];
+       // Check for multi flag or batch prefix
+       const isMulti = firstDefect && (String(firstDefect.isMulti) === "true" || firstDefect.isMulti === true);
+
+       if (isBatch || isMulti) {
+          // --- BATCH / MULTI ---
+          const batchId = isBatch ? pcData.pcNumber.replace("BATCH-", "") : Date.now();
+          multiDefects.push({
+             id: batchId, // Use the ID from the PC Number if available
+             selectedDefect: firstDefect?.defectId || firstDefect?.selectedDefect || "",
+             defectName: firstDefect?.defectName || "",
+             pcCount: parseInt(firstDefect?.pcCount) || 1,
+             defectQty: 1,
+             isMulti: true,
+             defectImages: (firstDefect?.defectImages || []).map(imgStr => ({
+               file: null,
+               preview: normalizeImageSrc(imgStr),
+               name: "image.jpg"
+             }))
+          });
+       } else {
+          // --- SINGLE ---
+          singleDefects[pcData.pcNumber] = (pcData.pcDefects || []).map((defect, index) => ({
+             id: index + 1,
+             selectedDefect: defect.defectId || defect.selectedDefect || "",
+             defectName: defect.defectName || "",
+             defectQty: defect.defectQty || 1,
+             isBodyVisible: true,
+             isMulti: false,
+             pcCount: 1,
+             defectImages: (defect.defectImages || []).map(imgStr => ({
+               file: null,
+               preview: normalizeImageSrc(imgStr),
+               name: "image.jpg"
+             }))
+          }));
+       }
+    });
+  }
+  return { singleDefects, multiDefects };
+}
+
 function transformDefectsByPc(savedDefectsByPc) {
   if (Array.isArray(savedDefectsByPc)) {
     return savedDefectsByPc.reduce((acc, pcData) => {
@@ -67,9 +117,12 @@ function transformDefectsByPc(savedDefectsByPc) {
         acc[pcNumber] = (pcData.pcDefects || []).map((defect, index) => ({
           id: index + 1,
           selectedDefect: defect.defectId || defect.selectedDefect || "",
-          defectName: defect.defectName || "", // Add this line
+          defectName: defect.defectName || "",
           defectQty: defect.defectQty || "",
           isBodyVisible: true,
+          // CRITICAL FIX: Preserve these fields
+          isMulti: defect.isMulti || false,
+          pcCount: defect.pcCount || 1,
           defectImages: (defect.defectImages || []).map((imgStr) => ({
             file: null,
             preview: normalizeImageSrc(imgStr),
@@ -79,26 +132,6 @@ function transformDefectsByPc(savedDefectsByPc) {
       }
       return acc;
     }, {});
-  }
-
-  if (typeof savedDefectsByPc === "object" && savedDefectsByPc !== null) {
-    const result = {};
-    Object.keys(savedDefectsByPc).forEach((pc) => {
-      result[pc] = (savedDefectsByPc[pc] || []).map((defect, index) => ({
-        id: defect.id || index + 1,
-        selectedDefect: defect.defectId || defect.selectedDefect || "",
-        defectName: defect.defectName || "", // Add this line
-        defectQty: defect.defectQty || "",
-        isBodyVisible:
-          defect.isBodyVisible !== undefined ? defect.isBodyVisible : true,
-        defectImages: (defect.defectImages || []).map((imgStr) => ({
-          file: null,
-          preview: normalizeImageSrc(imgStr),
-          name: "image.jpg",
-        })),
-      }));
-    });
-    return result;
   }
   return {};
 }
@@ -462,12 +495,13 @@ const QCWashingPage = () => {
   const [showMeasurementTable, setShowMeasurementTable] = useState(true);
   const [machineType, setMachineType] = useState("Washing Machine");
   const [isDataLoading, setIsDataLoading] = useState(false);
+  const [defectsByPc, setDefectsByPc] = useState({}); 
+  const [multiDefects, setMultiDefects] = useState([]);
 
   // State: Auto-save
   const [autoSaveId, setAutoSaveId] = useState(null);
   const [lastSaved, setLastSaved] = useState(null);
   const autoSaveTimeoutRef = useRef(null);
-  const [defectsByPc, setDefectsByPc] = useState({});
 
   // State: Cache for color-specific data to prevent data loss on switching
   const [colorDataCache, setColorDataCache] = useState({});
@@ -1005,7 +1039,24 @@ const loadSavedDataById = async (id) => {
       aql: saved.aql && saved.aql.length > 0 ? saved.aql : prev.aql
     }));
 
-    // Handle checkpoint inspection data - CORRECTED LOGIC
+     if (saved.defectDetails && saved.defectDetails.defectsByPc) {
+         const { singleDefects, multiDefects } = separateDefects(saved.defectDetails.defectsByPc);
+         setDefectsByPc(singleDefects);
+         setMultiDefects(multiDefects);
+      } else {
+         setDefectsByPc({});
+         setMultiDefects([]);
+      }
+
+      setUploadedImages(
+        (saved.defectDetails?.additionalImages || []).filter(Boolean).map((img) => ({
+            file: null,
+            preview: normalizeImageSrc(img.preview || img),
+            name: img.name || "image.jpg"
+        }))
+      );
+      setComment(saved.defectDetails?.comment || "");
+
 if (
   saved.inspectionDetails?.checkpointInspectionData &&
   saved.inspectionDetails.checkpointInspectionData.length > 0
@@ -1423,7 +1474,8 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
         measurementData,
         uploadedImages,
         savedSizes,
-        defectsByPc,
+        multiDefects: multiDefects,
+        defectsByPc: defectsByPc,
         referenceSampleApproveDate,
         formData: {
           washQty: formData.washQty,
@@ -2000,6 +2052,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
     setSavedSizes([]);
     setMeasurementData({ beforeWash: [], afterWash: [] });
     setDefectsByPc({});
+    setMultiDefects([]); 
     setColorDataCache({});
     setRecordId(null);
     setAutoSaveId(null);
@@ -2064,17 +2117,32 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
   useEffect(() => {
     // Debounce the calculation to prevent multiple rapid calls
     const timeoutId = setTimeout(() => {
-      const defectDetails = {
+      const mergedDefectsByPc = [];
+
+      Object.entries(defectsByPc).forEach(([pcNumber, pcDefects]) => {
+         mergedDefectsByPc.push({ pcNumber, pcDefects });
+      });
+
+      multiDefects.forEach(mDefect => {
+         mergedDefectsByPc.push({
+            pcNumber: `BATCH-${mDefect.id}`,
+            pcDefects: [{
+               defectId: mDefect.selectedDefect,
+               defectName: mDefect.defectName,
+               defectQty: 1, 
+               isMulti: true,
+               pcCount: mDefect.pcCount,
+               defectImages: mDefect.defectImages
+            }]
+         });
+      });
+
+     const defectDetails = {
         ...formData.defectDetails,
         checkedQty: formData.checkedQty,
         washQty: formData.washQty,
         result: formData.result,
-        defectsByPc: Object.entries(defectsByPc).map(
-          ([pcNumber, pcDefects]) => ({
-            pcNumber,
-            pcDefects,
-          }),
-        ),
+        defectsByPc: mergedDefectsByPc, 
       };
 
       
@@ -2137,6 +2205,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
       setUploadedImages(cachedData.uploadedImages);
       setSavedSizes(cachedData.savedSizes);
       setDefectsByPc(cachedData.defectsByPc || {});
+      setMultiDefects(cachedData.multiDefects || []); 
       if (cachedData.referenceSampleApproveDate) {
         setReferenceSampleApproveDate(cachedData.referenceSampleApproveDate);
       }
@@ -2288,11 +2357,12 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
           );
 
           if (colorData.defectDetails?.defectsByPc) {
-            setDefectsByPc(
-              transformDefectsByPc(colorData.defectDetails.defectsByPc),
-            );
+             const { singleDefects, multiDefects } = separateDefects(colorData.defectDetails.defectsByPc);
+             setDefectsByPc(singleDefects);
+             setMultiDefects(multiDefects);
           } else {
-            setDefectsByPc({});
+             setDefectsByPc({});
+             setMultiDefects([]);
           }
           if (colorData.defectDetails?.additionalImages) {
             setUploadedImages(
@@ -2359,6 +2429,7 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
 
           setAddedDefects([]);
           setDefectsByPc({});
+          setMultiDefects([]);
           setUploadedImages([]);
           setComment("");
           setMeasurementData({ beforeWash: [], afterWash: [] });
@@ -2769,6 +2840,8 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
                       recordId={recordId}
                       defectsByPc={defectsByPc}
                       setDefectsByPc={setDefectsByPc}
+                      multiDefects={multiDefects}
+                      setMultiDefects={setMultiDefects}
                       comment={comment}
                       setComment={setComment}
                       normalizeImageSrc={normalizeImageSrc}
@@ -2818,17 +2891,40 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
 
                   try {
                     // --- 1. Recalculate summary with the latest state ---
+                     const mergedDefectsByPc = [];
+                      Object.entries(defectsByPc).forEach(([pcKey, pcDefects]) => {
+                             mergedDefectsByPc.push({ pcNumber: pcKey, pcDefects });
+                           });
+
+                           multiDefects.forEach(mDefect => {
+                             mergedDefectsByPc.push({
+                                pcNumber: `BATCH-${mDefect.id}`,
+                                pcDefects: [{
+                                   defectName: mDefect.defectName,
+                                   defectId: mDefect.selectedDefect,
+                                   defectQty: 1,
+                                   isMulti: true,
+                                   pcCount: mDefect.pcCount,
+                                   defectImages: mDefect.defectImages
+                                }]
+                             });
+                           });
                     const defectDetails = {
                       ...formData.defectDetails,
                       checkedQty: formData.checkedQty,
                       washQty: formData.washQty,
                       result: formData.result,
-                      defectsByPc: Object.entries(defectsByPc).map(
-                        ([pcNumber, pcDefects]) => ({
-                          pcNumber,
-                          pcDefects
-                        })
-                      )
+                      defectsByPc: await Promise.all(mergedDefectsByPc.map(async (pc) => ({
+                          pcNumber: pc.pcNumber,
+                          pcDefects: await Promise.all(pc.pcDefects.map(async (d) => ({
+                            defectName: d.defectName,
+                            defectId: d.defectId,
+                            defectQty: d.defectQty,
+                            isMulti: d.isMulti,
+                            pcCount: d.pcCount,
+                            defectImages: await Promise.all((d.defectImages || []).map(img => imageToBase64(img)))
+                          })))
+                      })))
                     };
 
                     const measurementDetails = {
