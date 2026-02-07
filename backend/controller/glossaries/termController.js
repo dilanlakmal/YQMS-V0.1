@@ -11,7 +11,8 @@ import llmService from '../../services/llmService.js';
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
-// NOTE: pdf-parse and mammoth are imported dynamically to avoid startup errors
+import { extractTextHybrid } from '../../services/documentService.js';
+// NOTE: mammoth is imported dynamically to avoid startup errors
 
 // Dynamic import for GlossaryTerm model
 let GlossaryTerm = null;
@@ -35,14 +36,12 @@ async function getHistoryModel() {
 
 // ========== TEXT EXTRACTION ==========
 
-async function extractText(buffer, fileName) {
+async function extractText(buffer, fileName, options = {}) {
     const ext = path.extname(fileName).toLowerCase();
 
     if (ext === '.pdf') {
-        // Import directly from lib to avoid pdf-parse's problematic debug/test block in index.js
-        const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
-        const data = await pdfParse(buffer);
-        return data.text;
+        const text = await extractTextHybrid(buffer, fileName, options);
+        return text;
     } else if (ext === '.docx') {
         // Dynamic import mammoth
         const mammoth = (await import('mammoth')).default;
@@ -422,7 +421,9 @@ export async function mineSingleDoc(req, res) {
         const fileBuffer = req.file.buffer;
 
         // 1. Upload source to Azure Blob Storage
-        const blobName = `mining-sources/${miningBatchId}/${req.file.originalname}`;
+        // Sanitize filename to avoid InvalidUri errors with special chars
+        const cleanFileName = req.file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        const blobName = `mining-sources/${miningBatchId}/${cleanFileName}`;
         const sourceUrl = await uploadFileToBlob(
             fileBuffer,
             blobName,
@@ -488,8 +489,11 @@ export async function mineParallelDocs(req, res) {
         const targetBuffer = req.files.targetDoc[0].buffer;
 
         // 1. Upload sources to Azure Blob Storage
-        const sourceBlobPath = `mining-sources/${miningBatchId}/${req.files.sourceDoc[0].originalname}`;
-        const targetBlobPath = `mining-sources/${miningBatchId}/${req.files.targetDoc[0].originalname}`;
+        const cleanSource = req.files.sourceDoc[0].originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        const cleanTarget = req.files.targetDoc[0].originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+
+        const sourceBlobPath = `mining-sources/${miningBatchId}/${cleanSource}`;
+        const targetBlobPath = `mining-sources/${miningBatchId}/${cleanTarget}`;
 
         const [sourceUrl, targetUrl] = await Promise.all([
             uploadFileToBlob(

@@ -1,0 +1,3 @@
+Error: Client-side render failed: No PDFJS.workerSrc specified
+    at DocumentImageService.renderPage (file:///D:/YorkMars/YQMS-V0.1/backend/services/DocumentImageService.js:128:23)
+    at async run (file:///D:/YorkMars/YQMS-V0.1/debug-render.js:13:24)

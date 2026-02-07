@@ -39,7 +39,14 @@ export async function mineSingleDocument({
     console.log(`[Mining] Starting single doc mining: ${fileName}`);
 
     // 1. Extract text
-    const text = await textExtractor(fileBuffer, fileName);
+    const text = await textExtractor(fileBuffer, fileName, { sourceLang, targetLang });
+
+    // Log extraction results for visibility
+    console.log(`\n--- RAW EXTRACTED TEXT START (${fileName}) ---`);
+    console.log(`Length: ${text.length} characters`);
+    console.log(text);
+    console.log(`--- RAW EXTRACTED TEXT END --- \n`);
+
     if (text.length < 30) {
         throw new Error('Document too short for meaningful mining (min 100 chars)');
     }
@@ -156,8 +163,19 @@ export async function mineParallelDocuments({
     console.log(`[Mining] Starting parallel doc mining: ${sourceFileName} + ${targetFileName}`);
 
     // 1. Extract text from both files
-    const sourceText = await textExtractor(sourceBuffer, sourceFileName);
-    const targetText = await textExtractor(targetBuffer, targetFileName);
+    const sourceText = await textExtractor(sourceBuffer, sourceFileName, { sourceLang, targetLang });
+    const targetText = await textExtractor(targetBuffer, targetFileName, { sourceLang, targetLang });
+
+    // Log extraction results for visibility
+    console.log(`\n--- RAW EXTRACTED TEXT START (SOURCE: ${sourceFileName}) ---`);
+    console.log(`Length: ${sourceText.length} characters`);
+    console.log(sourceText);
+    console.log(`--- RAW EXTRACTED TEXT END --- \n`);
+
+    console.log(`\n--- RAW EXTRACTED TEXT START (TARGET: ${targetFileName}) ---`);
+    console.log(`Length: ${targetText.length} characters`);
+    console.log(targetText);
+    console.log(`--- RAW EXTRACTED TEXT END --- \n`);
 
     // 2. Detect domain if not provided
     let detectedDomain = domain;

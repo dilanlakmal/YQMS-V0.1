@@ -3,7 +3,8 @@
  * Handles CRUD operations for translation glossaries
  */
 
-import pdf from 'pdf-extraction';
+// import pdf from 'pdf-extraction';
+import { extractTextHybrid } from '../../services/documentService.js';
 
 import { randomUUID } from "crypto";
 import {
@@ -877,9 +878,11 @@ export const alignContent = async (req, res) => {
       const readTextFromPath = async (filePath) => {
         const ext = path.extname(filePath).toLowerCase();
         if (ext === '.pdf') {
+          const sourceLang = req.body.sourceLang || 'en';
+          const targetLang = req.body.targetLang || 'km';
           const buffer = await fs.promises.readFile(filePath);
-          const data = await pdf(buffer);
-          return data.text;
+          const text = await extractTextHybrid(buffer, path.basename(filePath), { sourceLang, targetLang });
+          return text;
         } else {
           return await fs.promises.readFile(filePath, 'utf-8');
         }
@@ -1012,8 +1015,8 @@ export const learnFromDocument = async (req, res) => {
         const ext = path.extname(filePath).toLowerCase();
         if (ext === '.pdf') {
           const buffer = await fs.promises.readFile(filePath);
-          const data = await pdf(buffer);
-          return data.text;
+          const text = await extractTextHybrid(buffer, path.basename(filePath), { sourceLang, targetLang });
+          return text;
         } else {
           return await fs.promises.readFile(filePath, 'utf-8');
         }

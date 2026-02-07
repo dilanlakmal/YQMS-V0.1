@@ -1,0 +1,1428 @@
+{
+  "status": "succeeded",
+  "createdDateTime": "2026-02-05T09:03:46Z",
+  "lastUpdatedDateTime": "2026-02-05T09:03:50Z",
+  "analyzeResult": {
+    "apiVersion": "2024-11-30",
+    "modelId": "prebuilt-layout",
+    "stringIndexType": "textElements",
+    "content": "GPRT00077C W02-490014 PPS neck stripe matching All accept for bulk.\nOption#1\nRW&CO\nRW&CO.\nOption#1\nOption#1\nOption#2\nOption#2\nOption#2\nRW&CO\nM/M\n·. CO.\nOption#3\nOption#3\nRW&CO.\nOption#3\nM/M\n- CAMBODIA",
+    "pages": [
+      {
+        "pageNumber": 1,
+        "angle": -90.22109985351562,
+        "width": 8.5,
+        "height": 11,
+        "unit": "inch",
+        "words": [
+          {
+            "content": "GPRT00077C",
+            "polygon": [
+              0.9024,
+              8.7693,
+              0.8965,
+              7.4612,
+              1.1208,
+              7.4599,
+              1.1187,
+              8.768
+            ],
+            "confidence": 0.974,
+            "span": {
+              "offset": 0,
+              "length": 10
+            }
+          },
+          {
+            "content": "W02-490014",
+            "polygon": [
+              0.8969,
+              7.3356,
+              0.9002,
+              6.0382,
+              1.1259,
+              6.0372,
+              1.1214,
+              7.3342
+            ],
+            "confidence": 0.97,
+            "span": {
+              "offset": 11,
+              "length": 10
+            }
+          },
+          {
+            "content": "PPS",
+            "polygon": [
+              0.9006,
+              5.953,
+              0.9021,
+              5.6054,
+              1.1286,
+              5.6048,
+              1.1265,
+              5.9522
+            ],
+            "confidence": 0.996,
+            "span": {
+              "offset": 22,
+              "length": 3
+            }
+          },
+          {
+            "content": "neck",
+            "polygon": [
+              0.9023,
+              5.5279,
+              0.9032,
+              5.0737,
+              1.1333,
+              5.0728,
+              1.1285,
+              5.5272
+            ],
+            "confidence": 0.988,
+            "span": {
+              "offset": 26,
+              "length": 4
+            }
+          },
+          {
+            "content": "stripe",
+            "polygon": [
+              0.9034,
+              4.9479,
+              0.9085,
+              4.3841,
+              1.1406,
+              4.3818,
+              1.1361,
+              4.9472
+            ],
+            "confidence": 0.995,
+            "span": {
+              "offset": 31,
+              "length": 6
+            }
+          },
+          {
+            "content": "matching",
+            "polygon": [
+              0.9097,
+              4.2994,
+              0.9134,
+              3.3548,
+              1.1456,
+              3.3548,
+              1.1407,
+              4.2968
+            ],
+            "confidence": 0.995,
+            "span": {
+              "offset": 38,
+              "length": 8
+            }
+          },
+          {
+            "content": "All",
+            "polygon": [
+              1.1596,
+              8.6153,
+              1.1658,
+              8.3099,
+              1.4169,
+              8.3114,
+              1.4103,
+              8.6174
+            ],
+            "confidence": 0.988,
+            "span": {
+              "offset": 47,
+              "length": 3
+            }
+          },
+          {
+            "content": "accept",
+            "polygon": [
+              1.1652,
+              8.204,
+              1.1648,
+              7.3985,
+              1.4243,
+              7.3972,
+              1.4179,
+              8.2065
+            ],
+            "confidence": 0.997,
+            "span": {
+              "offset": 51,
+              "length": 6
+            }
+          },
+          {
+            "content": "for",
+            "polygon": [
+              1.1652,
+              7.3196,
+              1.162,
+              6.996,
+              1.4199,
+              6.9947,
+              1.4253,
+              7.3175
+            ],
+            "confidence": 0.999,
+            "span": {
+              "offset": 58,
+              "length": 3
+            }
+          },
+          {
+            "content": "bulk.",
+            "polygon": [
+              1.1596,
+              6.9036,
+              1.1583,
+              6.3442,
+              1.415,
+              6.3442,
+              1.4181,
+              6.9024
+            ],
+            "confidence": 0.994,
+            "span": {
+              "offset": 62,
+              "length": 5
+            }
+          },
+          {
+            "content": "Option#1",
+            "polygon": [
+              1.9247,
+              6.8166,
+              1.9202,
+              6.2612,
+              2.072,
+              6.2612,
+              2.0819,
+              6.8147
+            ],
+            "confidence": 0.992,
+            "span": {
+              "offset": 68,
+              "length": 8
+            }
+          },
+          {
+            "content": "RW&CO",
+            "polygon": [
+              2.0071,
+              2.4983,
+              2.1608,
+              2.3037,
+              2.2156,
+              2.3344,
+              2.0628,
+              2.5294
+            ],
+            "confidence": 0.957,
+            "span": {
+              "offset": 77,
+              "length": 5
+            }
+          },
+          {
+            "content": "RW&CO.",
+            "polygon": [
+              2.2507,
+              9.0622,
+              2.2494,
+              8.8079,
+              2.3249,
+              8.8078,
+              2.3236,
+              9.0621
+            ],
+            "confidence": 0.374,
+            "span": {
+              "offset": 83,
+              "length": 6
+            }
+          },
+          {
+            "content": "Option#1",
+            "polygon": [
+              2.4133,
+              10.6639,
+              2.4072,
+              10.0986,
+              2.5508,
+              10.0976,
+              2.5581,
+              10.6626
+            ],
+            "confidence": 0.993,
+            "span": {
+              "offset": 90,
+              "length": 8
+            }
+          },
+          {
+            "content": "Option#1",
+            "polygon": [
+              2.5047,
+              0.6645,
+              2.4992,
+              0.1052,
+              2.6341,
+              0.1052,
+              2.6399,
+              0.6619
+            ],
+            "confidence": 0.992,
+            "span": {
+              "offset": 99,
+              "length": 8
+            }
+          },
+          {
+            "content": "Option#2",
+            "polygon": [
+              3.4212,
+              6.8885,
+              3.4199,
+              6.311,
+              3.5666,
+              6.311,
+              3.5762,
+              6.8869
+            ],
+            "confidence": 0.992,
+            "span": {
+              "offset": 108,
+              "length": 8
+            }
+          },
+          {
+            "content": "Option#2",
+            "polygon": [
+              3.5631,
+              0.7589,
+              3.5583,
+              0.1827,
+              3.6967,
+              0.1827,
+              3.704,
+              0.7575
+            ],
+            "confidence": 0.992,
+            "span": {
+              "offset": 117,
+              "length": 8
+            }
+          },
+          {
+            "content": "Option#2",
+            "polygon": [
+              3.9035,
+              10.7363,
+              3.8992,
+              10.1641,
+              4.0422,
+              10.1641,
+              4.0521,
+              10.7341
+            ],
+            "confidence": 0.992,
+            "span": {
+              "offset": 126,
+              "length": 8
+            }
+          },
+          {
+            "content": "RW&CO",
+            "polygon": [
+              3.8865,
+              9.1242,
+              3.8848,
+              8.8619,
+              3.9606,
+              8.8606,
+              3.9619,
+              9.1231
+            ],
+            "confidence": 0.972,
+            "span": {
+              "offset": 135,
+              "length": 5
+            }
+          },
+          {
+            "content": "M/M",
+            "polygon": [
+              4.0429,
+              9.0442,
+              4.0468,
+              8.9406,
+              4.1027,
+              8.9406,
+              4.0988,
+              9.0435
+            ],
+            "confidence": 0.841,
+            "span": {
+              "offset": 141,
+              "length": 3
+            }
+          },
+          {
+            "content": "·.",
+            "polygon": [
+              4.4358,
+              2.4885,
+              4.4535,
+              2.465,
+              4.5155,
+              2.5024,
+              4.4975,
+              2.5243
+            ],
+            "confidence": 0.297,
+            "span": {
+              "offset": 145,
+              "length": 2
+            }
+          },
+          {
+            "content": "CO.",
+            "polygon": [
+              4.466,
+              2.4572,
+              4.548,
+              2.3805,
+              4.6152,
+              2.4085,
+              4.5279,
+              2.4932
+            ],
+            "confidence": 0.794,
+            "span": {
+              "offset": 148,
+              "length": 3
+            }
+          },
+          {
+            "content": "Option#3",
+            "polygon": [
+              5.2189,
+              6.8867,
+              5.2184,
+              6.3055,
+              5.3669,
+              6.3055,
+              5.3764,
+              6.8852
+            ],
+            "confidence": 0.994,
+            "span": {
+              "offset": 152,
+              "length": 8
+            }
+          },
+          {
+            "content": "Option#3",
+            "polygon": [
+              5.2191,
+              0.6951,
+              5.2162,
+              0.1273,
+              5.3547,
+              0.1273,
+              5.3621,
+              0.6938
+            ],
+            "confidence": 0.994,
+            "span": {
+              "offset": 161,
+              "length": 8
+            }
+          },
+          {
+            "content": "RW&CO.",
+            "polygon": [
+              5.5234,
+              9.1697,
+              5.5272,
+              8.8832,
+              5.6095,
+              8.8825,
+              5.6029,
+              9.1695
+            ],
+            "confidence": 0.546,
+            "span": {
+              "offset": 170,
+              "length": 6
+            }
+          },
+          {
+            "content": "Option#3",
+            "polygon": [
+              5.7082,
+              10.7293,
+              5.7002,
+              10.1631,
+              5.8397,
+              10.1585,
+              5.8551,
+              10.7253
+            ],
+            "confidence": 0.992,
+            "span": {
+              "offset": 177,
+              "length": 8
+            }
+          },
+          {
+            "content": "M/M",
+            "polygon": [
+              5.6981,
+              9.0729,
+              5.6995,
+              8.9644,
+              5.7556,
+              8.9639,
+              5.7532,
+              9.0729
+            ],
+            "confidence": 0.912,
+            "span": {
+              "offset": 186,
+              "length": 3
+            }
+          },
+          {
+            "content": "-",
+            "polygon": [
+              5.8344,
+              9.1034,
+              5.8475,
+              8.948,
+              5.8937,
+              8.9475,
+              5.8796,
+              9.1032
+            ],
+            "confidence": 0.093,
+            "span": {
+              "offset": 190,
+              "length": 1
+            }
+          },
+          {
+            "content": "CAMBODIA",
+            "polygon": [
+              5.8552,
+              9.111,
+              5.8683,
+              8.942,
+              5.9174,
+              8.9419,
+              5.9044,
+              9.1114
+            ],
+            "confidence": 0.405,
+            "span": {
+              "offset": 192,
+              "length": 8
+            }
+          }
+        ],
+        "lines": [
+          {
+            "content": "GPRT00077C W02-490014 PPS neck stripe matching",
+            "polygon": [
+              0.8965,
+              8.7719,
+              0.9151,
+              3.357,
+              1.1465,
+              3.3582,
+              1.1187,
+              8.773
+            ],
+            "spans": [
+              {
+                "offset": 0,
+                "length": 46
+              }
+            ]
+          },
+          {
+            "content": "All accept for bulk.",
+            "polygon": [
+              1.1638,
+              8.618,
+              1.1607,
+              6.345,
+              1.424,
+              6.3447,
+              1.427,
+              8.6176
+            ],
+            "spans": [
+              {
+                "offset": 47,
+                "length": 20
+              }
+            ]
+          },
+          {
+            "content": "Option#1",
+            "polygon": [
+              1.9274,
+              6.8201,
+              1.9202,
+              6.2657,
+              2.0719,
+              6.2625,
+              2.0833,
+              6.8169
+            ],
+            "spans": [
+              {
+                "offset": 68,
+                "length": 8
+              }
+            ]
+          },
+          {
+            "content": "RW&CO",
+            "polygon": [
+              2.0042,
+              2.4964,
+              2.1658,
+              2.303,
+              2.2175,
+              2.3373,
+              2.0559,
+              2.5299
+            ],
+            "spans": [
+              {
+                "offset": 77,
+                "length": 5
+              }
+            ]
+          },
+          {
+            "content": "RW&CO.",
+            "polygon": [
+              2.2516,
+              9.0723,
+              2.2506,
+              8.8103,
+              2.3248,
+              8.81,
+              2.3259,
+              9.0721
+            ],
+            "spans": [
+              {
+                "offset": 83,
+                "length": 6
+              }
+            ]
+          },
+          {
+            "content": "Option#1",
+            "polygon": [
+              2.4138,
+              10.6649,
+              2.4072,
+              10.1027,
+              2.551,
+              10.1009,
+              2.5581,
+              10.6631
+            ],
+            "spans": [
+              {
+                "offset": 90,
+                "length": 8
+              }
+            ]
+          },
+          {
+            "content": "Option#1",
+            "polygon": [
+              2.5016,
+              0.6652,
+              2.4987,
+              0.1085,
+              2.638,
+              0.1077,
+              2.641,
+              0.6644
+            ],
+            "spans": [
+              {
+                "offset": 99,
+                "length": 8
+              }
+            ]
+          },
+          {
+            "content": "Option#2",
+            "polygon": [
+              3.4238,
+              6.8903,
+              3.4199,
+              6.3139,
+              3.5717,
+              6.3126,
+              3.5765,
+              6.8891
+            ],
+            "spans": [
+              {
+                "offset": 108,
+                "length": 8
+              }
+            ]
+          },
+          {
+            "content": "Option#2",
+            "polygon": [
+              3.5594,
+              0.7609,
+              3.5583,
+              0.1833,
+              3.7037,
+              0.183,
+              3.7048,
+              0.7606
+            ],
+            "spans": [
+              {
+                "offset": 117,
+                "length": 8
+              }
+            ]
+          },
+          {
+            "content": "Option#2",
+            "polygon": [
+              3.9024,
+              10.7381,
+              3.8958,
+              10.1674,
+              4.0454,
+              10.1656,
+              4.0522,
+              10.7363
+            ],
+            "spans": [
+              {
+                "offset": 126,
+                "length": 8
+              }
+            ]
+          },
+          {
+            "content": "RW&CO",
+            "polygon": [
+              3.8877,
+              9.1347,
+              3.8854,
+              8.8637,
+              3.9616,
+              8.8631,
+              3.9638,
+              9.134
+            ],
+            "spans": [
+              {
+                "offset": 135,
+                "length": 5
+              }
+            ]
+          },
+          {
+            "content": "M/M",
+            "polygon": [
+              4.0438,
+              9.0442,
+              4.0462,
+              8.9406,
+              4.1024,
+              8.9407,
+              4.1,
+              9.0455
+            ],
+            "spans": [
+              {
+                "offset": 141,
+                "length": 3
+              }
+            ]
+          },
+          {
+            "content": "·. CO.",
+            "polygon": [
+              4.4326,
+              2.4838,
+              4.5702,
+              2.3805,
+              4.6152,
+              2.4168,
+              4.4813,
+              2.5244
+            ],
+            "spans": [
+              {
+                "offset": 145,
+                "length": 6
+              }
+            ]
+          },
+          {
+            "content": "Option#3",
+            "polygon": [
+              5.2215,
+              6.8875,
+              5.2184,
+              6.3094,
+              5.371,
+              6.3079,
+              5.3765,
+              6.8861
+            ],
+            "spans": [
+              {
+                "offset": 152,
+                "length": 8
+              }
+            ]
+          },
+          {
+            "content": "Option#3",
+            "polygon": [
+              5.221,
+              0.6975,
+              5.2133,
+              0.1293,
+              5.3584,
+              0.1274,
+              5.3661,
+              0.6956
+            ],
+            "spans": [
+              {
+                "offset": 161,
+                "length": 8
+              }
+            ]
+          },
+          {
+            "content": "RW&CO.",
+            "polygon": [
+              5.5247,
+              9.1708,
+              5.5286,
+              8.884,
+              5.6098,
+              8.8851,
+              5.6059,
+              9.1719
+            ],
+            "spans": [
+              {
+                "offset": 170,
+                "length": 6
+              }
+            ]
+          },
+          {
+            "content": "Option#3",
+            "polygon": [
+              5.7104,
+              10.7297,
+              5.6999,
+              10.1643,
+              5.8401,
+              10.1604,
+              5.8551,
+              10.7258
+            ],
+            "spans": [
+              {
+                "offset": 177,
+                "length": 8
+              }
+            ]
+          },
+          {
+            "content": "M/M",
+            "polygon": [
+              5.698,
+              9.0805,
+              5.7004,
+              8.9637,
+              5.7555,
+              8.9648,
+              5.7531,
+              9.0817
+            ],
+            "spans": [
+              {
+                "offset": 186,
+                "length": 3
+              }
+            ]
+          },
+          {
+            "content": "-",
+            "polygon": [
+              5.8327,
+              9.1038,
+              5.8469,
+              8.9461,
+              5.8944,
+              8.949,
+              5.8797,
+              9.1067
+            ],
+            "spans": [
+              {
+                "offset": 190,
+                "length": 1
+              }
+            ]
+          },
+          {
+            "content": "CAMBODIA",
+            "polygon": [
+              5.856,
+              9.1112,
+              5.8694,
+              8.9406,
+              5.9185,
+              8.9444,
+              5.9051,
+              9.1122
+            ],
+            "spans": [
+              {
+                "offset": 192,
+                "length": 8
+              }
+            ]
+          }
+        ],
+        "spans": [
+          {
+            "offset": 0,
+            "length": 200
+          }
+        ]
+      }
+    ],
+    "tables": [],
+    "paragraphs": [
+      {
+        "spans": [
+          {
+            "offset": 0,
+            "length": 67
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              0.8965,
+              8.7723,
+              0.9151,
+              3.357,
+              1.4451,
+              3.3589,
+              1.4265,
+              8.7741
+            ]
+          }
+        ],
+        "content": "GPRT00077C W02-490014 PPS neck stripe matching All accept for bulk."
+      },
+      {
+        "spans": [
+          {
+            "offset": 68,
+            "length": 8
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              1.9274,
+              6.8201,
+              1.9159,
+              6.2657,
+              2.0719,
+              6.2625,
+              2.0833,
+              6.8169
+            ]
+          }
+        ],
+        "content": "Option#1"
+      },
+      {
+        "spans": [
+          {
+            "offset": 77,
+            "length": 5
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              2.0515,
+              2.5359,
+              2.0042,
+              2.4964,
+              2.1702,
+              2.2978,
+              2.2175,
+              2.3373
+            ]
+          }
+        ],
+        "content": "RW&CO"
+      },
+      {
+        "spans": [
+          {
+            "offset": 83,
+            "length": 6
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              2.2516,
+              9.0723,
+              2.2506,
+              8.8103,
+              2.3248,
+              8.81,
+              2.3259,
+              9.0721
+            ]
+          }
+        ],
+        "content": "RW&CO."
+      },
+      {
+        "spans": [
+          {
+            "offset": 90,
+            "length": 8
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              2.4138,
+              10.6649,
+              2.4067,
+              10.1027,
+              2.551,
+              10.1009,
+              2.5581,
+              10.6631
+            ]
+          }
+        ],
+        "content": "Option#1"
+      },
+      {
+        "spans": [
+          {
+            "offset": 99,
+            "length": 8
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              2.5016,
+              0.6652,
+              2.4987,
+              0.1085,
+              2.638,
+              0.1077,
+              2.641,
+              0.6644
+            ]
+          }
+        ],
+        "content": "Option#1"
+      },
+      {
+        "spans": [
+          {
+            "offset": 108,
+            "length": 8
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              3.4238,
+              6.8903,
+              3.419,
+              6.3139,
+              3.5717,
+              6.3126,
+              3.5765,
+              6.8891
+            ]
+          }
+        ],
+        "content": "Option#2"
+      },
+      {
+        "spans": [
+          {
+            "offset": 117,
+            "length": 8
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              3.5594,
+              0.7609,
+              3.5583,
+              0.1833,
+              3.7037,
+              0.183,
+              3.7048,
+              0.7606
+            ]
+          }
+        ],
+        "content": "Option#2"
+      },
+      {
+        "spans": [
+          {
+            "offset": 126,
+            "length": 8
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              3.9024,
+              10.7381,
+              3.8956,
+              10.1674,
+              4.0454,
+              10.1656,
+              4.0522,
+              10.7363
+            ]
+          }
+        ],
+        "content": "Option#2"
+      },
+      {
+        "spans": [
+          {
+            "offset": 135,
+            "length": 5
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              3.8877,
+              9.1347,
+              3.8854,
+              8.8637,
+              3.9616,
+              8.8631,
+              3.9638,
+              9.134
+            ]
+          }
+        ],
+        "content": "RW&CO"
+      },
+      {
+        "spans": [
+          {
+            "offset": 141,
+            "length": 3
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              4.0438,
+              9.0442,
+              4.0462,
+              8.9394,
+              4.1024,
+              8.9407,
+              4.1,
+              9.0455
+            ]
+          }
+        ],
+        "content": "M/M"
+      },
+      {
+        "spans": [
+          {
+            "offset": 145,
+            "length": 6
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              4.4716,
+              2.5323,
+              4.4326,
+              2.4838,
+              4.5763,
+              2.3683,
+              4.6152,
+              2.4168
+            ]
+          }
+        ],
+        "content": "·. CO."
+      },
+      {
+        "spans": [
+          {
+            "offset": 152,
+            "length": 8
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              5.2215,
+              6.8875,
+              5.2161,
+              6.3094,
+              5.371,
+              6.3079,
+              5.3765,
+              6.8861
+            ]
+          }
+        ],
+        "content": "Option#3"
+      },
+      {
+        "spans": [
+          {
+            "offset": 161,
+            "length": 8
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              5.221,
+              0.6975,
+              5.2133,
+              0.1293,
+              5.3584,
+              0.1274,
+              5.3661,
+              0.6956
+            ]
+          }
+        ],
+        "content": "Option#3"
+      },
+      {
+        "spans": [
+          {
+            "offset": 170,
+            "length": 6
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              5.5246,
+              9.1708,
+              5.5286,
+              8.884,
+              5.6098,
+              8.8851,
+              5.6059,
+              9.1719
+            ]
+          }
+        ],
+        "content": "RW&CO."
+      },
+      {
+        "spans": [
+          {
+            "offset": 177,
+            "length": 8
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              5.7104,
+              10.7297,
+              5.6954,
+              10.1643,
+              5.8401,
+              10.1604,
+              5.8551,
+              10.7258
+            ]
+          }
+        ],
+        "content": "Option#3"
+      },
+      {
+        "spans": [
+          {
+            "offset": 186,
+            "length": 3
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              5.698,
+              9.0805,
+              5.7004,
+              8.9637,
+              5.7555,
+              8.9648,
+              5.7531,
+              9.0817
+            ]
+          }
+        ],
+        "content": "M/M"
+      },
+      {
+        "spans": [
+          {
+            "offset": 190,
+            "length": 10
+          }
+        ],
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              5.8322,
+              9.1093,
+              5.8459,
+              8.9386,
+              5.9185,
+              8.9444,
+              5.9049,
+              9.1151
+            ]
+          }
+        ],
+        "content": "- CAMBODIA"
+      }
+    ],
+    "styles": [],
+    "contentFormat": "text",
+    "sections": [
+      {
+        "spans": [
+          {
+            "offset": 0,
+            "length": 200
+          }
+        ],
+        "elements": [
+          "/paragraphs/0",
+          "/figures/0"
+        ]
+      }
+    ],
+    "figures": [
+      {
+        "id": "1.1",
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [
+              1.4606,
+              10.8827,
+              1.4151,
+              0.0798,
+              6.4533,
+              0.0606,
+              6.4985,
+              10.8649
+            ]
+          }
+        ],
+        "spans": [
+          {
+            "offset": 68,
+            "length": 132
+          }
+        ],
+        "elements": [
+          "/paragraphs/1",
+          "/paragraphs/2",
+          "/paragraphs/3",
+          "/paragraphs/4",
+          "/paragraphs/5",
+          "/paragraphs/6",
+          "/paragraphs/7",
+          "/paragraphs/8",
+          "/paragraphs/9",
+          "/paragraphs/10",
+          "/paragraphs/11",
+          "/paragraphs/12",
+          "/paragraphs/13",
+          "/paragraphs/14",
+          "/paragraphs/15",
+          "/paragraphs/16",
+          "/paragraphs/17"
+        ]
+      }
+    ]
+  }
+}
