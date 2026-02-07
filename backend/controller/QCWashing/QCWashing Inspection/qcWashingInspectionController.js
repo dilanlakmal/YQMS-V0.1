@@ -727,9 +727,11 @@ export const saveQCWashingDefectData = async (req, res) => {
           if (defect.defectImages) {
             defect.defectImages = defect.defectImages.map((img, imgIdx) => {
               // Standardize the key to match the absolute index from the frontend
-              const fileKey = isMultiOrBatch 
-                ? `defectImages_MULTI_${pcIdx}_${defectIdx}_${imgIdx}`
-                : `defectImages_${pcIdx}_${defectIdx}_${imgIdx}`;
+              // const fileKey = isMultiOrBatch 
+              //   ? `defectImages_MULTI_${pcIdx}_${defectIdx}_${imgIdx}`
+              //   : `defectImages_${pcIdx}_${defectIdx}_${imgIdx}`;
+
+              const fileKey = `defectImages_${pcIdx}_${defectIdx}_${imgIdx}`;
 
               const newImageUrl = fileMap[fileKey];
               if (newImageUrl) return newImageUrl;
@@ -796,7 +798,8 @@ export const updateQCWashingDefectData = async (req, res) => {
         const isBatch = String(pc.pcNumber).startsWith("BATCH-");
         
         const updatedPcDefects = (pc.pcDefects || []).map((defect, defectIdx) => {
-          const fieldPrefix = isBatch ? `defectImages_MULTI_${pcIdx}` : `defectImages_${pcIdx}`;
+          // const fieldPrefix = isBatch ? `defectImages_MULTI_${pcIdx}` : `defectImages_${pcIdx}`;
+           const fieldPrefix = `defectImages_${pcIdx}`;
           
           const defectImages = (defect.defectImages || []).map((img, imgIdx) => {
             const fileKey = `${fieldPrefix}_${defectIdx}_${imgIdx}`;

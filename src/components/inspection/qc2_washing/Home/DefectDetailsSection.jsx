@@ -350,18 +350,19 @@ const DefectDetailsSection = ({
     comment,
   };
 
-  let singlePcCounter = 0;
-  
   // 1. Process Single PC Defects (Only numeric keys)
   Object.entries(defectsByPc).forEach(([pcNumber, pcDefects]) => {
     // CRITICAL FIX: Skip any keys that are batches (safety check)
     if (String(pcNumber).startsWith("BATCH-")) return;
 
     const pcDefectsArr = [];
+    // Use the current length of the array as the index for the next item
+    const currentPcIndex = defectDetails.defectsByPc.length;
+
     pcDefects.forEach((defect, defectIdx) => {
       const defectImages = (defect.defectImages || []).map((img, imgIdx) => {
         if (img.file) {
-          formDataObj.append(`defectImages_${singlePcCounter}_${defectIdx}_${imgIdx}`, img.file);
+          formDataObj.append(`defectImages_${currentPcIndex}_${defectIdx}_${imgIdx}`, img.file);
           return null; 
         }
         return img.preview || img; 
@@ -382,15 +383,17 @@ const DefectDetailsSection = ({
         pcNumber: pcNumber.toString(),
         pcDefects: pcDefectsArr,
       });
-      singlePcCounter++;
     }
   });
 
   // 2. Process Multi/Batch Defects
   multiDefects.forEach((mDefect, mIdx) => {
+    const currentPcIndex = defectDetails.defectsByPc.length;
+
     const defectImages = (mDefect.defectImages || []).map((img, imgIdx) => {
       if (img.file) {
-        formDataObj.append(`defectImages_MULTI_${mIdx}_0_${imgIdx}`, img.file);
+        // You are sending: defectImages_1_0_0 (for example)
+        formDataObj.append(`defectImages_${currentPcIndex}_0_${imgIdx}`, img.file);
         return null;
       }
       return img.preview || img;
