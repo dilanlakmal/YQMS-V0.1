@@ -475,7 +475,7 @@ const SubmittedWashingDataPage = () => {
 };
 
   // Helper function to extract defect details
-  const getDefectDetails = (record) => {
+    const getDefectDetails = (record) => {
     const defects = [];
 
     // Check defectsByPc in defectDetails
@@ -486,15 +486,24 @@ const SubmittedWashingDataPage = () => {
       record.defectDetails.defectsByPc.forEach((pc) => {
         if (pc.pcDefects && Array.isArray(pc.pcDefects)) {
           pc.pcDefects.forEach((defect) => {
+            
+            // --- UPDATED LOGIC HERE ---
+            // If isMulti is true, use pcCount. If false, use defectQty.
+            const quantity = defect.isMulti 
+              ? (parseInt(defect.pcCount) || 0) 
+              : (parseInt(defect.defectQty) || 0);
+            // --------------------------
+
             const existingDefect = defects.find(
               (d) => d.name === defect.defectName
             );
+            
             if (existingDefect) {
-              existingDefect.qty += parseInt(defect.defectQty) || 0;
+              existingDefect.qty += quantity;
             } else {
               defects.push({
                 name: defect.defectName || "Unknown",
-                qty: parseInt(defect.defectQty) || 0
+                qty: quantity
               });
             }
           });

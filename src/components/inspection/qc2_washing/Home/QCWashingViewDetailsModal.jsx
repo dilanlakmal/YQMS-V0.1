@@ -185,7 +185,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
   });
 
   // Group defects by name and count occurrences
-  const defectSummary = {};
+   const defectSummary = {};
   const defectsByPc = itemData.defectDetails?.defectsByPc || [];
   defectsByPc.forEach(pc => {
     pc.pcDefects?.forEach(defect => {
@@ -193,7 +193,15 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
       if (!defectSummary[key]) {
         defectSummary[key] = { name: defect.defectName, totalQty: 0 };
       }
-      defectSummary[key].totalQty += parseInt(defect.defectQty) || 0;
+      
+      // --- UPDATED LOGIC START ---
+      // If isMulti is true, use pcCount. If false, use defectQty.
+      const quantity = defect.isMulti 
+        ? (parseInt(defect.pcCount) || 0) 
+        : (parseInt(defect.defectQty) || 0);
+      
+      defectSummary[key].totalQty += quantity;
+      // --- UPDATED LOGIC END ---
     });
   });
 

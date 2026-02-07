@@ -629,7 +629,14 @@ const getImageUrl = (imagePath) => {
                               <div className="flex items-center space-x-2">
                                 <AlertTriangle className="w-4 h-4 text-red-600" />
                                 <span className="text-sm bg-red-200 dark:bg-red-900/50 text-red-800 dark:text-red-300 px-3 py-1 rounded-full font-medium">
-                                  {pcDefect.pcDefects?.length || 0} 
+                                  {(pcDefect.pcDefects || []).reduce((sum, d) => {
+                                    // If isMulti is true, use pcCount. 
+                                    // If false, use pcCount if available, otherwise 1 (object length).
+                                    const count = d.isMulti 
+                                      ? (parseInt(d.pcCount) || 0) 
+                                      : (parseInt(d.pcCount) || 1);
+                                    return sum + count;
+                                  }, 0)} 
                                 </span>
                               </div>
                             </div>
@@ -646,13 +653,17 @@ const getImageUrl = (imagePath) => {
                                       <div className="flex items-center space-x-1">
                                         <Hash className="w-3 h-3 text-red-500" />
                                         <span className="bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 px-2 py-1 rounded-full text-xs font-medium">
-                                          {defect.defectCount || defect.defectQty}
+                                          {/* --- UPDATED LOGIC HERE --- */}
+                                          {defect.isMulti 
+                                            ? (defect.pcCount || 0) 
+                                            : (defect.defectCount || defect.defectQty || 0)}
+                                          {/* -------------------------- */}
                                         </span>
                                       </div>
                                     </div>
                                     
                                     {/* Defect Images */}
-                                   {defect.defectImages && defect.defectImages.length > 0 && (
+                                    {defect.defectImages && defect.defectImages.length > 0 && (
                                       <div className="mb-3">
                                         <div className="flex items-center space-x-2 mb-2">
                                           <Camera className="w-3 h-3 text-gray-500" />
@@ -870,7 +881,7 @@ const getImageUrl = (imagePath) => {
                                                 </span>
                                               </div>
                                             </div>
-                                            {subPoint.remark && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">Remark: {subPoint.remark}</p>}
+                                            {subPoint.remark && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Remark: {subPoint.remark}</p>}
                                             {subPoint.comparisonImages && subPoint.comparisonImages.length > 0 && (
                                               <div className="mt-2">
                                                 <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Images:</p>

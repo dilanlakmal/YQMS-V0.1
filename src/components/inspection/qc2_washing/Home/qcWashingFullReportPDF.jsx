@@ -22,7 +22,8 @@ Font.register({
     },
     {
       src: "https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-bold-webfont.ttf",
-      fontWeight: "bold"
+      fontWeight: "bold",
+      fontStyle: "italic",
     }
   ]
 });
@@ -452,7 +453,14 @@ const DefectAnalysisTable = ({
           <Text
             style={[styles.sectionTitle, { fontSize: 10, marginBottom: 8 }]}
           >
-            PC {safeString(pcDefect.garmentNo || pcDefect.pcNumber)}
+            PC {safeString(pcDefect.garmentNo || pcDefect.pcNumber)} (Total Defects: {(pcDefect.pcDefects || []).reduce((sum, d) => {
+              // If isMulti is true, use pcCount. 
+              // If false, use pcCount if available, otherwise 1.
+              const count = d.isMulti 
+                ? (parseInt(d.pcCount) || 0) 
+                : (parseInt(d.pcCount) || 1);
+              return sum + count;
+            }, 0)})
           </Text>
           {pcDefect.pcDefects && pcDefect.pcDefects.length > 0 ? (
             <View style={styles.table}>
@@ -480,8 +488,12 @@ const DefectAnalysisTable = ({
                   >
                     {safeString(defect.defectName)}
                   </Text>
-                  <Text style={[styles.tableCol, { width: "10%" }]}>
-                    {defect.defectQty || defect.defectCount || 1}
+                 <Text style={[styles.tableCol, { width: "10%" }]}>
+                    {/* --- UPDATED LOGIC HERE --- */}
+                    {defect.isMulti 
+                      ? (defect.pcCount || 0) 
+                      : (defect.defectQty || defect.defectCount || 1)}
+                    {/* -------------------------- */}
                   </Text>
                   <View
                     style={[
