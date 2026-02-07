@@ -260,24 +260,28 @@ const factoryDefectSummary = await QCWashing.aggregate([
     $group: {
       _id: {
         factory: { $ifNull: ["$factoryName", "Unknown"] },
-        defect: "$defectDetails.defectsByPc.pcDefects.defectName",
-        // Group by report ID and pcNumber to identify a UNIQUE piece
-        reportId: "$_id",
-        pcNum: "$defectDetails.defectsByPc.pcNumber"
+        defect: "$defectDetails.defectsByPc.pcDefects.defectName"
       },
-      // Sum the quantities of this defect found on this specific piece
-      qtyOnThisPiece: { $sum: "$defectDetails.defectsByPc.pcDefects.defectQty" }
-    }
-  },
-  {
-    $group: {
-      _id: {
-        factory: "$_id.factory",
-        defect: "$_id.defect"
+      // Calculate Defect Qty based on isMulti flag
+      totalQty: {
+        $sum: {
+          $cond: {
+            if: { $eq: ["$defectDetails.defectsByPc.pcDefects.isMulti", true] },
+            then: { $ifNull: ["$defectDetails.defectsByPc.pcDefects.pcCount", 0] },
+            else: { $ifNull: ["$defectDetails.defectsByPc.pcDefects.defectQty", 0] }
+          }
+        }
       },
-      totalQty: { $sum: "$qtyOnThisPiece" },
-      // Count how many unique piece entries were in the previous group
-      totalPcs: { $sum: 1 } 
+      // Calculate Affected Pieces based on isMulti flag
+      totalPcs: {
+        $sum: {
+          $cond: {
+            if: { $eq: ["$defectDetails.defectsByPc.pcDefects.isMulti", true] },
+            then: { $ifNull: ["$defectDetails.defectsByPc.pcDefects.pcCount", 0] },
+            else: 1 // For single PC entries, each row represents 1 piece
+          }
+        }
+      }
     }
   },
   { $sort: { totalQty: -1 } }
