@@ -5,15 +5,15 @@ import {
 import mongoose from "mongoose";
 
 // =========================================================================
-// HELPER: SANITIZER & DECIMAL CALCULATOR
+// HELPER: SANITIZERS & DECIMAL CALCULATORS
 // =========================================================================
 
 /**
- * Cleans a measurement string and calculates its decimal value.
- * Handles: "-1 / 4", "1/ 2", "- 0.5", etc.
+ * Cleans a TOLERANCE measurement string and calculates its decimal value.
+ * Handles: "- 1/4" → "-1/4", "-0.5", etc.
+ * ⚠️ USE ONLY FOR TOLERANCE VALUES (TolMinus, TolPlus)
  */
-
-const sanitizeSpecValue = (inputValue) => {
+const sanitizeToleranceValue = (inputValue) => {
   // 1. Extract the string
   let str = "";
   if (inputValue && typeof inputValue === "object") {
@@ -22,12 +22,10 @@ const sanitizeSpecValue = (inputValue) => {
     str = String(inputValue || "");
   }
 
-  // 2. NORMALIZE SLASHES (Crucial Fix)
-  // Replace Unicode fraction slash (U+2044) and others with standard '/'
-  // This ensures "-1⁄4" becomes "-1/4"
+  // 2. NORMALIZE SLASHES - including Unicode fraction slash (⁄ U+2044)
   str = str.replace(/\u2044/g, "/").replace(/\\/g, "/");
 
-  // 3. Remove all spaces (fixes "- 1 / 4" -> "-1/4")
+  // 3. Remove ALL spaces (tolerances need this for negative parsing)
   const cleanStr = str.replace(/\s+/g, "");
 
   // 4. Calculate Decimal
@@ -38,36 +36,224 @@ const sanitizeSpecValue = (inputValue) => {
   }
 
   try {
-    // Check if it's a fraction using the standard slash
     if (cleanStr.includes("/")) {
       const parts = cleanStr.split("/");
       if (parts.length === 2) {
         const numerator = parseFloat(parts[0]);
         const denominator = parseFloat(parts[1]);
 
-        // Ensure both parts are valid numbers and denominator is not 0
         if (!isNaN(numerator) && !isNaN(denominator) && denominator !== 0) {
           decimal = numerator / denominator;
         }
       }
     } else {
-      // It's a standard number or decimal string
       decimal = parseFloat(cleanStr);
     }
   } catch (err) {
-    console.warn(`Failed to parse decimal for value: ${str}`);
+    console.warn(`Failed to parse decimal for tolerance value: ${str}`);
     decimal = 0;
   }
 
-  // 5. Handle NaN (Not a Number)
   if (isNaN(decimal)) decimal = 0;
 
-  // 6. Return clean object
   return {
-    fraction: cleanStr, // Saved as "-1/4"
-    decimal: decimal, // Saved as -0.25
+    fraction: cleanStr,
+    decimal: decimal,
   };
 };
+
+/**
+ * Cleans a SPEC measurement string and calculates its decimal value.
+ * Handles mixed fractions: "14 1/2", "1 3/4", simple fractions: "1/2", decimals: "14.5"
+ * ⚠️ PRESERVES SPACES in mixed fractions (e.g., "14 1/2")
+ * ⚠️ USE ONLY FOR SPEC VALUES (Specs array items)
+ */
+const sanitizeSpecValue = (inputValue) => {
+  // 1. Extract the string
+  let str = "";
+  if (inputValue && typeof inputValue === "object") {
+    str = inputValue.fraction || inputValue.raw || inputValue.value || "";
+  } else {
+    str = String(inputValue || "");
+  }
+
+  // 2. NORMALIZE SLASHES
+  str = str.replace(/\u2044/g, "/").replace(/\\/g, "/");
+
+  // 3. Trim but PRESERVE internal spaces (for mixed fractions like "14 1/2")
+  const cleanStr = str.trim();
+
+  // 4. Calculate Decimal
+  let decimal = 0;
+
+  if (!cleanStr) {
+    return { fraction: "", decimal: 0 };
+  }
+
+  try {
+    // Check for mixed fraction (e.g., "14 1/2" or "-1 1/4")
+    const mixedMatch = cleanStr.match(/^(-?\d+)\s+(\d+)\/(\d+)$/);
+    if (mixedMatch) {
+      const whole = parseFloat(mixedMatch[1]);
+      const numerator = parseFloat(mixedMatch[2]);
+      const denominator = parseFloat(mixedMatch[3]);
+
+      if (
+        !isNaN(whole) &&
+        !isNaN(numerator) &&
+        !isNaN(denominator) &&
+        denominator !== 0
+      ) {
+        const fractionPart = numerator / denominator;
+        decimal = whole >= 0 ? whole + fractionPart : whole - fractionPart;
+      }
+    }
+    // Check for simple fraction (e.g., "1/2")
+    else if (cleanStr.includes("/")) {
+      const parts = cleanStr.split("/");
+      if (parts.length === 2) {
+        const numerator = parseFloat(parts[0]);
+        const denominator = parseFloat(parts[1]);
+
+        if (!isNaN(numerator) && !isNaN(denominator) && denominator !== 0) {
+          decimal = numerator / denominator;
+        }
+      }
+    }
+    // Standard number or decimal
+    else {
+      decimal = parseFloat(cleanStr);
+    }
+  } catch (err) {
+    console.warn(`Failed to parse decimal for spec value: ${str}`);
+    decimal = 0;
+  }
+
+  if (isNaN(decimal)) decimal = 0;
+
+  return {
+    fraction: cleanStr, // Preserves "14 1/2" with space
+    decimal: decimal, // 14.5
+  };
+};
+
+/**
+ * FIX TOLERANCE HELPER - Fixes bad tolerance formats
+ * Handles:
+ * - "- 1/4" → "-1/4" (remove space after minus for simple fractions)
+ * - "-1⁄8" → "-1/8" (fix Unicode fraction slash)
+ * - Calculates decimal if null/undefined
+ *
+ * Does NOT touch mixed fractions like "-1 1/4" (correct format)
+ */
+const fixToleranceFraction = (tolObj) => {
+  if (!tolObj) {
+    return { wasFixed: false, result: { fraction: "", decimal: 0 } };
+  }
+
+  let wasFixed = false;
+  let fraction = "";
+
+  // Extract fraction string
+  if (typeof tolObj === "object") {
+    fraction = tolObj.fraction || "";
+  } else {
+    fraction = String(tolObj || "");
+  }
+
+  let decimal = tolObj?.decimal;
+  const originalFraction = fraction;
+  const originalDecimal = decimal;
+
+  // Step 1: Normalize Unicode fraction slash (⁄ U+2044 → /)
+  fraction = fraction.replace(/\u2044/g, "/").replace(/\\/g, "/");
+
+  // Step 2: Fix "- 1/4" → "-1/4" and "+ 1/4" → "+1/4"
+  // Pattern: sign followed by space(s), then a SIMPLE fraction (NOT mixed)
+  // BAD: "- 1/4", "+ 1/4", "- 3/8"
+  // GOOD: "-1 1/4" (mixed fraction), "-1/4", "1/4"
+
+  // Fix negative with bad spacing (simple fraction only)
+  const negBadPattern = /^-\s+(\d+\/\d+)$/;
+  const negBadMatch = fraction.match(negBadPattern);
+  if (negBadMatch) {
+    fraction = "-" + negBadMatch[1];
+  }
+
+  // Fix positive with bad spacing
+  const posBadPattern = /^\+\s+(\d+\/\d+)$/;
+  const posBadMatch = fraction.match(posBadPattern);
+  if (posBadMatch) {
+    fraction = "+" + posBadMatch[1];
+  }
+
+  // Also handle decimal values with bad spacing like "- 0.5" or "+ 0.25"
+  const negDecPattern = /^-\s+([\d.]+)$/;
+  const negDecMatch = fraction.match(negDecPattern);
+  if (negDecMatch) {
+    fraction = "-" + negDecMatch[1];
+  }
+
+  const posDecPattern = /^\+\s+([\d.]+)$/;
+  const posDecMatch = fraction.match(posDecPattern);
+  if (posDecMatch) {
+    fraction = "+" + posDecMatch[1];
+  }
+
+  // Check if fraction was modified
+  if (fraction !== originalFraction) {
+    wasFixed = true;
+  }
+
+  // Step 3: Calculate decimal if null/undefined/NaN
+  const needsDecimalCalc =
+    decimal === null ||
+    decimal === undefined ||
+    (typeof decimal === "number" && isNaN(decimal));
+
+  if (needsDecimalCalc && fraction) {
+    // Remove all spaces for calculation
+    const cleanStr = fraction.replace(/\s+/g, "");
+
+    if (cleanStr.includes("/")) {
+      const parts = cleanStr.split("/");
+      if (parts.length === 2) {
+        const numerator = parseFloat(parts[0]);
+        const denominator = parseFloat(parts[1]);
+        if (!isNaN(numerator) && !isNaN(denominator) && denominator !== 0) {
+          decimal = numerator / denominator;
+          wasFixed = true;
+        }
+      }
+    } else {
+      const parsed = parseFloat(cleanStr);
+      if (!isNaN(parsed)) {
+        decimal = parsed;
+        wasFixed = true;
+      }
+    }
+  }
+
+  // Ensure decimal is a number
+  if (decimal === null || decimal === undefined || isNaN(decimal)) {
+    if (originalDecimal !== 0) {
+      wasFixed = true;
+    }
+    decimal = 0;
+  }
+
+  return {
+    wasFixed,
+    result: {
+      fraction: fraction,
+      decimal: decimal,
+    },
+  };
+};
+
+// =========================================================================
+// BEFORE WASH FUNCTIONS
+// =========================================================================
 
 export const getQASectionsMeasurementSpecs = async (req, res) => {
   const { moNo } = req.params;
@@ -115,13 +301,12 @@ export const getQASectionsMeasurementSpecs = async (req, res) => {
       });
     }
 
-    // Process Data (Add IDs)
+    // Process Data - Use sanitizeToleranceValue for tolerances only
     const processedSpecs = dtOrderData.BeforeWashSpecs.map((spec) => ({
       ...spec,
       id: new mongoose.Types.ObjectId().toString(),
-      // Optional: Sanitize on Read if DT_Order data is messy
-      TolMinus: sanitizeSpecValue(spec.TolMinus),
-      TolPlus: sanitizeSpecValue(spec.TolPlus),
+      TolMinus: sanitizeToleranceValue(spec.TolMinus),
+      TolPlus: sanitizeToleranceValue(spec.TolPlus),
     }));
 
     return res.status(200).json({
@@ -147,37 +332,42 @@ export const saveQASectionsMeasurementSpecs = async (req, res) => {
   }
 
   try {
-    // 🟢 SANITIZATION FIX HERE
-    // We map over the incoming specs and clean the Tolerance values
+    // Clean ONLY tolerance values, leave Specs array untouched
     const cleanedAllSpecs = allSpecs.map((spec) => ({
       ...spec,
-      TolMinus: sanitizeSpecValue(spec.TolMinus),
-      TolPlus: sanitizeSpecValue(spec.TolPlus),
+      TolMinus: sanitizeToleranceValue(spec.TolMinus),
+      TolPlus: sanitizeToleranceValue(spec.TolPlus),
     }));
 
-    // We also need to clean the selectedSpecs to match
     const cleanedSelectedSpecs = selectedSpecs.map((spec) => ({
       ...spec,
-      TolMinus: sanitizeSpecValue(spec.TolMinus),
-      TolPlus: sanitizeSpecValue(spec.TolPlus),
+      TolMinus: sanitizeToleranceValue(spec.TolMinus),
+      TolPlus: sanitizeToleranceValue(spec.TolPlus),
     }));
 
-    const updateData = {
-      Order_No: moNo,
-      AllBeforeWashSpecs: cleanedAllSpecs,
-      selectedBeforeWashSpecs: cleanedSelectedSpecs,
-      isSaveAllBeforeWashSpecs: isSaveAll ? "Yes" : "No",
-    };
-
+    // Use direct update with explicit $set for arrays
     const result = await QASectionsMeasurementSpecs.findOneAndUpdate(
-      { Order_No: moNo },
-      { $set: updateData },
-      { new: true, upsert: true, runValidators: true },
+      { Order_No: { $regex: new RegExp(`^${moNo.trim()}$`, "i") } },
+      {
+        $set: {
+          Order_No: moNo.trim(),
+          AllBeforeWashSpecs: cleanedAllSpecs,
+          selectedBeforeWashSpecs: cleanedSelectedSpecs,
+          isSaveAllBeforeWashSpecs: isSaveAll ? "Yes" : "No",
+        },
+        $currentDate: { updatedAt: true },
+      },
+      {
+        new: true,
+        upsert: true,
+        runValidators: true,
+      },
     );
 
     res.status(200).json({
       message: "Before Wash specs saved successfully.",
       data: result,
+      updatedAt: result.updatedAt,
     });
   } catch (error) {
     console.error("Error saving Before Wash specs:", error);
@@ -230,7 +420,7 @@ export const getQASectionsMeasurementSpecsAW = async (req, res) => {
       });
     }
 
-    // Transform Data & 🟢 APPLY SANITIZER
+    // Transform Data & Apply sanitizers appropriately
     const processedSpecs = dtOrderData.SizeSpec.map((item, index) => {
       const transformedSpecsValues = [];
 
@@ -238,7 +428,6 @@ export const getQASectionsMeasurementSpecsAW = async (req, res) => {
         item.Specs.forEach((sizeObj, sIdx) => {
           const sizeKey = Object.keys(sizeObj)[0];
           if (sizeKey) {
-            // Sanitize the size measurement values too
             const rawVal = sizeObj[sizeKey];
             const cleanVal = sanitizeSpecValue(rawVal);
 
@@ -252,9 +441,8 @@ export const getQASectionsMeasurementSpecsAW = async (req, res) => {
         });
       }
 
-      // Sanitize Tolerances
-      const cleanTolMinus = sanitizeSpecValue(item.ToleranceMinus);
-      const cleanTolPlus = sanitizeSpecValue(item.TolerancePlus);
+      const cleanTolMinus = sanitizeToleranceValue(item.ToleranceMinus);
+      const cleanTolPlus = sanitizeToleranceValue(item.TolerancePlus);
 
       return {
         id: new mongoose.Types.ObjectId().toString(),
@@ -290,18 +478,18 @@ export const saveQASectionsMeasurementSpecsAW = async (req, res) => {
   }
 
   try {
-    // 🟢 SANITIZE BEFORE SAVING (Just like Before Wash)
+    // Clean tolerance values with sanitizeToleranceValue
+    // Clean Specs array values with sanitizeSpecValue
     const cleanedAllSpecs = allSpecs.map((spec) => {
-      // Clean Specs Array (S, M, L values)
       const cleanSpecsValues = spec.Specs.map((s) => ({
         ...s,
-        ...sanitizeSpecValue({ fraction: s.fraction }), // Recalculate based on fraction string
+        ...sanitizeSpecValue({ fraction: s.fraction }),
       }));
 
       return {
         ...spec,
-        TolMinus: sanitizeSpecValue(spec.TolMinus),
-        TolPlus: sanitizeSpecValue(spec.TolPlus),
+        TolMinus: sanitizeToleranceValue(spec.TolMinus),
+        TolPlus: sanitizeToleranceValue(spec.TolPlus),
         Specs: cleanSpecsValues,
       };
     });
@@ -311,32 +499,298 @@ export const saveQASectionsMeasurementSpecsAW = async (req, res) => {
         ...s,
         ...sanitizeSpecValue({ fraction: s.fraction }),
       }));
+
       return {
         ...spec,
-        TolMinus: sanitizeSpecValue(spec.TolMinus),
-        TolPlus: sanitizeSpecValue(spec.TolPlus),
+        TolMinus: sanitizeToleranceValue(spec.TolMinus),
+        TolPlus: sanitizeToleranceValue(spec.TolPlus),
         Specs: cleanSpecsValues,
       };
     });
 
-    const updateData = {
-      Order_No: moNo,
-      AllAfterWashSpecs: cleanedAllSpecs,
-      selectedAfterWashSpecs: cleanedSelectedSpecs,
-    };
-
+    // Use direct update with explicit $set for arrays
     const result = await QASectionsMeasurementSpecs.findOneAndUpdate(
-      { Order_No: moNo },
-      { $set: updateData },
-      { new: true, upsert: true, runValidators: true },
+      { Order_No: { $regex: new RegExp(`^${moNo.trim()}$`, "i") } },
+      {
+        $set: {
+          Order_No: moNo.trim(),
+          AllAfterWashSpecs: cleanedAllSpecs,
+          selectedAfterWashSpecs: cleanedSelectedSpecs,
+        },
+        $currentDate: { updatedAt: true },
+      },
+      {
+        new: true,
+        upsert: true,
+        runValidators: true,
+      },
     );
 
     res.status(200).json({
       message: "After Wash specs saved successfully.",
       data: result,
+      updatedAt: result.updatedAt,
     });
   } catch (error) {
     console.error("Error saving AW measurement specs:", error);
     res.status(500).json({ error: error.message });
+  }
+};
+
+// =========================================================================
+// FIX TOLERANCE VALUES - BULK UPDATE
+// =========================================================================
+
+/**
+ * Fixes all tolerance values across all documents in the collection
+ * - Fixes "- 1/4" → "-1/4" (bad spacing)
+ * - Fixes Unicode fraction slash "⁄" → "/"
+ * - Calculates decimal if null/undefined
+ * - Does NOT touch Specs arrays
+ */
+export const fixAllToleranceValues = async (req, res) => {
+  try {
+    // Fetch all documents
+    const allDocs = await QASectionsMeasurementSpecs.find({});
+
+    let totalDocumentsChecked = allDocs.length;
+    let totalDocumentsUpdated = 0;
+    let totalTolerancesFixed = 0;
+    const fixDetails = [];
+
+    for (const doc of allDocs) {
+      let docModified = false;
+      let docFixCount = 0;
+
+      // Process all 4 arrays
+      const arrayFields = [
+        "AllBeforeWashSpecs",
+        "selectedBeforeWashSpecs",
+        "AllAfterWashSpecs",
+        "selectedAfterWashSpecs",
+      ];
+
+      for (const fieldName of arrayFields) {
+        const arr = doc[fieldName];
+        if (!Array.isArray(arr) || arr.length === 0) continue;
+
+        for (let i = 0; i < arr.length; i++) {
+          const item = arr[i];
+
+          // Fix TolMinus
+          if (item.TolMinus) {
+            const fixedMinus = fixToleranceFraction(item.TolMinus);
+            if (fixedMinus.wasFixed) {
+              arr[i].TolMinus = fixedMinus.result;
+              docModified = true;
+              docFixCount++;
+              totalTolerancesFixed++;
+            }
+          }
+
+          // Fix TolPlus
+          if (item.TolPlus) {
+            const fixedPlus = fixToleranceFraction(item.TolPlus);
+            if (fixedPlus.wasFixed) {
+              arr[i].TolPlus = fixedPlus.result;
+              docModified = true;
+              docFixCount++;
+              totalTolerancesFixed++;
+            }
+          }
+        }
+
+        // Mark the array as modified for Mongoose
+        if (docModified) {
+          doc.markModified(fieldName);
+        }
+      }
+
+      if (docModified) {
+        await doc.save();
+        totalDocumentsUpdated++;
+        fixDetails.push({
+          Order_No: doc.Order_No,
+          fixesApplied: docFixCount,
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Tolerance fix completed successfully.`,
+      summary: {
+        totalDocumentsChecked,
+        totalDocumentsUpdated,
+        totalTolerancesFixed,
+      },
+      details: fixDetails,
+    });
+  } catch (error) {
+    console.error("Error fixing tolerance values:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Fix tolerances for a single order
+ */
+export const fixTolerancesByOrder = async (req, res) => {
+  const { moNo } = req.params;
+
+  if (!moNo) {
+    return res.status(400).json({ message: "MO Number is required." });
+  }
+
+  try {
+    const doc = await QASectionsMeasurementSpecs.findOne({
+      Order_No: { $regex: new RegExp(`^${moNo.trim()}$`, "i") },
+    });
+
+    if (!doc) {
+      return res.status(404).json({
+        message: `No record found for Order No: ${moNo}`,
+      });
+    }
+
+    let docModified = false;
+    let totalFixed = 0;
+
+    const arrayFields = [
+      "AllBeforeWashSpecs",
+      "selectedBeforeWashSpecs",
+      "AllAfterWashSpecs",
+      "selectedAfterWashSpecs",
+    ];
+
+    for (const fieldName of arrayFields) {
+      const arr = doc[fieldName];
+      if (!Array.isArray(arr) || arr.length === 0) continue;
+
+      for (let i = 0; i < arr.length; i++) {
+        const item = arr[i];
+
+        if (item.TolMinus) {
+          const fixedMinus = fixToleranceFraction(item.TolMinus);
+          if (fixedMinus.wasFixed) {
+            arr[i].TolMinus = fixedMinus.result;
+            docModified = true;
+            totalFixed++;
+          }
+        }
+
+        if (item.TolPlus) {
+          const fixedPlus = fixToleranceFraction(item.TolPlus);
+          if (fixedPlus.wasFixed) {
+            arr[i].TolPlus = fixedPlus.result;
+            docModified = true;
+            totalFixed++;
+          }
+        }
+      }
+
+      if (docModified) {
+        doc.markModified(fieldName);
+      }
+    }
+
+    if (docModified) {
+      await doc.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: docModified
+        ? `Fixed ${totalFixed} tolerance values for ${moNo}`
+        : `No fixes needed for ${moNo}`,
+      Order_No: doc.Order_No,
+      tolerancesFixed: totalFixed,
+    });
+  } catch (error) {
+    console.error("Error fixing tolerances for order:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Preview tolerance issues without fixing
+ */
+export const previewToleranceIssues = async (req, res) => {
+  try {
+    const allDocs = await QASectionsMeasurementSpecs.find({});
+
+    const issues = [];
+
+    for (const doc of allDocs) {
+      const orderIssues = {
+        Order_No: doc.Order_No,
+        problems: [],
+      };
+
+      const arrayFields = [
+        "AllBeforeWashSpecs",
+        "selectedBeforeWashSpecs",
+        "AllAfterWashSpecs",
+        "selectedAfterWashSpecs",
+      ];
+
+      for (const fieldName of arrayFields) {
+        const arr = doc[fieldName];
+        if (!Array.isArray(arr) || arr.length === 0) continue;
+
+        for (const item of arr) {
+          // Check TolMinus
+          if (item.TolMinus) {
+            const fixed = fixToleranceFraction(item.TolMinus);
+            if (fixed.wasFixed) {
+              orderIssues.problems.push({
+                field: fieldName,
+                point: item.MeasurementPointEngName,
+                type: "TolMinus",
+                original: item.TolMinus,
+                corrected: fixed.result,
+              });
+            }
+          }
+
+          // Check TolPlus
+          if (item.TolPlus) {
+            const fixed = fixToleranceFraction(item.TolPlus);
+            if (fixed.wasFixed) {
+              orderIssues.problems.push({
+                field: fieldName,
+                point: item.MeasurementPointEngName,
+                type: "TolPlus",
+                original: item.TolPlus,
+                corrected: fixed.result,
+              });
+            }
+          }
+        }
+      }
+
+      if (orderIssues.problems.length > 0) {
+        issues.push(orderIssues);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      totalDocumentsWithIssues: issues.length,
+      totalProblems: issues.reduce((acc, i) => acc + i.problems.length, 0),
+      issues,
+    });
+  } catch (error) {
+    console.error("Error previewing tolerance issues:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 };
