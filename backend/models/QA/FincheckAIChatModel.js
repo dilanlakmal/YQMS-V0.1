@@ -18,6 +18,12 @@ const createFincheckAIChatModel = (connection) => {
         isError: { type: Boolean, default: false },
         errorType: { type: String, default: null }, // 'api_error', 'db_error', 'parse_error'
 
+        modelUsed: {
+          type: String,
+          enum: ["gemini", "groq", null],
+          default: null,
+        },
+
         // Query/Function tracking
         queryExecuted: { type: mongoose.Schema.Types.Mixed, default: null }, // Stores the query that was run
         functionCalled: { type: String, default: null }, // e.g., 'calculateAQL'

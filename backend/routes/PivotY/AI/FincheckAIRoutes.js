@@ -15,6 +15,7 @@ import {
   getUserAIStats,
   addChatTags,
   getPinnedChats,
+  getAIStatus,
 } from "../../../controller/PivotY/AI/FincheckAIController.js";
 
 const router = express.Router();
@@ -39,5 +40,7 @@ router.get("/api/fincheck-ai/pinned", getPinnedChats);
 // Stats
 router.get("/api/fincheck-ai/stats", getQuickStats);
 router.get("/api/fincheck-ai/user-stats", getUserAIStats);
+
+router.get("/api/fincheck-ai/status", getAIStatus);
 
 export default router;

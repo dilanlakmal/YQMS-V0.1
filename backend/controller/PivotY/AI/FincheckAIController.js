@@ -4,12 +4,19 @@ import {
   QASectionsAqlBuyerConfig,
 } from "../../MongoDB/dbConnectionController.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 
 // --- CONFIGURATION ---
 const HARDCODED_KEY = "your-harcoded-key-xxx";
-const API_KEY = process.env.GEMINI_API_KEY || HARDCODED_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || HARDCODED_KEY; // ✅ Correct name
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-const genAI = new GoogleGenerativeAI(API_KEY);
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY); // ✅ Correct name
+const groq = GROQ_API_KEY ? new Groq({ apiKey: GROQ_API_KEY }) : null;
+
+// Track which model is being used
+let currentModel = "gemini";
+let geminiRateLimitResetTime = null;
 
 // ============================================================================
 // SCHEMA CONTEXT - DETAILED FOR AI UNDERSTANDING
@@ -21,7 +28,7 @@ MAIN FIELDS:
 - reportId (Number): Unique report ID (e.g., 7582054152)
 - inspectionDate (Date): When the inspection occurred
 - inspectionType (String): "first" or "re" (re-inspection)
-- buyer (String): Buyer/Brand name (e.g., "Zara", "H&M", "Uniqlo")
+- buyer (String) - **IMPORTANT: Only use actual buyer names from the database. Common buyers include: Aritzia, Costco, ANF, Reitmans, MWW, Elite**
 - orderNos (Array of Strings): PO/Order numbers
 - orderNosString (String): Comma-separated order numbers
 - orderType (String): "single", "multi", or "batch"
@@ -41,7 +48,7 @@ INSPECTION DETAILS (nested in inspectionDetails):
 - inspectedQty (Number): Total pieces inspected - CRITICAL FOR AQL
 - aqlSampleSize (Number): AQL sample size
 - cartonQty (Number): Number of cartons
-- shippingStage (String): e.g., "FRI", "DRI", "Size Set"
+- shippingStage (String): e.g., "D1", "D2", "D3"
 - totalOrderQty (Number): Total order quantity
 - custStyle (String): Customer style code
 - customer (String): Customer name
@@ -97,11 +104,14 @@ TIMESTAMPS:
 
 IMPORTANT RULES FOR QUERYING:
 1. For order numbers: Use orderNos array or orderNosString
-2. For buyer search: buyer field (case-sensitive)
+2. For buyer search: buyer field (use exact names from database)
 3. For inspector: empId or empName
 4. For date range: inspectionDate with $gte, $lte
 5. For AQL reports: inspectionMethod === "AQL"
 6. For Fixed reports: inspectionMethod === "Fixed"
+7. **NEVER fabricate or assume buyer names - always query the database first**
+8. When asked about "today", use current date comparison
+9. When listing results, ALWAYS show actual data from database, not examples
 `;
 
 const AQL_CALCULATION_CONTEXT = `
@@ -143,17 +153,24 @@ YOUR CAPABILITIES:
 5. Compare inspections across time periods
 6. Provide quality insights and recommendations
 
-RESPONSE RULES:
+CRITICAL RESPONSE RULES:
 1. For GENERAL questions about QA/AQL concepts, answer directly with expertise.
 2. For DATA-SPECIFIC questions, you MUST request data using the QUERY or FUNCTION prefix.
+3. **NEVER make up or fabricate data** - ALWAYS query the database first
+4. **NEVER use example buyer names** - only show actual buyers from query results
+5. When you receive SYSTEM_DATA_RESULT with empty array [], clearly state "No reports found" instead of showing examples
+6. If asked about "today", calculate today's date range correctly
 
 QUERY FORMAT (for fetching data):
 QUERY: {"reportId": 7582054152}
-QUERY: {"buyer": "Zara", "status": "completed", "limit": 5}
-QUERY: {"inspectionDate": {"$gte": "2024-01-01"}, "limit": 10}
-QUERY: {"orderNos": "PO12345"}
+QUERY: {"buyer": "Aritzia", "status": "completed", "limit": 5}
+QUERY: {"inspectionDate": {"$gte": "2026-01-01"}, "limit": 10}
+QUERY: {"orderNos": "GPAR12345"}
 QUERY: {"defectAnalysis": true, "reportId": 7582054152}
 QUERY: {"aqlCalculation": true, "reportId": 7582054152}
+
+For "today" queries, use:
+QUERY: {"inspectionDate": {"$gte": "[TODAY_START]", "$lte": "[TODAY_END]"}, "limit": 20}
 
 FUNCTION FORMAT (for special calculations):
 FUNCTION: calculateAQL(reportId: 7582054152)
@@ -167,14 +184,74 @@ FORMATTING:
 - Use bullet points for lists
 - Present data in clear, structured formats
 - When showing defect summaries, always show: Defect Code, Name, Minor/Major/Critical counts
+- When showing AQL results, clearly indicate PASS/FAIL with proper formatting
 
 NEVER make up data. Always query first.
 When you receive SYSTEM_DATA_RESULT, analyze it thoroughly and answer the user's question.
+
+**IMPORTANT**: 
+- If query returns empty results, say "No reports found for [criteria]"
+- Do NOT provide example data or sample reports
+- Do NOT mention buyers not in the actual query results
+- Always show the actual reportId, buyer, and other fields from the database
 `;
 
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
+
+/**
+ * Get today's date range (start and end of day)
+ */
+const getTodayDateRange = () => {
+  const now = new Date();
+  const startOfDay = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    0,
+    0,
+    0,
+  );
+  const endOfDay = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    23,
+    59,
+    59,
+  );
+  return { startOfDay, endOfDay };
+};
+
+/**
+ * Get this week's date range
+ */
+const getThisWeekDateRange = () => {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - dayOfWeek);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  endOfWeek.setHours(23, 59, 59, 999);
+
+  return { startOfWeek, endOfWeek };
+};
+
+/**
+ * Get last N days date range
+ */
+const getLastNDaysRange = (days) => {
+  const now = new Date();
+  const startDate = new Date(now);
+  startDate.setDate(now.getDate() - days);
+  startDate.setHours(0, 0, 0, 0);
+
+  return { startDate, endDate: now };
+};
 
 /**
  * Calculate defect totals from defectData array
@@ -599,11 +676,14 @@ const buildSmartQuery = (queryParams) => {
         query.reportId = parseInt(value);
         break;
       case "buyer":
-        query.buyer = { $regex: value, $options: "i" };
+        // Exact match or regex for partial match
+        if (typeof value === "string") {
+          query.buyer = { $regex: new RegExp(`^${value}$`, "i") }; // Case-insensitive exact match
+        }
         break;
       case "orderNo":
       case "orderNos":
-        query.orderNos = { $in: [value] };
+        query.orderNos = { $in: Array.isArray(value) ? value : [value] };
         break;
       case "empId":
         query.empId = value;
@@ -632,6 +712,33 @@ const buildSmartQuery = (queryParams) => {
       case "custStyle":
         query["inspectionDetails.custStyle"] = { $regex: value, $options: "i" };
         break;
+
+      // Enhanced Date Handling
+      case "today":
+        if (value === true) {
+          const { startOfDay, endOfDay } = getTodayDateRange();
+          query.inspectionDate = { $gte: startOfDay, $lte: endOfDay };
+        }
+        break;
+      case "thisWeek":
+        if (value === true) {
+          const { startOfWeek, endOfWeek } = getThisWeekDateRange();
+          query.inspectionDate = { $gte: startOfWeek, $lte: endOfWeek };
+        }
+        break;
+      case "last7days":
+        if (value === true) {
+          const { startDate, endDate } = getLastNDaysRange(7);
+          query.inspectionDate = { $gte: startDate, $lte: endDate };
+        }
+        break;
+      case "last30days":
+        if (value === true) {
+          const { startDate, endDate } = getLastNDaysRange(30);
+          query.inspectionDate = { $gte: startDate, $lte: endDate };
+        }
+        break;
+
       case "inspectionDate":
         if (typeof value === "object") {
           query.inspectionDate = {};
@@ -649,6 +756,7 @@ const buildSmartQuery = (queryParams) => {
         query.inspectionDate = query.inspectionDate || {};
         query.inspectionDate.$lte = new Date(value);
         break;
+
       // Skip special flags
       case "defectAnalysis":
       case "aqlCalculation":
@@ -918,6 +1026,116 @@ const executeFunction = async (funcName, params) => {
   }
 };
 
+/**
+ * Check if error is a rate limit error
+ */
+const isRateLimitError = (error) => {
+  const errorMessage = error?.message?.toLowerCase() || "";
+  const errorStatus = error?.status || error?.response?.status;
+
+  return (
+    errorStatus === 429 ||
+    errorMessage.includes("429") ||
+    errorMessage.includes("rate_limit") ||
+    errorMessage.includes("rate limit") ||
+    errorMessage.includes("quota") ||
+    errorMessage.includes("resource_exhausted") ||
+    errorMessage.includes("too many requests")
+  );
+};
+
+/**
+ * Call Groq API
+ */
+const callGroqAPI = async (messages, systemInstruction) => {
+  if (!groq) {
+    throw new Error("Groq API key not configured");
+  }
+
+  console.log("🤖 Using Groq API (openai/gpt-oss-120b)");
+
+  // Convert messages to Groq format
+  const groqMessages = [
+    {
+      role: "system",
+      content: systemInstruction,
+    },
+    ...messages.map((msg) => ({
+      role: msg.role === "user" ? "user" : "assistant",
+      content: msg.content,
+    })),
+  ];
+
+  const completion = await groq.chat.completions.create({
+    model: "openai/gpt-oss-120b", // Your specified model
+    messages: groqMessages,
+    temperature: 0.7,
+    max_tokens: 4096,
+    top_p: 0.9,
+  });
+
+  return completion.choices[0]?.message?.content || "";
+};
+
+/**
+ * Send follow-up message to Groq
+ */
+const sendGroqFollowUp = async (allMessages, followUpPrompt) => {
+  const messagesWithFollowUp = [
+    ...allMessages.map((msg) => ({
+      role: msg.role === "user" ? "user" : "assistant",
+      content: msg.content,
+    })),
+    {
+      role: "user",
+      content: followUpPrompt,
+    },
+  ];
+
+  const groqMessages = [
+    {
+      role: "system",
+      content: SYSTEM_INSTRUCTION,
+    },
+    ...messagesWithFollowUp,
+  ];
+
+  const completion = await groq.chat.completions.create({
+    model: "openai/gpt-oss-120b",
+    messages: groqMessages,
+    temperature: 0.7,
+    max_tokens: 4096,
+    top_p: 0.9,
+  });
+
+  return completion.choices[0]?.message?.content || "";
+};
+
+/**
+ * Generate title using Groq
+ */
+const generateTitleWithGroq = async (message) => {
+  try {
+    const completion = await groq.chat.completions.create({
+      model: "openai/gpt-oss-120b",
+      messages: [
+        {
+          role: "user",
+          content: `Based on this question: "${message.substring(0, 100)}", generate a very short title (max 35 chars) for this conversation. Just respond with the title, nothing else.`,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 50,
+    });
+    return (
+      completion.choices[0]?.message?.content?.trim().replace(/"/g, "") ||
+      message.substring(0, 35) + "..."
+    );
+  } catch {
+    return message.substring(0, 35) + "...";
+  }
+};
+
 // ============================================================================
 // API ENDPOINTS
 // ============================================================================
@@ -976,10 +1194,11 @@ export const sendMessage = async (req, res) => {
   try {
     const { chatId, message } = req.body;
 
-    if (!API_KEY) {
+    // Check if at least one API key is configured
+    if (!GEMINI_API_KEY && !GROQ_API_KEY) {
       return res
         .status(500)
-        .json({ success: false, error: "API Key not configured" });
+        .json({ success: false, error: "No API Key configured" });
     }
 
     const chat = await FincheckAIChat.findById(chatId);
@@ -992,29 +1211,128 @@ export const sendMessage = async (req, res) => {
     // 1. Add User Message
     chat.messages.push({ role: "user", content: message });
 
-    // 2. Prepare History for AI
-    const history = chat.messages.slice(0, -1).map((msg) => ({
-      role: msg.role === "user" ? "user" : "model",
-      parts: [{ text: msg.content }],
-    }));
+    // 2. Preprocess message for date keywords
+    let enhancedMessage = message;
+    const lowerMsg = message.toLowerCase();
 
-    // 3. Initialize Model
-    const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
-      systemInstruction: SYSTEM_INSTRUCTION,
-      generationConfig: {
-        temperature: 0.7,
-        topP: 0.9,
-        topK: 40,
-        maxOutputTokens: 4096,
-      },
-    });
+    if (lowerMsg.includes("today") && !lowerMsg.includes("yesterday")) {
+      enhancedMessage += `\n\n[SYSTEM HINT: For "today", use this query: {"today": true}]`;
+    } else if (lowerMsg.includes("this week")) {
+      enhancedMessage += `\n\n[SYSTEM HINT: For "this week", use this query: {"thisWeek": true}]`;
+    } else if (
+      lowerMsg.includes("last 7 days") ||
+      lowerMsg.includes("past week")
+    ) {
+      enhancedMessage += `\n\n[SYSTEM HINT: Use this query: {"last7days": true}]`;
+    } else if (
+      lowerMsg.includes("last month") ||
+      lowerMsg.includes("last 30 days")
+    ) {
+      enhancedMessage += `\n\n[SYSTEM HINT: Use this query: {"last30days": true}]`;
+    }
 
-    const chatSession = model.startChat({ history });
+    // 3. Determine which model to use
+    let useGroq = false;
+
+    // Check if Gemini is in rate limit cooldown
+    if (geminiRateLimitResetTime && Date.now() < geminiRateLimitResetTime) {
+      console.log("⚠️ Gemini still in rate limit cooldown, using Groq");
+      useGroq = true;
+      currentModel = "groq";
+    }
+
+    let responseText = "";
+    let chatSession = null;
+    let usedModel = "gemini";
 
     // 4. First Call to AI
-    let result = await chatSession.sendMessage(message);
-    let responseText = result.response.text();
+    if (!useGroq) {
+      // TRY GEMINI FIRST
+      try {
+        console.log("🔷 Attempting Gemini API (gemini-3-flash-preview)...");
+
+        // Prepare History for Gemini
+        const history = chat.messages.slice(0, -1).map((msg) => ({
+          role: msg.role === "user" ? "user" : "model",
+          parts: [{ text: msg.content }],
+        }));
+
+        // Initialize Gemini Model
+        const model = genAI.getGenerativeModel({
+          model: "gemini-3-flash-preview",
+          systemInstruction: SYSTEM_INSTRUCTION,
+          generationConfig: {
+            temperature: 0.7,
+            topP: 0.9,
+            topK: 40,
+            maxOutputTokens: 4096,
+          },
+        });
+
+        chatSession = model.startChat({ history });
+
+        // Send message to Gemini
+        const result = await chatSession.sendMessage(enhancedMessage);
+        responseText = result.response.text();
+        usedModel = "gemini";
+        currentModel = "gemini";
+        geminiRateLimitResetTime = null; // Reset on success
+
+        console.log("✅ Gemini API responded successfully");
+      } catch (geminiError) {
+        console.error("❌ Gemini Error:", geminiError.message);
+
+        // Check if rate limit error
+        if (isRateLimitError(geminiError)) {
+          console.log("🔄 Gemini rate limit hit! Switching to Groq...");
+          useGroq = true;
+          currentModel = "groq";
+          // Set cooldown for 60 minutes
+          geminiRateLimitResetTime = Date.now() + 60 * 60 * 1000;
+        } else {
+          // Non-rate-limit error, try Groq as backup
+          console.log(
+            "⚠️ Gemini failed with non-rate-limit error, trying Groq...",
+          );
+          useGroq = true;
+        }
+      }
+    }
+
+    // USE GROQ (either as fallback or primary if Gemini is rate limited)
+    if (useGroq) {
+      if (!groq) {
+        return res.status(500).json({
+          success: false,
+          error: "Gemini API unavailable and Groq API key not configured",
+        });
+      }
+
+      try {
+        console.log("🟢 Using Groq API...");
+
+        // Prepare messages for Groq (include enhanced message)
+        const messagesForGroq = [
+          ...chat.messages.slice(0, -1), // Previous messages
+          { role: "user", content: enhancedMessage }, // Current message with hints
+        ];
+
+        responseText = await callGroqAPI(messagesForGroq, SYSTEM_INSTRUCTION);
+        usedModel = "groq";
+
+        console.log("✅ Groq API responded successfully");
+      } catch (groqError) {
+        console.error("❌ Groq Error:", groqError.message);
+        return res.status(500).json({
+          success: false,
+          error: "Both AI services failed. Please try again later.",
+          details:
+            process.env.NODE_ENV === "development"
+              ? groqError.message
+              : undefined,
+        });
+      }
+    }
 
     // 5. Check if AI wants data
     const aiRequest = parseAIRequest(responseText);
@@ -1024,10 +1342,11 @@ export const sendMessage = async (req, res) => {
         let dataResult;
 
         if (aiRequest.type === "QUERY") {
+          console.log("📊 AI Requested QUERY:", aiRequest.params);
           dataResult = await executeEnrichedQuery(aiRequest.params);
         } else if (aiRequest.type === "FUNCTION") {
           console.log(
-            `AI Requested FUNCTION: ${aiRequest.name}`,
+            `📊 AI Requested FUNCTION: ${aiRequest.name}`,
             aiRequest.params,
           );
           dataResult = await executeFunction(aiRequest.name, aiRequest.params);
@@ -1042,42 +1361,69 @@ SYSTEM_DATA_RESULT:
 ${dataString}
 \`\`\`
 
-Now analyze this data and provide a comprehensive, well-formatted answer to the user's original question: "${message}"
+**IMPORTANT INSTRUCTIONS:**
+1. Analyze ONLY the data provided above
+2. If the array is empty [], clearly state "No reports found matching your criteria"
+3. DO NOT provide example or sample data
+4. Show actual reportId, buyer, orderNos from the results
+5. Format the response clearly with proper structure
 
-Remember to:
-- Format numbers clearly
-- Highlight important findings
-- If this is an AQL report, explain the pass/fail status
-- For defects, show the breakdown by severity
-- Use tables or lists for better readability
+Now provide a comprehensive, well-formatted answer to the user's original question: "${message}"
+
+${aiRequest.type === "QUERY" && dataResult.length === 0 ? "\n⚠️ The query returned NO RESULTS. Inform the user clearly." : ""}
 `;
 
-        result = await chatSession.sendMessage(followUpPrompt);
-        responseText = result.response.text();
+        // Send follow-up based on which model we're using
+        if (usedModel === "gemini" && chatSession) {
+          const followUpResult = await chatSession.sendMessage(followUpPrompt);
+          responseText = followUpResult.response.text();
+        } else {
+          // Use Groq for follow-up
+          responseText = await sendGroqFollowUp(chat.messages, followUpPrompt);
+        }
       } catch (dbError) {
         console.error("Data Fetch Error:", dbError);
         responseText = `I encountered an error while fetching data: ${dbError.message}. Please try rephrasing your question or provide more specific criteria.`;
       }
     }
 
-    // 6. Save AI Response
-    chat.messages.push({ role: "model", content: responseText });
+    // 6. Save AI Response with metadata
+    chat.messages.push({
+      role: "model",
+      content: responseText,
+      metadata: {
+        modelUsed: usedModel, // Track which model was used
+        dataFetched: !!aiRequest,
+        queryExecuted: aiRequest?.params || null,
+        functionCalled: aiRequest?.type === "FUNCTION" ? aiRequest.name : null,
+      },
+    });
 
     // 7. Update Chat Title if new
     if (chat.messages.length <= 4 && chat.title === "New Conversation") {
-      // Generate a smart title
-      const titlePrompt = `Based on this question: "${message.substring(0, 100)}", generate a very short title (max 35 chars) for this conversation. Just respond with the title, nothing else.`;
-      try {
-        const titleResult = await model.generateContent(titlePrompt);
-        const newTitle = titleResult.response.text().trim().replace(/"/g, "");
-        chat.title = newTitle.substring(0, 40);
-      } catch {
-        chat.title = message.substring(0, 35) + "...";
+      if (usedModel === "gemini" && chatSession) {
+        const titlePrompt = `Based on this question: "${message.substring(0, 100)}", generate a very short title (max 35 chars) for this conversation. Just respond with the title, nothing else.`;
+        try {
+          const model = genAI.getGenerativeModel({
+            model: "gemini-3-flash-preview",
+          });
+          const titleResult = await model.generateContent(titlePrompt);
+          const newTitle = titleResult.response.text().trim().replace(/"/g, "");
+          chat.title = newTitle.substring(0, 40);
+        } catch {
+          chat.title = message.substring(0, 35) + "...";
+        }
+      } else {
+        // Use Groq for title generation
+        chat.title = await generateTitleWithGroq(message);
       }
     }
 
     chat.updatedAt = new Date();
     await chat.save();
+
+    // Log which model was used (for debugging)
+    console.log(`📤 Response sent using: ${usedModel.toUpperCase()}`);
 
     return res.status(200).json({ success: true, data: chat });
   } catch (error) {
@@ -1379,6 +1725,31 @@ export const getPinnedChats = async (req, res) => {
       .sort({ lastActivityAt: -1 });
 
     return res.status(200).json({ success: true, data: chats });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// --- Get AI Status ---
+export const getAIStatus = async (req, res) => {
+  try {
+    const cooldownMinutesRemaining = geminiRateLimitResetTime
+      ? Math.max(
+          0,
+          Math.ceil((geminiRateLimitResetTime - Date.now()) / 1000 / 60),
+        )
+      : 0;
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        currentModel,
+        geminiAvailable:
+          !geminiRateLimitResetTime || Date.now() >= geminiRateLimitResetTime,
+        groqAvailable: !!GROQ_API_KEY,
+        geminiCooldownMinutes: cooldownMinutesRemaining,
+      },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

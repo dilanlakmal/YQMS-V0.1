@@ -171,19 +171,35 @@ const QuickActions = ({ onAction, empId, collapsed = false }) => {
         borderColor: "border-indigo-200 dark:border-indigo-800",
         actions: [
           {
-            label: "Zara Reports",
+            label: "Aritzia Reports",
             prompt:
-              "Show me the latest 5 Zara inspection reports with their AQL results",
+              "Show me the latest 5 Aritzia inspection reports with their AQL results",
             icon: FileSearch,
           },
           {
-            label: "H&M Reports",
-            prompt: "Show me H&M inspection reports from this month",
+            label: "Costco Reports",
+            prompt: "Show me Costco inspection reports from this month",
             icon: FileSearch,
           },
           {
-            label: "Uniqlo Reports",
-            prompt: "Show Uniqlo inspection reports with defect summary",
+            label: "ANF Reports",
+            prompt: "Show ANF inspection reports with defect summary",
+            icon: FileSearch,
+          },
+          {
+            label: "Reitmans Reports",
+            prompt: "Show Reitmans inspection reports with defect summary",
+            icon: FileSearch,
+          },
+          {
+            label: "MWW Reports",
+            prompt: "Show MWW inspection reports with defect summary",
+            icon: FileSearch,
+          },
+          {
+            label: "Elite Reports",
+            prompt:
+              "Show Elite Sub orders inspection reports with defect summary",
             icon: FileSearch,
           },
           {
@@ -254,14 +270,15 @@ const QuickActions = ({ onAction, empId, collapsed = false }) => {
         borderColor: "border-amber-200 dark:border-amber-800",
         actions: [
           {
-            label: "Search by PO",
+            label: "Search by Order No",
             prompt:
-              "Search for inspection report with PO number: [Enter PO number]",
+              "Search for inspection report with Order number: [Enter Order No number]",
             icon: Search,
           },
           {
             label: "Search by Style",
-            prompt: "Find all inspections for style: [Enter style code]",
+            prompt:
+              "Find all inspections for Customer style: [Enter Cust.Style]",
             icon: FileSearch,
           },
           {
@@ -427,7 +444,8 @@ const QuickActions = ({ onAction, empId, collapsed = false }) => {
             </p>
             <p className="text-[10px] text-indigo-600/70 dark:text-indigo-400/70 leading-relaxed">
               You can ask specific questions like "Calculate AQL for report
-              7582054152" or "Compare defects between Zara and H&M this month"
+              7582054152" or "Compare defects between Aritzia and Reitmans this
+              month"
             </p>
           </div>
         </div>
