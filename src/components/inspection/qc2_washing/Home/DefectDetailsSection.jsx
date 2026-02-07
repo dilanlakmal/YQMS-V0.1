@@ -22,6 +22,8 @@ const DefectDetailsSection = ({
   setComment,
   defectsByPc,
   setDefectsByPc,
+  multiDefects, 
+  setMultiDefects,
   normalizeImageSrc,
 }) => {
   const imageInputRef = useRef(null);
@@ -32,80 +34,77 @@ const DefectDetailsSection = ({
   const [isCapturing, setIsCapturing] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false); // Guard to prevent overwrite loops
 
-  // State for Multi-Defects (Batch)
-  const [multiDefects, setMultiDefects] = useState([]);
-
   // AQL Data
   const aql = formData.aql && formData.aql[0];
 
   // --- 1. LOAD SAVED DATA LOGIC ---
-  useEffect(() => {
-    // Only load if we have data and we haven't already loaded it for this specific recordId
-    if (formData.defectDetails && formData.defectDetails.defectsByPc && !hasLoaded) {
-      const backendDefects = formData.defectDetails.defectsByPc;
+  // useEffect(() => {
+  //   // Only load if we have data and we haven't already loaded it for this specific recordId
+  //   if (formData.defectDetails && formData.defectDetails.defectsByPc && !hasLoaded) {
+  //     const backendDefects = formData.defectDetails.defectsByPc;
       
-      const newSingleDefects = {};
-      const newMultiDefects = [];
+  //     const newSingleDefects = {};
+  //     const newMultiDefects = [];
 
-      const batchMap = new Map();
+  //     const batchMap = new Map();
       
-      backendDefects.forEach(pcItem => {
-        const firstDefect = pcItem.pcDefects?.[0];
-        const isBatch = pcItem.pcNumber && String(pcItem.pcNumber).startsWith("BATCH-");
-         const isMulti = firstDefect && (String(firstDefect.isMulti) === "true" || firstDefect.isMulti === true);
+  //     backendDefects.forEach(pcItem => {
+  //       const firstDefect = pcItem.pcDefects?.[0];
+  //       const isBatch = pcItem.pcNumber && String(pcItem.pcNumber).startsWith("BATCH-");
+  //        const isMulti = firstDefect && (String(firstDefect.isMulti) === "true" || firstDefect.isMulti === true);
 
-        if (isBatch || isMulti) {
-         const batchId = isBatch ? pcItem.pcNumber.replace("BATCH-", "") : `${Date.now()}`;
+  //       if (isBatch || isMulti) {
+  //        const batchId = isBatch ? pcItem.pcNumber.replace("BATCH-", "") : `${Date.now()}`;
           
-          // Create the batch object
-          batchMap.set(batchId, { 
-            id: batchId,
-            selectedDefect: firstDefect.defectId,
-            defectName: firstDefect.defectName,
-            pcCount: parseInt(firstDefect.pcCount) || 1, // Ensure it's a number
-            defectQty: 1,
-            defectImages: (firstDefect.defectImages || []).filter(img => img).map(img => ({
-              preview: normalizeImageSrc ? normalizeImageSrc(img) : img,
-              file: null 
-            }))
-          });
-        } else {
-          const pcNum = pcItem.pcNumber;
-          newSingleDefects[pcNum] = pcItem.pcDefects.map(d => ({
-            id: Date.now() + Math.random(),
-            selectedDefect: d.defectId,
-            defectName: d.defectName,
-            defectQty: 1,
-            isMulti: false,
-            pcCount: 1,
-            defectImages: (d.defectImages || []).filter(img => img).map(img => ({
-              preview: normalizeImageSrc ? normalizeImageSrc(img) : img,
-              file: null
-            }))
-          }));
-        }
-      });
+  //         // Create the batch object
+  //         batchMap.set(batchId, { 
+  //           id: batchId,
+  //           selectedDefect: firstDefect.defectId,
+  //           defectName: firstDefect.defectName,
+  //           pcCount: parseInt(firstDefect.pcCount) || 1, // Ensure it's a number
+  //           defectQty: 1,
+  //           defectImages: (firstDefect.defectImages || []).filter(img => img).map(img => ({
+  //             preview: normalizeImageSrc ? normalizeImageSrc(img) : img,
+  //             file: null 
+  //           }))
+  //         });
+  //       } else {
+  //         const pcNum = pcItem.pcNumber;
+  //         newSingleDefects[pcNum] = pcItem.pcDefects.map(d => ({
+  //           id: Date.now() + Math.random(),
+  //           selectedDefect: d.defectId,
+  //           defectName: d.defectName,
+  //           defectQty: 1,
+  //           isMulti: false,
+  //           pcCount: 1,
+  //           defectImages: (d.defectImages || []).filter(img => img).map(img => ({
+  //             preview: normalizeImageSrc ? normalizeImageSrc(img) : img,
+  //             file: null
+  //           }))
+  //         }));
+  //       }
+  //     });
       
-      newMultiDefects.push(...Array.from(batchMap.values()));
+  //     newMultiDefects.push(...Array.from(batchMap.values()));
 
-      setDefectsByPc(newSingleDefects);
-      setMultiDefects(newMultiDefects);
+  //     setDefectsByPc(newSingleDefects);
+  //     setMultiDefects(newMultiDefects);
       
-      if (formData.defectDetails.comment) setComment(formData.defectDetails.comment);
-      if (formData.defectDetails.additionalImages) {
-         setUploadedImages(formData.defectDetails.additionalImages.map(img => ({
-            preview: normalizeImageSrc ? normalizeImageSrc(img) : img,
-            file: null
-         })));
-      }
+  //     if (formData.defectDetails.comment) setComment(formData.defectDetails.comment);
+  //     if (formData.defectDetails.additionalImages) {
+  //        setUploadedImages(formData.defectDetails.additionalImages.map(img => ({
+  //           preview: normalizeImageSrc ? normalizeImageSrc(img) : img,
+  //           file: null
+  //        })));
+  //     }
       
-      if (backendDefects.length > 0) {
-        setIsSaved(true);
-        setIsEditing(false);
-      }
-      setHasLoaded(true); // Mark as loaded so we don't overwrite user changes later
-    } 
-  }, [formData.defectDetails, recordId]); // Depend on recordId to allow reloading if the user switches records
+  //     if (backendDefects.length > 0) {
+  //       setIsSaved(true);
+  //       setIsEditing(false);
+  //     }
+  //     setHasLoaded(true); // Mark as loaded so we don't overwrite user changes later
+  //   } 
+  // }, [formData.defectDetails, recordId]); // Depend on recordId to allow reloading if the user switches records
 
   // Reset loading guard if recordId changes
   useEffect(() => {
