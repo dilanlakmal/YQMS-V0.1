@@ -2320,7 +2320,7 @@ const YPivotQAReportMain = () => {
                       {/* Customer (Buyer) */}
                       {isColumnVisible("customer") && (
                         <td className="px-3 sm:px-5 py-3 sm:py-4 text-[11px] sm:text-xs font-bold text-gray-700 dark:text-gray-300 capitalize">
-                          {report.buyer ? report.buyer.toLowerCase() : "-"}
+                          {report.buyer || "-"}
                         </td>
                       )}
 

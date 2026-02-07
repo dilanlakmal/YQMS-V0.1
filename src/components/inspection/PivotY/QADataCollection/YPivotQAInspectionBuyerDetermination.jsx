@@ -9,7 +9,7 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  Save
+  Save,
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
@@ -25,7 +25,7 @@ const BUYER_CONFIG = {
     textClass: "text-blue-600 dark:text-blue-400",
     bgClass: "bg-blue-50 dark:bg-blue-900/30",
     borderClass: "border-blue-200 dark:border-blue-800",
-    code: "COM"
+    code: "COM",
   },
   Costco: {
     name: "Costco",
@@ -34,7 +34,7 @@ const BUYER_CONFIG = {
     textClass: "text-red-600 dark:text-red-400",
     bgClass: "bg-red-50 dark:bg-red-900/30",
     borderClass: "border-red-200 dark:border-red-800",
-    code: "CO"
+    code: "CO",
   },
   Aritzia: {
     name: "Aritzia",
@@ -43,7 +43,7 @@ const BUYER_CONFIG = {
     textClass: "text-purple-600 dark:text-purple-400",
     bgClass: "bg-purple-50 dark:bg-purple-900/30",
     borderClass: "border-purple-200 dark:border-purple-800",
-    code: "AR"
+    code: "AR",
   },
   Reitmans: {
     name: "Reitmans",
@@ -52,7 +52,7 @@ const BUYER_CONFIG = {
     textClass: "text-pink-600 dark:text-pink-400",
     bgClass: "bg-pink-50 dark:bg-pink-900/30",
     borderClass: "border-pink-200 dark:border-pink-800",
-    code: "RT"
+    code: "RT",
   },
   ANF: {
     name: "ANF",
@@ -61,7 +61,7 @@ const BUYER_CONFIG = {
     textClass: "text-indigo-600 dark:text-indigo-400",
     bgClass: "bg-indigo-50 dark:bg-indigo-900/30",
     borderClass: "border-indigo-200 dark:border-indigo-800",
-    code: "AF"
+    code: "AF",
   },
   STORI: {
     name: "STORI",
@@ -70,7 +70,16 @@ const BUYER_CONFIG = {
     textClass: "text-emerald-600 dark:text-emerald-400",
     bgClass: "bg-emerald-50 dark:bg-emerald-900/30",
     borderClass: "border-emerald-200 dark:border-emerald-800",
-    code: "NT"
+    code: "NT",
+  },
+  Elite: {
+    name: "Elite",
+    fullName: "ELITE",
+    gradientClass: "from-emerald-500 to-emerald-600",
+    textClass: "text-emerald-600 dark:text-emerald-400",
+    bgClass: "bg-emerald-50 dark:bg-emerald-900/30",
+    borderClass: "border-emerald-200 dark:border-emerald-800",
+    code: "YMCMT/H",
   },
   Unknown: {
     name: "Unknown",
@@ -79,8 +88,8 @@ const BUYER_CONFIG = {
     textClass: "text-gray-600 dark:text-gray-400",
     bgClass: "bg-gray-50 dark:bg-gray-900/30",
     borderClass: "border-gray-200 dark:border-gray-700",
-    code: "--"
-  }
+    code: "--",
+  },
 };
 
 // ============================================================
@@ -99,6 +108,8 @@ export const determineBuyerFromOrderNo = (orderNo) => {
   if (upperOrderNo.includes("RT")) return { buyer: "Reitmans" };
   if (upperOrderNo.includes("AF")) return { buyer: "ANF" };
   if (upperOrderNo.includes("NT")) return { buyer: "STORI" };
+  if (upperOrderNo.includes("YMCMT")) return { buyer: "Elite" };
+  if (upperOrderNo.includes("YMCMH")) return { buyer: "Elite" };
 
   return { buyer: "Unknown" };
 };
@@ -113,7 +124,7 @@ const ProductTypeImage = ({ imageURL, productTypeName, size = "medium" }) => {
   const sizeClasses = {
     small: "w-12 h-12",
     medium: "w-20 h-20",
-    large: "w-32 h-32"
+    large: "w-32 h-32",
   };
 
   const fullImageUrl = imageURL ? `${PUBLIC_ASSET_URL}${imageURL}` : null;
@@ -162,7 +173,7 @@ const ProductTypeSelector = ({
   onSelectProductType,
   loading,
   onSave,
-  saving
+  saving,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -170,14 +181,14 @@ const ProductTypeSelector = ({
   const filteredOptions = useMemo(() => {
     if (!searchTerm) return productTypeOptions;
     return productTypeOptions.filter((pt) =>
-      pt.EnglishProductName.toLowerCase().includes(searchTerm.toLowerCase())
+      pt.EnglishProductName.toLowerCase().includes(searchTerm.toLowerCase()),
     );
   }, [productTypeOptions, searchTerm]);
 
   const selectedOption = useMemo(() => {
     if (!selectedProductType) return null;
     return productTypeOptions.find(
-      (pt) => pt.EnglishProductName === selectedProductType
+      (pt) => pt.EnglishProductName === selectedProductType,
     );
   }, [productTypeOptions, selectedProductType]);
 
@@ -240,7 +251,7 @@ const ProductTypeSelector = ({
                         onClick={() => {
                           onSelectProductType(
                             pt.EnglishProductName,
-                            pt.imageURL
+                            pt.imageURL,
                           );
                           setIsOpen(false);
                           setSearchTerm("");
@@ -329,7 +340,7 @@ const YPivotQAInspectionBuyerDetermination = ({
   selectedOrders = [],
   orderData = null,
   orderType = "single",
-  onProductTypeUpdate // <--- FIX 1: New Prop to bubble up ID
+  onProductTypeUpdate, // <--- FIX 1: New Prop to bubble up ID
 }) => {
   // Product Type State
   const [productTypeInfo, setProductTypeInfo] = useState(null);
@@ -349,7 +360,7 @@ const YPivotQAInspectionBuyerDetermination = ({
 
     return {
       ...determination,
-      ...config
+      ...config,
     };
   }, [selectedOrders]);
 
@@ -364,7 +375,7 @@ const YPivotQAInspectionBuyerDetermination = ({
     try {
       const res = await axios.post(
         `${API_BASE_URL}/api/fincheck-inspection/order-product-type`,
-        { orderNos: selectedOrders }
+        { orderNos: selectedOrders },
       );
 
       if (res.data.success) {
@@ -396,7 +407,7 @@ const YPivotQAInspectionBuyerDetermination = ({
     setLoadingOptions(true);
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/fincheck-inspection/product-type-options`
+        `${API_BASE_URL}/api/fincheck-inspection/product-type-options`,
       );
       if (res.data.success) {
         setProductTypeOptions(res.data.data);
@@ -430,8 +441,8 @@ const YPivotQAInspectionBuyerDetermination = ({
         `${API_BASE_URL}/api/fincheck-inspection/update-product-type`,
         {
           orderNos: selectedOrders,
-          productType: selectedProductType
-        }
+          productType: selectedProductType,
+        },
       );
 
       if (res.data.success) {
@@ -440,12 +451,12 @@ const YPivotQAInspectionBuyerDetermination = ({
           ...prev,
           productType: selectedProductType,
           imageURL: res.data.data.imageURL,
-          hasProductType: true
+          hasProductType: true,
         }));
 
         // <--- FIX 3: Find ID and Propagate ID up when manually saved
         const matchedOption = productTypeOptions.find(
-          (opt) => opt.EnglishProductName === selectedProductType
+          (opt) => opt.EnglishProductName === selectedProductType,
         );
         if (matchedOption && onProductTypeUpdate) {
           onProductTypeUpdate(matchedOption._id);

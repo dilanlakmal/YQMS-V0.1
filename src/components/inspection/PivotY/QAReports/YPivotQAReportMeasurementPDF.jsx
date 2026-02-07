@@ -1344,7 +1344,7 @@ const MeasurementStatsCards = ({ stats }) => (
 // PAGINATION CONSTANTS
 // =============================================================================
 const ROWS_FIRST_PAGE = 20; // First page has summary table + stats, so fewer rows
-const ROWS_CONTINUATION_PAGE = 35; // Continuation pages can have more rows
+const ROWS_CONTINUATION_PAGE = 30; // Continuation pages can have more rows
 const SIZES_PER_TABLE = 2; // Max 2 sizes per table for readability
 
 // =============================================================================

@@ -11,9 +11,11 @@ import {
 } from "@react-pdf/renderer";
 
 import MeasurementSectionPDF from "./YPivotQAReportMeasurementPDF";
+import MeasurementValueDistributionPDF from "./YPivotQAReportMeasurementValueDistributionPDF";
 import DefectSectionPDF from "./YPivotQAReportDefectPDF";
 import YPivotQAReportPPSheetPDF from "./YPivotQAReportPPSheetPDF";
 import DefectLocationSummaryPDF from "./DefectLocationSummaryPDF";
+import DefectsByQCPDF from "./YPivotQAReportDefectsByQCPDF";
 
 // =============================================================================
 // FONT REGISTRATION (Optional - for better typography)
@@ -1765,43 +1767,12 @@ const AQLSection = ({
 // =============================================================================
 // DEFECT SUMMARY SECTION
 // =============================================================================
-const DefectSummarySection = ({
-  summaryData,
-  defectImages,
-  defectHeatmapData,
-}) => {
+const DefectSummarySection = ({ summaryData }) => {
   if (!summaryData?.groups || summaryData.groups.length === 0) {
     return null;
   }
 
-  return (
-    <>
-      {/* 1. New Table Component from external file */}
-      <DefectSectionPDF summaryData={summaryData} />
-
-      {/* 2. NEW: Defect Location Map */}
-      {defectHeatmapData && (
-        <DefectLocationSummaryPDF
-          mapData={defectHeatmapData.map}
-          counts={defectHeatmapData.counts}
-        />
-      )}
-
-      {/* 3. Existing Defect Visual Evidence Logic (Kept here as requested) */}
-      {defectImages && defectImages.length > 0 && (
-        <View style={styles.section}>
-          <Text
-            style={[styles.sectionTitle, { backgroundColor: colors.primary }]}
-          >
-            DEFECT VISUAL EVIDENCE
-          </Text>
-          <View style={styles.sectionContent}>
-            <DefectImageGrid images={defectImages} />
-          </View>
-        </View>
-      )}
-    </>
-  );
+  return <DefectSectionPDF summaryData={summaryData} />;
 };
 
 // =============================================================================
@@ -2210,6 +2181,8 @@ const YPivotQAReportPDFDocument = ({
   ppSheetDataWithImages,
   defectHeatmapData,
   sizeList = [],
+  measurementDistributionData,
+  qcDefectsData,
 }) => {
   const selectedOrders = reportData?.orderNos || [];
   const orderNo = selectedOrders.length > 0 ? selectedOrders[0] : "N/A";
@@ -2246,33 +2219,81 @@ const YPivotQAReportPDFDocument = ({
         />
       </Page>
 
-      {/* PAGE 2: AQL & Defects */}
-      {(isAQLMethod || summaryData?.groups?.length > 0) && (
+      {/* PAGE 2A: Defect Summary Table */}
+      {summaryData?.groups?.length > 0 && (
         <Page size="A4" style={styles.page}>
           <Header reportData={reportData} orderNo={orderNo} />
           <Footer />
 
-          {/* AQL Section */}
-          {isAQLMethod && (
-            <AQLSection
-              aqlResult={aqlResult}
-              aqlSampleData={aqlSampleData}
-              totals={summaryData?.totals}
-              inspectedQty={inspectedQty}
-              defectsList={summaryData?.defectsList || []}
-            />
-          )}
+          {/* Defect Summary Table Only */}
+          <DefectSectionPDF summaryData={summaryData} />
+        </Page>
+      )}
 
-          {/* Defect Summary */}
-          <DefectSummarySection
-            summaryData={summaryData}
-            defectImages={defectImagesWithBase64}
-            defectHeatmapData={defectHeatmapData}
+      {/* PAGE 2B: AQL Section (Separate Page) */}
+      {isAQLMethod && aqlResult && aqlResult.sampleSize > 0 && (
+        <Page size="A4" style={styles.page}>
+          <Header reportData={reportData} orderNo={orderNo} />
+          <Footer />
+
+          <AQLSection
+            aqlResult={aqlResult}
+            aqlSampleData={aqlSampleData}
+            totals={summaryData?.totals}
+            inspectedQty={inspectedQty}
+            defectsList={summaryData?.defectsList || []}
           />
         </Page>
       )}
 
-      {/* PAGE 3: Measurements */}
+      {/* PAGE 2C: Defect Location Map (Separate Page) */}
+      {defectHeatmapData?.map && summaryData?.totals?.total > 0 && (
+        <Page size="A4" style={styles.page}>
+          <Header reportData={reportData} orderNo={orderNo} />
+          <Footer />
+
+          <DefectLocationSummaryPDF
+            mapData={defectHeatmapData.map}
+            counts={defectHeatmapData.counts}
+          />
+        </Page>
+      )}
+
+      {/* PAGE 2D: QC Defects Cards (Separate Page) */}
+      {qcDefectsData &&
+        Array.isArray(qcDefectsData) &&
+        qcDefectsData.length > 0 && (
+          <Page size="A4" style={styles.page}>
+            <Header reportData={reportData} orderNo={orderNo} />
+            <Footer />
+
+            <DefectsByQCPDF
+              qcDefectsData={qcDefectsData}
+              inspectedQty={inspectedQty}
+            />
+          </Page>
+        )}
+
+      {/* PAGE 2E: Defect Visual Evidence (Separate Page) */}
+      {defectImagesWithBase64?.length > 0 && (
+        <Page size="A4" style={styles.page}>
+          <Header reportData={reportData} orderNo={orderNo} />
+          <Footer />
+
+          <View style={styles.section}>
+            <Text
+              style={[styles.sectionTitle, { backgroundColor: colors.primary }]}
+            >
+              DEFECT VISUAL EVIDENCE
+            </Text>
+            <View style={styles.sectionContent}>
+              <DefectImageGrid images={defectImagesWithBase64} />
+            </View>
+          </View>
+        </Page>
+      )}
+
+      {/* PAGE 3A: Measurements */}
       {measurementStageData?.length > 0 && (
         <MeasurementSectionPDF
           measurementStageData={measurementStageData}
@@ -2287,7 +2308,20 @@ const YPivotQAReportPDFDocument = ({
         />
       )}
 
-      {/* PAGE 4: Checklist */}
+      {/* PAGE 3B: Measurement Value Distribution */}
+      {measurementDistributionData &&
+        measurementDistributionData.specs?.length > 0 && (
+          <MeasurementValueDistributionPDF
+            distributionData={measurementDistributionData}
+            reportData={reportData}
+            orderNo={orderNo}
+            HeaderComponent={Header}
+            FooterComponent={Footer}
+            pageStyle={styles.page}
+          />
+        )}
+
+      {/* PAGE 4A: Checklist */}
       {definitions?.headers?.length > 0 && (
         <Page size="A4" style={styles.page}>
           <Header reportData={reportData} orderNo={orderNo} />
@@ -2300,7 +2334,7 @@ const YPivotQAReportPDFDocument = ({
         </Page>
       )}
 
-      {/* PAGE: PP SHEET / PILOT RUN */}
+      {/* PAGE 4B: PP SHEET / PILOT RUN */}
       {ppSheetDataWithImages && (
         <Page size="A4" style={styles.page}>
           <Header reportData={reportData} orderNo={orderNo} />

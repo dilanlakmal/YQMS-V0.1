@@ -105,6 +105,7 @@ import createFincheckApprovalAssigneeModel from "../../models/QA/FincheckApprova
 import createFincheckNotificationGroupModel from "../../models/QA/FincheckNotificationGroupSchema.js";
 import createFincheckInspectionDecisionModel from "../../models/QA/fincheck_inspection_decision.js";
 import createFincheckPushSubscriptionModel from "../../models/QA/FincheckPushSubscription.js";
+import createFincheckAIChatModel from "../../models/QA/FincheckAIChatModel.js";
 
 //P88Data
 import createP88DataSchema from "../../models/P88/p88LegacyData.js";
@@ -276,6 +277,7 @@ export const FincheckInspectionDecision =
   createFincheckInspectionDecisionModel(ymProdConnection);
 export const FincheckPushSubscription =
   createFincheckPushSubscriptionModel(ymProdConnection);
+export const FincheckAIChat = createFincheckAIChatModel(ymProdConnection);
 
 export const NormalNotification = normalNotificationSchema(ymProdConnection);
 
