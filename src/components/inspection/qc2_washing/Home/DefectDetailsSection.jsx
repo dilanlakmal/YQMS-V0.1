@@ -504,7 +504,9 @@ const DefectDetailsSection = ({
               {multiDefects.map((mDefect) => (
                 <div key={mDefect.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-indigo-100 p-3 relative">
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                    
                     <div className="md:col-span-5">
+                      <label className="w-28 text-sm font-medium dark:text-gray-300">Defect Name</label>
                       <select
                         value={mDefect.selectedDefect}
                         onChange={(e) => handleMultiDefectChange(mDefect.id, 'selectedDefect', e.target.value)}
@@ -518,6 +520,7 @@ const DefectDetailsSection = ({
                       </select>
                     </div>
                     <div className="md:col-span-2">
+                      <label className="w-28 text-sm font-medium dark:text-gray-300"># Pcs</label>
                        <input
                           type="number" min="1" placeholder="PCs"
                           value={mDefect.pcCount}
@@ -568,6 +571,7 @@ const DefectDetailsSection = ({
                       <div key={defect.id} className="border-b last:border-0 pb-2 border-gray-100 dark:border-gray-700">
                          <div className="flex items-center gap-2 mb-2">
                             <div className="flex-grow">
+                              <label className="w-28 text-sm font-medium dark:text-gray-300">Defect Name</label>
                                 <select
                                   value={defect.selectedDefect}
                                   onChange={(e) => handleSingleDefectChange(pc, defect.id, 'selectedDefect', e.target.value)}

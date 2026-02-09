@@ -304,11 +304,24 @@ function calculateSummaryData(currentFormData) {
     overallResult = "Fail";
   }
 
+  // Calculate rate based on the new count
+
+  // --- FIX: Overall Result Logic ---
+  const aql = currentFormData.aql?.[0];
+
+  // If we have AQL data, check if defectCount (11) > acceptedDefect (2)
+  if (aql && aql.acceptedDefect !== undefined) {
+    overallResult = totalDefectCount <= aql.acceptedDefect ? "Pass" : "Fail";
+  } else {
+    // Fallback to the result saved in formData
+    overallResult = currentFormData.overallFinalResult || "Pending";
+  }
+
   return {
     checkedQty: parseInt(currentFormData.checkedQty, 10) || 0,
     totalCheckedPcs: totalCheckedPcs,
-    rejectedDefectPcs: rejectedDefectPcs, // Will now be 16
-    totalDefectCount: totalDefectCount,   // Will now be 16
+    rejectedDefectPcs: rejectedDefectPcs, 
+    totalDefectCount: totalDefectCount,   
     defectRate,
     defectRatio,
     overallFinalResult: overallResult,
@@ -1023,7 +1036,8 @@ const loadSavedDataById = async (id) => {
     totalDefectCount: saved.totalDefectCount || 0,
     defectRate: saved.defectRate || 0,
     defectRatio: saved.defectRatio || 0,
-    overallFinalResult: saved.overallFinalResult || "Pending"
+    overallFinalResult: saved.overallFinalResult || "Pending",
+    result: saved.defectDetails?.result || saved.result 
   }));
 
   // 2. FIX THE BUG: Use separateDefects ONLY. 
