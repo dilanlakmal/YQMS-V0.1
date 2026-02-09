@@ -144,14 +144,25 @@ const QuickActions = ({ onAction, empId, collapsed = false }) => {
         borderColor: "border-green-200 dark:border-green-800",
         actions: [
           {
+            label: "Style Measurement Summary",
+            prompt: "Show measurement summary for style: [Enter Style No]",
+            icon: Ruler,
+          },
+          {
             label: "Failed Measurements",
-            prompt: "Show reports where measurement inspection failed",
+            prompt: "Show me reports with failed measurement inspections",
             icon: XCircle,
           },
           {
-            label: "Before/After Wash",
+            label: "Before Wash Analysis",
             prompt:
-              "Show me reports with After Wash measurements and their results",
+              "Show Before Wash measurement summary for style: [Enter Style No]",
+            icon: Filter,
+          },
+          {
+            label: "After Wash Analysis",
+            prompt:
+              "Show After Wash/Buyer Spec measurement summary for style: [Enter Style No]",
             icon: Filter,
           },
           {
@@ -159,6 +170,12 @@ const QuickActions = ({ onAction, empId, collapsed = false }) => {
             prompt:
               "What is the overall measurement pass rate across all inspections?",
             icon: Target,
+          },
+          {
+            label: "Out of Tolerance Points",
+            prompt:
+              "Show me which measurement points are frequently out of tolerance",
+            icon: AlertTriangle,
           },
         ],
       },

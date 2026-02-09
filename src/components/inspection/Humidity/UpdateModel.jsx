@@ -29,7 +29,6 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
   const [message, setMessage] = useState({ type: "", text: "" });
 
   const [isSaving, setIsSaving] = useState(false);
-  const [unlockedFields, setUnlockedFields] = useState({});
   const [availableColors, setAvailableColors] = useState([]);
   const [colorSearch, setColorSearch] = useState("");
   const [showColorDropdown, setShowColorDropdown] = useState(false);
@@ -46,22 +45,14 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       report.aquaboySpecRibs !== "0") ??
     false;
 
-  const toggleUnlock = (fieldId) => {
-    setUnlockedFields((prev) => ({
-      ...prev,
-      [fieldId]: !prev[fieldId],
-    }));
-  };
-
-  const isRecordLocked = (rec) => {
-    return rec?.top?.pass && rec?.middle?.pass && rec?.bottom?.pass;
-  };
-
   useEffect(() => {
     if (open && report) {
       let sourceRecords = [];
       if (report.inspectionRecords && report.inspectionRecords.length > 0) {
-        sourceRecords = report.inspectionRecords;
+        // Only show the last record from the array
+        sourceRecords = [
+          report.inspectionRecords[report.inspectionRecords.length - 1],
+        ];
       } else if (report.history && typeof report.history === "object") {
         // Convert nested Map history (Item -> Check) to latest records for editing
         const historyMap = report.history;
@@ -84,6 +75,11 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
               checkCount: checkKeys.length,
             };
           });
+
+        // Only show the last item in history
+        if (sourceRecords.length > 0) {
+          sourceRecords = [sourceRecords[sourceRecords.length - 1]];
+        }
       }
 
       const specLimit = Number(report.aquaboySpecBody || report.aquaboySpec);
@@ -178,9 +174,8 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                   fail: false,
                 },
               },
-          images: rec.images || [],
+          images: [],
           modified: false,
-          originallyPassed: isRecordLocked(rec),
         };
       });
 
@@ -250,7 +245,6 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
           },
           images: [],
           modified: false,
-          originallyPassed: false,
         });
       }
 
@@ -590,7 +584,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
         "image/png",
         "image/webp",
       ].includes(file.type);
-      const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB limit
+      const isValidSize = file.size <= 20 * 1024 * 1024; // 20MB limit
       return isValidType && isValidSize;
     });
 
@@ -604,6 +598,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
             preview: reader.result, // Base64 string
             name: file.name,
             size: file.size,
+            isNewSession: true, // Mark images added in THIS edit session
           });
         };
         reader.readAsDataURL(file);
@@ -617,10 +612,21 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       if (!newRecords[recordIndex]) return prev;
 
       const currentImages = newRecords[recordIndex].images || [];
+      const hasNewSessionImages = currentImages.some((img) => img.isNewSession);
+
+      let finalImages;
+      if (hasNewSessionImages) {
+        // Already started uploading in this session, so append
+        finalImages = [...currentImages, ...newImages];
+      } else {
+        // First upload of this session, clear original images
+        finalImages = newImages;
+      }
+
       newRecords[recordIndex] = {
         ...newRecords[recordIndex],
         modified: true,
-        images: [...currentImages, ...newImages],
+        images: finalImages,
       };
       return { ...prev, inspectionRecords: newRecords };
     });
@@ -819,7 +825,6 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       const result = await response.json();
       if (response.ok) {
         setMessage({ type: "success", text: "Report updated successfully!" });
-        setUnlockedFields({}); // Clear unlock state on success
         onUpdate();
         setTimeout(() => {
           onCancel();
@@ -843,16 +848,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4 transition-opacity">
-      <style>{`
-                @keyframes modalPop {
-                    from { opacity: 0; transform: scale(0.95); }
-                    to { opacity: 1; transform: scale(1); }
-                }
-            `}</style>
-      <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[95vh] flex flex-col overflow-hidden"
-        style={{ animation: "modalPop 0.3s ease-out" }}
-      >
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300 ease-out">
         <div className="p-6 border-b flex justify-between items-center bg-white z-10 shrink-0">
           <div className="flex items-center gap-2">
             <svg
@@ -1154,7 +1150,6 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
               </div>
               <div className="space-y-4">
                 {formData.inspectionRecords.map((record, index) => {
-                  if (record.originallyPassed) return null;
                   return (
                     <div
                       key={`record-${index}`}
@@ -1165,39 +1160,11 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                           <h4 className="font-bold text-gray-700">
                             Record #{index + 1}
                           </h4>
-                          {isRecordLocked(record) && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200 shadow-sm animate-pulse">
-                              <svg
-                                className="w-2.5 h-2.5 mr-1"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2.5}
-                                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                                />
-                              </svg>
-                              RECORD PROTECTED
-                            </span>
-                          )}
                         </div>
-                        {/* {formData.inspectionRecords.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeRecord(index)}
-                          className="text-red-500 hover:text-red-700 text-xs font-semibold px-2 py-1 rounded hover:bg-red-50 transition-colors"
-                        >
-                          Remove record
-                        </button>
-                      )} */}
                       </div>
 
                       <div className="space-y-4">
                         {["top", "middle", "bottom"].map((section) => {
-                          const isProtected = isRecordLocked(record);
                           return (
                             <div
                               key={section}
@@ -1222,22 +1189,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                         e.target.value,
                                       )
                                     }
-                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed transition-all"
-                                    disabled={
-                                      isProtected &&
-                                      !unlockedFields[
-                                        `body-${index}-${section}`
-                                      ]
-                                    }
-                                    onDoubleClick={() =>
-                                      isProtected &&
-                                      toggleUnlock(`body-${index}-${section}`)
-                                    }
-                                    title={
-                                      isProtected
-                                        ? "Double-click to edit (Record Protected)"
-                                        : ""
-                                    }
+                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 transition-all"
                                   />
                                 </div>
                                 {record[section].bodyPass ? (
@@ -1296,22 +1248,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                           e.target.value,
                                         )
                                       }
-                                      className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed transition-all"
-                                      disabled={
-                                        isProtected &&
-                                        !unlockedFields[
-                                          `ribs-${index}-${section}`
-                                        ]
-                                      }
-                                      onDoubleClick={() =>
-                                        isProtected &&
-                                        toggleUnlock(`ribs-${index}-${section}`)
-                                      }
-                                      title={
-                                        isProtected
-                                          ? "Double-click to edit (Record Protected)"
-                                          : ""
-                                      }
+                                      className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 transition-all"
                                     />
                                   </div>
                                   {record[section].ribsPass ? (
@@ -1449,22 +1386,17 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                 </div>
                 <div className="space-y-4">
                   {formData.inspectionRecords.map((record, index) => {
-                    if (record.originallyPassed) return null;
                     return (
                       <div
                         key={`add-${index}`}
                         className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4"
                       >
-                        <h4 className="font-bold text-gray-700 mb-3 underline decoration-blue-500/30 underline-offset-4">
+                        <h4 className="font-bold text-gray-700 mb-3 underline decoration-blue-500/30 underline-offset-4 flex items-center gap-2">
                           Record #{index + 1} Additional
                         </h4>
 
                         <div className="space-y-4">
                           {["top", "middle", "bottom"].map((section) => {
-                            const isProtected =
-                              record.additional?.top?.pass &&
-                              record.additional?.middle?.pass &&
-                              record.additional?.bottom?.pass;
                             return (
                               <div
                                 key={section}
@@ -1491,24 +1423,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                           e.target.value,
                                         )
                                       }
-                                      className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed transition-all"
-                                      disabled={
-                                        isProtected &&
-                                        !unlockedFields[
-                                          `add-body-${index}-${section}`
-                                        ]
-                                      }
-                                      onDoubleClick={() =>
-                                        isProtected &&
-                                        toggleUnlock(
-                                          `add-body-${index}-${section}`,
-                                        )
-                                      }
-                                      title={
-                                        isProtected
-                                          ? "Double-click to edit (Record Protected)"
-                                          : ""
-                                      }
+                                      className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 transition-all"
                                     />
                                   </div>
                                   {record.additional?.[section]?.bodyPass ? (
@@ -1570,24 +1485,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                             e.target.value,
                                           )
                                         }
-                                        className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed transition-all"
-                                        disabled={
-                                          isProtected &&
-                                          !unlockedFields[
-                                            `add-ribs-${index}-${section}`
-                                          ]
-                                        }
-                                        onDoubleClick={() =>
-                                          isProtected &&
-                                          toggleUnlock(
-                                            `add-ribs-${index}-${section}`,
-                                          )
-                                        }
-                                        title={
-                                          isProtected
-                                            ? "Double-click to edit (Record Protected)"
-                                            : ""
-                                        }
+                                        className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 transition-all"
                                       />
                                     </div>
                                     {record.additional?.[section]?.ribsPass ? (
@@ -1639,24 +1537,6 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                       </div>
                     );
                   })}
-                  {formData.inspectionRecords.every(
-                    (r) => r.originallyPassed,
-                  ) && (
-                    <div className="p-8 text-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-                      <div className="flex justify-center mb-3">
-                        <div className="bg-green-100 p-3 rounded-full">
-                          <CheckCircle2 className="w-8 h-8 text-green-600" />
-                        </div>
-                      </div>
-                      <h3 className="text-lg font-bold text-gray-800 mb-1">
-                        All Records Pass
-                      </h3>
-                      <p className="text-gray-500 text-sm">
-                        Everything in this report has already been completed and
-                        passed.
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
