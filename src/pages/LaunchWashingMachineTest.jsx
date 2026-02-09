@@ -1,4 +1,5 @@
 ﻿import React, { useState, useRef, useEffect, useCallback } from "react";
+import { io } from "socket.io-client";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../components/authentication/AuthContext";
 import { useSearchParams } from "react-router-dom";
@@ -79,8 +80,25 @@ const LaundryWashingMachineTest = () => {
 
   const { formData, setFormData, handleInputChange: handleFormInputChange, resetForm } = useFormState(initialFormData);
 
-  // Standard Reports Hook
-  const reportsHook = useReports();
+  // Initialize Socket.IO connection once for the component
+  const [socket, setSocket] = useState(null);
+
+  useEffect(() => {
+    const newSocket = io(API_BASE_URL);
+
+    newSocket.on("connect", () => {
+      console.log("✅ Socket connected to:", API_BASE_URL);
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, []);
+
+  // Standard Reports Hook - share socket
+  const reportsHook = useReports(socket);
   const {
     reports,
     isLoadingReports,
@@ -93,8 +111,8 @@ const LaundryWashingMachineTest = () => {
     pagination,
   } = reportsHook;
 
-  // Warehouse Reports Hook
-  const whReportsHook = useReports();
+  // Warehouse Reports Hook - share socket
+  const whReportsHook = useReports(socket);
   const {
     reports: whReports,
     isLoadingReports: isLoadingWhReports,
@@ -2085,19 +2103,24 @@ const LaundryWashingMachineTest = () => {
                   <span className="sm:hidden">Reports <span className="text-[10px] bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded-full">{pagination.totalRecords}</span></span>
                 </span>
               </button>
-              <button
-                onClick={() => setActiveTab("warehouse_reports")}
-                className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "warehouse_reports"
-                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
-              >
-                <span className="flex items-center gap-1.5 sm:gap-2">
-                  <MdWarehouse className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "warehouse_reports" ? "text-amber-600" : "text-amber-500/70"}`} />
-                  <span className="hidden sm:inline">Warehouse Report</span>
-                  <span className="sm:hidden">Warehouse</span>
-                </span>
-              </button>
+
+              {/* Warehouse Report Tab - Conditionally Hidden based on Role */}
+              {/* Example: Only show warehouse tab if user has permission. Modify the condition as needed. */}
+              {(!user?.role || user?.role !== 'user_assigned_to_hide_warehouse') && (
+                <button
+                  onClick={() => setActiveTab("warehouse_reports")}
+                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "warehouse_reports"
+                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+                    }`}
+                >
+                  <span className="flex items-center gap-1.5 sm:gap-2">
+                    <MdWarehouse className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "warehouse_reports" ? "text-amber-600" : "text-amber-500/70"}`} />
+                    <span className="hidden sm:inline">Warehouse Report</span>
+                    <span className="sm:hidden">Warehouse</span>
+                  </span>
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab("assign_control")}
                 className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "assign_control"

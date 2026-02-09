@@ -39,12 +39,45 @@ export const handleEditFormSubmit = async (
         const formDataToSubmit = new FormData();
 
         // Add form fields
+        formDataToSubmit.append("reportType", editFormData.reportType || "Home Wash Test");
         formDataToSubmit.append("color", JSON.stringify(editFormData.color || []));
         formDataToSubmit.append("buyerStyle", editFormData.buyerStyle || "");
         formDataToSubmit.append("po", JSON.stringify(editFormData.po || []));
         formDataToSubmit.append("exFtyDate", JSON.stringify(editFormData.exFtyDate || []));
         formDataToSubmit.append("factory", editFormData.factory || "");
         formDataToSubmit.append("sendToHomeWashingDate", editFormData.sendToHomeWashingDate || "");
+
+        // Care Label Information (if applicable)
+        if (editFormData.careSymbols) {
+            const symbolsValue = typeof editFormData.careSymbols === 'string'
+                ? editFormData.careSymbols
+                : JSON.stringify(editFormData.careSymbols);
+            formDataToSubmit.append("careSymbols", symbolsValue);
+        }
+        if (editFormData.careLabelNotes) {
+            formDataToSubmit.append("careLabelNotes", editFormData.careLabelNotes || "");
+        }
+
+        // Handle careLabelImage
+        if (editFormData.careLabelImage) {
+            if (Array.isArray(editFormData.careLabelImage)) {
+                // New files
+                editFormData.careLabelImage.forEach(item => {
+                    if (item instanceof File) {
+                        formDataToSubmit.append("careLabelImage", item);
+                    }
+                });
+                // Existing URLs
+                const existingUrls = editFormData.careLabelImage.filter(item => typeof item === 'string');
+                if (existingUrls.length > 0) {
+                    formDataToSubmit.append("careLabelImageUrls", JSON.stringify(existingUrls));
+                }
+            } else if (editFormData.careLabelImage instanceof File) {
+                formDataToSubmit.append("careLabelImage", editFormData.careLabelImage);
+            } else if (typeof editFormData.careLabelImage === 'string') {
+                formDataToSubmit.append("careLabelImageUrls", JSON.stringify([editFormData.careLabelImage]));
+            }
+        }
 
         const reportId = editingReport._id || editingReport.id;
         const result = await updateReportAPI(reportId, formDataToSubmit);

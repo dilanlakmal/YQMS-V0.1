@@ -53,7 +53,8 @@ const EditReportModal = ({
                     ...prev,
                     reportType: e.target.value,
                   }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
                   required
                 >
                   <option value="Home Wash Test">Home Wash Test</option>

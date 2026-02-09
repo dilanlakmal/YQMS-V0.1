@@ -6,7 +6,7 @@ import showToast from "../../../../utils/toast.js";
 /**
  * Custom hook for report CRUD operations
  */
-export const useReports = () => {
+export const useReports = (socket) => {
   const [reports, setReports] = useState([]);
   const [isLoadingReports, setIsLoadingReports] = useState(false);
   const [expandedReports, setExpandedReports] = useState(new Set());
@@ -63,21 +63,12 @@ export const useReports = () => {
     }
   }, []);
 
-  // Socket.IO for real-time updates
+  // Socket.IO for real-time updates - Now accepts socket from parent
   useEffect(() => {
-    // Connect to Socket.IO server
-    const socket = io(API_BASE_URL);
-
-    socket.on("connect", () => {
-      console.log("✅ Socket connected to:", API_BASE_URL);
-    });
-
-    socket.on("connect_error", (err) => {
-      console.error("❌ Socket connection error:", err);
-    });
+    if (!socket) return;
 
     // Listen for events
-    socket.on("washing-report-created", (newReport) => {
+    const handleReportCreated = (newReport) => {
       setReports((prev) => {
         // Prevent duplicate if already added
         if (prev.some(r => r._id === newReport._id || r.id === newReport._id)) {
@@ -85,24 +76,30 @@ export const useReports = () => {
         }
         return [newReport, ...prev];
       });
-    });
+    };
 
-    socket.on("washing-report-updated", (updatedReport) => {
+    const handleReportUpdated = (updatedReport) => {
       setReports((prev) => prev.map((report) =>
         (report._id === updatedReport._id || report.id === updatedReport._id) ? updatedReport : report
       ));
-    });
+    };
 
-    socket.on("washing-report-deleted", (deletedId) => {
+    const handleReportDeleted = (deletedId) => {
       setReports((prev) => prev.filter((report) =>
         report._id !== deletedId && report.id !== deletedId
       ));
-    });
+    };
+
+    socket.on("washing-report-created", handleReportCreated);
+    socket.on("washing-report-updated", handleReportUpdated);
+    socket.on("washing-report-deleted", handleReportDeleted);
 
     return () => {
-      socket.disconnect();
+      socket.off("washing-report-created", handleReportCreated);
+      socket.off("washing-report-updated", handleReportUpdated);
+      socket.off("washing-report-deleted", handleReportDeleted);
     };
-  }, []);
+  }, [socket]);
 
   // Delete report
   const deleteReport = useCallback(async (reportId) => {

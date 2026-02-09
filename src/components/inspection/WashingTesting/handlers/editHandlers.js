@@ -30,6 +30,9 @@ export const prepareEditFormData = async (
         exFtyDate: report.exFtyDate || [],
         factory: report.factory || "",
         sendToHomeWashingDate: normalizeDateForInput(report.sendToHomeWashingDate),
+        careSymbols: report.careSymbols || {},
+        careLabelImage: report.careLabelImage || [],
+        careLabelNotes: report.careLabelNotes || "",
     });
 
     // Fetch available options for the report's ymStyle
