@@ -82,16 +82,26 @@ Each defect object contains:
 - lineName, tableName, colorName: Context info
 - qcUser: QC inspector who recorded it
 
-MEASUREMENT DATA (measurementData array):
-- groupId (Number): Config group
-- stage (String): "Before" or "After"
-- line, table, color: Context
-- size (String): Size being measured
-- kValue (String): K-value for wash
-- allMeasurements (Object): Measured values by spec
-- criticalMeasurements (Object): Critical point measurements
+MEASUREMENT DATA (measurementData array) - IMPORTANT:
+Each measurement entry contains:
+- groupId (Number): Configuration group ID
+- stage (String): "Before" or "After" (Before Wash or After Wash/Buyer Spec)
+- size (String): Size being measured (e.g., "S", "M", "L", "XL")
+- kValue (String): K-value for wash shrinkage
+- allMeasurements (Object): { specId: { pcsIndex: { decimal, fraction } } }
+- criticalMeasurements (Object): Critical point measurements only
+- allEnabledPcs (Array of Numbers): Valid piece indices to count
+- criticalEnabledPcs (Array of Numbers): Valid critical piece indices
 - inspectorDecision (String): "pass" or "fail"
 - systemDecision (String): "pending", "pass", "fail"
+- lineName, tableName, colorName: Context info
+
+MEASUREMENT SPECS (from QASectionsMeasurementSpecs collection):
+- MeasurementPointEngName: Name of measurement point (e.g., "Chest Width", "Body Length")  **IMPORTANT: Only use actual MeasurementPointEngName names using matching index**
+- TolMinus: { decimal, fraction } - Negative tolerance
+- TolPlus: { decimal, fraction } - Positive tolerance
+- Size values contain: { decimal, fraction } - Spec value for each size
+
 
 PRODUCTION STATUS (inspectionDetails.productionStatus):
 - cutting, sewing, ironing, qc2FinishedChecking, folding, packing (all Numbers)
@@ -112,6 +122,7 @@ IMPORTANT RULES FOR QUERYING:
 7. **NEVER fabricate or assume buyer names - always query the database first**
 8. When asked about "today", use current date comparison
 9. When listing results, ALWAYS show actual data from database, not examples
+10. For measurement analysis: Use FUNCTION: getMeasurementSummary(styleNo: "STYLE123")
 `;
 
 const AQL_CALCULATION_CONTEXT = `
@@ -136,6 +147,13 @@ AQL (Acceptable Quality Level) CALCULATION LOGIC:
    - No AQL calculation applies
    - inspectionMethod === "Fixed"
    - Simply report defect counts without Ac/Re comparison
+
+5. MEASUREMENT TOLERANCE LOGIC:
+   - Get TolMinus and TolPlus from measurement specs
+   - Measured value (decimal) should be within: -|TolMinus| to +|TolPlus|
+   - If within range → PASS (green)
+   - If outside range → FAIL (red)
+   - Values are stored as fractions (e.g., "1/4", "-3/16") and decimals
 `;
 
 const SYSTEM_INSTRUCTION = `
@@ -149,9 +167,10 @@ YOUR CAPABILITIES:
 1. Query inspection reports by any field
 2. Calculate AQL results for AQL-method inspections
 3. Analyze defect patterns and trends
-4. Summarize measurement data
+4. **Generate measurement summary tables by style**
 5. Compare inspections across time periods
 6. Provide quality insights and recommendations
+
 
 CRITICAL RESPONSE RULES:
 1. For GENERAL questions about QA/AQL concepts, answer directly with expertise.
@@ -163,19 +182,22 @@ CRITICAL RESPONSE RULES:
 
 QUERY FORMAT (for fetching data):
 QUERY: {"reportId": 7582054152}
-QUERY: {"buyer": "Aritzia", "status": "completed", "limit": 5}
-QUERY: {"inspectionDate": {"$gte": "2026-01-01"}, "limit": 10}
+QUERY: {"buyer": "Aritzia", "status": "completed", "limit": 200}
+QUERY: {"inspectionDate": {"$gte": "2026-01-01"}, "limit": 200}
 QUERY: {"orderNos": "GPAR12345"}
 QUERY: {"defectAnalysis": true, "reportId": 7582054152}
 QUERY: {"aqlCalculation": true, "reportId": 7582054152}
 
 For "today" queries, use:
-QUERY: {"inspectionDate": {"$gte": "[TODAY_START]", "$lte": "[TODAY_END]"}, "limit": 20}
+QUERY: {"inspectionDate": {"$gte": "[TODAY_START]", "$lte": "[TODAY_END]"}, "limit": 100}
 
-FUNCTION FORMAT (for special calculations):
+FUNCTION FORMAT (for special calculations and complex operations):
 FUNCTION: calculateAQL(reportId: 7582054152)
 FUNCTION: getDefectSummary(reportId: 7582054152)
 FUNCTION: compareReports(reportIds: [123, 456])
+FUNCTION: getMeasurementSummary(styleNo: "STYLE123")
+FUNCTION: getMeasurementSummary(styleNo: "STYLE123", stage: "Before")
+FUNCTION: getMeasurementSummary(styleNo: "STYLE123", reportType: "FRI")
 FUNCTION: getInspectorStats(empId: "E001", dateRange: "last30days")
 
 FORMATTING:
@@ -185,6 +207,16 @@ FORMATTING:
 - Present data in clear, structured formats
 - When showing defect summaries, always show: Defect Code, Name, Minor/Major/Critical counts
 - When showing AQL results, clearly indicate PASS/FAIL with proper formatting
+
+**MEASUREMENT TABLE FORMATTING:**
+When showing measurement summaries, format as a markdown table:
+| Measurement Point | Tol- | Tol+ | Size S | Size M | Size L | Status |
+|------------------|------|------|--------|--------|--------|--------|
+| Chest Width | -1/4 | 1/4 | 🟢 0 | 🟢 1/8 | 🔴 3/8 | 2P/1F |
+
+Use 🟢 for PASS (within tolerance), 🔴 for FAIL (out of tolerance)
+Show fraction values with status indicators
+Include summary statistics at bottom
 
 NEVER make up data. Always query first.
 When you receive SYSTEM_DATA_RESULT, analyze it thoroughly and answer the user's question.
@@ -610,57 +642,662 @@ const getDefectSummaryByGroup = (report) => {
   return Object.values(groupsMap);
 };
 
+// ============================================================================
+// MEASUREMENT SUMMARY HELPERS - NEW
+// ============================================================================
+
+/**
+ * Check if a measured value is within tolerance
+ */
+const checkToleranceStatus = (measuredDecimal, tolMinus, tolPlus) => {
+  if (
+    measuredDecimal === null ||
+    measuredDecimal === undefined ||
+    isNaN(measuredDecimal)
+  ) {
+    return { status: "N/A", withinTolerance: null };
+  }
+
+  const tolMinusDecimal = parseFloat(tolMinus?.decimal) || 0;
+  const tolPlusDecimal = parseFloat(tolPlus?.decimal) || 0;
+
+  const lowerLimit = -Math.abs(tolMinusDecimal);
+  const upperLimit = Math.abs(tolPlusDecimal);
+  const epsilon = 0.0001;
+
+  const isWithin =
+    measuredDecimal >= lowerLimit - epsilon &&
+    measuredDecimal <= upperLimit + epsilon;
+
+  return {
+    status: isWithin ? "PASS" : "FAIL",
+    withinTolerance: isWithin,
+    deviation: isWithin
+      ? 0
+      : measuredDecimal < lowerLimit
+        ? measuredDecimal - lowerLimit
+        : measuredDecimal - upperLimit,
+  };
+};
+
+/**
+ * Get measurement summary for a style with tolerance analysis
+ */
+const getMeasurementSummaryForStyle = async (
+  styleNo,
+  reportType = null,
+  stage = "All",
+) => {
+  try {
+    if (!styleNo) {
+      return { error: true, message: "Style number is required" };
+    }
+
+    // 1. Fetch DtOrder for SizeList
+    const dtOrder = await DtOrder.findOne({
+      Order_No: { $regex: new RegExp(`^${styleNo}$`, "i") },
+    })
+      .select("SizeList OrderColors")
+      .lean();
+
+    const sizeList = dtOrder?.SizeList || [];
+
+    if (sizeList.length === 0) {
+      return {
+        error: true,
+        message: `No size list found for style: ${styleNo}`,
+      };
+    }
+
+    // 2. Fetch Measurement Specs
+    const specsRecord = await QASectionsMeasurementSpecs.findOne({
+      Order_No: { $regex: new RegExp(`^${styleNo}$`, "i") },
+    }).lean();
+
+    if (!specsRecord) {
+      return {
+        error: true,
+        message: `No measurement specs found for style: ${styleNo}`,
+      };
+    }
+
+    // Get all specs based on stage
+    let allSpecs = [];
+    if (stage === "All" || stage === "Before") {
+      allSpecs = [...allSpecs, ...(specsRecord.AllBeforeWashSpecs || [])];
+    }
+    if (stage === "All" || stage === "After") {
+      allSpecs = [...allSpecs, ...(specsRecord.AllAfterWashSpecs || [])];
+    }
+
+    // Get critical specs
+    const criticalPointNames = new Set();
+    const beforeCritSpecs = specsRecord.selectedBeforeWashSpecs || [];
+    const afterCritSpecs = specsRecord.selectedAfterWashSpecs || [];
+    [...beforeCritSpecs, ...afterCritSpecs].forEach((s) => {
+      const name = (s.MeasurementPointEngName || s.name || "").trim();
+      if (name) criticalPointNames.add(name);
+    });
+
+    // Build spec lookup maps
+    const specIdToInfo = new Map();
+    const pointNameToSpec = new Map();
+    const allPointNames = new Set();
+
+    allSpecs.forEach((s) => {
+      const id = s.id || s._id?.toString();
+      const name = (s.MeasurementPointEngName || s.name || "").trim();
+      if (!name) return;
+
+      specIdToInfo.set(id, {
+        id,
+        name,
+        TolMinus: s.TolMinus,
+        TolPlus: s.TolPlus,
+        sizeSpecs: {}, // Will store spec values per size
+      });
+
+      allPointNames.add(name);
+
+      if (!pointNameToSpec.has(name)) {
+        pointNameToSpec.set(name, {
+          name,
+          TolMinus: s.TolMinus,
+          TolPlus: s.TolPlus,
+          isCritical: criticalPointNames.has(name),
+        });
+      }
+
+      // Extract size-specific spec values
+      sizeList.forEach((size) => {
+        if (s[size]) {
+          specIdToInfo.get(id).sizeSpecs[size] = s[size];
+        }
+      });
+    });
+
+    // 3. Query Reports
+    const query = {
+      orderNos: styleNo,
+      status: { $ne: "cancelled" },
+    };
+
+    if (reportType && reportType !== "All") {
+      query.reportType = reportType;
+    }
+
+    const reports = await FincheckInspectionReports.find(query)
+      .select("reportId reportType inspectionDate measurementData")
+      .sort({ inspectionDate: -1 })
+      .lean();
+
+    if (reports.length === 0) {
+      return {
+        error: false,
+        styleNo,
+        sizeList,
+        message: `No inspection reports found for style: ${styleNo}`,
+        measurementPoints: [],
+        totalReports: 0,
+      };
+    }
+
+    // 4. Aggregate Measurements
+    const aggregatedData = {};
+
+    reports.forEach((report) => {
+      if (!report.measurementData || !Array.isArray(report.measurementData))
+        return;
+
+      report.measurementData.forEach((m) => {
+        if (m.size === "Manual_Entry") return;
+
+        const measurementStage = m.stage || "Before";
+        if (stage !== "All" && measurementStage !== stage) return;
+
+        const size = m.size;
+        const validAllIndices = Array.isArray(m.allEnabledPcs)
+          ? m.allEnabledPcs
+          : [];
+        const validCritIndices = Array.isArray(m.criticalEnabledPcs)
+          ? m.criticalEnabledPcs
+          : [];
+
+        // Process allMeasurements
+        const processMeasurements = (measurements, validIndices) => {
+          if (!measurements || typeof measurements !== "object") return;
+
+          Object.entries(measurements).forEach(([specId, pcsData]) => {
+            const specInfo = specIdToInfo.get(specId);
+            if (!specInfo) return;
+
+            const pointName = specInfo.name;
+            const specData = pointNameToSpec.get(pointName);
+            if (!specData) return;
+
+            if (!aggregatedData[pointName]) {
+              aggregatedData[pointName] = {
+                name: pointName,
+                tolMinus: specData.TolMinus?.fraction || "-",
+                tolMinusDecimal: parseFloat(specData.TolMinus?.decimal) || 0,
+                tolPlus: specData.TolPlus?.fraction || "-",
+                tolPlusDecimal: parseFloat(specData.TolPlus?.decimal) || 0,
+                isCritical: specData.isCritical,
+                sizeData: {},
+              };
+            }
+
+            if (!aggregatedData[pointName].sizeData[size]) {
+              aggregatedData[pointName].sizeData[size] = {
+                measurements: [],
+                pass: 0,
+                fail: 0,
+                total: 0,
+              };
+            }
+
+            validIndices.forEach((pcsIndex) => {
+              const valObj = pcsData[pcsIndex];
+              if (!valObj || valObj.decimal === undefined) return;
+
+              const decimal = parseFloat(valObj.decimal);
+              const fraction = valObj.fraction || String(decimal);
+              const tolCheck = checkToleranceStatus(
+                decimal,
+                specData.TolMinus,
+                specData.TolPlus,
+              );
+
+              aggregatedData[pointName].sizeData[size].measurements.push({
+                decimal,
+                fraction,
+                status: tolCheck.status,
+                withinTolerance: tolCheck.withinTolerance,
+                reportId: report.reportId,
+              });
+
+              aggregatedData[pointName].sizeData[size].total += 1;
+              if (tolCheck.withinTolerance === true) {
+                aggregatedData[pointName].sizeData[size].pass += 1;
+              } else if (tolCheck.withinTolerance === false) {
+                aggregatedData[pointName].sizeData[size].fail += 1;
+              }
+            });
+          });
+        };
+
+        processMeasurements(m.allMeasurements, validAllIndices);
+        processMeasurements(m.criticalMeasurements, validCritIndices);
+      });
+    });
+
+    // 5. Format response for AI
+    const measurementPoints = [];
+    let totalPass = 0;
+    let totalFail = 0;
+    let totalMeasurements = 0;
+
+    Object.values(aggregatedData).forEach((point) => {
+      const sizeResults = {};
+      let pointPass = 0;
+      let pointFail = 0;
+      let pointTotal = 0;
+
+      sizeList.forEach((size) => {
+        const data = point.sizeData[size];
+        if (data && data.total > 0) {
+          // Get the most recent/representative value
+          const lastMeasurement =
+            data.measurements[data.measurements.length - 1];
+
+          // Calculate average if multiple measurements
+          const avgDecimal =
+            data.measurements.reduce((sum, m) => sum + m.decimal, 0) /
+            data.measurements.length;
+          const avgTolCheck = checkToleranceStatus(
+            avgDecimal,
+            { decimal: point.tolMinusDecimal },
+            { decimal: point.tolPlusDecimal },
+          );
+
+          sizeResults[size] = {
+            value: lastMeasurement.fraction,
+            decimal: lastMeasurement.decimal,
+            status: lastMeasurement.status,
+            statusIcon: lastMeasurement.withinTolerance ? "🟢" : "🔴",
+            pass: data.pass,
+            fail: data.fail,
+            total: data.total,
+            passRate: ((data.pass / data.total) * 100).toFixed(0) + "%",
+            allValues: data.measurements.map((m) => ({
+              value: m.fraction,
+              status: m.status,
+            })),
+          };
+
+          pointPass += data.pass;
+          pointFail += data.fail;
+          pointTotal += data.total;
+        } else {
+          sizeResults[size] = { value: "-", status: "N/A", statusIcon: "⚪" };
+        }
+      });
+
+      measurementPoints.push({
+        name: point.name,
+        isCritical: point.isCritical,
+        criticalIndicator: point.isCritical ? "⭐" : "",
+        tolMinus: point.tolMinus,
+        tolPlus: point.tolPlus,
+        sizeResults,
+        summary: {
+          pass: pointPass,
+          fail: pointFail,
+          total: pointTotal,
+          passRate:
+            pointTotal > 0
+              ? ((pointPass / pointTotal) * 100).toFixed(1) + "%"
+              : "N/A",
+        },
+      });
+
+      totalPass += pointPass;
+      totalFail += pointFail;
+      totalMeasurements += pointTotal;
+    });
+
+    // Sort: Critical first, then alphabetically
+    measurementPoints.sort((a, b) => {
+      if (a.isCritical && !b.isCritical) return -1;
+      if (!a.isCritical && b.isCritical) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    // 6. Build formatted table for AI response
+    const tableHeader = `| ${point.isCritical ? "⭐ " : ""}Measurement Point | Tol- | Tol+ | ${sizeList.join(" | ")} | Pass Rate |`;
+    const tableDivider = `|${"-".repeat(20)}|------|------|${sizeList.map(() => "------").join("|")}|----------|`;
+
+    const formattedTable = {
+      header: ["Measurement Point", "Tol-", "Tol+", ...sizeList, "Pass Rate"],
+      rows: measurementPoints.map((point) => ({
+        name: (point.isCritical ? "⭐ " : "") + point.name,
+        tolMinus: point.tolMinus,
+        tolPlus: point.tolPlus,
+        sizes: sizeList.map((size) => {
+          const data = point.sizeResults[size];
+          return {
+            display:
+              data.value !== "-" ? `${data.statusIcon} ${data.value}` : "-",
+            value: data.value,
+            status: data.status,
+          };
+        }),
+        passRate: point.summary.passRate,
+      })),
+    };
+
+    return {
+      error: false,
+      styleNo,
+      sizeList,
+      stage:
+        stage === "All"
+          ? "All Stages"
+          : stage === "Before"
+            ? "Before Wash"
+            : "After Wash/Buyer Spec",
+      totalReports: reports.length,
+      reportTypes: [...new Set(reports.map((r) => r.reportType))],
+      measurementPoints,
+      formattedTable,
+      grandSummary: {
+        totalMeasurements,
+        totalPass,
+        totalFail,
+        overallPassRate:
+          totalMeasurements > 0
+            ? ((totalPass / totalMeasurements) * 100).toFixed(1) + "%"
+            : "N/A",
+        status:
+          totalFail === 0
+            ? "✅ ALL PASS"
+            : totalPass === 0
+              ? "❌ ALL FAIL"
+              : "⚠️ MIXED",
+      },
+      // Markdown formatted summary for AI to display
+      markdownSummary: generateMeasurementMarkdown(
+        styleNo,
+        sizeList,
+        measurementPoints,
+        stage,
+        reports.length,
+        totalPass,
+        totalFail,
+        totalMeasurements,
+      ),
+    };
+  } catch (error) {
+    console.error("Error in getMeasurementSummaryForStyle:", error);
+    return {
+      error: true,
+      message: `Error fetching measurement data: ${error.message}`,
+    };
+  }
+};
+
+/**
+ * Generate markdown table for measurement summary
+ */
+const generateMeasurementMarkdown = (
+  styleNo,
+  sizeList,
+  measurementPoints,
+  stage,
+  totalReports,
+  totalPass,
+  totalFail,
+  totalMeasurements,
+) => {
+  let markdown = `## 📏 Measurement Summary for Style: ${styleNo}\n\n`;
+  markdown += `**Stage:** ${stage === "All" ? "All Stages" : stage}\n`;
+  markdown += `**Reports Analyzed:** ${totalReports}\n\n`;
+
+  // Table header
+  markdown += `| Measurement Point | Tol- | Tol+ |`;
+  sizeList.forEach((size) => {
+    markdown += ` ${size} |`;
+  });
+  markdown += ` Status |\n`;
+
+  // Table divider
+  markdown += `|:-----------------|:----:|:----:|`;
+  sizeList.forEach(() => {
+    markdown += `:------:|`;
+  });
+  markdown += `:------:|\n`;
+
+  // Table rows
+  measurementPoints.forEach((point) => {
+    const criticalMarker = point.isCritical ? "⭐ " : "";
+    markdown += `| ${criticalMarker}${point.name} | ${point.tolMinus} | ${point.tolPlus} |`;
+
+    sizeList.forEach((size) => {
+      const data = point.sizeResults[size];
+      if (data && data.value !== "-") {
+        markdown += ` ${data.statusIcon} ${data.value} |`;
+      } else {
+        markdown += ` - |`;
+      }
+    });
+
+    markdown += ` ${point.summary.passRate} |\n`;
+  });
+
+  // Summary
+  markdown += `\n### Summary\n`;
+  markdown += `- **Total Measurements:** ${totalMeasurements}\n`;
+  markdown += `- **Pass:** ${totalPass} 🟢\n`;
+  markdown += `- **Fail:** ${totalFail} 🔴\n`;
+  markdown += `- **Overall Pass Rate:** ${totalMeasurements > 0 ? ((totalPass / totalMeasurements) * 100).toFixed(1) + "%" : "N/A"}\n`;
+
+  if (totalFail > 0) {
+    markdown += `\n⚠️ **Attention Required:** ${totalFail} measurements are out of tolerance.\n`;
+  } else if (totalMeasurements > 0) {
+    markdown += `\n✅ **All measurements are within tolerance.**\n`;
+  }
+
+  // Legend
+  markdown += `\n**Legend:** 🟢 = Within Tolerance | 🔴 = Out of Tolerance | ⭐ = Critical Measurement Point\n`;
+
+  return markdown;
+};
+
+/**
+ * Get detailed measurement data for a specific report
+ */
+const getMeasurementDetailsForReport = async (reportId) => {
+  try {
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId),
+    })
+      .select(
+        "reportId orderNos measurementData inspectionDate reportType buyer empName",
+      )
+      .lean();
+
+    if (!report) {
+      return { error: true, message: `Report ${reportId} not found` };
+    }
+
+    if (!report.measurementData || report.measurementData.length === 0) {
+      return {
+        error: false,
+        reportId: report.reportId,
+        message: "No measurement data recorded for this report",
+        hasMeasurements: false,
+      };
+    }
+
+    const styleNo = report.orderNos?.[0];
+    if (!styleNo) {
+      return { error: true, message: "No style number found in report" };
+    }
+
+    // Get specs
+    const specsRecord = await QASectionsMeasurementSpecs.findOne({
+      Order_No: { $regex: new RegExp(`^${styleNo}$`, "i") },
+    }).lean();
+
+    const specIdToInfo = new Map();
+    const allSpecs = [
+      ...(specsRecord?.AllBeforeWashSpecs || []),
+      ...(specsRecord?.AllAfterWashSpecs || []),
+    ];
+
+    allSpecs.forEach((s) => {
+      const id = s.id || s._id?.toString();
+      const name = (s.MeasurementPointEngName || s.name || "").trim();
+      if (name) {
+        specIdToInfo.set(id, {
+          name,
+          TolMinus: s.TolMinus,
+          TolPlus: s.TolPlus,
+        });
+      }
+    });
+
+    // Process measurements
+    const measurementGroups = [];
+
+    report.measurementData.forEach((m) => {
+      if (m.size === "Manual_Entry") return;
+
+      const groupData = {
+        stage: m.stage || "Before",
+        stageLabel:
+          m.stage === "After" ? "After Wash/Buyer Spec" : "Before Wash",
+        size: m.size,
+        line: m.lineName || m.line || "-",
+        table: m.tableName || m.table || "-",
+        color: m.colorName || m.color || "-",
+        kValue: m.kValue || "-",
+        inspectorDecision: m.inspectorDecision || "pending",
+        measurements: [],
+      };
+
+      const validAllIndices = Array.isArray(m.allEnabledPcs)
+        ? m.allEnabledPcs
+        : [];
+
+      if (m.allMeasurements && typeof m.allMeasurements === "object") {
+        Object.entries(m.allMeasurements).forEach(([specId, pcsData]) => {
+          const specInfo = specIdToInfo.get(specId);
+          if (!specInfo) return;
+
+          validAllIndices.forEach((pcsIndex) => {
+            const valObj = pcsData[pcsIndex];
+            if (!valObj || valObj.decimal === undefined) return;
+
+            const decimal = parseFloat(valObj.decimal);
+            const fraction = valObj.fraction || String(decimal);
+            const tolCheck = checkToleranceStatus(
+              decimal,
+              specInfo.TolMinus,
+              specInfo.TolPlus,
+            );
+
+            groupData.measurements.push({
+              pointName: specInfo.name,
+              pcsNo: pcsIndex + 1,
+              value: fraction,
+              decimal,
+              tolMinus: specInfo.TolMinus?.fraction || "-",
+              tolPlus: specInfo.TolPlus?.fraction || "-",
+              status: tolCheck.status,
+              statusIcon: tolCheck.withinTolerance ? "🟢" : "🔴",
+            });
+          });
+        });
+      }
+
+      if (groupData.measurements.length > 0) {
+        measurementGroups.push(groupData);
+      }
+    });
+
+    return {
+      error: false,
+      reportId: report.reportId,
+      styleNo,
+      inspectionDate: report.inspectionDate,
+      reportType: report.reportType,
+      buyer: report.buyer,
+      inspector: report.empName,
+      hasMeasurements: true,
+      measurementGroups,
+      totalMeasurements: measurementGroups.reduce(
+        (sum, g) => sum + g.measurements.length,
+        0,
+      ),
+    };
+  } catch (error) {
+    console.error("Error in getMeasurementDetailsForReport:", error);
+    return { error: true, message: `Error: ${error.message}` };
+  }
+};
+
 /**
  * Get measurement summary
  */
-const getMeasurementSummary = (report) => {
-  if (
-    !report ||
-    !report.measurementData ||
-    report.measurementData.length === 0
-  ) {
-    return { available: false };
-  }
+// const getMeasurementSummary = (report) => {
+//   if (
+//     !report ||
+//     !report.measurementData ||
+//     report.measurementData.length === 0
+//   ) {
+//     return { available: false };
+//   }
 
-  const data = report.measurementData;
-  const byStage = { Before: [], After: [] };
+//   const data = report.measurementData;
+//   const byStage = { Before: [], After: [] };
 
-  data.forEach((m) => {
-    const stage = m.stage || "Before";
-    byStage[stage].push({
-      size: m.size,
-      decision: m.inspectorDecision,
-      systemDecision: m.systemDecision,
-      line: m.lineName,
-      table: m.tableName,
-      color: m.colorName,
-    });
-  });
+//   data.forEach((m) => {
+//     const stage = m.stage || "Before";
+//     byStage[stage].push({
+//       size: m.size,
+//       decision: m.inspectorDecision,
+//       systemDecision: m.systemDecision,
+//       line: m.lineName,
+//       table: m.tableName,
+//       color: m.colorName,
+//     });
+//   });
 
-  const totalMeasurements = data.length;
-  const passCount = data.filter((m) => m.inspectorDecision === "pass").length;
-  const failCount = data.filter((m) => m.inspectorDecision === "fail").length;
+//   const totalMeasurements = data.length;
+//   const passCount = data.filter((m) => m.inspectorDecision === "pass").length;
+//   const failCount = data.filter((m) => m.inspectorDecision === "fail").length;
 
-  return {
-    available: true,
-    method: report.measurementMethod,
-    totalMeasurements,
-    passCount,
-    failCount,
-    passRate:
-      totalMeasurements > 0
-        ? ((passCount / totalMeasurements) * 100).toFixed(1)
-        : 0,
-    byStage,
-  };
-};
+//   return {
+//     available: true,
+//     method: report.measurementMethod,
+//     totalMeasurements,
+//     passCount,
+//     failCount,
+//     passRate:
+//       totalMeasurements > 0
+//         ? ((passCount / totalMeasurements) * 100).toFixed(1)
+//         : 0,
+//     byStage,
+//   };
+// };
 
 /**
  * Build a smart query from AI request
  */
 const buildSmartQuery = (queryParams) => {
   const query = {};
-  const options = { limit: 5, sort: { inspectionDate: -1 } };
+  const options = { limit: 200, sort: { inspectionDate: -1 } };
 
   Object.keys(queryParams).forEach((key) => {
     const value = queryParams[key];
@@ -841,14 +1478,35 @@ const executeEnrichedQuery = async (queryParams) => {
       enriched.aqlResult = calculateAQLResult(report);
     }
 
-    // Measurement summary if requested
-    if (queryParams.measurementSummary && report.measurementData) {
-      enriched.measurementSummary = getMeasurementSummary(report);
-    }
-
     // Defect by group if requested
     if (queryParams.defectAnalysis) {
       enriched.defectsByGroup = getDefectSummaryByGroup(report);
+    }
+
+    // Measurement summary (basic)
+    if (report.measurementData && report.measurementData.length > 0) {
+      const totalMeasurements = report.measurementData.filter(
+        (m) => m.size !== "Manual_Entry",
+      ).length;
+      const passCount = report.measurementData.filter(
+        (m) => m.inspectorDecision === "pass",
+      ).length;
+      const failCount = report.measurementData.filter(
+        (m) => m.inspectorDecision === "fail",
+      ).length;
+
+      enriched.measurementSummary = {
+        hasMeasurements: true,
+        totalMeasurements,
+        passCount,
+        failCount,
+        passRate:
+          totalMeasurements > 0
+            ? ((passCount / totalMeasurements) * 100).toFixed(1) + "%"
+            : "N/A",
+      };
+    } else {
+      enriched.measurementSummary = { hasMeasurements: false };
     }
 
     // Remove raw arrays to reduce token size unless full details requested
@@ -861,63 +1519,6 @@ const executeEnrichedQuery = async (queryParams) => {
   });
 
   return enrichedReports;
-};
-
-/**
- * Parse AI response for QUERY or FUNCTION requests
- */
-const parseAIRequest = (responseText) => {
-  const trimmed = responseText.trim();
-
-  // Check for QUERY
-  if (trimmed.startsWith("QUERY:")) {
-    try {
-      const jsonStr = trimmed.replace("QUERY:", "").trim();
-      // Handle potential markdown code blocks
-      const cleanJson = jsonStr
-        .replace(/```json\n?/g, "")
-        .replace(/```\n?/g, "")
-        .trim();
-      return { type: "QUERY", params: JSON.parse(cleanJson) };
-    } catch (e) {
-      console.error("Failed to parse QUERY:", e);
-      return null;
-    }
-  }
-
-  // Check for FUNCTION
-  if (trimmed.startsWith("FUNCTION:")) {
-    try {
-      const funcStr = trimmed.replace("FUNCTION:", "").trim();
-      // Parse function name and params: functionName(param: value, ...)
-      const match = funcStr.match(/(\w+)\((.*)\)/);
-      if (match) {
-        const funcName = match[1];
-        const paramsStr = match[2];
-        const params = {};
-
-        // Parse key: value pairs
-        paramsStr.split(",").forEach((pair) => {
-          const [key, val] = pair.split(":").map((s) => s.trim());
-          if (key && val) {
-            // Try to parse as JSON, fallback to string
-            try {
-              params[key] = JSON.parse(val);
-            } catch {
-              params[key] = val.replace(/['"]/g, "");
-            }
-          }
-        });
-
-        return { type: "FUNCTION", name: funcName, params };
-      }
-    } catch (e) {
-      console.error("Failed to parse FUNCTION:", e);
-      return null;
-    }
-  }
-
-  return null;
 };
 
 /**
@@ -952,6 +1553,17 @@ const executeFunction = async (funcName, params) => {
         reportId: report.reportId,
         summary: getDefectSummaryByGroup(report),
       };
+    }
+
+    case "getMeasurementSummary": {
+      const styleNo = params.styleNo || params.style || params.orderNo;
+      const reportType = params.reportType || null;
+      const stage = params.stage || "All";
+      return await getMeasurementSummaryForStyle(styleNo, reportType, stage);
+    }
+
+    case "getMeasurementDetails": {
+      return await getMeasurementDetailsForReport(params.reportId);
     }
 
     case "compareReports": {
@@ -1024,6 +1636,76 @@ const executeFunction = async (funcName, params) => {
     default:
       return { error: `Unknown function: ${funcName}` };
   }
+};
+
+/**
+ * Parse AI response for QUERY or FUNCTION requests
+ */
+const parseAIRequest = (responseText) => {
+  const trimmed = responseText.trim();
+
+  // Check for QUERY
+  if (trimmed.startsWith("QUERY:")) {
+    try {
+      const jsonStr = trimmed.replace("QUERY:", "").trim();
+      // Handle potential markdown code blocks
+      const cleanJson = jsonStr
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
+        .trim();
+      return { type: "QUERY", params: JSON.parse(cleanJson) };
+    } catch (e) {
+      console.error("Failed to parse QUERY:", e);
+      return null;
+    }
+  }
+
+  // Check for FUNCTION
+  if (trimmed.startsWith("FUNCTION:")) {
+    try {
+      const funcStr = trimmed.replace("FUNCTION:", "").trim();
+      // Parse function name and params: functionName(param: value, ...)
+      const match = funcStr.match(/(\w+)\((.*)\)/);
+      if (match) {
+        const funcName = match[1];
+        const paramsStr = match[2];
+        const params = {};
+
+        // Parse key: value pairs
+        paramsStr.split(",").forEach((pair) => {
+          const colonIndex = pair.indexOf(":");
+          if (colonIndex > -1) {
+            const key = pair.substring(0, colonIndex).trim();
+            const val = pair.substring(colonIndex + 1).trim();
+            try {
+              params[key] = JSON.parse(val);
+            } catch {
+              params[key] = val.replace(/['"]/g, "");
+            }
+          }
+        });
+
+        // paramsStr.split(",").forEach((pair) => {
+        //   const [key, val] = pair.split(":").map((s) => s.trim());
+        //   if (key && val) {
+        //     // Try to parse as JSON, fallback to string
+        //     try {
+        //       params[key] = JSON.parse(val);
+        //     } catch {
+        //       params[key] = val.replace(/['"]/g, "");
+        //     }
+        //   }
+        // });
+
+        return { type: "FUNCTION", name: funcName, params };
+      }
+    } catch (e) {
+      console.error("Failed to parse FUNCTION:", e);
+      return null;
+    }
+  }
+
+  return null;
 };
 
 /**
@@ -1231,6 +1913,19 @@ export const sendMessage = async (req, res) => {
       enhancedMessage += `\n\n[SYSTEM HINT: Use this query: {"last30days": true}]`;
     }
 
+    // Measurement-specific hints
+    if (
+      lowerMsg.includes("measurement") &&
+      (lowerMsg.includes("style") || lowerMsg.includes("order"))
+    ) {
+      const styleMatch = message.match(
+        /(?:style|order)\s*[:#]?\s*([A-Z0-9-]+)/i,
+      );
+      if (styleMatch) {
+        enhancedMessage += `\n\n[HINT: For measurement summary, use FUNCTION: getMeasurementSummary(styleNo: "${styleMatch[1]}")]`;
+      }
+    }
+
     // 3. Determine which model to use
     let useGroq = false;
 
@@ -1352,14 +2047,24 @@ export const sendMessage = async (req, res) => {
           dataResult = await executeFunction(aiRequest.name, aiRequest.params);
         }
 
-        const dataString = JSON.stringify(dataResult, null, 2);
+        //const dataString = JSON.stringify(dataResult, null, 2);
+
+        // For measurement summary, use the markdown summary if available
+        let dataString;
+        if (
+          aiRequest.type === "FUNCTION" &&
+          aiRequest.name === "getMeasurementSummary" &&
+          dataResult.markdownSummary
+        ) {
+          dataString = dataResult.markdownSummary;
+        } else {
+          dataString = JSON.stringify(dataResult, null, 2);
+        }
 
         // Feed data back to AI
         const followUpPrompt = `
 SYSTEM_DATA_RESULT:
-\`\`\`json
-${dataString}
-\`\`\`
+${aiRequest.type === "FUNCTION" && aiRequest.name === "getMeasurementSummary" ? dataString : `\`\`\`json\n${dataString}\n\`\`\``}
 
 **IMPORTANT INSTRUCTIONS:**
 1. Analyze ONLY the data provided above
@@ -1367,6 +2072,7 @@ ${dataString}
 3. DO NOT provide example or sample data
 4. Show actual reportId, buyer, orderNos from the results
 5. Format the response clearly with proper structure
+6. For measurement tables, use the markdown format with emojis
 
 Now provide a comprehensive, well-formatted answer to the user's original question: "${message}"
 

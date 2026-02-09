@@ -44,27 +44,27 @@ const PaperPreview = ({ data }) => {
   const formData = data;
   const rawHistory = formData.history || formData.inspectionRecords || [];
 
-  // Helper to group nested history by Session (Check 1, Check 2, etc.)
+  // Helper to group nested history by Session (Item 1, Item 2, etc.)
   const getGroupedHistory = (history) => {
     if (Array.isArray(history)) {
       if (history.length > 0 && (history[0].itemName || history[0].checkName)) {
         const sessions = {};
         history.forEach((item) => {
-          const ck = item.checkName || "Check 1";
+          const ck = item.checkName || "Item 1";
           if (!sessions[ck]) sessions[ck] = { name: ck, items: [] };
           sessions[ck].items.push(item);
         });
         return Object.keys(sessions)
           .sort((a, b) => {
-            const numA = parseInt(a.replace("Check ", ""));
-            const numB = parseInt(b.replace("Check ", ""));
+            const numA = parseInt(a.replace("Item ", ""));
+            const numB = parseInt(b.replace("Item ", ""));
             return numA - numB;
           })
           .map((k) => sessions[k]);
       }
       return history.map((h, i) => ({
-        name: h.checkName || `Check ${i + 1}`,
-        items: [{ ...h, itemName: h.itemName || "Item 1" }],
+        name: h.checkName || `Item ${i + 1}`,
+        items: [{ ...h, itemName: h.itemName || "Check 1" }],
       }));
     }
 
@@ -74,24 +74,27 @@ const PaperPreview = ({ data }) => {
     Object.keys(history).forEach((itemKey) => {
       const checks = history[itemKey] || {};
       Object.keys(checks).forEach((checkKey) => {
-        if (!sessions[checkKey]) {
-          sessions[checkKey] = {
-            name: checkKey,
+        // Here itemKey is expected to be "Item 1" and checkKey "Check 1"
+        // But PaperPreview was using checkName for session and itemName for reading.
+        // We normalize to Session = itemKey, Reading = checkKey
+        if (!sessions[itemKey]) {
+          sessions[itemKey] = {
+            name: itemKey,
             items: [],
           };
         }
-        sessions[checkKey].items.push({
+        sessions[itemKey].items.push({
           ...checks[checkKey],
-          itemName: itemKey,
-          checkName: checkKey,
+          itemName: checkKey,
+          checkName: itemKey,
         });
       });
     });
 
     return Object.keys(sessions)
       .sort((a, b) => {
-        const numA = parseInt(a.replace("Check ", ""));
-        const numB = parseInt(b.replace("Check ", ""));
+        const numA = parseInt(a.replace("Item ", ""));
+        const numB = parseInt(b.replace("Item ", ""));
         return numA - numB;
       })
       .map((k) => sessions[k]);
@@ -174,7 +177,7 @@ const PaperPreview = ({ data }) => {
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm border border-black table-fixed py-6">
           <colgroup>
-            <col className="w-[70px]" /> {/* Item */}
+            <col className="w-[70px]" /> {/* Check */}
             <col className="w-[110px]" /> {/* Date */}
             <col className="w-[120px]" /> {/* Customer */}
             <col className="w-[150px]" /> {/* Fabrication */}
@@ -192,7 +195,7 @@ const PaperPreview = ({ data }) => {
           </colgroup>
           <thead>
             <tr className="bg-gray-50 font-bold uppercase text-[15px]">
-              <th className="border border-black px-1 py-2">Item</th>
+              <th className="border border-black px-1 py-2">Check</th>
               <th className="border border-black px-1 py-2">Date</th>
               <th className="border border-black px-1 py-2">Customer</th>
               <th className="border border-black px-1 py-2">Fabrication</th>
@@ -252,8 +255,7 @@ const PaperPreview = ({ data }) => {
                     <div className="flex justify-between items-center uppercase tracking-wider text-xs">
                       <span>{session.name}</span>
                       <span>
-                        Session Result:{" "}
-                        {getSessionStatus(session).toUpperCase()}
+                        Item Result: {getSessionStatus(session).toUpperCase()}
                       </span>
                     </div>
                   </td>
@@ -265,7 +267,7 @@ const PaperPreview = ({ data }) => {
                     <React.Fragment key={iIdx}>
                       <tr className="text-xs">
                         <td className="border border-black px-1 py-2 text-center font-bold">
-                          {item.itemName || `Item ${iIdx + 1}`}
+                          {item.itemName || `Check ${iIdx + 1}`}
                         </td>
                         <td className="border border-black px-1 py-2 text-center whitespace-nowrap">
                           {formatDate(item.date || formData.date)}
@@ -397,22 +399,22 @@ const PaperPreview = ({ data }) => {
         </table>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-4 items-stretch print:grid-cols-2">
+      <div className="mt-4 grid grid-cols-2 gap-4 items-start print:grid-cols-2">
         <div className="border border-black rounded overflow-hidden flex flex-col">
-          <div className="font-bold text-sm bg-gray-50 px-3 py-2 border-b border-black uppercase text-gray-700">
+          <div className="font-bold text-sm bg-gray-50 px-3 py-3 border-b border-black uppercase text-gray-700">
             Remark / Comments
           </div>
-          <div className="p-3 min-h-[80px] text-sm text-gray-800 flex-grow">
+          <div className="p-3 py-10 text-sm text-gray-800">
             {formData.generalRemark || "No additional remarks."}
           </div>
         </div>
 
         {flattenedHistory.some((rec) => rec.images && rec.images.length > 0) ? (
           <div className="border border-black rounded overflow-hidden print:break-inside-avoid flex flex-col">
-            <div className="font-bold text-sm bg-gray-50 px-3 py-2 border-b border-black uppercase text-gray-700">
+            <div className="font-bold text-sm bg-gray-50 px-3 py-3 border-b border-black uppercase text-gray-700">
               Inspection Proof Photos
             </div>
-            <div className="p-3 grid grid-cols-2 gap-2 flex-grow content-start">
+            <div className="p-3 grid grid-cols-2 gap-2 content-start">
               {flattenedHistory
                 .flatMap((rec) => rec.images || [])
                 .map((img, i) => (
@@ -423,7 +425,7 @@ const PaperPreview = ({ data }) => {
                     <img
                       src={img.preview}
                       alt={`Proof ${i}`}
-                      className="w-full h-24 object-cover border border-gray-300 rounded"
+                      className="w-full h-auto max-h-[250px] object-contain border border-gray-300 rounded"
                     />
                     <span className="text-[8px] text-gray-500 truncate w-full text-center">
                       {img.name || `Photo ${i + 1}`}
@@ -433,7 +435,7 @@ const PaperPreview = ({ data }) => {
             </div>
           </div>
         ) : (
-          <div className="border border-black rounded overflow-hidden bg-gray-50/30 flex items-center justify-center italic text-gray-400 text-xs text-center p-4">
+          <div className="border border-black rounded overflow-hidden bg-gray-50/30 flex items-center justify-center italic text-gray-400 text-xs text-center p-16">
             No inspection photos available
           </div>
         )}

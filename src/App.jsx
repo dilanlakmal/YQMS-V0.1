@@ -3,7 +3,7 @@ import {
   Navigate,
   Route,
   BrowserRouter as Router,
-  Routes
+  Routes,
 } from "react-router-dom";
 
 import "./App.css";
@@ -128,7 +128,7 @@ function AppContent() {
     returnDefectArray: [],
     returnDefectQty: 0,
     cumulativeReturnDefectQty: 0,
-    defectArray: []
+    defectArray: [],
   });
   const [inspectionState, setInspectionState] = useState(null);
   const [returnState, setReturnState] = useState(null);
@@ -136,7 +136,7 @@ function AppContent() {
     details: null,
     logs: [],
     startTime: null,
-    lastActionTime: null
+    lastActionTime: null,
   });
   const [timer, setTimer] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -155,7 +155,7 @@ function AppContent() {
   const handleUpdateSharedState = (newState) => {
     setSharedState((prev) => ({
       ...prev,
-      ...newState
+      ...newState,
     }));
   };
 
@@ -205,13 +205,13 @@ function AppContent() {
       returnDefectArray: [],
       returnDefectQty: 0,
       cumulativeReturnDefectQty: 0,
-      defectArray: []
+      defectArray: [],
     });
     setLogsState({
       details: null,
       logs: [],
       startTime: null,
-      lastActionTime: null
+      lastActionTime: null,
     });
     setDetailsSubmitted(false);
     setTimer(0);
@@ -229,18 +229,18 @@ function AppContent() {
       defectPieces: 0,
       language: "english",
       view: "list",
-      hasDefectSelected: false
+      hasDefectSelected: false,
     };
 
     setInspectionState(initialState);
     setReturnState({
       ...initialState,
       returnDefects: {},
-      returnDefectQty: 0
+      returnDefectQty: 0,
     });
     setLogsState((prev) => ({
       ...prev,
-      details
+      details,
     }));
     setDetailsSubmitted(true);
   };
@@ -257,13 +257,13 @@ function AppContent() {
 
     const newEntry = {
       ...entry,
-      inspectionTime: inspectionTime.toFixed(2)
+      inspectionTime: inspectionTime.toFixed(2),
     };
 
     setLogsState((prev) => ({
       ...prev,
       logs: [...prev.logs, newEntry],
-      lastActionTime: currentTime
+      lastActionTime: currentTime,
     }));
   };
 
@@ -275,7 +275,7 @@ function AppContent() {
       setInspectionStartTime(currentTime);
       setLogsState((prev) => ({
         ...prev,
-        startTime: currentTime.getTime()
+        startTime: currentTime.getTime(),
       }));
     }
   };
@@ -287,19 +287,19 @@ function AppContent() {
   const handleInspectionStateChange = (newState) => {
     setInspectionState((prev) => ({
       ...prev,
-      ...newState
+      ...newState,
     }));
   };
 
   const handleReturnStateChange = (newState) => {
     setReturnState((prev) => ({
       ...prev,
-      ...newState
+      ...newState,
     }));
     if (newState.goodOutput !== inspectionState?.goodOutput) {
       setInspectionState((prev) => ({
         ...prev,
-        goodOutput: newState.goodOutput
+        goodOutput: newState.goodOutput,
       }));
     }
   };
@@ -347,7 +347,7 @@ function AppContent() {
                         setLogsState((prev) => ({
                           ...prev,
                           startTime: time,
-                          lastActionTime: time
+                          lastActionTime: time,
                         }))
                       }
                       onSubmit={handleSubmit}
