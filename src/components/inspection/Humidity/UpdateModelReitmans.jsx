@@ -1,0 +1,978 @@
+import React, { useState, useEffect, useRef } from "react";
+import Swal from "sweetalert2";
+import { API_BASE_URL } from "../../../../config";
+
+export default function UpdateModelReimans({
+  open,
+  onCancel,
+  report,
+  onUpdate,
+}) {
+  const [formData, setFormData] = useState({
+    buyerStyle: "",
+    factoryStyleNo: "",
+    customer: "",
+    fabrication: "",
+    colorName: "",
+    date: "",
+    generalRemark: "",
+    // Reitmans fields
+    upperCentisimalIndex: "",
+    composition: "",
+    primaryFabric: "",
+    primaryPercentage: "",
+    secondaryFabric: "",
+    secondaryPercentage: "",
+    timeChecked: "",
+    moistureRateBeforeDehumidify: "",
+    noPcChecked: "",
+    timeIn: "",
+    timeOut: "",
+    moistureRateAfter: "",
+    poLine: "",
+    matchedRule: null,
+    inspectionRecords: [],
+  });
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [expandedRecordIndex, setExpandedRecordIndex] = useState(0);
+  const [availableColors, setAvailableColors] = useState([]);
+  const [colorSearch, setColorSearch] = useState("");
+  const [showColorDropdown, setShowColorDropdown] = useState(false);
+  const colorRef = useRef(null);
+
+  useEffect(() => {
+    if (open && report) {
+      let sourceRecords = [];
+      if (report.inspectionRecords && report.inspectionRecords.length > 0) {
+        sourceRecords = report.inspectionRecords;
+      } else if (
+        report.history &&
+        typeof report.history === "object" &&
+        !Array.isArray(report.history)
+      ) {
+        // Convert nested Map history (Item -> Check) to latest records for editing
+        const historyMap = report.history;
+        sourceRecords = Object.keys(historyMap)
+          .sort((a, b) => {
+            const numA = parseInt(a.replace("Item ", ""));
+            const numB = parseInt(b.replace("Item ", ""));
+            return numA - numB;
+          })
+          .map((itemKey) => {
+            const checks = historyMap[itemKey] || {};
+            const checkKeys = Object.keys(checks).sort((a, b) => {
+              const numA = parseInt(a.replace("Check ", ""));
+              const numB = parseInt(b.replace("Check ", ""));
+              return numB - numA; // Sort descending to get latest
+            });
+            return {
+              ...checks[checkKeys[0]],
+              itemName: itemKey, // Store the item name to identify it during save
+              checkCount: checkKeys.length,
+            };
+          });
+      } else if (Array.isArray(report.history)) {
+        sourceRecords = report.history;
+      }
+
+      const specLimit = Number(report.upperCentisimalIndex);
+      const parseNumberInternal = (v) => {
+        if (v === undefined || v === null) return NaN;
+        const s = String(v).trim();
+        if (s === "") return NaN;
+        const cleaned = s.replace(/[^0-9.\-]/g, "");
+        if (cleaned.length === 0) return NaN;
+        const n = Number(cleaned);
+        return Number.isFinite(n) ? n : NaN;
+      };
+
+      const safeRecords = sourceRecords.map((rec) => {
+        const processSection = (sec) => {
+          const body = sec?.body || "";
+          const bodyVal = parseNumberInternal(body);
+          return {
+            body,
+            ribs: "",
+            pass:
+              !Number.isNaN(bodyVal) && !Number.isNaN(specLimit)
+                ? bodyVal <= specLimit
+                : sec?.pass === true || sec?.status === "pass",
+            fail:
+              !Number.isNaN(bodyVal) && !Number.isNaN(specLimit)
+                ? bodyVal > specLimit
+                : sec?.fail === true || sec?.status === "fail",
+          };
+        };
+
+        return {
+          ...rec,
+          top: processSection(rec.top),
+          middle: processSection(rec.middle),
+          bottom: processSection(rec.bottom),
+          images: rec.images || [],
+        };
+      });
+
+      if (safeRecords.length === 0) {
+        safeRecords.push({
+          top: { body: "", ribs: "", pass: false, fail: false },
+          middle: { body: "", ribs: "", pass: false, fail: false },
+          bottom: { body: "", ribs: "", pass: false, fail: false },
+          images: [],
+        });
+      }
+
+      let initialDate = "";
+      if (report.createdAt) {
+        const dateObj = new Date(report.createdAt);
+        initialDate = dateObj.toISOString().split("T")[0];
+      }
+
+      setFormData({
+        buyerStyle: report.buyerStyle || "",
+        factoryStyleNo: report.factoryStyleNo || "",
+        customer: report.customer || "",
+        fabrication: report.fabrication || "",
+        colorName: report.colorName || "",
+        date: initialDate,
+        generalRemark: report.generalRemark || "",
+        // Reitmans fields
+        upperCentisimalIndex: report.upperCentisimalIndex || "",
+        composition: report.composition || "",
+        primaryFabric: report.primaryFabric || "",
+        primaryPercentage: report.primaryPercentage || "",
+        secondaryFabric: report.secondaryFabric || "",
+        secondaryPercentage: report.secondaryPercentage || "",
+        timeChecked: report.timeChecked || "",
+        moistureRateBeforeDehumidify: report.moistureRateBeforeDehumidify || "",
+        noPcChecked: report.noPcChecked || "",
+        timeIn: report.timeIn || "",
+        timeOut: report.timeOut || "",
+        moistureRateAfter: report.moistureRateAfter || "",
+        poLine: report.poLine || "",
+        matchedRule: report.matchedRule || null,
+        inspectionRecords: safeRecords,
+      });
+      setExpandedRecordIndex(
+        safeRecords.length > 0 ? safeRecords.length - 1 : 0,
+      );
+    }
+  }, [open, report]);
+
+  // Click outside to close color dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (colorRef.current && !colorRef.current.contains(event.target)) {
+        setShowColorDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Fetch available colors when factoryStyleNo changes or on load
+  useEffect(() => {
+    const fetchColors = async () => {
+      if (open && formData.factoryStyleNo) {
+        try {
+          const base =
+            API_BASE_URL && API_BASE_URL !== ""
+              ? API_BASE_URL
+              : "http://localhost:5001";
+          const prefix = base.endsWith("/") ? base.slice(0, -1) : base;
+          const res = await fetch(
+            `${prefix}/api/yorksys-orders/${encodeURIComponent(formData.factoryStyleNo)}`,
+          );
+          const json = await res.json();
+          const order = json && json.data ? json.data : json || null;
+
+          if (order) {
+            const colors = [];
+            if (Array.isArray(order.SKUData))
+              colors.push(...order.SKUData.map((s) => s.Color).filter(Boolean));
+            if (Array.isArray(order.OrderQtyByCountry)) {
+              order.OrderQtyByCountry.forEach((c) => {
+                if (Array.isArray(c.ColorQty))
+                  c.ColorQty.forEach(
+                    (col) => col.ColorName && colors.push(col.ColorName),
+                  );
+              });
+            }
+            const uniqueColors = [...new Set(colors)];
+            setAvailableColors(uniqueColors);
+          }
+        } catch (err) {
+          console.error("Error fetching colors:", err);
+        }
+      }
+    };
+    fetchColors();
+  }, [open, formData.factoryStyleNo]);
+
+  const updateSectionData = (recordIndex, section, field, value) => {
+    setFormData((prev) => {
+      const newRecords = [...prev.inspectionRecords];
+      if (!newRecords[recordIndex]) return prev;
+
+      const updatedRecord = { ...newRecords[recordIndex] };
+      updatedRecord[section] = {
+        ...updatedRecord[section],
+        [field]: value,
+      };
+
+      // Auto-grading logic (Reitmans uses upperCentisimalIndex)
+      const specNum = Number(prev.upperCentisimalIndex);
+
+      const parseNumber = (v) => {
+        if (v === undefined || v === null) return NaN;
+        const s = String(v).trim();
+        if (s === "") return NaN;
+        const cleaned = s.replace(/[^0-9.\-]/g, "");
+        if (cleaned.length === 0) return NaN;
+        const n = Number(cleaned);
+        return Number.isFinite(n) ? n : NaN;
+      };
+
+      const bodyStr = String(updatedRecord[section].body || "").trim();
+      const bodyVal = parseNumber(bodyStr);
+
+      if (
+        !Number.isNaN(bodyVal) &&
+        bodyStr.length >= 2 &&
+        !Number.isNaN(specNum)
+      ) {
+        if (bodyVal <= specNum) {
+          updatedRecord[section].pass = true;
+          updatedRecord[section].fail = false;
+        } else {
+          updatedRecord[section].pass = false;
+          updatedRecord[section].fail = true;
+        }
+      } else {
+        updatedRecord[section].pass = false;
+        updatedRecord[section].fail = false;
+      }
+
+      newRecords[recordIndex] = updatedRecord;
+
+      // Sync with moistureRateAfter (take the reading of the latest check)
+      if (recordIndex === newRecords.length - 1) {
+        const moistureValue = parseNumber(updatedRecord.top.body) || 0;
+        if (moistureValue > 0) {
+          return {
+            ...prev,
+            inspectionRecords: newRecords,
+            moistureRateAfter: moistureValue.toString(),
+          };
+        }
+      }
+
+      return { ...prev, inspectionRecords: newRecords };
+    });
+  };
+
+  const setPassFail = (recordIndex, section, isPass) => {
+    setFormData((prev) => {
+      const newRecords = [...prev.inspectionRecords];
+      if (!newRecords[recordIndex]) return prev;
+      newRecords[recordIndex][section].pass = isPass;
+      newRecords[recordIndex][section].fail = !isPass;
+      return { ...prev, inspectionRecords: newRecords };
+    });
+  };
+
+  const handleImageUpload = async (recordIndex, files) => {
+    const validFiles = Array.from(files).filter((file) => {
+      const isValidType = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+      ].includes(file.type);
+      const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB limit
+      return isValidType && isValidSize;
+    });
+
+    const imagePromises = validFiles.map((file) => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          resolve({
+            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            preview: reader.result,
+            name: file.name,
+            size: file.size,
+          });
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    const newImages = await Promise.all(imagePromises);
+
+    setFormData((prev) => {
+      const newRecords = [...prev.inspectionRecords];
+      if (!newRecords[recordIndex]) return prev;
+      const currentImages = newRecords[recordIndex].images || [];
+      newRecords[recordIndex] = {
+        ...newRecords[recordIndex],
+        images: [...currentImages, ...newImages],
+      };
+      return { ...prev, inspectionRecords: newRecords };
+    });
+  };
+
+  const removeImage = (recordIndex, imageId) => {
+    setFormData((prev) => {
+      const newRecords = [...prev.inspectionRecords];
+      if (!newRecords[recordIndex]) return prev;
+      const currentImages = newRecords[recordIndex].images || [];
+      newRecords[recordIndex] = {
+        ...newRecords[recordIndex],
+        images: currentImages.filter((img) => img.id !== imageId),
+      };
+      return { ...prev, inspectionRecords: newRecords };
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      const base =
+        API_BASE_URL && API_BASE_URL !== ""
+          ? API_BASE_URL
+          : "http://localhost:5001";
+      const prefix = base.endsWith("/") ? base.slice(0, -1) : base;
+
+      const currentEditRecords = formData.inspectionRecords.map(
+        (rec, index) => ({
+          top: {
+            body: rec.top.body,
+            ribs: "",
+            status: rec.top.pass ? "pass" : rec.top.fail ? "fail" : "",
+          },
+          middle: { body: "", ribs: "", status: "" },
+          bottom: { body: "", ribs: "", status: "" },
+          images: rec.images || [],
+          date: formData.date || rec.date,
+          generalRemark: formData.generalRemark || rec.remark || "",
+          // Capture full Reitmans snapshot in history
+          factoryStyleNo: formData.factoryStyleNo,
+          buyerStyle: formData.buyerStyle,
+          customer: formData.customer,
+          colorName: formData.colorName,
+          poLine: formData.poLine,
+          composition: formData.composition,
+          primaryFabric: formData.primaryFabric,
+          primaryPercentage: formData.primaryPercentage,
+          upperCentisimalIndex: formData.upperCentisimalIndex,
+          secondaryFabric: formData.secondaryFabric,
+          secondaryPercentage: formData.secondaryPercentage,
+          timeChecked: formData.timeChecked,
+          moistureRateBeforeDehumidify: formData.moistureRateBeforeDehumidify,
+          noPcChecked: formData.noPcChecked,
+          timeIn: formData.timeIn,
+          timeOut: formData.timeOut,
+          moistureRateAfter: formData.moistureRateAfter,
+          matchedRule: formData.matchedRule,
+          itemName: rec.itemName || `Item ${index + 1}`,
+        }),
+      );
+
+      const previousHistory = { ...(report.history || {}) };
+
+      currentEditRecords.forEach((rec) => {
+        const itemKey = rec.itemName;
+        const previousChecks =
+          previousHistory[itemKey] &&
+          typeof previousHistory[itemKey] === "object"
+            ? previousHistory[itemKey]
+            : {};
+        const checkKeys = Object.keys(previousChecks).sort((a, b) => {
+          const numA = parseInt(a.replace("Check ", ""));
+          const numB = parseInt(b.replace("Check ", ""));
+          return numB - numA;
+        });
+
+        const latestCheck = previousChecks[checkKeys[0]];
+        const newCheckNumber = checkKeys.length + 1;
+        const newCheckKey = `Check ${newCheckNumber}`;
+
+        // Detection: checking if readings changed
+        const isChanged =
+          !latestCheck ||
+          String(rec.top?.body) !== String(latestCheck.top?.body);
+
+        if (isChanged) {
+          previousHistory[itemKey] = {
+            ...previousChecks,
+            [newCheckKey]: {
+              ...rec,
+              saveTime: new Date().toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true,
+              }),
+            },
+          };
+        }
+      });
+
+      const payload = {
+        ...formData,
+        history: previousHistory,
+        inspectionRecords: currentEditRecords,
+      };
+
+      const response = await fetch(
+        `${prefix}/api/humidity-reports/${report._id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      const result = await response.json();
+      if (response.ok) {
+        Swal.fire({
+          icon: "success",
+          title: "Success",
+          text: "Reitmans Report updated successfully!",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        onUpdate();
+        onCancel();
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: result.message || "Failed to update report",
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Error updating report",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4 transition-opacity">
+      <style>{`
+                @keyframes modalPop {
+                    from { opacity: 0; transform: scale(0.95); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+            `}</style>
+      <div
+        className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[95vh] flex flex-col overflow-hidden"
+        style={{ animation: "modalPop 0.3s ease-out" }}
+      >
+        <div className="p-6 border-b flex justify-between items-center bg-white z-10 shrink-0">
+          <div className="flex items-center gap-2">
+            <svg
+              className="w-8 h-8 text-blue-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
+            </svg>
+            <h2 className="text-2xl font-bold text-blue-500">
+              Edit Reitmans Inspection
+            </h2>
+          </div>
+          <button
+            onClick={onCancel}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          <form id="update-form" onSubmit={handleSubmit} className="space-y-6">
+            {/* Reitmans Specific Fields UI */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Factory Style No
+                </label>
+                <input
+                  type="text"
+                  value={formData.factoryStyleNo}
+                  readOnly
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Buyer Style
+                </label>
+                <input
+                  type="text"
+                  value={formData.buyerStyle}
+                  readOnly
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Customer
+                </label>
+                <input
+                  type="text"
+                  value={formData.customer}
+                  readOnly
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
+                />
+              </div>
+              <div ref={colorRef}>
+                <label className="block text-sm font-medium text-gray-700">
+                  Color Name
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Select or type color..."
+                    value={colorSearch || formData.colorName}
+                    onFocus={() => {
+                      setColorSearch("");
+                      setShowColorDropdown(true);
+                    }}
+                    onChange={(e) => {
+                      setColorSearch(e.target.value);
+                      setFormData({ ...formData, colorName: e.target.value });
+                      setShowColorDropdown(true);
+                    }}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-white focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                  <div
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 cursor-pointer"
+                    onClick={() => setShowColorDropdown(!showColorDropdown)}
+                  >
+                    <svg
+                      className={`fill-current h-4 w-4 transition-transform ${showColorDropdown ? "rotate-180" : ""}`}
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                    >
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
+                  </div>
+
+                  {showColorDropdown && (
+                    <div className="absolute z-[60] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto min-w-[200px]">
+                      {availableColors.length > 0 ? (
+                        availableColors
+                          .filter(
+                            (c) =>
+                              !colorSearch ||
+                              c
+                                .toLowerCase()
+                                .includes(colorSearch.toLowerCase()),
+                          )
+                          .map((color, idx) => (
+                            <div
+                              key={idx}
+                              className={`px-4 py-2 cursor-pointer text-sm font-medium transition-colors border-b border-gray-50 last:border-0 ${
+                                formData.colorName === color
+                                  ? "bg-blue-50 text-blue-700"
+                                  : "hover:bg-blue-600 hover:text-white text-gray-700"
+                              }`}
+                              onClick={() => {
+                                setFormData({ ...formData, colorName: color });
+                                setColorSearch(color);
+                                setShowColorDropdown(false);
+                              }}
+                            >
+                              {color}
+                            </div>
+                          ))
+                      ) : (
+                        <div className="px-4 py-2 text-xs text-gray-400 italic">
+                          No suggested colors for this style.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Composition
+                </label>
+                <input
+                  type="text"
+                  value={formData.composition}
+                  onChange={(e) =>
+                    setFormData({ ...formData, composition: e.target.value })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  PO Line
+                </label>
+                <input
+                  type="text"
+                  value={formData.poLine}
+                  onChange={(e) =>
+                    setFormData({ ...formData, poLine: e.target.value })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Upper Centisimal Index (Spec)
+                </label>
+                <input
+                  type="text"
+                  value={formData.upperCentisimalIndex}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      upperCentisimalIndex: e.target.value,
+                    })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Time Checked
+                </label>
+                <input
+                  type="time"
+                  value={formData.timeChecked}
+                  onChange={(e) =>
+                    setFormData({ ...formData, timeChecked: e.target.value })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Moisture Rate (Before)
+                </label>
+                <input
+                  type="number"
+                  value={formData.moistureRateBeforeDehumidify}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      moistureRateBeforeDehumidify: e.target.value,
+                    })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  No. Pcs Checked
+                </label>
+                <input
+                  type="number"
+                  value={formData.noPcChecked}
+                  onChange={(e) =>
+                    setFormData({ ...formData, noPcChecked: e.target.value })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Time In
+                </label>
+                <input
+                  type="time"
+                  value={formData.timeIn}
+                  onChange={(e) =>
+                    setFormData({ ...formData, timeIn: e.target.value })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Time Out
+                </label>
+                <input
+                  type="time"
+                  value={formData.timeOut}
+                  onChange={(e) =>
+                    setFormData({ ...formData, timeOut: e.target.value })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Moisture Rate (After)
+                </label>
+                <input
+                  type="number"
+                  value={formData.moistureRateAfter}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      moistureRateAfter: e.target.value,
+                    })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={formData.date}
+                  disabled
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
+                />
+              </div>
+            </div>
+
+            {/* Inspection Records */}
+            <div className="border-t pt-4">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Readings
+              </h3>
+              <div className="space-y-4">
+                {formData.inspectionRecords.map((record, index) => {
+                  if (index !== formData.inspectionRecords.length - 1)
+                    return null;
+                  const isExpanded = index === expandedRecordIndex;
+                  const isPassed = record.top.pass;
+
+                  return (
+                    <div
+                      key={index}
+                      className={`border rounded-lg p-4 ${isPassed ? "bg-green-50 border-green-200" : "bg-gray-50"}`}
+                    >
+                      <div
+                        className="flex justify-between items-center cursor-pointer mb-2"
+                        onClick={() => setExpandedRecordIndex(index)}
+                      >
+                        <h4 className="font-bold text-gray-700">
+                          Record #{index + 1}
+                        </h4>
+                        <span className="text-sm text-gray-500">
+                          {isExpanded ? "Collapse" : "Expand"}
+                        </span>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="space-y-4">
+                          <div className="flex flex-col md:flex-row gap-4 w-full items-center p-4 rounded-2xl shadow-sm bg-white border border-blue-100 mb-2 transition-all hover:shadow-md">
+                            <div className="w-40 font-black uppercase text-[11px] text-blue-600 tracking-wider">
+                              Moisture Reading
+                            </div>
+
+                            <div className="flex flex-1 items-center gap-4 w-full">
+                              <div className="flex-1 relative">
+                                <input
+                                  type="number"
+                                  placeholder="0.0"
+                                  value={record.top.body}
+                                  onChange={(e) =>
+                                    updateSectionData(
+                                      index,
+                                      "top",
+                                      "body",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full pl-4 pr-10 py-3 border-2 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-100 border-gray-100 font-bold text-gray-700 transition-all focus:border-blue-400"
+                                />
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">
+                                  %
+                                </span>
+                              </div>
+                              {record.top.pass ? (
+                                <span className="inline-flex items-center px-4 py-2 rounded-xl bg-emerald-50 text-emerald-600 font-black text-[10px] uppercase tracking-widest border border-emerald-100">
+                                  <svg
+                                    className="w-3.5 h-3.5 mr-2 stroke-[3]"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M5 13l4 4L19 7"
+                                    />
+                                  </svg>
+                                  Pass
+                                </span>
+                              ) : record.top.fail ? (
+                                <span className="inline-flex items-center px-4 py-2 rounded-xl bg-rose-50 text-rose-500 font-black text-[10px] uppercase tracking-widest border border-rose-100">
+                                  <svg
+                                    className="w-3.5 h-3.5 mr-2 stroke-[3]"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M6 18L18 6M6 6l12 12"
+                                    />
+                                  </svg>
+                                  Fail
+                                </span>
+                              ) : (
+                                <span className="text-gray-300 font-bold text-[10px] px-4 uppercase tracking-widest italic">
+                                  Pending
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="mt-4 border-t pt-4">
+                        <h5 className="text-sm font-medium text-gray-700 mb-2">
+                          Inspection Photos
+                        </h5>
+                        <div className="space-y-3">
+                          <label className="flex justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer hover:border-blue-400 focus:outline-none hover:bg-gray-50">
+                            <span className="flex items-center space-x-2">
+                              <svg
+                                className="w-6 h-6 text-gray-400"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
+                              </svg>
+                              <span className="font-medium text-gray-600">
+                                Upload images
+                              </span>
+                            </span>
+                            <input
+                              type="file"
+                              className="hidden"
+                              multiple
+                              accept="image/*"
+                              onChange={(e) =>
+                                handleImageUpload(index, e.target.files)
+                              }
+                            />
+                          </label>
+
+                          {record.images && record.images.length > 0 && (
+                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 mt-2">
+                              {record.images.map((img, imgIdx) => (
+                                <div
+                                  key={img.id || imgIdx}
+                                  className="relative group aspect-square"
+                                >
+                                  <img
+                                    src={img.preview}
+                                    alt={img.name}
+                                    className="h-full w-full object-cover rounded border"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeImage(index, img.id)}
+                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow hover:bg-red-600"
+                                  >
+                                    <svg
+                                      className="h-3 w-3"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth="2"
+                                        d="M6 18L18 6M6 6l12 12"
+                                      />
+                                    </svg>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                General Remark
+              </label>
+              <textarea
+                value={formData.generalRemark}
+                onChange={(e) =>
+                  setFormData({ ...formData, generalRemark: e.target.value })
+                }
+                className="w-full rounded-md border-gray-300 shadow-sm border p-3 min-h-[100px]"
+                placeholder="Remarks..."
+              />
+            </div>
+
+            <div className="pt-4 flex justify-end gap-3 sticky bottom-0 bg-white border-t p-4 -mx-6 -mb-6">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-6 py-2 border rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isSaving ? "Updating..." : "Update Report"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}

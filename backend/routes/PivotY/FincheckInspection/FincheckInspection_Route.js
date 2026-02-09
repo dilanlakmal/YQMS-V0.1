@@ -1,3 +1,7 @@
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 import express from "express";
 import {
   getInspectionOrderDetails,
@@ -13,20 +17,46 @@ import {
   createInspectionReport,
   getInspectionReportById,
   checkExistingReport,
+  uploadHeaderImages,
   updateHeaderData,
   uploadPhotoBatch,
   deletePhotoFromItem,
   updatePhotoItemRemark,
   updatePhotoData,
   updateInspectionConfig,
+  clearInspectionConfig,
   updateMeasurementData,
+  uploadDefectImages,
   updateDefectData,
+  uploadPPSheetImages,
   updatePPSheetData,
   submitFullInspectionReport,
   searchPreviousReports
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Controller.js";
 
 const router = express.Router();
+
+// Configure Multer
+
+// Define Storage Path
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// We save to a temporary folder first. The controller will move files to the final destination.
+const tempUploadDir = path.join(
+  __dirname,
+  "../../../storage/PivotY/Fincheck/temp_uploads"
+);
+
+// Ensure temp directory exists
+if (!fs.existsSync(tempUploadDir)) {
+  fs.mkdirSync(tempUploadDir, { recursive: true });
+}
+
+const upload = multer({
+  dest: tempUploadDir,
+  limits: { fileSize: 50 * 1024 * 1024 } // Optional: Limit to 50MB per file
+});
 
 // Search orders for inspection (supports mode: single, multi)
 router.get("/api/fincheck-inspection/search-orders", searchInspectionOrders);
@@ -88,16 +118,27 @@ router.post(
   checkExistingReport
 );
 
+// Save Header Images (Multipart)
+router.post(
+  "/api/fincheck-inspection/upload-header-images",
+  upload.array("images"),
+  uploadHeaderImages
+);
+
 // Save Header Data
 router.post("/api/fincheck-inspection/update-header-data", updateHeaderData);
 
-// NEW: Batch Upload Photos (Incremental - per item)
-router.post("/api/fincheck-inspection/upload-photo-batch", uploadPhotoBatch);
+// Batch Upload Photos (Incremental - per item)
+router.post(
+  "/api/fincheck-inspection/upload-photo-batch",
+  upload.array("images"),
+  uploadPhotoBatch
+);
 
-// NEW: Delete Single Photo
+// Delete Single Photo
 router.post("/api/fincheck-inspection/delete-photo", deletePhotoFromItem);
 
-// NEW: Update Remark Only
+// Update Remark Only
 router.post(
   "/api/fincheck-inspection/update-photo-remark",
   updatePhotoItemRemark
@@ -112,14 +153,34 @@ router.post(
   updateInspectionConfig
 );
 
+// Clear Inspection Config (Remove All)
+router.post(
+  "/api/fincheck-inspection/clear-inspection-config",
+  clearInspectionConfig
+);
+
 // Save Measurement Data (Measurement Tab)
 router.post(
   "/api/fincheck-inspection/update-measurement-data",
   updateMeasurementData
 );
 
+// Save Defect Images
+router.post(
+  "/api/fincheck-inspection/upload-defect-images",
+  upload.array("images"),
+  uploadDefectImages
+);
+
 // Save Defect Data
 router.post("/api/fincheck-inspection/update-defect-data", updateDefectData);
+
+// Upload PP Sheet Images (Multipart)
+router.post(
+  "/api/fincheck-inspection/upload-pp-sheet-images",
+  upload.array("images"),
+  uploadPPSheetImages
+);
 
 // Save PP Sheet Data
 router.post("/api/fincheck-inspection/update-pp-sheet-data", updatePPSheetData);

@@ -5,8 +5,8 @@ const OrderQtyItemSchema = new mongoose.Schema(
   {},
   {
     strict: false, // Allow dynamic keys like {"XS": 167}
-    _id: false
-  }
+    _id: false,
+  },
 );
 
 // Schema for individual size cut quantity data
@@ -15,15 +15,15 @@ const SizeCutQtySchema = new mongoose.Schema(
     ActualCutQty: {
       type: Number,
       required: false,
-      default: 0
+      default: 0,
     },
     PlanCutQty: {
       type: Number,
       required: false,
-      default: 0
-    }
+      default: 0,
+    },
   },
-  { _id: false }
+  { _id: false },
 );
 
 // Updated CutQty Schema - more explicit structure
@@ -31,8 +31,8 @@ const CutQtySchema = new mongoose.Schema(
   {},
   {
     strict: false, // Allow dynamic size keys like "XS", "S", "M", etc.
-    _id: false
-  }
+    _id: false,
+  },
 );
 
 // Alternative approach - if you want to be more explicit about the structure
@@ -54,8 +54,8 @@ const SpecsSchema = new mongoose.Schema(
   {},
   {
     strict: false, // Allow dynamic size keys
-    _id: false
-  }
+    _id: false,
+  },
 );
 
 const SizeSpecSchema = new mongoose.Schema(
@@ -63,52 +63,52 @@ const SizeSpecSchema = new mongoose.Schema(
     Seq: {
       type: Number,
       required: true,
-      default: 0
+      default: 0,
     },
     AtoZ: {
       type: String,
       required: false,
-      default: null
+      default: null,
     },
     Area: {
       type: String,
       required: false,
-      default: null
+      default: null,
     },
     ChineseArea: {
       type: String,
       required: false,
-      default: null
+      default: null,
     },
     EnglishRemark: {
       type: String,
       required: false,
-      default: null
+      default: null,
     },
     ChineseRemark: {
       type: String,
       required: false,
-      default: null
+      default: null,
     },
     ChineseName: {
       type: String,
       required: false,
-      default: null
+      default: null,
     },
     AreaCode: {
       type: String,
       required: false,
-      default: null
+      default: null,
     },
     IsMiddleCalc: {
       type: String,
       required: false,
-      default: null
+      default: null,
     },
     ToleranceMinus: {
       fraction: {
         type: String,
-        default: ""
+        default: "",
       },
       decimal: {
         type: Number,
@@ -117,14 +117,14 @@ const SizeSpecSchema = new mongoose.Schema(
           validator: function (v) {
             return !isNaN(v);
           },
-          message: "Decimal must be a valid number"
-        }
-      }
+          message: "Decimal must be a valid number",
+        },
+      },
     },
     TolerancePlus: {
       fraction: {
         type: String,
-        default: ""
+        default: "",
       },
       decimal: {
         type: Number,
@@ -133,86 +133,86 @@ const SizeSpecSchema = new mongoose.Schema(
           validator: function (v) {
             return !isNaN(v);
           },
-          message: "Decimal must be a valid number"
-        }
-      }
+          message: "Decimal must be a valid number",
+        },
+      },
     },
     SpecMemo: {
       type: String,
       required: false,
-      default: null
+      default: null,
     },
     SizeSpecMeasUnit: {
       type: String,
       required: false,
-      default: null
+      default: null,
     },
-    Specs: [SpecsSchema] // Array of objects with dynamic keys
+    Specs: [SpecsSchema], // Array of objects with dynamic keys
   },
-  { _id: false }
+  { _id: false },
 );
 
 const ShipSeqNoSchema = new mongoose.Schema(
   {
     seqNo: {
       type: Number,
-      required: true
+      required: true,
     },
     Ship_ID: {
       type: Number,
       required: false,
-      default: null
+      default: null,
     },
-    sizes: [OrderQtyItemSchema]
+    sizes: [OrderQtyItemSchema],
   },
-  { _id: false }
+  { _id: false },
 );
 
 const OrderColorShipSchema = new mongoose.Schema(
   {
     ColorCode: {
       type: String,
-      required: false
+      required: false,
     },
     Color: {
       type: String,
-      required: false
+      required: false,
     },
     ChnColor: {
       type: String,
-      required: false
+      required: false,
     },
     ColorKey: {
       type: Number,
-      required: false
+      required: false,
     },
-    ShipSeqNo: [ShipSeqNoSchema]
+    ShipSeqNo: [ShipSeqNoSchema],
   },
-  { _id: false }
+  { _id: false },
 );
 
 const OrderColorsSchema = new mongoose.Schema(
   {
     ColorCode: {
       type: String,
-      required: false
+      required: false,
     },
     Color: {
       type: String,
-      required: false
+      required: false,
     },
     ChnColor: {
       type: String,
-      required: false
+      required: false,
     },
     ColorKey: {
       type: Number,
-      required: false
+      required: false,
     },
     OrderQty: [OrderQtyItemSchema], // Array of objects like [{"XS": 167}, {"S": 493}]
-    CutQty: CutQtySchema // Object with dynamic size keys, each containing ActualCutQty and PlanCutQty
+    CutQty: CutQtySchema, // Object with dynamic size keys, each containing ActualCutQty and PlanCutQty
   },
-  { _id: false }
+  { _id: false },
 );
 
 // Main Schema
@@ -221,86 +221,117 @@ const DtOrderSchema = new mongoose.Schema(
     // Top level data
     SC_Heading: {
       type: String,
-      required: false
+      required: false,
     },
     Factory: {
       type: String,
-      required: false
+      required: false,
     },
     SalesTeamName: {
       type: String,
-      required: false
+      required: false,
     },
     Cust_Code: {
       type: String,
-      required: false
+      required: false,
     },
     ShortName: {
       type: String,
-      required: false
+      required: false,
     },
     EngName: {
       type: String,
-      required: false
+      required: false,
     },
     Order_No: {
       type: String,
       required: true,
-      unique: true
+      unique: true,
     },
     Ccy: {
       type: String,
-      required: false
+      required: false,
     },
     Style: {
       type: String,
-      required: false
+      required: false,
     },
     CustStyle: {
       type: String,
-      required: false
+      required: false,
     },
     Mode: {
       type: String,
-      required: false
+      required: false,
     },
     Country: {
       type: String,
-      required: false
+      required: false,
     },
     Origin: {
       type: String,
-      required: false
+      required: false,
     },
     CustPORef: {
       type: String,
-      required: false
+      required: false,
     },
     TotalQty: {
       type: Number,
       required: false,
-      default: 0
+      default: 0,
     },
     NoOfSize: {
       type: Number,
       required: false,
-      default: 0
+      default: 0,
     },
     SizeList: {
       type: [String],
       required: false,
-      default: []
+      default: [],
     },
+    isModify: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
+    modifiedAt: {
+      type: Date,
+      required: false,
+      default: null,
+    },
+    modifiedBy: {
+      type: String,
+      required: false,
+      default: null,
+    },
+    modificationHistory: [
+      {
+        modifiedAt: {
+          type: Date,
+          default: Date.now,
+        },
+        modifiedBy: {
+          type: String,
+          required: false,
+        },
+        changes: {
+          type: String,
+          required: false,
+        },
+      },
+    ],
 
     // Nested Arrays
     SizeSpec: [SizeSpecSchema],
     OrderColors: [OrderColorsSchema],
-    OrderColorShip: [OrderColorShipSchema]
+    OrderColorShip: [OrderColorShipSchema],
   },
   {
     timestamps: true,
-    collection: "dt_orders"
-  }
+    collection: "dt_orders",
+  },
 );
 
 // Indexes for better performance
@@ -308,5 +339,6 @@ DtOrderSchema.index({ Factory: 1 });
 DtOrderSchema.index({ Cust_Code: 1 });
 DtOrderSchema.index({ Style: 1 }); // Added index for Style since we're using it for mapping
 DtOrderSchema.index({ createdAt: -1 });
+DtOrderSchema.index({ isModify: 1 });
 
 export default (connection) => connection.model("DtOrder", DtOrderSchema);

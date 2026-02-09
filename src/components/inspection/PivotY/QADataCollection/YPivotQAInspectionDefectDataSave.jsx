@@ -1,339 +1,10 @@
-// import React, { useState, useEffect } from "react";
-// import axios from "axios";
-// import { Save, Loader2, Bug } from "lucide-react";
-// import { API_BASE_URL } from "../../../../../config";
-// import YPivotQAInspectionDefectConfig from "./YPivotQAInspectionDefectConfig";
-
-// const YPivotQAInspectionDefectDataSave = ({
-//   selectedOrders,
-//   orderData,
-//   reportData,
-//   onUpdateDefectData,
-//   activeGroup,
-//   reportId,
-//   isReportSaved
-// }) => {
-//   const [saving, setSaving] = useState(false);
-//   const [loadingData, setLoadingData] = useState(false);
-
-//   // --- FETCH EXISTING DATA ---
-//   useEffect(() => {
-//     const fetchExistingDefectData = async () => {
-//       if (!reportId) return;
-
-//       // Check if data already exists in client state
-//       const hasDefects = reportData.defectData?.savedDefects?.length > 0;
-//       const hasManual =
-//         Object.keys(reportData.defectData?.manualDataByGroup || {}).length > 0;
-
-//       if (hasDefects || hasManual) {
-//         return;
-//       }
-
-//       setLoadingData(true);
-//       try {
-//         const res = await axios.get(
-//           `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}`
-//         );
-
-//         if (res.data.success) {
-//           const backendData = res.data.data;
-
-//           // 1. Process Standard Defects (Deep Restore)
-//           const backendDefects = backendData.defectData || [];
-//           const processedDefects = backendDefects.map((defect) => {
-//             // Restore Location Images & Logic
-//             const restoredLocations = (defect.locations || []).map((loc) => {
-//               const restoredLocImages = (loc.images || []).map((img) => {
-//                 let displayUrl = img.imageURL;
-//                 if (
-//                   displayUrl &&
-//                   !displayUrl.startsWith("http") &&
-//                   !displayUrl.startsWith("data:")
-//                 ) {
-//                   displayUrl = `${API_BASE_URL}${displayUrl}`;
-//                 }
-//                 return {
-//                   id: img.imageId,
-//                   url: displayUrl,
-//                   imgSrc: displayUrl,
-//                   editedImgSrc: displayUrl,
-//                   history: []
-//                 };
-//               });
-
-//               return { ...loc, images: restoredLocImages };
-//             });
-
-//             // Restore General Images
-//             const restoredImages = (defect.images || []).map((img) => {
-//               let displayUrl = img.imageURL;
-//               if (
-//                 displayUrl &&
-//                 !displayUrl.startsWith("http") &&
-//                 !displayUrl.startsWith("data:")
-//               ) {
-//                 displayUrl = `${API_BASE_URL}${displayUrl}`;
-//               }
-//               return {
-//                 id: img.imageId,
-//                 url: displayUrl,
-//                 imgSrc: displayUrl,
-//                 history: []
-//               };
-//             });
-
-//             return {
-//               ...defect,
-//               locations: restoredLocations,
-//               images: restoredImages
-//             };
-//           });
-
-//           // 2. Process Manual Defect Data (Array -> Object Map)
-//           const backendManualData = backendData.defectManualData || [];
-//           const processedManualDataByGroup = {};
-
-//           backendManualData.forEach((item) => {
-//             const groupId = item.groupId;
-//             const processedImages = (item.images || []).map((img) => {
-//               let displayUrl = img.imageURL;
-//               if (
-//                 displayUrl &&
-//                 !displayUrl.startsWith("http") &&
-//                 !displayUrl.startsWith("data:")
-//               ) {
-//                 displayUrl = `${API_BASE_URL}${displayUrl}`;
-//               }
-//               return {
-//                 id: img.imageId,
-//                 url: displayUrl,
-//                 imgSrc: displayUrl,
-//                 editedImgSrc: displayUrl,
-//                 remark: img.remark || "",
-//                 history: []
-//               };
-//             });
-
-//             processedManualDataByGroup[groupId] = {
-//               remarks: item.remarks || "",
-//               images: processedImages
-//             };
-//           });
-
-//           // Update parent state
-//           onUpdateDefectData({
-//             savedDefects: processedDefects,
-//             manualDataByGroup: processedManualDataByGroup
-//           });
-//         }
-//       } catch (error) {
-//         console.error("Error fetching defect data:", error);
-//       } finally {
-//         setLoadingData(false);
-//       }
-//     };
-
-//     if (reportId) {
-//       fetchExistingDefectData();
-//     }
-//   }, [reportId]);
-
-//   // --- SAVE HANDLER ---
-//   const handleSaveData = async () => {
-//     if (!isReportSaved || !reportId) {
-//       alert("Please save the Order information first.");
-//       return;
-//     }
-
-//     const currentDefects = reportData.defectData?.savedDefects || [];
-//     const manualDataByGroup = reportData.defectData?.manualDataByGroup || {};
-
-//     if (
-//       currentDefects.length === 0 &&
-//       Object.keys(manualDataByGroup).length === 0
-//     ) {
-//       alert("No defect data recorded to save.");
-//       return;
-//     }
-
-//     setSaving(true);
-//     try {
-//       // 1. Prepare Standard Defects Payload
-//       const payloadDefects = currentDefects.map((defect) => {
-//         // Process Location Images
-//         const processedLocations = (defect.locations || []).map((loc) => {
-//           const locImages = (loc.images || []).map((img) => {
-//             let payloadImageURL = null;
-//             let payloadImgSrc = null;
-//             const imageData = img.editedImgSrc || img.imgSrc || img.url;
-
-//             if (imageData && imageData.startsWith("data:")) {
-//               payloadImgSrc = imageData;
-//             } else if (imageData) {
-//               payloadImageURL = imageData.replace(API_BASE_URL, "");
-//             }
-
-//             return {
-//               id: img.id,
-//               imageURL: payloadImageURL,
-//               imgSrc: payloadImgSrc
-//             };
-//           });
-//           return { ...loc, images: locImages };
-//         });
-
-//         // Process General Images
-//         const processedImages = (defect.images || []).map((img) => {
-//           let payloadImageURL = null;
-//           let payloadImgSrc = null;
-//           const imageData = img.url || img.imgSrc;
-
-//           if (imageData && imageData.startsWith("data:")) {
-//             payloadImgSrc = imageData;
-//           } else if (imageData) {
-//             payloadImageURL = imageData.replace(API_BASE_URL, "");
-//           }
-
-//           return {
-//             id: img.id,
-//             imageURL: payloadImageURL,
-//             imgSrc: payloadImgSrc
-//           };
-//         });
-
-//         return {
-//           ...defect,
-//           additionalRemark: defect.additionalRemark || "",
-//           locations: processedLocations,
-//           images: processedImages
-//         };
-//       });
-
-//       // 2. Prepare Manual Defects Payload
-//       const payloadManualData = Object.entries(manualDataByGroup).map(
-//         ([groupIdStr, data]) => {
-//           const groupId = isNaN(Number(groupIdStr))
-//             ? groupIdStr
-//             : Number(groupIdStr);
-
-//           const processedImages = (data.images || []).map((img) => {
-//             let payloadImageURL = null;
-//             let payloadImgSrc = null;
-//             const imageData = img.editedImgSrc || img.imgSrc || img.url;
-
-//             if (imageData && imageData.startsWith("data:")) {
-//               payloadImgSrc = imageData;
-//             } else if (imageData) {
-//               payloadImageURL = imageData.replace(API_BASE_URL, "");
-//             }
-
-//             return {
-//               id: img.id,
-//               imageId: img.id,
-//               imageURL: payloadImageURL,
-//               imgSrc: payloadImgSrc,
-//               remark: img.remark
-//             };
-//           });
-
-//           return {
-//             groupId: groupId,
-//             remarks: data.remarks,
-//             images: processedImages
-//             // We can attach minimal context if needed, otherwise backend relies on groupId
-//           };
-//         }
-//       );
-
-//       const res = await axios.post(
-//         `${API_BASE_URL}/api/fincheck-inspection/update-defect-data`,
-//         {
-//           reportId: reportId,
-//           defectData: payloadDefects,
-//           defectManualData: payloadManualData
-//         }
-//       );
-
-//       if (res.data.success) {
-//         alert("Defect data saved successfully!");
-//       }
-//     } catch (error) {
-//       console.error("Error saving defect data:", error);
-//       alert("Failed to save defect data.");
-//     } finally {
-//       setSaving(false);
-//     }
-//   };
-
-//   if (loadingData) {
-//     return (
-//       <div className="flex justify-center items-center h-64">
-//         <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
-//         <span className="ml-3 text-gray-600 font-medium">
-//           Loading existing defects...
-//         </span>
-//       </div>
-//     );
-//   }
-
-//   if (!reportData?.selectedTemplate) {
-//     return (
-//       <div className="flex flex-col items-center justify-center py-16">
-//         <Bug className="w-12 h-12 text-gray-300 mb-4" />
-//         <p className="text-gray-500">Please select a Report Type first.</p>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div className="relative pb-24">
-//       <YPivotQAInspectionDefectConfig
-//         selectedOrders={selectedOrders}
-//         orderData={orderData}
-//         reportData={reportData}
-//         onUpdateDefectData={onUpdateDefectData}
-//         activeGroup={activeGroup}
-//       />
-
-//       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
-//         <div className="max-w-8xl mx-auto flex justify-end px-4">
-//           <button
-//             onClick={handleSaveData}
-//             disabled={!isReportSaved || saving}
-//             className={`
-//               flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95
-//               ${
-//                 isReportSaved
-//                   ? "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white"
-//                   : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
-//               }
-//             `}
-//             title={
-//               !isReportSaved ? "Save Order Data first" : "Save Defect Data"
-//             }
-//           >
-//             {saving ? (
-//               <>
-//                 <Loader2 className="w-5 h-5 animate-spin" />
-//                 Saving...
-//               </>
-//             ) : (
-//               <>
-//                 <Save className="w-5 h-5" />
-//                 Save Defects
-//               </>
-//             )}
-//           </button>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default YPivotQAInspectionDefectDataSave;
-
-import React, { useState, useEffect, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback
+} from "react";
 import { createPortal } from "react-dom";
 import axios from "axios";
 import {
@@ -347,6 +18,18 @@ import {
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQAInspectionDefectConfig from "./YPivotQAInspectionDefectConfig";
+
+// helper function to convert blob URL to File object
+const blobUrlToFile = async (blobUrl, filename = "image.jpg") => {
+  try {
+    const response = await fetch(blobUrl);
+    const blob = await response.blob();
+    return new File([blob], filename, { type: blob.type || "image/jpeg" });
+  } catch (error) {
+    console.error("[blobUrlToFile] Failed to convert:", blobUrl, error);
+    return null;
+  }
+};
 
 // ==============================================================================
 // INTERNAL COMPONENT: AUTO-DISMISS STATUS MODAL
@@ -426,18 +109,30 @@ const transformImageFromBackend = (img) => {
 const transformImageToBackend = (img) => {
   if (!img) return null;
 
-  // Determine if this is a new image (base64) or existing (URL)
-  const isBase64 =
-    img.imgSrc?.startsWith("data:") || img.editedImgSrc?.startsWith("data:");
-  const hasExistingUrl = img.imageURL && img.imageURL.startsWith("/");
+  // Priority order: imageURL (from injectUrl) > imgSrc (if valid path)
+  let finalUrl = img.imageURL;
+
+  // Fallback to imgSrc if it's a valid server path (not blob/data)
+  if (!finalUrl && img.imgSrc) {
+    if (img.imgSrc.startsWith("/") || img.imgSrc.startsWith("http")) {
+      finalUrl = img.imgSrc;
+    }
+  }
+
+  // Must have a valid URL to save
+  if (!finalUrl) {
+    console.warn("[transformImageToBackend] No valid URL:", {
+      id: img.id,
+      imageURL: img.imageURL,
+      imgSrc: img.imgSrc?.substring(0, 50)
+    });
+    return null;
+  }
 
   return {
     id: img.id || img.imageId,
     imageId: img.id || img.imageId,
-    // If we have a new edited image, send it as imgSrc
-    imgSrc: img.editedImgSrc || (isBase64 ? img.imgSrc : null),
-    // If it's an existing image, keep the relative URL
-    imageURL: hasExistingUrl && !isBase64 ? img.imageURL : null
+    imageURL: finalUrl
   };
 };
 
@@ -628,7 +323,10 @@ const transformManualDataFromBackend = (backendManualData) => {
   const manualDataByGroup = {};
 
   (backendManualData || []).forEach((manual) => {
-    const groupId = manual.groupId;
+    const groupId =
+      manual.groupId !== undefined && manual.groupId !== null
+        ? manual.groupId
+        : 0;
     manualDataByGroup[groupId] = {
       remarks: manual.remarks || "",
       images: (manual.images || []).map((img) => ({
@@ -658,28 +356,40 @@ const transformManualDataFromBackend = (backendManualData) => {
 // HELPER: Transform Manual Data to Backend
 // ==============================================================================
 const transformManualDataToBackend = (manualDataByGroup) => {
-  return Object.entries(manualDataByGroup || {}).map(([groupId, data]) => ({
-    groupId: parseInt(groupId) || groupId,
-    remarks: data.remarks || "",
-    images: (data.images || []).map((img) => {
-      const isBase64 =
-        img.imgSrc?.startsWith("data:") ||
-        img.editedImgSrc?.startsWith("data:");
-      const hasExistingUrl = img.imageURL && img.imageURL.startsWith("/");
+  return Object.entries(manualDataByGroup || {}).map(([key, data]) => {
+    // Object keys are strings. Convert back to Number.
+    // Use Number() to safely handle large integers/timestamps
+    let numericGroupId = Number(key);
 
-      return {
-        id: img.id || img.imageId,
-        imageId: img.id || img.imageId,
-        imgSrc: img.editedImgSrc || (isBase64 ? img.imgSrc : null),
-        imageURL: hasExistingUrl && !isBase64 ? img.imageURL : null,
-        remark: (img.remark || "").slice(0, 100)
-      };
-    }),
-    line: data.line || "",
-    table: data.table || "",
-    color: data.color || "",
-    qcUser: data.qcUser || null
-  }));
+    // 2. If it is NaN (e.g. legacy "general" string), force it to 0
+    if (isNaN(numericGroupId)) {
+      numericGroupId = 0;
+    }
+
+    return {
+      groupId: numericGroupId, // Save as Number
+      remarks: data.remarks || "",
+      images: (data.images || []).map((img) => {
+        // ... (keep existing image logic)
+        const isBase64 =
+          img.imgSrc?.startsWith("data:") ||
+          img.editedImgSrc?.startsWith("data:");
+        const hasExistingUrl = img.imageURL && img.imageURL.startsWith("/");
+
+        return {
+          id: img.id || img.imageId,
+          imageId: img.id || img.imageId,
+          imgSrc: img.editedImgSrc || (isBase64 ? img.imgSrc : null),
+          imageURL: hasExistingUrl && !isBase64 ? img.imageURL : null,
+          remark: (img.remark || "").slice(0, 100)
+        };
+      }),
+      line: data.line || "",
+      table: data.table || "",
+      color: data.color || "",
+      qcUser: data.qcUser || null
+    };
+  });
 };
 
 // ==============================================================================
@@ -741,6 +451,11 @@ const YPivotQAInspectionDefectDataSave = ({
 
     return { total, critical, major, minor };
   }, [reportData?.defectData?.savedDefects]);
+
+  // state to track unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const lastSavedHashRef = useRef(null);
+  const [triggerAutoSave, setTriggerAutoSave] = useState(false);
 
   // --- FETCH EXISTING DATA ON MOUNT ---
   useEffect(() => {
@@ -809,65 +524,332 @@ const YPivotQAInspectionDefectDataSave = ({
     }
   }, [hasDefectData, dataLoaded]);
 
-  // --- SAVE HANDLER ---
-  const handleSaveDefectData = async () => {
-    if (!isReportSaved || !reportId) {
-      setStatusModal({
-        isOpen: true,
-        type: "error",
-        message: "Please save Order information first."
+  // ADD this helper function to generate hash of defect data
+  const generateDataHash = (defects, manualData) => {
+    try {
+      // Create a simplified version for comparison (excluding file objects and blob URLs)
+      const simplifiedDefects = (defects || []).map((d) => ({
+        defectId: d.defectId,
+        groupId: d.groupId,
+        isNoLocation: d.isNoLocation,
+        qty: d.qty,
+        status: d.status,
+        locations: (d.locations || []).map((l) => ({
+          uniqueId: l.uniqueId,
+          positions: (l.positions || []).map((p) => ({
+            pcsNo: p.pcsNo,
+            status: p.status,
+            hasImage: !!(p.requiredImage?.imageURL || p.requiredImage?.imgSrc)
+          }))
+        })),
+        imageCount: (d.images || []).length
+      }));
+
+      const simplifiedManual = Object.entries(manualData || {}).map(
+        ([k, v]) => ({
+          groupId: k,
+          remarks: v.remarks,
+          imageCount: (v.images || []).length
+        })
+      );
+
+      return JSON.stringify({
+        defects: simplifiedDefects,
+        manual: simplifiedManual
       });
+    } catch (e) {
+      return Date.now().toString(); // Fallback - always different
+    }
+  };
+
+  // ADD this useEffect to detect changes
+  useEffect(() => {
+    if (!dataLoaded) return;
+
+    const savedDefects = reportData?.defectData?.savedDefects || [];
+    const manualData = reportData?.defectData?.manualDataByGroup || {};
+    const currentHash = generateDataHash(savedDefects, manualData);
+
+    // Compare with last saved hash
+    if (
+      lastSavedHashRef.current !== null &&
+      currentHash !== lastSavedHashRef.current
+    ) {
+      setHasUnsavedChanges(true);
+    }
+  }, [reportData?.defectData, dataLoaded]);
+
+  // ADD this useEffect - triggers save when flag is set AND data has changed
+  useEffect(() => {
+    if (triggerAutoSave && !saving && isReportSaved && reportId) {
+      const savedDefects = reportData?.defectData?.savedDefects || [];
+
+      if (savedDefects.length > 0) {
+        console.log(
+          "[AutoSave] Triggered by flag, defects count:",
+          savedDefects.length
+        );
+
+        // Reset flag first
+        setTriggerAutoSave(false);
+
+        // Then trigger save
+        handleSaveDefectData(true);
+      } else {
+        setTriggerAutoSave(false);
+      }
+    }
+  }, [
+    triggerAutoSave,
+    reportData?.defectData?.savedDefects,
+    saving,
+    isReportSaved,
+    reportId
+  ]);
+
+  // ADD this simple handler to pass to DefectConfig
+  const handleDefectsSaved = useCallback(() => {
+    console.log("[AutoSave] Modal closed, setting trigger flag...");
+    // Use setTimeout to ensure state update from DefectConfig has propagated
+    setTimeout(() => {
+      setTriggerAutoSave(true);
+    }, 100);
+  }, []);
+
+  // --- SAVE HANDLER ---
+  const handleSaveDefectData = async (isAutoSave = false) => {
+    if (!isReportSaved || !reportId) {
+      if (!isAutoSave) {
+        setStatusModal({
+          isOpen: true,
+          type: "error",
+          message: "Please save Order information first."
+        });
+      }
       return;
     }
 
     const savedDefects = reportData?.defectData?.savedDefects || [];
     const manualDataByGroup = reportData?.defectData?.manualDataByGroup || {};
 
-    // Validation: Check if there's anything to save
     if (
       savedDefects.length === 0 &&
       Object.keys(manualDataByGroup).length === 0
     ) {
-      setStatusModal({
-        isOpen: true,
-        type: "error",
-        message: "No defect data to save. Add defects first."
-      });
+      if (!isAutoSave) {
+        setStatusModal({
+          isOpen: true,
+          type: "error",
+          message: "No defect data to save. Add defects first."
+        });
+      }
+      return;
+    }
+
+    // CHECK FOR CHANGES - Skip if no changes
+    const currentHash = generateDataHash(savedDefects, manualDataByGroup);
+
+    if (!hasUnsavedChanges && lastSavedHashRef.current === currentHash) {
+      console.log("[Save] No changes detected, skipping save");
+      if (!isAutoSave) {
+        setStatusModal({
+          isOpen: true,
+          type: "success",
+          message: "Data already up to date!"
+        });
+      }
       return;
     }
 
     setSaving(true);
     try {
-      // Transform frontend data to backend format
-      const defectPayload = savedDefects.map(transformDefectToBackend);
-      const manualPayload = transformManualDataToBackend(manualDataByGroup);
+      // =========================================================
+      // STEP 1: COLLECT & UPLOAD IMAGES
+      // =========================================================
+      const imageFiles = [];
+      const imageMap = {};
+
+      const collectImage = async (img, contextPrefix) => {
+        if (!img) return;
+
+        if (!img.id && !img.imageId) {
+          img.id = `${contextPrefix}_${Date.now()}_${Math.random()
+            .toString(36)
+            .substr(2, 9)}`;
+        }
+        const imageId = img.id || img.imageId;
+
+        // Already uploaded?
+        if (img.imageURL && img.imageURL.startsWith("/")) {
+          imageMap[imageId] = img.imageURL;
+          return;
+        }
+
+        // Has File object?
+        if (img.file instanceof File || img.file instanceof Blob) {
+          imageFiles.push({ id: imageId, file: img.file });
+          return;
+        }
+
+        // Has blob URL? Convert it
+        const blobUrl = img.editedImgSrc || img.imgSrc;
+        if (blobUrl && blobUrl.startsWith("blob:")) {
+          const file = await blobUrlToFile(blobUrl, `${imageId}.jpg`);
+          if (file) {
+            img.file = file;
+            imageFiles.push({ id: imageId, file });
+          }
+          return;
+        }
+      };
+
+      // Collect from savedDefects
+      for (const [dIdx, defect] of savedDefects.entries()) {
+        if (defect.isNoLocation) {
+          for (const [iIdx, img] of (defect.images || []).entries()) {
+            await collectImage(img, `noloc_${dIdx}_${iIdx}`);
+          }
+        } else {
+          for (const [lIdx, loc] of (defect.locations || []).entries()) {
+            for (const [pIdx, pos] of (loc.positions || []).entries()) {
+              if (pos.requiredImage) {
+                await collectImage(
+                  pos.requiredImage,
+                  `loc_${dIdx}_${lIdx}_${pIdx}_req`
+                );
+              }
+              for (const [aIdx, addImg] of (
+                pos.additionalImages || []
+              ).entries()) {
+                await collectImage(
+                  addImg,
+                  `loc_${dIdx}_${lIdx}_${pIdx}_add_${aIdx}`
+                );
+              }
+            }
+          }
+        }
+      }
+
+      // Collect from manualData
+      for (const [groupId, group] of Object.entries(manualDataByGroup)) {
+        for (const [iIdx, img] of (group.images || []).entries()) {
+          await collectImage(img, `manual_${groupId}_${iIdx}`);
+        }
+      }
+
+      console.log(`[Save] Images to upload: ${imageFiles.length}`);
+
+      // Upload only if there are new files
+      if (imageFiles.length > 0) {
+        const formData = new FormData();
+        imageFiles.forEach((item) => {
+          formData.append("images", item.file, `defect_${item.id}.jpg`);
+        });
+
+        const uploadRes = await axios.post(
+          `${API_BASE_URL}/api/fincheck-inspection/upload-defect-images`,
+          formData,
+          { headers: { "Content-Type": "multipart/form-data" } }
+        );
+
+        if (uploadRes.data.success) {
+          const paths = uploadRes.data.data?.paths || [];
+          imageFiles.forEach((item, index) => {
+            if (paths[index]) {
+              imageMap[item.id] = paths[index];
+            }
+          });
+        }
+      }
+
+      // =========================================================
+      // STEP 2: INJECT URLs INTO DATA
+      // =========================================================
+      const injectUrl = (img) => {
+        if (!img) return null;
+        const imageId = img.id || img.imageId;
+
+        if (imageMap[imageId]) {
+          return {
+            ...img,
+            imageURL: imageMap[imageId],
+            imgSrc: imageMap[imageId],
+            file: null,
+            editedImgSrc: null
+          };
+        }
+        return img;
+      };
+
+      const defectsWithUrls = savedDefects.map((d) => {
+        if (d.isNoLocation) {
+          return {
+            ...d,
+            images: (d.images || []).map(injectUrl).filter(Boolean)
+          };
+        } else {
+          return {
+            ...d,
+            locations: (d.locations || []).map((loc) => ({
+              ...loc,
+              positions: (loc.positions || []).map((pos) => ({
+                ...pos,
+                requiredImage: injectUrl(pos.requiredImage),
+                additionalImages: (pos.additionalImages || [])
+                  .map(injectUrl)
+                  .filter(Boolean)
+              }))
+            }))
+          };
+        }
+      });
+
+      const manualDataWithUrls = {};
+      Object.entries(manualDataByGroup).forEach(([groupId, data]) => {
+        manualDataWithUrls[groupId] = {
+          ...data,
+          images: (data.images || []).map(injectUrl).filter(Boolean)
+        };
+      });
+
+      // =========================================================
+      // STEP 3: TRANSFORM & SEND
+      // =========================================================
+      const finalDefects = defectsWithUrls.map(transformDefectToBackend);
+      const finalManualData = transformManualDataToBackend(manualDataWithUrls);
 
       const res = await axios.post(
         `${API_BASE_URL}/api/fincheck-inspection/update-defect-data`,
         {
           reportId,
-          defectData: defectPayload,
-          defectManualData: manualPayload
+          defectData: finalDefects,
+          defectManualData: finalManualData
         }
       );
 
       if (res.data.success) {
-        const wasUpdateMode = isUpdateMode;
-        setIsUpdateMode(true);
+        // UPDATE: Store hash and reset change flag
+        const newHash = generateDataHash(savedDefects, manualDataByGroup);
+        lastSavedHashRef.current = newHash;
+        setHasUnsavedChanges(false);
 
-        if (onSaveSuccess) {
-          onSaveSuccess("defectData");
+        setIsUpdateMode(true);
+        if (onSaveSuccess) onSaveSuccess("defectData");
+
+        // Show message only for manual save, not auto-save
+        if (!isAutoSave) {
+          setStatusModal({
+            isOpen: true,
+            type: "success",
+            message: isUpdateMode
+              ? "Defect Data Updated!"
+              : "Defect Data Saved!"
+          });
+        } else {
+          console.log("[AutoSave] Saved successfully");
         }
 
-        setStatusModal({
-          isOpen: true,
-          type: "success",
-          message: wasUpdateMode
-            ? "Defect Data Updated Successfully!"
-            : "Defect Data Saved Successfully!"
-        });
-
-        // Optionally update local state with saved URLs from backend
         if (res.data.data) {
           const updatedDefects = (res.data.data.defectData || []).map(
             transformDefectFromBackend
@@ -875,20 +857,28 @@ const YPivotQAInspectionDefectDataSave = ({
           const updatedManual = transformManualDataFromBackend(
             res.data.data.defectManualData || []
           );
-
           onUpdateDefectData({
             savedDefects: updatedDefects,
             manualDataByGroup: updatedManual
           });
+
+          // Update hash after server response
+          lastSavedHashRef.current = generateDataHash(
+            updatedDefects,
+            updatedManual
+          );
         }
       }
     } catch (error) {
-      console.error("Error saving defect data:", error);
-      setStatusModal({
-        isOpen: true,
-        type: "error",
-        message: error.response?.data?.message || "Failed to save defect data."
-      });
+      console.error("Save error:", error);
+      if (!isAutoSave) {
+        setStatusModal({
+          isOpen: true,
+          type: "error",
+          message:
+            error.response?.data?.message || "Failed to save defect data."
+        });
+      }
     } finally {
       setSaving(false);
     }
@@ -915,6 +905,7 @@ const YPivotQAInspectionDefectDataSave = ({
         reportData={reportData}
         onUpdateDefectData={onUpdateDefectData}
         activeGroup={activeGroup}
+        onDefectsSaved={handleDefectsSaved}
       />
 
       {/* Fixed Bottom Save Button */}
@@ -924,13 +915,20 @@ const YPivotQAInspectionDefectDataSave = ({
           <div className="flex items-center gap-3 flex-wrap">
             {/* Save Status Badge */}
             {isUpdateMode ? (
-              <span className="flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-full">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                Data Saved
-              </span>
+              hasUnsavedChanges ? (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full">
+                  <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+                  Unsaved Changes
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-full">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Data Saved
+                </span>
+              )
             ) : (
-              <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full">
-                <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
+              <span className="flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/20 px-3 py-1.5 rounded-full">
+                <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
                 Not Saved
               </span>
             )}
@@ -965,31 +963,31 @@ const YPivotQAInspectionDefectDataSave = ({
 
           {/* Right Side: Save Button */}
           <button
-            onClick={handleSaveDefectData}
+            onClick={() => handleSaveDefectData(false)}
             disabled={!isReportSaved || saving}
             className={`w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-[0.98] ${
               isReportSaved
-                ? isUpdateMode
+                ? hasUnsavedChanges
+                  ? "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
+                  : isUpdateMode
                   ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
                   : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
                 : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
             }`}
-            title={
-              !isReportSaved
-                ? "Save Order Data first"
-                : isUpdateMode
-                ? "Update existing defect data"
-                : "Save new defect data"
-            }
           >
             {saving ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
                 {isUpdateMode ? "Updating..." : "Saving..."}
               </>
+            ) : hasUnsavedChanges ? (
+              <>
+                <Save className="w-5 h-5" />
+                Save New Changes
+              </>
             ) : isUpdateMode ? (
               <>
-                <RefreshCw className="w-5 h-5" />
+                <CheckCircle2 className="w-5 h-5" />
                 Update Defect Data
               </>
             ) : (
