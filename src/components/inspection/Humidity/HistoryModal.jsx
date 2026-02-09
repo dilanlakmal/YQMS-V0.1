@@ -526,7 +526,7 @@ const HistoryModal = ({
                         className="hover:bg-green-50/50 transition-colors group border-b"
                       >
                         <td className="px-4 py-3.5 text-center font-bold text-gray-400 group-hover:text-green-600 transition-colors">
-                          {item.itemName || `Item ${itemIdx + 1}`}
+                          {item.itemName || `Check ${itemIdx + 1}`}
                         </td>
                         <td className="px-4 py-3.5 text-center text-gray-600 border-l border-gray-50 font-medium">
                           {formatDate(item.date)}

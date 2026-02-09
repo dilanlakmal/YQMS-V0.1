@@ -175,11 +175,14 @@ export default function Dashboard() {
   const [customerFilter, setCustomerFilter] = useState("");
   const [showBuyerDropdown, setShowBuyerDropdown] = useState(false);
   const [showStyleDropdown, setShowStyleDropdown] = useState(false);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [styleSearch, setStyleSearch] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isOrderLoading, setIsOrderLoading] = useState(false);
   const buyerRef = useRef(null);
   const styleRef = useRef(null);
+  const customerRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;
@@ -287,6 +290,9 @@ export default function Dashboard() {
   // filtered docs based on current filters
   const filteredDocs = useMemo(() => {
     const docs = Array.isArray(docsRaw) ? docsRaw : [];
+
+    // By default, show all docs (filtered by date if set)
+
     return docs.filter((d) => {
       const dtStr = d.date || d.createdAt || d.created || d._createdAt || null;
       if (startDate || endDate) {
@@ -595,65 +601,91 @@ export default function Dashboard() {
 
   const customerOptionsFiltered = useMemo(() => {
     try {
-      if (!factoryStyleFilter) return customerOptions;
-      const f = factoryStyleFilter.toString().trim().toLowerCase();
       const s = new Set();
-      (docsRaw || []).forEach((d) => {
-        const fs = (
-          d.factoryStyleNo ||
-          d.factoryStyle ||
-          d.style ||
-          d.moNo ||
-          "" ||
-          ""
-        )
-          .toString()
-          .trim()
-          .toLowerCase();
-        if (!fs.includes(f)) return;
-        const v =
-          d && (d.customer || d.buyer || d.customerName || d.buyerName || "");
-        if (v) s.add(String(v).trim());
-      });
-      (ordersRaw || []).forEach((o) => {
-        const fs = (o.moNo || o.style || "" || "")
-          .toString()
-          .trim()
-          .toLowerCase();
-        if (!fs.includes(f)) return;
-        const v =
-          o && (o.buyer || o.customer || o.buyerName || o.customerName || "");
-        if (v) s.add(String(v).trim());
-      });
+      // If a style is selected, filter customers to only those having that style
+      if (factoryStyleFilter) {
+        const f = factoryStyleFilter.toString().trim().toLowerCase();
+        (docsRaw || []).forEach((d) => {
+          const fs = (d.factoryStyleNo || d.factoryStyle || d.style || d.moNo || "").toString().trim().toLowerCase();
+          if (fs.includes(f)) {
+            const v = d.customer || d.buyer || d.customerName || d.buyerName || "";
+            if (v) s.add(String(v).trim());
+          }
+        });
+        (ordersRaw || []).forEach((o) => {
+          const fs = (o.moNo || o.style || "").toString().trim().toLowerCase();
+          if (fs.includes(f)) {
+            const v = o.buyer || o.customer || o.buyerName || o.customerName || "";
+            if (v) s.add(String(v).trim());
+          }
+        });
+      } else {
+        // If no style selected, show all customers
+        return customerOptions;
+      }
       return Array.from(s).length ? Array.from(s).sort() : customerOptions;
     } catch (e) {
       return customerOptions;
     }
   }, [factoryStyleFilter, docsRaw, ordersRaw, customerOptions]);
 
-  // when factory selection changes, reset buyer/customer
+  // filtered options for factory style when a customer is selected
+  const styleOptionsFiltered = useMemo(() => {
+    try {
+      if (!customerFilter) return []; // Will use ordersRaw/docsRaw logic in JSX if no customer
+      const c = customerFilter.toString().trim().toLowerCase();
+      const s = new Set();
+      (docsRaw || []).forEach((d) => {
+        const cu = (d.customer || d.buyer || d.customerName || d.buyerName || "").toString().trim().toLowerCase();
+        if (cu.includes(c)) {
+          const fs = d.factoryStyleNo || d.factoryStyle || d.style || d.moNo || "";
+          if (fs) s.add(String(fs).trim());
+        }
+      });
+      (ordersRaw || []).forEach((o) => {
+        const cu = (o.buyer || o.customer || o.buyerName || o.customerName || "").toString().trim().toLowerCase();
+        if (cu.includes(c)) {
+          const fs = o.moNo || o.style || "";
+          if (fs) s.add(String(fs).trim());
+        }
+      });
+      return Array.from(s).sort();
+    } catch (e) {
+      return [];
+    }
+  }, [customerFilter, docsRaw, ordersRaw]);
+
+  // when factory selection changes, reset/set customer and buyer style
   useEffect(() => {
     try {
       if (factoryStyleFilter && factoryStyleFilter.toString().trim() !== "") {
+        if (customerOptionsFiltered && customerOptionsFiltered.length === 1) {
+          setCustomerFilter(customerOptionsFiltered[0]);
+          setCustomerSearch(customerOptionsFiltered[0]);
+        }
         if (buyerOptionsFiltered && buyerOptionsFiltered.length === 1) {
           setBuyerStyleFilter(buyerOptionsFiltered[0]);
         } else {
           setBuyerStyleFilter("");
         }
-        if (customerOptionsFiltered && customerOptionsFiltered.length === 1) {
-          setCustomerFilter(customerOptionsFiltered[0]);
-        } else {
-          setCustomerFilter("");
-        }
       } else {
         setBuyerStyleFilter("");
-        setCustomerFilter("");
+        // Note: we don't clear customerFilter here to allow independent customer selection
       }
     } catch (e) {
-      setBuyerStyleFilter("");
-      setCustomerFilter("");
+      /* ignore */
     }
-  }, [factoryStyleFilter, buyerOptionsFiltered, customerOptionsFiltered]);
+  }, [factoryStyleFilter, customerOptionsFiltered, buyerOptionsFiltered]);
+
+  // when customer selection changes, clear style if it doesn't belong to the new customer
+  useEffect(() => {
+    if (customerFilter && factoryStyleFilter) {
+      if (styleOptionsFiltered.length > 0 && !styleOptionsFiltered.includes(factoryStyleFilter)) {
+        setFactoryStyleFilter("");
+        setStyleSearch("");
+      }
+    }
+  }, [customerFilter, styleOptionsFiltered]);
 
   // Handle click outside for dropdowns
   useEffect(() => {
@@ -663,6 +695,9 @@ export default function Dashboard() {
       }
       if (styleRef.current && !styleRef.current.contains(event.target)) {
         setShowStyleDropdown(false);
+      }
+      if (customerRef.current && !customerRef.current.contains(event.target)) {
+        setShowCustomerDropdown(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -857,59 +892,77 @@ export default function Dashboard() {
                 type="text"
                 placeholder="Select or type style..."
                 value={styleSearch || factoryStyleFilter}
-                onFocus={() => setShowStyleDropdown(true)}
+                onFocus={() => {
+                  setShowStyleDropdown(true);
+                  // Don't clear styleSearch here, let the user see their current filter if any
+                }}
                 onChange={(e) => {
-                  setStyleSearch(e.target.value);
-                  setFactoryStyleFilter(e.target.value);
+                  const val = e.target.value;
+                  setStyleSearch(val);
+                  setFactoryStyleFilter(val);
                   setShowStyleDropdown(true);
                 }}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all pr-10"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all pr-20 text-gray-700 font-medium"
               />
-              <div
-                className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 cursor-pointer"
-                onClick={() => setShowStyleDropdown(!showStyleDropdown)}
-              >
-                <svg
-                  className={`fill-current h-5 w-5 transition-transform ${showStyleDropdown ? "rotate-180" : ""}`}
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                </svg>
-              </div>
-
-              {showStyleDropdown && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-                  <div
-                    className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm text-gray-500 border-b border-gray-50 italic"
-                    onClick={() => {
+              <div className="absolute inset-y-0 right-0 flex items-center pr-2 gap-1">
+                {(styleSearch || factoryStyleFilter) && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setFactoryStyleFilter("");
                       setStyleSearch("");
                       setShowStyleDropdown(false);
                     }}
+                    className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
                   >
-                    Clear Search / All Styles
-                  </div>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+                <div className="w-px h-5 bg-gray-200 mx-0.5" />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const nextState = !showStyleDropdown;
+                    setShowStyleDropdown(nextState);
+                    if (nextState) {
+                      // When manually opening via chevron, clear the search-sub-filter 
+                      // so the user can see all available options for the current context.
+                      setStyleSearch("");
+                    }
+                  }}
+                  className="p-1 hover:bg-gray-100 rounded-md text-gray-500 hover:text-gray-700 transition-all"
+                >
+                  <svg
+                    className={`h-5 w-5 transition-transform duration-200 ${showStyleDropdown ? "rotate-180" : ""}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+
+              {showStyleDropdown && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300">
                   {[
                     ...new Set([
-                      ...(Array.isArray(ordersRaw)
-                        ? ordersRaw
-                          .map((o) => (o.moNo || o.style || "").toString())
-                          .filter(Boolean)
-                        : []),
-                      ...(Array.isArray(docsRaw)
-                        ? docsRaw
-                          .map((d) =>
-                            (
-                              d.factoryStyleNo ||
-                              d.factoryStyle ||
-                              d.moNo ||
-                              d.style ||
-                              ""
-                            ).toString(),
-                          )
-                          .filter(Boolean)
-                        : []),
+                      ...(customerFilter
+                        ? styleOptionsFiltered
+                        : (Array.isArray(ordersRaw)
+                          ? ordersRaw.map((o) => (o.moNo || o.style || "").toString()).filter(Boolean)
+                          : [])
+                      ),
+                      ...(customerFilter
+                        ? styleOptionsFiltered
+                        : (Array.isArray(docsRaw)
+                          ? docsRaw.map((d) => (d.factoryStyleNo || d.factoryStyle || d.moNo || d.style || "").toString()).filter(Boolean)
+                          : [])
+                      ),
                     ]),
                   ]
                     .filter(
@@ -917,19 +970,25 @@ export default function Dashboard() {
                         !styleSearch ||
                         f.toLowerCase().includes(styleSearch.toLowerCase()),
                     )
-                    .map((f) => (
-                      <div
-                        key={f}
-                        className="px-4 py-2.5 hover:bg-blue-50 cursor-pointer text-sm text-gray-700 font-medium transition-colors border-b border-gray-50 last:border-0"
-                        onClick={() => {
-                          setFactoryStyleFilter(f);
-                          setStyleSearch(f);
-                          setShowStyleDropdown(false);
-                        }}
-                      >
-                        {f}
-                      </div>
-                    ))}
+                    .map((f) => {
+                      const isSelected = (factoryStyleFilter === f);
+                      return (
+                        <div
+                          key={f}
+                          className={`px-4 py-2.5 cursor-pointer text-sm font-medium transition-colors border-b border-gray-50 last:border-0 ${isSelected
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-700 hover:bg-blue-50"
+                            }`}
+                          onClick={() => {
+                            setFactoryStyleFilter(f);
+                            setStyleSearch("");
+                            setShowStyleDropdown(false);
+                          }}
+                        >
+                          {f}
+                        </div>
+                      );
+                    })}
                 </div>
               )}
             </div>
@@ -952,22 +1011,97 @@ export default function Dashboard() {
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 disabled:opacity-50 cursor-not-allowed"
             />
           </div>
-          <div>
+          <div ref={customerRef}>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Customer
             </label>
-            <input
-              value={
-                factoryStyleFilter
-                  ? customerFilter ||
-                  (customerOptionsFiltered && customerOptionsFiltered[0]) ||
-                  ""
-                  : ""
-              }
-              readOnly
-              disabled={!factoryStyleFilter}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 disabled:opacity-50 cursor-not-allowed"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Select or type customer..."
+                value={customerSearch || customerFilter}
+                onFocus={() => {
+                  setShowCustomerDropdown(true);
+                }}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCustomerSearch(val);
+                  setCustomerFilter(val);
+                  setShowCustomerDropdown(true);
+                }}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all pr-20 text-gray-700 font-medium"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-2 gap-1">
+                {(customerSearch || customerFilter) && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCustomerFilter("");
+                      setCustomerSearch("");
+                      setShowCustomerDropdown(false);
+                    }}
+                    className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+                <div className="w-px h-5 bg-gray-200 mx-0.5" />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const nextState = !showCustomerDropdown;
+                    setShowCustomerDropdown(nextState);
+                    if (nextState) {
+                      setCustomerSearch("");
+                    }
+                  }}
+                  className="p-1 hover:bg-gray-100 rounded-md text-gray-500 hover:text-gray-700 transition-all"
+                >
+                  <svg
+                    className={`h-5 w-5 transition-transform duration-200 ${showCustomerDropdown ? "rotate-180" : ""}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+
+              {showCustomerDropdown && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300">
+                  {customerOptions
+                    .filter(
+                      (c) =>
+                        !customerSearch ||
+                        c.toLowerCase().includes(customerSearch.toLowerCase()),
+                    )
+                    .map((c) => {
+                      const isSelected = (customerFilter === c);
+                      return (
+                        <div
+                          key={c}
+                          className={`px-4 py-2.5 cursor-pointer text-sm font-medium transition-colors border-b border-gray-50 last:border-0 ${isSelected
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-700 hover:bg-blue-50"
+                            }`}
+                          onClick={() => {
+                            setCustomerFilter(c);
+                            setCustomerSearch("");
+                            setShowCustomerDropdown(false);
+                          }}
+                        >
+                          {c}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

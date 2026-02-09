@@ -15,6 +15,7 @@ import {
   X,
   ShieldCheck,
   MessageSquare,
+  Calendar,
 } from "lucide-react";
 
 export default function ExportPanel({ setActiveTab }) {
@@ -104,6 +105,15 @@ export default function ExportPanel({ setActiveTab }) {
       window.removeEventListener("humidityReportsUpdated", handleReportUpdate);
     };
   }, [startDate, endDate]);
+
+  const handleQuickSelect = (days) => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - days);
+
+    setStartDate(start.toISOString().split("T")[0]);
+    setEndDate(end.toISOString().split("T")[0]);
+  };
 
   useEffect(() => {
     if (!factoryStyleFilter) {
@@ -316,7 +326,7 @@ export default function ExportPanel({ setActiveTab }) {
     fetchData();
   };
 
-  const AUTHORIZED_APPROVERS = ["YM7625", "TYM010"];
+  const AUTHORIZED_APPROVERS = ["YM7625", "TYM010", "YM7927", "YM5730", "YM8271", "YM4312", "YM3565", "YM4608"];
 
   const handleApprove = async (reportId) => {
     // Reset states before opening modal
@@ -461,8 +471,8 @@ export default function ExportPanel({ setActiveTab }) {
         return numA - numB;
       }).map(checkKey => ({
         ...checks[checkKey],
-        itemName: itemKey,
-        checkName: checkKey
+        itemName: checkKey,
+        checkName: itemKey
       }));
     });
   };
@@ -508,37 +518,51 @@ export default function ExportPanel({ setActiveTab }) {
 
     let allPassed = true;
     let hasCheck = false;
-    const isPass = (status) => String(status || "").toLowerCase() === "pass";
+
+    const isPass = (sec) => {
+      if (!sec) return false;
+      // Handle case where sec is just the status string
+      if (typeof sec === 'string') return sec.toLowerCase() === 'pass';
+      // Handle case where sec is an object with status property
+      if (sec.status) return String(sec.status).toLowerCase() === 'pass';
+      // Handle case where sec is an object with pass/fail booleans
+      return sec.pass === true || String(sec.success || "").toLowerCase() === 'true';
+    };
 
     if (Array.isArray(history)) {
       const latestCheck = history[history.length - 1];
       if (latestCheck) {
         hasCheck = true;
         allPassed =
-          isPass(latestCheck.top?.status) &&
-          isPass(latestCheck.middle?.status) &&
-          isPass(latestCheck.bottom?.status);
+          isPass(latestCheck.top) &&
+          isPass(latestCheck.middle) &&
+          isPass(latestCheck.bottom);
       }
     } else if (typeof history === 'object') {
-      Object.keys(history).forEach(itemKey => {
-        const itemChecks = history[itemKey] || {};
+      const itemKeys = Object.keys(history).sort((a, b) => {
+        const numA = parseInt(String(a).replace('Item ', '')) || 0;
+        const numB = parseInt(String(b).replace('Item ', '')) || 0;
+        return numB - numA;
+      });
+
+      if (itemKeys.length > 0) {
+        const latestItemKey = itemKeys[0];
+        const itemChecks = history[latestItemKey] || {};
         const checkKeys = Object.keys(itemChecks).sort((a, b) => {
-          const numA = parseInt(a.replace('Check ', ''));
-          const numB = parseInt(b.replace('Check ', ''));
+          const numA = parseInt(String(a).replace('Check ', '')) || 0;
+          const numB = parseInt(String(b).replace('Check ', '')) || 0;
           return numB - numA;
         });
 
         if (checkKeys.length > 0) {
           hasCheck = true;
           const latestCheck = itemChecks[checkKeys[0]];
-          const itemPassed =
-            isPass(latestCheck.top?.status) &&
-            isPass(latestCheck.middle?.status) &&
-            isPass(latestCheck.bottom?.status);
-
-          if (!itemPassed) allPassed = false;
+          allPassed =
+            isPass(latestCheck.top) &&
+            isPass(latestCheck.middle) &&
+            isPass(latestCheck.bottom);
         }
-      });
+      }
     }
 
     if (!hasCheck) return "none";
@@ -622,34 +646,51 @@ export default function ExportPanel({ setActiveTab }) {
     <div className="space-y-6">
       <div className="bg-white p-4 rounded-md border">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                const newStart = e.target.value;
-                setStartDate(newStart);
-                // If the user hasn't explicitly set a range yet (or they are picking a new day), update end date too
-                if (startDate === endDate) {
-                  setEndDate(newStart);
-                }
-              }}
-              className="w-full px-3 py-2 border rounded-lg"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
-              End Date
-            </label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg"
-            />
+          <div className="md:col-span-2">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-medium text-gray-600">Date Range</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleQuickSelect(0)}
+                  className="text-[10px] px-2 py-0.5 bg-gray-100 hover:bg-gray-200 rounded font-bold text-gray-600 transition-colors"
+                >
+                  Today
+                </button>
+                <button
+                  onClick={() => handleQuickSelect(7)}
+                  className="text-[10px] px-2 py-0.5 bg-gray-100 hover:bg-gray-200 rounded font-bold text-gray-600 transition-colors"
+                >
+                  7 Days
+                </button>
+                <button
+                  onClick={() => handleQuickSelect(30)}
+                  className="text-[10px] px-2 py-0.5 bg-gray-100 hover:bg-gray-200 rounded font-bold text-gray-600 transition-colors"
+                >
+                  30 Days
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none custom-date-input"
+                />
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+              </div>
+              <span className="text-gray-400 font-medium">to</span>
+              <div className="relative flex-1">
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none custom-date-input"
+                />
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+              </div>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">
@@ -774,10 +815,10 @@ export default function ExportPanel({ setActiveTab }) {
       </div>
       {/* Approve remark modal */}
       {showApproveModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-all duration-300">
-          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden relative animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm transition-all duration-500 animate-in fade-in">
+          <div className="bg-white/90 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden relative animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 border border-white/40">
             {/* Header Banner */}
-            <div className="bg-gradient-to-br from-green-500 to-green-600 px-6 py-6 relative overflow-hidden">
+            <div className="bg-gradient-to-br from-green-500/90 to-green-600/90 px-6 py-6 relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-10 transform rotate-12 scale-150 pointer-events-none">
                 <CheckCircle2 size={120} />
               </div>
@@ -829,11 +870,11 @@ export default function ExportPanel({ setActiveTab }) {
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between px-1">
-                    <label className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                      <MessageSquare size={14} className="text-slate-300" />
+                    <label className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                      <MessageSquare size={14} className="text-gray-500" />
                       Supervisor Remarks
                     </label>
-                    <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">
+                    <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-bold">
                       Optional
                     </span>
                   </div>
@@ -842,7 +883,7 @@ export default function ExportPanel({ setActiveTab }) {
                       value={approvalRemarkInput}
                       onChange={(e) => setApprovalRemarkInput(e.target.value)}
                       rows={4}
-                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:bg-white transition-all outline-none resize-none shadow-inner-white"
+                      className="w-full bg-white/40 border-2 border-white/20 rounded-2xl p-4 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:bg-white/80 transition-all outline-none resize-none shadow-inner-white"
                       placeholder="Enter verification notes or quality remarks..."
                     />
                   </div>
@@ -1010,13 +1051,13 @@ export default function ExportPanel({ setActiveTab }) {
                     Date
                   </th>
                   <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                    Checks
+                    Item
                   </th>
                   <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                    Status
+                    Results
                   </th>
                   <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                    Approval
+                    Approval Status
                   </th>
                   <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
                     Actions
@@ -1078,27 +1119,6 @@ export default function ExportPanel({ setActiveTab }) {
                                 </span>
                               )}
                             </div>
-                          ) : isAuthorized ? (
-                            <button
-                              onClick={() => handleApprove(reportId)}
-                              className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-green-600 hover:text-green-800 hover:bg-green-50 rounded-full border border-green-200 transition-colors"
-                              title="Supervisor Approve"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
-                              </svg>
-                              Approve
-                            </button>
                           ) : (
                             <span className="px-2 py-1 text-xs rounded-full bg-orange-100 text-orange-500 font-medium border border-orange-200">
                               Pending
@@ -1107,6 +1127,15 @@ export default function ExportPanel({ setActiveTab }) {
                         </td>
                         <td className="px-4 py-3 text-sm text-center">
                           <div className="flex items-center justify-center gap-2">
+                            {isAuthorized && !isApproved && (
+                              <button
+                                onClick={() => handleApprove(reportId)}
+                                className="inline-flex items-center p-2.5 text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all duration-200 group"
+                                title="Approve Report"
+                              >
+                                <ShieldCheck className="w-4 h-4" />
+                              </button>
+                            )}
                             {history.length > 0 && (
                               <button
                                 onClick={() => openHistoryModal(report)}
@@ -1385,6 +1414,20 @@ export default function ExportPanel({ setActiveTab }) {
                 @keyframes bounce-slow {
                     0%, 100% { transform: translateY(0); }
                     50% { transform: translateY(-3px); }
+                }
+
+                .custom-date-input::-webkit-calendar-picker-indicator {
+                    background: transparent;
+                    bottom: 0;
+                    color: transparent;
+                    cursor: pointer;
+                    height: auto;
+                    left: 0;
+                    position: absolute;
+                    right: 0;
+                    top: 0;
+                    width: auto;
+                    z-index: 10;
                 }
             `}</style>
     </div>
