@@ -2259,29 +2259,6 @@ const InspectionDataSection = ({
               </div>
             </div>
 
-            {/* Reference Sample Approve Date Section - NEW SECTION */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-                Reference Sample
-              </h3>
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-2 sm:space-y-0">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                    Approve Date:
-                  </label>
-                  <input
-                    type="date"
-                    value={referenceSampleApproveDate}
-                    onChange={(e) =>
-                      setReferenceSampleApproveDate(e.target.value)
-                    }
-                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white disabled:bg-gray-200 dark:disabled:bg-gray-700"
-                    disabled={!isEditing}
-                  />
-                </div>
-              </div>
-            </div>
-
             {/* Save/Edit Buttons */}
             <div className="flex justify-end mt-6">
               <button

@@ -218,119 +218,103 @@ function calculateSummaryData(currentFormData) {
   const currentDefectDetails = currentFormData.defectDetails;
   const currentMeasurementDetails = currentFormData.measurementDetails;
 
+  // 1. Calculate totalCheckedPcs from measurement data qty
   let measurementArray = [];
-  if (
-    currentMeasurementDetails &&
-    typeof currentMeasurementDetails === "object"
-  ) {
+  if (currentMeasurementDetails && typeof currentMeasurementDetails === "object") {
     measurementArray = currentMeasurementDetails.measurement || [];
   } else if (Array.isArray(currentMeasurementDetails)) {
     measurementArray = currentMeasurementDetails;
   }
 
-  // 1. Calculate totalCheckedPcs from measurement data qty (FIXED)
   let totalCheckedPcs = 0;
   measurementArray.forEach((data) => {
-    // Use qty field which represents the number of pieces checked for each size
     if (typeof data.qty === "number" && data.qty > 0) {
       totalCheckedPcs += data.qty;
     }
   });
 
-  // If no measurement data, fallback to checkedQty from form
-  const checkedQty = parseInt(currentFormData.checkedQty, 10) || 0;
   if (totalCheckedPcs === 0) {
     totalCheckedPcs = parseInt(currentFormData.checkedQty, 10) || 0;
   }
 
-  // 2. Calculate measurement points and passes using measurementSizeSummary if available
-  let measurementPoints = 0;
-  let measurementPass = 0;
+  // --- START FIX FOR DEFECT CALCULATIONS ---
+  
+  let rejectedDefectPcs = 0;
+  let totalDefectCount = 0;
 
-  // Check if measurementSizeSummary exists (same as backend logic)
-  if (currentMeasurementDetails?.measurementSizeSummary?.length > 0) {
-    currentMeasurementDetails.measurementSizeSummary.forEach(sizeData => {
-      measurementPoints += (sizeData.checkedPoints || 0);
-      measurementPass += (sizeData.totalPass || 0);
-    });
-  } else {
-    // Fallback: Calculate from measurement array
-    measurementArray.forEach((data) => {
-      if (Array.isArray(data.pcs)) {
-        data.pcs.forEach((pc) => {
-          if (Array.isArray(pc.measurementPoints)) {
-            pc.measurementPoints.forEach((point) => {
-              if (point.result === "pass" || point.result === "fail") {
-                measurementPoints++;
-                if (point.result === "pass") measurementPass++;
-              }
-            });
-          }
-        });
+  if (Array.isArray(currentDefectDetails?.defectsByPc)) {
+    currentDefectDetails.defectsByPc.forEach(pc => {
+      const firstDefect = pc.pcDefects?.[0];
+      
+      // Determine if this row is a Batch or Multi-entry
+      const isMulti = firstDefect?.isMulti === true || 
+                      String(firstDefect?.isMulti) === "true" || 
+                      String(pc.pcNumber).startsWith("BATCH-");
+
+      if (isMulti) {
+        // If it's a batch (e.g., BATCH-177...), use the pcCount (15)
+        const count = parseInt(firstDefect?.pcCount) || 1;
+        rejectedDefectPcs += count;
+        totalDefectCount += count;
+      } else {
+        // If it's a single PC entry (e.g., PC "1"), it counts as 1 rejected garment
+        rejectedDefectPcs += 1;
+        // Sum the actual quantities of individual defects in that PC
+        totalDefectCount += (pc.pcDefects || []).reduce((sum, d) => sum + (parseInt(d.defectQty) || 0), 0);
       }
     });
   }
 
-  // 3. Defect calculations
-  const rejectedDefectPcs = Array.isArray(currentDefectDetails?.defectsByPc)
-    ? currentDefectDetails.defectsByPc.length
-    : 0;
+  // --- END FIX ---
 
-  const defectCount = currentDefectDetails?.defectsByPc
-    ? currentDefectDetails.defectsByPc.reduce((sum, pc) => {
-        return (
-          sum +
-          (Array.isArray(pc.pcDefects)
-            ? pc.pcDefects.reduce(
-                (defSum, defect) =>
-                  defSum + (parseInt(defect.defectQty, 10) || 0),
-                0,
-              )
-            : 0)
-        );
-      }, 0)
-    : 0;
-
-  // 4. Defect rate and ratio (use totalCheckedPcs, not measurementPoints)
-  const defectRate =
-    totalCheckedPcs > 0
-      ? Number(((defectCount / totalCheckedPcs) * 100).toFixed(1))
+  // 4. Defect rate and ratio
+  const defectRate = totalCheckedPcs > 0
+      ? Number(((totalDefectCount / totalCheckedPcs) * 100).toFixed(1))
       : 0;
 
-  const defectRatio =
-    totalCheckedPcs > 0
+  const defectRatio = totalCheckedPcs > 0
       ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
       : 0;
 
-  // 5. SIMPLIFIED LOGIC - only consider defectDetails.result and pass rate >= 95%
-  let overallResult = "Pending";
+  // 5. Result Logic
+  let measurementPoints = 0;
+  let measurementPass = 0;
+  measurementArray.forEach((data) => {
+    if (Array.isArray(data.pcs)) {
+      data.pcs.forEach((pc) => {
+        if (Array.isArray(pc.measurementPoints)) {
+          pc.measurementPoints.forEach((point) => {
+            if (point.result === "pass" || point.result === "fail") {
+              measurementPoints++;
+              if (point.result === "pass") measurementPass++;
+            }
+          });
+        }
+      });
+    }
+  });
+
+  const measurementPassRate = measurementPoints > 0 ? (measurementPass / measurementPoints) * 100 : 100;
   const savedDefectResult = currentDefectDetails?.result || "Pending";
-
-  // Calculate measurement pass rate - default to 100% when no measurement points
-  const measurementPassRate =
-    measurementPoints > 0 ? (measurementPass / measurementPoints) * 100 : 100;
-
-  // Overall result: Pass only if defect result is Pass AND pass rate >= 95%
+  
+  let overallResult = "Pending";
   if (savedDefectResult === "Pass" && measurementPassRate >= 95.0) {
     overallResult = "Pass";
   } else if (savedDefectResult === "Fail" || (measurementPoints > 0 && measurementPassRate < 95.0)) {
     overallResult = "Fail";
-  } else {
-    overallResult = "Pending";
   }
 
   return {
-    checkedQty: checkedQty, // Ensure checkedQty is a number
-    totalCheckedPcs: totalCheckedPcs || 0, // This should be the sum of qty from each size
-    rejectedDefectPcs: rejectedDefectPcs || 0,
-    totalDefectCount: defectCount || 0,
+    checkedQty: parseInt(currentFormData.checkedQty, 10) || 0,
+    totalCheckedPcs: totalCheckedPcs,
+    rejectedDefectPcs: rejectedDefectPcs, // Will now be 16
+    totalDefectCount: totalDefectCount,   // Will now be 16
     defectRate,
     defectRatio,
-    overallFinalResult: overallResult || "Pending",
+    overallFinalResult: overallResult,
     overallResult,
-    // Additional fields for measurement statistics
-    measurementPoints: measurementPoints || 0,
-    measurementPass: measurementPass || 0,
+    measurementPoints,
+    measurementPass,
   };
 }
 
@@ -1030,23 +1014,28 @@ const loadSavedDataById = async (id) => {
 
     // Set form data
     setFormData((prev) => ({
-      ...prev,
-      ...saved,
-      date: saved.date ? saved.date.split("T")[0] : prev.date,
-      before_after_wash: saved.before_after_wash || prev.before_after_wash,
-      orderQty: saved.orderQty || prev.orderQty,
-      buyer: saved.buyer || prev.buyer,
-      aql: saved.aql && saved.aql.length > 0 ? saved.aql : prev.aql
-    }));
+    ...prev,
+    ...saved,
+    date: saved.date ? saved.date.split("T")[0] : prev.date,
+    // DIRECT FROM DB:
+    totalCheckedPcs: saved.totalCheckedPcs || 0,
+    rejectedDefectPcs: saved.rejectedDefectPcs || 0,
+    totalDefectCount: saved.totalDefectCount || 0,
+    defectRate: saved.defectRate || 0,
+    defectRatio: saved.defectRatio || 0,
+    overallFinalResult: saved.overallFinalResult || "Pending"
+  }));
 
-     if (saved.defectDetails && saved.defectDetails.defectsByPc) {
-         const { singleDefects, multiDefects } = separateDefects(saved.defectDetails.defectsByPc);
-         setDefectsByPc(singleDefects);
-         setMultiDefects(multiDefects);
-      } else {
-         setDefectsByPc({});
-         setMultiDefects([]);
-      }
+  // 2. FIX THE BUG: Use separateDefects ONLY. 
+  // Do NOT use transformDefectsByPc here because it causes double-counting.
+  if (saved.defectDetails && saved.defectDetails.defectsByPc) {
+      const { singleDefects, multiDefects } = separateDefects(saved.defectDetails.defectsByPc);
+      setDefectsByPc(singleDefects);
+      setMultiDefects(multiDefects);
+  } else {
+      setDefectsByPc({});
+      setMultiDefects([]);
+  }
 
       setUploadedImages(
         (saved.defectDetails?.additionalImages || []).filter(Boolean).map((img) => ({
@@ -2115,81 +2104,73 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
   };
 
   useEffect(() => {
-    // Debounce the calculation to prevent multiple rapid calls
-    const timeoutId = setTimeout(() => {
-      const mergedDefectsByPc = [];
+  const timeoutId = setTimeout(() => {
+    const mergedDefectsByPc = [];
 
-      Object.entries(defectsByPc).forEach(([pcNumber, pcDefects]) => {
-         mergedDefectsByPc.push({ pcNumber, pcDefects });
-      });
+    // Add single defects
+    Object.entries(defectsByPc).forEach(([pcNumber, pcDefects]) => {
+       // Only add if it's NOT a batch (to prevent double-counting)
+       if (!String(pcNumber).startsWith("BATCH-")) {
+          mergedDefectsByPc.push({ pcNumber, pcDefects });
+       }
+    });
 
-      multiDefects.forEach(mDefect => {
-         mergedDefectsByPc.push({
-            pcNumber: `BATCH-${mDefect.id}`,
-            pcDefects: [{
-               defectId: mDefect.selectedDefect,
-               defectName: mDefect.defectName,
-               defectQty: 1, 
-               isMulti: true,
-               pcCount: mDefect.pcCount,
-               defectImages: mDefect.defectImages
-            }]
-         });
-      });
+    // Add multi/batch defects
+    multiDefects.forEach(mDefect => {
+       mergedDefectsByPc.push({
+          pcNumber: `BATCH-${mDefect.id}`,
+          pcDefects: [{
+             defectId: mDefect.selectedDefect,
+             defectName: mDefect.defectName,
+             defectQty: 1, 
+             isMulti: true,
+             pcCount: mDefect.pcCount,
+             defectImages: mDefect.defectImages
+          }]
+       });
+    });
 
-     const defectDetails = {
-        ...formData.defectDetails,
-        checkedQty: formData.checkedQty,
-        washQty: formData.washQty,
-        result: formData.result,
-        defectsByPc: mergedDefectsByPc, 
-      };
+    const defectDetails = {
+      ...formData.defectDetails,
+      checkedQty: formData.checkedQty,
+      washQty: formData.washQty,
+      result: formData.result,
+      defectsByPc: mergedDefectsByPc, 
+    };
 
-      
+    const measurementDetails = {
+      measurement: [
+        ...measurementData.beforeWash.map((item) => ({...item, before_after_wash: "beforeWash"})),
+        ...measurementData.afterWash.map((item) => ({...item, before_after_wash: "afterWash"}))
+      ],
+    };
 
-      const measurementDetails = {
-        measurement: [
-          ...measurementData.beforeWash.map((item) => ({
-            ...item,
-            before_after_wash: "beforeWash",
-          })),
-          ...measurementData.afterWash.map((item) => ({
-            ...item,
-            before_after_wash: "afterWash",
-          })),
-        ],
-      };
+    // Calculate summary
+    const summary = calculateSummaryData({
+      ...formData,
+      defectDetails,
+      measurementDetails,
+    });
 
-      // Calculate summary from the latest data
-      const summary = calculateSummaryData({
-        ...formData,
-        defectDetails,
-        measurementDetails,
-      });
-
-
-      setFormData((prev) => ({
+    // Only update if something actually changed to prevent overwriting DB values unnecessarily
+    setFormData((prev) => {
+      // If we just loaded from DB (recordId exists), we should trust DB values 
+      // unless user is actively clicking/changing things.
+      return {
         ...prev,
         defectDetails,
         measurementDetails,
         ...summary,
-      }));
+      };
+    });
 
-      if (recordId) {
-        autoSaveSummary(summary, recordId);
-      }
-    }, 100); // 100ms debounce
+    if (recordId) {
+      autoSaveSummary(summary, recordId);
+    }
+  }, 100);
 
-    return () => clearTimeout(timeoutId);
-  }, [
-    defectsByPc,
-    measurementData.beforeWash,
-    measurementData.afterWash,
-    formData.checkedQty,
-    formData.washQty,
-    formData.result,
-    recordId,
-  ]);
+  return () => clearTimeout(timeoutId);
+}, [defectsByPc, multiDefects, measurementData]); // Added multiDefects to dependency
 
   // Load color-specific data
   const loadColorSpecificData = async (orderNo, color) => {

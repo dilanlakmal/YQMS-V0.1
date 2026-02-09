@@ -1472,56 +1472,8 @@ export const getqcwashingOverAllSummary = async (req, res) => {
 
     const qcRecord = await QCWashing.findById(recordId);
     if (!qcRecord) {
-      return res
-        .status(404)
-        .json({ success: false, message: "No data found for this record." });
+      return res.status(404).json({ success: false, message: "No data found." });
     }
-
-    // Recalculate overall result to ensure accuracy (but don't save)
-    let totalMeasurementPoints = 0;
-    let totalMeasurementPass = 0;
-    let totalMeasurementFail = 0;
-
-    // Use measurementSizeSummary if available
-    if (qcRecord.measurementDetails?.measurementSizeSummary?.length > 0) {
-      qcRecord.measurementDetails.measurementSizeSummary.forEach((sizeData) => {
-        totalMeasurementPoints += sizeData.checkedPoints || 0;
-        totalMeasurementPass += sizeData.totalPass || 0;
-        totalMeasurementFail += sizeData.totalFail || 0;
-      });
-    } else if (qcRecord.measurementDetails?.measurement?.length > 0) {
-      // Fallback calculation
-      qcRecord.measurementDetails.measurement.forEach((data) => {
-        if (data.pcs && Array.isArray(data.pcs)) {
-          data.pcs.forEach((pc) => {
-            if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
-              pc.measurementPoints.forEach((point) => {
-                if (point.result === "pass" || point.result === "fail") {
-                  totalMeasurementPoints++;
-                  if (point.result === "pass") {
-                    totalMeasurementPass++;
-                  } else {
-                    totalMeasurementFail++;
-                  }
-                }
-              });
-            }
-          });
-        }
-      });
-    }
-
-    const passRate =
-      totalMeasurementPoints > 0
-        ? Math.round((totalMeasurementPass / totalMeasurementPoints) * 100)
-        : 100;
-
-    // SIMPLIFIED LOGIC: Only consider defectDetails.result and pass rate >= 95%
-    const savedDefectResult = qcRecord.defectDetails?.result || "Pass";
-
-    // Overall result: Pass only if defect result is Pass AND pass rate >= 95%
-    const calculatedOverallResult =
-      savedDefectResult === "Pass" && passRate >= 95.0 ? "Pass" : "Fail";
 
     res.json({
       success: true,
@@ -1529,40 +1481,21 @@ export const getqcwashingOverAllSummary = async (req, res) => {
         recordId,
         orderNo: qcRecord.orderNo,
         color: qcRecord.color,
-        totalCheckedPcs: qcRecord.totalCheckedPcs ?? 0,
-        checkedQty: qcRecord.checkedQty ?? "",
-        washQty: qcRecord.washQty ?? "",
-        rejectedDefectPcs: qcRecord.rejectedDefectPcs ?? 0,
-        totalDefectCount: qcRecord.totalDefectCount ?? 0,
-        defectRate: qcRecord.defectRate ?? 0,
-        defectRatio: qcRecord.defectRatio ?? 0,
-        passRate: passRate,
-        overallResult: calculatedOverallResult,
-        overallFinalResult: qcRecord.overallFinalResult, // Use saved value
-
-        // Additional debug information
-        measurementStats: {
-          totalPoints: totalMeasurementPoints,
-          totalPass: totalMeasurementPass,
-          totalFail: totalMeasurementFail,
-          passRate: passRate,
-          passRateThreshold: 95
-        },
-        defectStats: {
-          savedDefectResult: savedDefectResult
-        },
-
-        // Include the measurement details for frontend calculation
-        measurementDetails: qcRecord.measurementDetails,
-        defectDetails: qcRecord.defectDetails ?? {}
+        // Pulling directly from top-level collection fields as requested
+        totalCheckedPcs: qcRecord.totalCheckedPcs || 0,
+        checkedQty: qcRecord.checkedQty || 0,
+        washQty: qcRecord.washQty || 0,
+        rejectedDefectPcs: qcRecord.rejectedDefectPcs || 0,
+        totalDefectCount: qcRecord.totalDefectCount || 0,
+        defectRate: qcRecord.defectRate || 0,
+        defectRatio: qcRecord.defectRatio || 0,
+        passRate: qcRecord.passRate || 0,
+        overallFinalResult: qcRecord.overallFinalResult || "Pending"
       }
     });
   } catch (error) {
-    console.error("Error fetching overall summary by id:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while fetching overall summary."
-    });
+    console.error("Error fetching overall summary:", error);
+    res.status(500).json({ success: false, message: "Server error." });
   }
 };
 
