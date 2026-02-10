@@ -53,25 +53,25 @@ const HomeWashForm = ({
         if (season && season !== '' && (!formData.season || formData.season === '')) {
             handleInputChange('season', season);
         }
-    }, [season, formData.season]);
+    }, [season, formData.season, handleInputChange]);
 
     useEffect(() => {
         if (styleDescription && styleDescription !== '' && (!formData.styleDescription || formData.styleDescription === '')) {
             handleInputChange('styleDescription', styleDescription);
         }
-    }, [styleDescription, formData.styleDescription]);
+    }, [styleDescription, formData.styleDescription, handleInputChange]);
 
     useEffect(() => {
         if (fabrication && fabrication !== '' && (!formData.fabrication || formData.fabrication === '')) {
             handleInputChange('fabrication', fabrication);
         }
-    }, [fabrication, formData.fabrication]);
+    }, [fabrication, formData.fabrication, handleInputChange]);
 
     useEffect(() => {
         if (custStyle && custStyle !== '' && (!formData.custStyle || formData.custStyle === '')) {
             handleInputChange('custStyle', custStyle);
         }
-    }, [custStyle, formData.custStyle]);
+    }, [custStyle, formData.custStyle, handleInputChange]);
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -82,10 +82,10 @@ const HomeWashForm = ({
                     </label>
                     <input
                         type="text"
-                        value={formData.ymStyle}
+                        value={formData.ymStyle || ''}
                         onChange={(e) => handleInputChange("ymStyle", e.target.value)}
                         onFocus={() => {
-                            if (formData.ymStyle.length >= 2) {
+                            if (formData.ymStyle?.length >= 2) {
                                 searchOrderNo(formData.ymStyle);
                             }
                         }}
@@ -237,7 +237,7 @@ const HomeWashForm = ({
                     </label>
                     <input
                         type="text"
-                        value={formData.buyerStyle}
+                        value={formData.buyerStyle || ''}
                         readOnly
                         placeholder="Select YM Style first"
                         className="w-full px-3 py-2 border border-gray-300  rounded-md  cursor-not-allowed"
@@ -539,7 +539,7 @@ const HomeWashForm = ({
                         value={formData.fabrication || fabrication || ''}
                         readOnly
                         placeholder="Select YM Style to load fabrication"
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 dark:text-white cursor-not-allowed"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:text-white cursor-not-allowed"
                         title={fabrication || "Fabrication will be auto-filled when you select a YM Style"}
                     />
                     {fabrication && (
