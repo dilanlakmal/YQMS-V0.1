@@ -116,14 +116,19 @@ import createQASectionsMeasurementSpecsModel from "../../models/QA/QASectionsMea
 
 import createQASectionsTemplatesModel from "../../models/QA/QASectionsTemplates.js";
 
+import createFincheckUserPreferencesModel from "../../models/QA/FincheckUserPreferences.js";
 import createFincheckInspectionReportsModel from "../../models/QA/FincheckInspectionReports.js";
+import createFincheckApprovalAssigneeModel from "../../models/QA/FincheckApprovalAssignee.js";
+import createFincheckNotificationGroupModel from "../../models/QA/FincheckNotificationGroupSchema.js";
+import createFincheckInspectionDecisionModel from "../../models/QA/fincheck_inspection_decision.js";
+import createFincheckPushSubscriptionModel from "../../models/QA/FincheckPushSubscription.js";
+import createFincheckAIChatModel from "../../models/QA/FincheckAIChatModel.js";
 
 //P88Data
 import createP88DataSchema from "../../models/P88/p88LegacyData.js";
+import p88failedReportsModel from "../../models/P88/p88failedReports.js";
 
 import normalNotificationSchema from "../../models/NormalNotification.js";
-
-import createHumidityFiberNameModel from "../../models/HumidityFiberName.js";
 
 //YDT Models
 /*------------- Cover page ----------------*/
@@ -131,29 +136,31 @@ import createCoverPageSchema from "../../models/YDT/coverPage.js";
 
 //Humidity Models
 import createHumidityModel from "../../models/huminity/HumidityReport.js";
+import createHumidityFiberNameModel from "../../models/HumidityFiberName.js";
+import createReitmansReportModel from "../../models/huminity/ReitmansReport.js";
 
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
-  process.env.MongoDB_URI_ym_prod
+  process.env.MongoDB_URI_ym_prod,
 );
 
 export const ymEcoConnection = mongoose.createConnection(
-  process.env.MongoDB_URI_ym_eco_board
+  process.env.MongoDB_URI_ym_eco_board,
 );
 
 //Connection status
 ymProdConnection.on("connected", () =>
-  console.log("✅ Connected to ym_prod database...")
+  console.log("✅ Connected to ym_prod database..."),
 );
 ymProdConnection.on("error", (err) =>
-  console.error("❌ unexpected error:", err)
+  console.error("❌ unexpected error:", err),
 );
 
 ymEcoConnection.on("connected", () =>
-  console.log("✅ Connected to ym_eco_board database...")
+  console.log("✅ Connected to ym_eco_board database..."),
 );
 ymEcoConnection.on("error", (err) =>
-  console.error("❌ unexpected error:", err)
+  console.error("❌ unexpected error:", err),
 );
 
 //Collections
@@ -305,10 +312,23 @@ export const QASectionsMeasurementSpecs =
 export const QASectionsTemplates =
   createQASectionsTemplatesModel(ymProdConnection);
 
+export const FincheckUserPreferences =
+  createFincheckUserPreferencesModel(ymProdConnection);
 export const FincheckInspectionReports =
   createFincheckInspectionReportsModel(ymProdConnection);
+export const FincheckApprovalAssignees =
+  createFincheckApprovalAssigneeModel(ymProdConnection);
+export const FincheckNotificationGroup =
+  createFincheckNotificationGroupModel(ymProdConnection);
+
+export const FincheckInspectionDecision =
+  createFincheckInspectionDecisionModel(ymProdConnection);
+export const FincheckPushSubscription =
+  createFincheckPushSubscriptionModel(ymProdConnection);
+export const FincheckAIChat = createFincheckAIChatModel(ymProdConnection);
 
 export const p88LegacyData = createP88DataSchema(ymProdConnection);
+export const p88FailedReport = p88failedReportsModel(ymProdConnection);
 
 export const NormalNotification = normalNotificationSchema(ymProdConnection);
 
@@ -320,6 +340,7 @@ export const CoverPage = createCoverPageSchema(ymProdConnection);
 
 //Humidity Exported Models
 export const HumidityReport = createHumidityModel(ymProdConnection);
+export const ReitmansReport = createReitmansReportModel(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

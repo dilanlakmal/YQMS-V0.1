@@ -12,7 +12,8 @@ import {
   GitMerge, // Sub: Sync,
   Ruler,
   FileText,
-  Scissors
+  Scissors,
+  Pencil,
 } from "lucide-react";
 import { useAuth } from "../components/authentication/AuthContext";
 
@@ -22,6 +23,7 @@ import UploadWashingSpecs from "./UploadWashingSpecs";
 import Measurement from "./Measurement";
 import QASectionsMeasurementSpecsSelection from "../components/inspection/PivotY/QAMeasurement/QASectionsMeasurementSpecsSelection";
 import QASectionsMeasurementAWSelection from "../components/inspection/PivotY/QAMeasurement/QASectionsMeasurementAWSelection";
+import ModifyDTSpec from "../components/inspection/PivotY/QAMeasurement/ModifyDTSpec";
 
 // --- PLACEHOLDER ---
 const PlaceholderComponent = ({ title, icon: Icon }) => {
@@ -62,38 +64,45 @@ const YPivotQAMeasurements = () => {
         label: "YorkSys Orders",
         icon: <ShoppingCart size={20} />,
         component: <UploadYorksysOrders activeSubTab={activeYorksysSubTab} />, // Pass subTab state!
-        description: "Manage Buyer Specs & Orders"
+        description: "Manage Buyer Specs & Orders",
       },
       {
         id: "spec-upload",
         label: "BW/AW Spec Upload",
         icon: <Upload size={20} />,
         component: <UploadWashingSpecs />,
-        description: "Upload Washing Specifications"
+        description: "Upload Washing Specifications",
       },
       {
         id: "measurement-print",
         label: "MES. Print",
         icon: <Printer size={20} />,
         component: <Measurement />,
-        description: "Print Measurement Reports"
+        description: "Print Measurement Reports",
       },
       {
         id: "qa-spec-selection",
         label: "BW Mes. Specs",
         icon: <Ruler size={20} />,
         component: <QASectionsMeasurementSpecsSelection />,
-        description: "Select and Config Measurement Specs"
+        description: "Select and Config Measurement Specs",
       },
       {
         id: "qa-aw-spec-selection",
         label: "AW Mes. Specs",
         icon: <FileText size={20} />,
         component: <QASectionsMeasurementAWSelection />,
-        description: "Select Measurement Specs (After Wash)"
-      }
+        description: "Select Measurement Specs (After Wash)",
+      },
+      {
+        id: "modify-dt-measurement",
+        label: "Modify DT Spec",
+        icon: <Pencil size={20} />,
+        component: <ModifyDTSpec />,
+        description: "Select Measurement Specs (After Wash)",
+      },
     ],
-    [activeYorksysSubTab] // Dependency added so component updates when subTab changes
+    [activeYorksysSubTab], // Dependency added so component updates when subTab changes
   );
 
   // --- Configuration: Sub Tabs (YorkSys Only) ---
@@ -105,15 +114,15 @@ const YPivotQAMeasurements = () => {
       {
         id: "cuttingSync",
         label: "Sync from Cutting",
-        icon: <GitMerge size={20} />
+        icon: <GitMerge size={20} />,
       },
       {
         id: "ribContent",
         label: "RIB Content",
-        icon: <Scissors size={20} />
-      }
+        icon: <Scissors size={20} />,
+      },
     ],
-    []
+    [],
   );
 
   const activeComponent = useMemo(() => {
@@ -250,7 +259,7 @@ const YPivotQAMeasurements = () => {
                           }`}
                         >
                           {React.cloneElement(subTab.icon, {
-                            className: "w-3.5 h-3.5"
+                            className: "w-3.5 h-3.5",
                           })}
                         </div>
                         <span
@@ -341,7 +350,7 @@ const YPivotQAMeasurements = () => {
                             }`}
                           >
                             {React.cloneElement(tab.icon, {
-                              className: "w-5 h-5"
+                              className: "w-5 h-5",
                             })}
                           </div>
                           <span
@@ -383,7 +392,7 @@ const YPivotQAMeasurements = () => {
                                 }`}
                               >
                                 {React.cloneElement(subTab.icon, {
-                                  className: "w-4 h-4"
+                                  className: "w-4 h-4",
                                 })}
                               </div>
                               <span
@@ -492,7 +501,8 @@ const YPivotQAMeasurements = () => {
         }
 
         .bg-grid-white {
-          background-image: linear-gradient(
+          background-image:
+            linear-gradient(
               to right,
               rgba(255, 255, 255, 0.1) 1px,
               transparent 1px

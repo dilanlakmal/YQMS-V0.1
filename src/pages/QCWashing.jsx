@@ -11,6 +11,7 @@ import imageCompression from "browser-image-compression";
 import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/SubmittedWashingData";
 import { useTranslation } from "react-i18next";
 import SubConEdit from "../components/inspection/qc2_washing/Home/SubConEdit";
+import WashingDashboard from "../components/inspection/qc2_washing/Dashboard/QCWashingDashboard";
 import { encodeColorForUrl } from "../utils/colorUtils";
 import {
   Shield,
@@ -18,7 +19,8 @@ import {
   User,
   ClipboardList,
   Edit,
-  BarChart3
+  BarChart3,
+  Monitor,
 } from "lucide-react";
 
 const normalizeImageSrc = (src) => {
@@ -79,8 +81,8 @@ function transformDefectsByPc(savedDefectsByPc) {
           defectImages: (defect.defectImages || []).map((imgStr) => ({
             file: null,
             preview: normalizeImageSrc(imgStr),
-            name: "image.jpg"
-          }))
+            name: "image.jpg",
+          })),
         }));
       }
       return acc;
@@ -100,8 +102,8 @@ function transformDefectsByPc(savedDefectsByPc) {
         defectImages: (defect.defectImages || []).map((imgStr) => ({
           file: null,
           preview: normalizeImageSrc(imgStr),
-          name: "image.jpg"
-        }))
+          name: "image.jpg",
+        })),
       }));
     });
     return result;
@@ -113,7 +115,7 @@ function transformDefectsByPc(savedDefectsByPc) {
 const initializeDefaultCheckpointData = async () => {
   try {
     const checkpointResponse = await fetch(
-      `${API_BASE_URL}/api/qc-washing-checklist`
+      `${API_BASE_URL}/api/qc-washing-checklist`,
     );
     const checkpointResult = await checkpointResponse.json();
 
@@ -141,13 +143,13 @@ const initializeDefaultCheckpointData = async () => {
           options: checkpoint.options,
           decision: defaultOption?.name || "",
           remark: defaultRemark,
-          comparisonImages: []
+          comparisonImages: [],
         });
 
         // Add subpoints
         checkpoint.subPoints?.forEach((subPoint) => {
           const defaultSubOption = subPoint.options.find(
-            (opt) => opt.isDefault
+            (opt) => opt.isDefault,
           );
           let defaultSubRemark = "";
 
@@ -169,7 +171,7 @@ const initializeDefaultCheckpointData = async () => {
             options: subPoint.options,
             decision: defaultSubOption?.name || "",
             remark: defaultSubRemark,
-            comparisonImages: []
+            comparisonImages: [],
           });
         });
       });
@@ -262,7 +264,7 @@ function calculateSummaryData(currentFormData) {
             ? pc.pcDefects.reduce(
                 (defSum, defect) =>
                   defSum + (parseInt(defect.defectQty, 10) || 0),
-                0
+                0,
               )
             : 0)
         );
@@ -311,7 +313,7 @@ function calculateSummaryData(currentFormData) {
     overallResult,
     // Additional fields for measurement statistics
     measurementPoints: measurementPoints || 0,
-    measurementPass: measurementPass || 0
+    measurementPass: measurementPass || 0,
   };
 }
 
@@ -323,13 +325,13 @@ function machineProcessesToObject(machineProcesses) {
         temperature: proc.temperature || "",
         time: proc.time || "",
         silicon: proc.silicon || "",
-        softener: proc.softener || ""
+        softener: proc.softener || "",
       };
     } else if (proc.machineType === "Tumble Dry") {
       obj[proc.machineType] = {
         temperature: proc.temperature || "",
         timeCool: proc.timeCool || "",
-        timeHot: proc.timeHot || ""
+        timeHot: proc.timeHot || "",
       };
     }
   });
@@ -364,8 +366,8 @@ const QCWashingPage = () => {
         sampleSize: "",
         acceptedDefect: "",
         rejectedDefect: "",
-        levelUsed: ""
-      }
+        levelUsed: "",
+      },
     ],
 
     inspectionDetails: {},
@@ -375,7 +377,7 @@ const QCWashingPage = () => {
       result: "",
       defectsByPc: [],
       additionalImages: [],
-      comment: ""
+      comment: "",
     },
     measurementDetails: [],
 
@@ -384,7 +386,7 @@ const QCWashingPage = () => {
     totalDefectCount: 0,
     defectRate: 0,
     defectRatio: 0,
-    overallFinalResult: "Pending"
+    overallFinalResult: "Pending",
   });
 
   // State: Data Lists
@@ -409,7 +411,7 @@ const QCWashingPage = () => {
     if (!recordId) return;
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/overall-summary-by-id/${recordId}`
+        `${API_BASE_URL}/api/qc-washing/overall-summary-by-id/${recordId}`,
       );
       const data = await response.json();
       if (data.success) {
@@ -427,7 +429,7 @@ const QCWashingPage = () => {
   const [inspectionData, setInspectionData] = useState([]);
   const [processData, setProcessData] = useState({
     "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
-    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" },
   });
   const defaultDefectData = [
     {
@@ -437,7 +439,7 @@ const QCWashingPage = () => {
       checkedQty: 0,
       failedQty: 0,
       result: "Pass",
-      remark: ""
+      remark: "",
     },
     {
       parameter: "Appearance",
@@ -446,11 +448,11 @@ const QCWashingPage = () => {
       checkedQty: 0,
       failedQty: 0,
       result: "Pass",
-      remark: ""
-    }
+      remark: "",
+    },
   ];
   const [defectData, setDefectData] = useState(
-    normalizeDefectData(defaultDefectData)
+    normalizeDefectData(defaultDefectData),
   );
   function normalizeDefectData(data) {
     return (data || []).map((param) => ({
@@ -462,7 +464,7 @@ const QCWashingPage = () => {
       failedQty: param.failedQty || 0,
       remark: param.remark || "",
       acceptedDefect: param.aqlAcceptedDefect || "",
-      checkboxes: param.checkboxes || {}
+      checkboxes: param.checkboxes || {},
     }));
   }
   const [addedDefects, setAddedDefects] = useState([]);
@@ -471,7 +473,7 @@ const QCWashingPage = () => {
   const [savedSizes, setSavedSizes] = useState([]);
   const [measurementData, setMeasurementData] = useState({
     beforeWash: [],
-    afterWash: []
+    afterWash: [],
   });
   const [showMeasurementTable, setShowMeasurementTable] = useState(true);
   const [machineType, setMachineType] = useState("Washing Machine");
@@ -520,12 +522,12 @@ const QCWashingPage = () => {
 
   const [standardValues, setStandardValues] = useState({
     "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
-    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" },
   });
 
   const [actualValues, setActualValues] = useState({
     "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
-    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" },
   });
 
   const [machineStatus, setMachineStatus] = useState({
@@ -533,20 +535,20 @@ const QCWashingPage = () => {
       temperature: { ok: true, no: false },
       time: { ok: true, no: false },
       silicon: { ok: true, no: false },
-      softener: { ok: true, no: false }
+      softener: { ok: true, no: false },
     },
     "Tumble Dry": {
       temperature: { ok: true, no: false },
       timeCool: { ok: true, no: false },
-      timeHot: { ok: true, no: false }
-    }
+      timeHot: { ok: true, no: false },
+    },
   });
   const [referenceSampleApproveDate, setReferenceSampleApproveDate] = useState(
     () => {
       const now = new Date();
       now.setHours(0, 0, 0, 0);
       return now.toISOString().split("T")[0];
-    }
+    },
   );
 
   // Helper function to convert English fiber remarks to current language
@@ -554,7 +556,7 @@ const QCWashingPage = () => {
     const englishToDecisionMap = {
       "Cleaning must be done by fabric mill.": "1",
       "YM doing the cleaning, front & back side.": "2",
-      "Randomly 2-3 pcs back side hairly can acceptable.": "3"
+      "Randomly 2-3 pcs back side hairly can acceptable.": "3",
     };
 
     const decision = englishToDecisionMap[englishRemark];
@@ -615,12 +617,12 @@ const QCWashingPage = () => {
     ) {
       const newCheckedQty = Math.min(
         parseInt(formData.washQty, 10),
-        parseInt(aql.sampleSize, 10)
+        parseInt(aql.sampleSize, 10),
       ).toString();
       if (formData.checkedQty !== newCheckedQty) {
         setFormData((prev) => ({
           ...prev,
-          checkedQty: newCheckedQty
+          checkedQty: newCheckedQty,
         }));
       }
     }
@@ -655,7 +657,7 @@ const QCWashingPage = () => {
         .flat()
         .reduce(
           (sum, defect) => sum + (parseInt(defect.defectQty, 10) || 0),
-          0
+          0,
         );
 
       const acceptedDefectCount = parseInt(aql.acceptedDefect, 10);
@@ -677,7 +679,7 @@ const QCWashingPage = () => {
     formData.reportType,
     formData.firstOutput,
     formData.result,
-    formData.checkedQty
+    formData.checkedQty,
   ]);
 
   useEffect(() => {
@@ -691,13 +693,10 @@ const QCWashingPage = () => {
         const encodedColor = encodeColorForUrl(formData.color);
 
         const response = await fetch(
-          `${API_BASE_URL}/api/qc-washing/order-color-qty/${formData.orderNo}/${encodedColor}`
+          `${API_BASE_URL}/api/qc-washing/order-color-qty/${formData.orderNo}/${encodedColor}`,
         );
 
         if (!response.ok) {
-          console.warn(
-            `Failed to fetch color order qty: ${response.status} ${response.statusText}`
-          );
           setColorOrderQty(null);
           return;
         }
@@ -726,7 +725,7 @@ const QCWashingPage = () => {
           // First, try to convert English remarks to current language
           const translatedRemark = convertEnglishToCurrentLanguage(
             item.remark,
-            t
+            t,
           );
 
           // If it was translated (different from original), use the translation
@@ -754,7 +753,7 @@ const QCWashingPage = () => {
           }
         }
         return item;
-      })
+      }),
     );
   }, [t, inspectionData.length]); // Add inspectionData.length as dependency
 
@@ -762,7 +761,7 @@ const QCWashingPage = () => {
     const fetchCheckpointDefinitions = async () => {
       try {
         const response = await fetch(
-          `${API_BASE_URL}/api/qc-washing-checklist`
+          `${API_BASE_URL}/api/qc-washing-checklist`,
         );
         const result = await response.json();
         if (Array.isArray(result)) {
@@ -784,10 +783,10 @@ const QCWashingPage = () => {
         .filter(Boolean);
 
       const beforeWash = measurements.filter(
-        (m) => m.before_after_wash === "beforeWash"
+        (m) => m.before_after_wash === "beforeWash",
       );
       const afterWash = measurements.filter(
-        (m) => m.before_after_wash === "afterWash"
+        (m) => m.before_after_wash === "afterWash",
       );
       return { beforeWash, afterWash };
     }
@@ -800,7 +799,7 @@ const QCWashingPage = () => {
       checkedList: item.name,
       approvedDate: "",
       na: false,
-      remark: ""
+      remark: "",
     }));
   };
 
@@ -823,7 +822,7 @@ const QCWashingPage = () => {
   const fetchSubFactories = async () => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/supplier-issues/defects/Washing`
+        `${API_BASE_URL}/api/supplier-issues/defects/Washing`,
       );
       const data = await response.json();
       if (data && Array.isArray(data.factoryList)) {
@@ -832,7 +831,7 @@ const QCWashingPage = () => {
           ...prev,
           factoryName: data.factoryList.includes("YM")
             ? "YM"
-            : data.factoryList[0] || ""
+            : data.factoryList[0] || "",
         }));
       } else {
         setSubFactories([]);
@@ -862,7 +861,7 @@ const QCWashingPage = () => {
     }
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/search-mono?term=${searchTerm}`
+        `${API_BASE_URL}/api/search-mono?term=${searchTerm}`,
       );
       if (response.ok) {
         const data = await response.json();
@@ -879,7 +878,7 @@ const QCWashingPage = () => {
   const fetchOrderNumbers = async () => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/order-numbers`
+        `${API_BASE_URL}/api/qc-washing/order-numbers`,
       );
       const data = await response.json();
       if (data.success) {
@@ -897,7 +896,7 @@ const QCWashingPage = () => {
       return;
     }
     const filtered = orderNumbers.filter((orderNo) =>
-      orderNo.toLowerCase().includes(searchTerm.toLowerCase())
+      orderNo.toLowerCase().includes(searchTerm.toLowerCase()),
     );
     setFilteredOrderNumbers(filtered);
   };
@@ -909,7 +908,7 @@ const QCWashingPage = () => {
     }
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/styles/search/${searchTerm}`
+        `${API_BASE_URL}/api/qc-washing/styles/search/${searchTerm}`,
       );
       if (response.ok) {
         const data = await response.json();
@@ -932,7 +931,7 @@ const QCWashingPage = () => {
         ...prev,
         color: "",
         orderQty: "",
-        buyer: ""
+        buyer: "",
       }));
       setStyleSuggestions([]);
       return;
@@ -961,13 +960,13 @@ const QCWashingPage = () => {
 
       // 3. If not submitted, fetch order details from dt_orders
       let response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/order-details-by-style/${orderNo}`
+        `${API_BASE_URL}/api/qc-washing/order-details-by-style/${orderNo}`,
       );
       let orderData = await response.json();
 
       if (!orderData.success) {
         response = await fetch(
-          `${API_BASE_URL}/api/qc-washing/order-details-by-order/${orderNo}`
+          `${API_BASE_URL}/api/qc-washing/order-details-by-order/${orderNo}`,
         );
         orderData = await response.json();
       }
@@ -978,11 +977,11 @@ const QCWashingPage = () => {
           ...prev,
           orderQty: orderData.orderQty || "",
           buyer: orderData.buyer || "",
-          color: ""
+          color: "",
         }));
       } else {
         throw new Error(
-          orderData.message || "Style/Order not found in master records."
+          orderData.message || "Style/Order not found in master records.",
         );
       }
     } catch (error) {
@@ -990,7 +989,7 @@ const QCWashingPage = () => {
       Swal.fire(
         "Error",
         `Could not fetch details for: ${orderNo}. Please check the Style No or Order No.`,
-        "error"
+        "error",
       );
       setColorOptions([]);
       setFormData((prev) => ({ ...prev, color: "", orderQty: "", buyer: "" }));
@@ -1004,7 +1003,7 @@ const QCWashingPage = () => {
     setIsDataLoading(true);
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/load-saved-by-id/${id}`
+        `${API_BASE_URL}/api/qc-washing/load-saved-by-id/${id}`,
       );
       const data = await response.json();
 
@@ -1024,7 +1023,7 @@ const QCWashingPage = () => {
         before_after_wash: saved.before_after_wash || prev.before_after_wash,
         orderQty: saved.orderQty || prev.orderQty,
         buyer: saved.buyer || prev.buyer,
-        aql: saved.aql && saved.aql.length > 0 ? saved.aql : prev.aql
+        aql: saved.aql && saved.aql.length > 0 ? saved.aql : prev.aql,
       }));
 
       // Handle checkpoint inspection data - CORRECTED LOGIC
@@ -1035,7 +1034,7 @@ const QCWashingPage = () => {
         try {
           // First, fetch the checkpoint definitions to get the options
           const checkpointResponse = await fetch(
-            `${API_BASE_URL}/api/qc-washing-checklist`
+            `${API_BASE_URL}/api/qc-washing-checklist`,
           );
           const checkpointDefinitions = await checkpointResponse.json();
 
@@ -1047,7 +1046,7 @@ const QCWashingPage = () => {
               (savedCheckpoint) => {
                 // Find the checkpoint definition
                 const checkpointDef = checkpointDefinitions.find(
-                  (cp) => cp._id === savedCheckpoint.checkpointId
+                  (cp) => cp._id === savedCheckpoint.checkpointId,
                 );
 
                 if (checkpointDef) {
@@ -1072,8 +1071,8 @@ const QCWashingPage = () => {
                         typeof img === "string"
                           ? img.split("/").pop()
                           : "image.jpg",
-                      source: "upload"
-                    }))
+                      source: "upload",
+                    })),
                   });
 
                   // Add sub-points if they exist in the saved data
@@ -1083,7 +1082,7 @@ const QCWashingPage = () => {
                   ) {
                     savedCheckpoint.subPoints.forEach((savedSubPoint) => {
                       const subPointDef = checkpointDef.subPoints?.find(
-                        (sp) => sp.id === savedSubPoint.subPointId
+                        (sp) => sp.id === savedSubPoint.subPointId,
                       );
 
                       if (subPointDef) {
@@ -1110,8 +1109,8 @@ const QCWashingPage = () => {
                               typeof img === "string"
                                 ? img.split("/").pop()
                                 : "image.jpg",
-                            source: "upload"
-                          }))
+                            source: "upload",
+                          })),
                         });
                       }
                     });
@@ -1119,7 +1118,7 @@ const QCWashingPage = () => {
                     // If no saved sub-points but definition has sub-points, add them with defaults
                     checkpointDef.subPoints?.forEach((subPointDef) => {
                       const defaultSubOption = subPointDef.options.find(
-                        (opt) => opt.isDefault
+                        (opt) => opt.isDefault,
                       );
                       let defaultSubRemark = "";
 
@@ -1144,25 +1143,25 @@ const QCWashingPage = () => {
                         options: subPointDef.options || [],
                         decision: defaultSubOption?.name || "",
                         remark: defaultSubRemark,
-                        comparisonImages: []
+                        comparisonImages: [],
                       });
                     });
                   }
                 }
-              }
+              },
             );
 
             // Also add any checkpoints that exist in definitions but not in saved data
             checkpointDefinitions.forEach((checkpointDef) => {
               const existsInSaved =
                 saved.inspectionDetails.checkpointInspectionData.find(
-                  (saved) => saved.checkpointId === checkpointDef._id
+                  (saved) => saved.checkpointId === checkpointDef._id,
                 );
 
               if (!existsInSaved) {
                 // Add main checkpoint with defaults
                 const defaultOption = checkpointDef.options.find(
-                  (opt) => opt.isDefault
+                  (opt) => opt.isDefault,
                 );
                 let defaultRemark = "";
 
@@ -1182,13 +1181,13 @@ const QCWashingPage = () => {
                   options: checkpointDef.options || [],
                   decision: defaultOption?.name || "",
                   remark: defaultRemark,
-                  comparisonImages: []
+                  comparisonImages: [],
                 });
 
                 // Add sub-points with defaults
                 checkpointDef.subPoints?.forEach((subPointDef) => {
                   const defaultSubOption = subPointDef.options.find(
-                    (opt) => opt.isDefault
+                    (opt) => opt.isDefault,
                   );
                   let defaultSubRemark = "";
 
@@ -1210,7 +1209,7 @@ const QCWashingPage = () => {
                     options: subPointDef.options || [],
                     decision: defaultSubOption?.name || "",
                     remark: defaultSubRemark,
-                    comparisonImages: []
+                    comparisonImages: [],
                   });
                 });
               }
@@ -1259,16 +1258,16 @@ const QCWashingPage = () => {
                 ...prev,
                 [machineType]: {
                   ...prev[machineType],
-                  [param]: standardStr
-                }
+                  [param]: standardStr,
+                },
               }));
 
               setActualValues((prev) => ({
                 ...prev,
                 [machineType]: {
                   ...prev[machineType],
-                  [param]: actualStr
-                }
+                  [param]: actualStr,
+                },
               }));
 
               setMachineStatus((prev) => ({
@@ -1277,9 +1276,9 @@ const QCWashingPage = () => {
                   ...prev[machineType],
                   [param]: {
                     ok: machine[param].status?.ok || false,
-                    no: machine[param].status?.no || false
-                  }
-                }
+                    no: machine[param].status?.no || false,
+                  },
+                },
               }));
             }
           });
@@ -1287,7 +1286,7 @@ const QCWashingPage = () => {
 
         // Set timeCool and timeHot enabled states based on saved data
         const tumbleDryMachine = saved.inspectionDetails.machineProcesses.find(
-          (m) => m.machineType === "Tumble Dry"
+          (m) => m.machineType === "Tumble Dry",
         );
 
         if (tumbleDryMachine) {
@@ -1306,10 +1305,10 @@ const QCWashingPage = () => {
             tumbleDryMachine.timeHot.actualValue !== "";
 
           setTimeCoolEnabled(
-            timeCoolHasData || saved.inspectionDetails.timeCoolEnabled || false
+            timeCoolHasData || saved.inspectionDetails.timeCoolEnabled || false,
           );
           setTimeHotEnabled(
-            timeHotHasData || saved.inspectionDetails.timeHotEnabled || false
+            timeHotHasData || saved.inspectionDetails.timeHotEnabled || false,
           );
         } else {
           // Set from saved inspection details if available
@@ -1323,9 +1322,9 @@ const QCWashingPage = () => {
             temperature: "",
             time: "",
             silicon: "",
-            softener: ""
+            softener: "",
           },
-          "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+          "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" },
         });
 
         setActualValues({
@@ -1333,9 +1332,9 @@ const QCWashingPage = () => {
             temperature: "",
             time: "",
             silicon: "",
-            softener: ""
+            softener: "",
           },
-          "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+          "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" },
         });
 
         setMachineStatus({
@@ -1343,13 +1342,13 @@ const QCWashingPage = () => {
             temperature: { ok: true, no: false },
             time: { ok: true, no: false },
             silicon: { ok: true, no: false },
-            softener: { ok: true, no: false }
+            softener: { ok: true, no: false },
           },
           "Tumble Dry": {
             temperature: { ok: true, no: false },
             timeCool: { ok: true, no: false },
-            timeHot: { ok: true, no: false }
-          }
+            timeHot: { ok: true, no: false },
+          },
         });
 
         // Set default enabled states
@@ -1360,7 +1359,7 @@ const QCWashingPage = () => {
       // Handle reference sample approve date
       if (saved.inspectionDetails?.referenceSampleApproveDate) {
         const savedDate = new Date(
-          saved.inspectionDetails.referenceSampleApproveDate
+          saved.inspectionDetails.referenceSampleApproveDate,
         );
         savedDate.setHours(0, 0, 0, 0); // Normalize to midnight
         setReferenceSampleApproveDate(savedDate.toISOString().split("T")[0]);
@@ -1369,7 +1368,7 @@ const QCWashingPage = () => {
         const dateAtMidnight = new Date();
         dateAtMidnight.setHours(0, 0, 0, 0);
         setReferenceSampleApproveDate(
-          dateAtMidnight.toISOString().split("T")[0]
+          dateAtMidnight.toISOString().split("T")[0],
         );
       }
 
@@ -1389,8 +1388,8 @@ const QCWashingPage = () => {
             ok: param.ok !== undefined ? param.ok : true,
             no: param.no !== undefined ? param.no : false,
             acceptedDefect: param.aqlAcceptedDefect || "",
-            checkboxes: param.checkboxes || {}
-          }))
+            checkboxes: param.checkboxes || {},
+          })),
         );
       } else {
         // Initialize with default defect data if no saved defect data
@@ -1400,7 +1399,7 @@ const QCWashingPage = () => {
       // Continue with other data loading...
       setAddedDefects(saved.addedDefects || []);
       setDefectsByPc(
-        transformDefectsByPc(saved.defectDetails?.defectsByPc || {})
+        transformDefectsByPc(saved.defectDetails?.defectsByPc || {}),
       );
 
       setUploadedImages(
@@ -1411,33 +1410,33 @@ const QCWashingPage = () => {
               return {
                 file: null,
                 preview: normalizeImageSrc(img.preview || img),
-                name: img.name || "image.jpg"
+                name: img.name || "image.jpg",
               };
             }
             if (typeof img === "string") {
               return {
                 file: null,
                 preview: normalizeImageSrc(img),
-                name: img.split("/").pop() || "image.jpg"
+                name: img.split("/").pop() || "image.jpg",
               };
             }
             return {
               file: null,
               preview: "",
-              name: "image.jpg"
+              name: "image.jpg",
             };
-          })
+          }),
       );
 
       setComment(saved.defectDetails?.comment || "");
 
       setMeasurementData({
         beforeWash: (saved.measurementDetails?.measurement || []).filter(
-          (m) => m.before_after_wash === "beforeWash"
+          (m) => m.before_after_wash === "beforeWash",
         ),
         afterWash: (saved.measurementDetails?.measurement || []).filter(
-          (m) => m.before_after_wash === "afterWash"
-        )
+          (m) => m.before_after_wash === "afterWash",
+        ),
       });
 
       let sizes = [];
@@ -1462,7 +1461,7 @@ const QCWashingPage = () => {
         timer: 1200,
         toast: true,
         position: "top-end",
-        showConfirmButton: false
+        showConfirmButton: false,
       });
     } catch (error) {
       Swal.fire("Error loading saved data", error.message, "error");
@@ -1496,12 +1495,12 @@ const QCWashingPage = () => {
         formData: {
           washQty: formData.washQty,
           checkedQty: formData.checkedQty,
-          before_after_wash: formData.before_after_wash
-        }
+          before_after_wash: formData.before_after_wash,
+        },
       };
       setColorDataCache((prevCache) => ({
         ...prevCache,
-        [outgoingColor]: currentStateForColor
+        [outgoingColor]: currentStateForColor,
       }));
     }
 
@@ -1544,7 +1543,7 @@ const QCWashingPage = () => {
         if (value && (prev.orderNo || prev.style)) {
           setTimeout(
             () => loadColorSpecificData(prev.orderNo || prev.style, value),
-            100
+            100,
           );
         }
       }
@@ -1576,7 +1575,7 @@ const QCWashingPage = () => {
       Swal.fire(
         "Missing Order No",
         "Please enter an Order No before selecting First Output.",
-        "warning"
+        "warning",
       );
       setFormData((prev) => ({ ...prev, firstOutput: "", reportType: "" }));
       return;
@@ -1588,8 +1587,8 @@ const QCWashingPage = () => {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderNo: orderNo })
-        }
+          body: JSON.stringify({ orderNo: orderNo }),
+        },
       );
       const data = await response.json();
 
@@ -1602,16 +1601,16 @@ const QCWashingPage = () => {
               sampleSize: data.aqlData.sampleSize,
               acceptedDefect: data.aqlData.acceptedDefect,
               rejectedDefect: data.aqlData.rejectedDefect,
-              levelUsed: data.aqlData.levelUsed
-            }
+              levelUsed: data.aqlData.levelUsed,
+            },
           ],
-          washQty: data.checkedQty
+          washQty: data.checkedQty,
         }));
       } else {
         Swal.fire({
           icon: "error",
           title: "Could not fetch First Output data",
-          text: data.message || "An unknown error occurred."
+          text: data.message || "An unknown error occurred.",
         });
         // Clear relevant fields on failure
         setFormData((prev) => ({
@@ -1623,9 +1622,9 @@ const QCWashingPage = () => {
               sampleSize: "",
               acceptedDefect: "",
               rejectedDefect: "",
-              levelUsed: ""
-            }
-          ]
+              levelUsed: "",
+            },
+          ],
         }));
       }
     } catch (error) {
@@ -1633,7 +1632,7 @@ const QCWashingPage = () => {
       Swal.fire(
         "Error",
         "A network error occurred while fetching First Output details.",
-        "error"
+        "error",
       );
     } finally {
       setIsDataLoading(false);
@@ -1654,14 +1653,14 @@ const QCWashingPage = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             lotSize: parseInt(washQty) || 0,
-            orderNo: orderNo
-          })
-        }
+            orderNo: orderNo,
+          }),
+        },
       );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({
-          message: `Request failed with status ${response.status}`
+          message: `Request failed with status ${response.status}`,
         }));
         setFormData((prev) => ({
           ...prev,
@@ -1670,9 +1669,9 @@ const QCWashingPage = () => {
               sampleSize: "",
               acceptedDefect: "",
               rejectedDefect: "",
-              levelUsed: ""
-            }
-          ]
+              levelUsed: "",
+            },
+          ],
         }));
         return;
       }
@@ -1686,9 +1685,9 @@ const QCWashingPage = () => {
               sampleSize: data.aqlData.sampleSize,
               acceptedDefect: data.aqlData.acceptedDefect,
               rejectedDefect: data.aqlData.rejectedDefect,
-              levelUsed: data.aqlData.levelUsed
-            }
-          ]
+              levelUsed: data.aqlData.levelUsed,
+            },
+          ],
         }));
       } else {
         setFormData((prev) => ({
@@ -1698,9 +1697,9 @@ const QCWashingPage = () => {
               sampleSize: "",
               acceptedDefect: "",
               rejectedDefect: "",
-              levelUsed: ""
-            }
-          ]
+              levelUsed: "",
+            },
+          ],
         }));
       }
     } catch (error) {
@@ -1716,7 +1715,7 @@ const QCWashingPage = () => {
         if (aql?.sampleSize && washQty) {
           const checkedQty = Math.min(
             parseInt(washQty),
-            parseInt(aql.sampleSize)
+            parseInt(aql.sampleSize),
           );
           return { ...prev, checkedQty: checkedQty };
         }
@@ -1734,7 +1733,7 @@ const QCWashingPage = () => {
     if (measurementData && typeof measurementData === "object") {
       const allMeasurements = [
         ...(measurementData.beforeWash || []),
-        ...(measurementData.afterWash || [])
+        ...(measurementData.afterWash || []),
       ];
 
       allMeasurements.forEach((data) => {
@@ -1764,7 +1763,7 @@ const QCWashingPage = () => {
       totalCheckedPoint: totalCheckedPoints,
       totalPass,
       totalFail,
-      passRate
+      passRate,
     };
   };
 
@@ -1781,7 +1780,7 @@ const QCWashingPage = () => {
       const existingRecord = currentArray.find(
         (item) =>
           item.size === transformedSizeData.size &&
-          item.kvalue === transformedSizeData.kvalue
+          item.kvalue === transformedSizeData.kvalue,
       );
 
       // 1. Update local measurement data and saved sizes
@@ -1790,7 +1789,7 @@ const QCWashingPage = () => {
         const existingIndex = currentArray.findIndex(
           (item) =>
             item.size === transformedSizeData.size &&
-            item.kvalue === transformedSizeData.kvalue
+            item.kvalue === transformedSizeData.kvalue,
         );
         if (existingIndex >= 0) {
           // Update existing record
@@ -1801,7 +1800,7 @@ const QCWashingPage = () => {
           // Add new record
           return {
             ...prev,
-            [before_after_wash]: [...currentArray, transformedSizeData]
+            [before_after_wash]: [...currentArray, transformedSizeData],
           };
         }
       });
@@ -1816,7 +1815,7 @@ const QCWashingPage = () => {
       // 2. Remove the just-saved size from selectedSizes to hide its input table
       if (typeof setSelectedSizes === "function") {
         setSelectedSizes((prev) =>
-          prev.filter((s) => s.size !== transformedSizeData.size)
+          prev.filter((s) => s.size !== transformedSizeData.size),
         );
       }
 
@@ -1831,7 +1830,7 @@ const QCWashingPage = () => {
       const measurementDetail = {
         ...transformedSizeData,
         before_after_wash,
-        isUpdate: !!existingRecord // Flag to indicate if this is an update
+        isUpdate: !!existingRecord, // Flag to indicate if this is an update
       };
 
       const response = await fetch(
@@ -1841,9 +1840,9 @@ const QCWashingPage = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             recordId,
-            measurementDetail
-          })
-        }
+            measurementDetail,
+          }),
+        },
       );
 
       const result = await response.json();
@@ -1855,7 +1854,7 @@ const QCWashingPage = () => {
         Swal.fire(
           "Error",
           result.message || "Failed to save measurement data",
-          "error"
+          "error",
         );
       }
     } catch (error) {
@@ -1878,13 +1877,13 @@ const QCWashingPage = () => {
         setMeasurementData((prev) => ({
           ...prev,
           [before_after_wash]: prev[before_after_wash].filter(
-            (item) => !(item.size === size && item.kvalue === kvalue)
-          )
+            (item) => !(item.size === size && item.kvalue === kvalue),
+          ),
         }));
 
         // Only remove from savedSizes if no other k-values exist for this size
         const remainingRecords = measurementData[before_after_wash].filter(
-          (item) => item.size === size && item.kvalue !== kvalue
+          (item) => item.size === size && item.kvalue !== kvalue,
         );
         if (remainingRecords.length === 0) {
           setSavedSizes((prev) => prev.filter((s) => s !== size));
@@ -1895,8 +1894,8 @@ const QCWashingPage = () => {
         setMeasurementData((prev) => ({
           ...prev,
           [before_after_wash]: prev[before_after_wash].filter(
-            (item) => item.size !== size
-          )
+            (item) => item.size !== size,
+          ),
         }));
       }
     }
@@ -1916,7 +1915,7 @@ const QCWashingPage = () => {
       Swal.fire(
         "Limit Exceeded",
         "You can only upload a maximum of 5 images.",
-        "warning"
+        "warning",
       );
       return;
     }
@@ -1924,7 +1923,7 @@ const QCWashingPage = () => {
     const options = {
       maxSizeMB: 0.5,
       maxWidthOrHeight: 1024,
-      useWebWorker: true
+      useWebWorker: true,
     };
 
     Swal.fire({
@@ -1933,7 +1932,7 @@ const QCWashingPage = () => {
       allowOutsideClick: false,
       didOpen: () => {
         Swal.showLoading();
-      }
+      },
     });
 
     for (const file of files) {
@@ -1942,7 +1941,7 @@ const QCWashingPage = () => {
         const preview = URL.createObjectURL(compressedFile);
         setUploadedImages((prev) => [
           ...prev,
-          { file: compressedFile, preview, name: compressedFile.name }
+          { file: compressedFile, preview, name: compressedFile.name },
         ]);
       } catch (error) {
         console.error("Image compression failed:", error);
@@ -1960,15 +1959,15 @@ const QCWashingPage = () => {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ summary })
-        }
+          body: JSON.stringify({ summary }),
+        },
       );
 
       if (!response.ok) {
         console.error(
           "Failed to save summary:",
           response.status,
-          response.statusText
+          response.statusText,
         );
       }
     } catch (error) {
@@ -1984,8 +1983,8 @@ const QCWashingPage = () => {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ summary })
-        }
+          body: JSON.stringify({ summary }),
+        },
       );
     } catch (error) {
       console.error("Failed to auto-save overall summary:", error);
@@ -1997,7 +1996,7 @@ const QCWashingPage = () => {
     const summary = calculateSummaryData(currentFormData);
     setFormData((prevData) => ({
       ...prevData,
-      ...summary
+      ...summary,
     }));
     if (recordId) {
       autoSaveSummary(summary, recordId);
@@ -2027,8 +2026,8 @@ const QCWashingPage = () => {
           sampleSize: "",
           acceptedDefect: "",
           rejectedDefect: "",
-          levelUsed: ""
-        }
+          levelUsed: "",
+        },
       ],
 
       inspectionDetails: {},
@@ -2038,7 +2037,7 @@ const QCWashingPage = () => {
         result: "",
         defectsByPc: [],
         additionalImages: [],
-        comment: ""
+        comment: "",
       },
       measurementDetails: [],
 
@@ -2047,7 +2046,7 @@ const QCWashingPage = () => {
       totalDefectCount: 0,
       defectRate: 0,
       defectRatio: 0,
-      overallFinalResult: "Pending"
+      overallFinalResult: "Pending",
     });
 
     // Reset all other states
@@ -2067,9 +2066,9 @@ const QCWashingPage = () => {
         temperature: "",
         time: "",
         silicon: "",
-        softener: ""
+        softener: "",
       },
-      "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+      "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" },
     });
     setDefectData(normalizeDefectData(defaultDefectData));
     setAddedDefects([]);
@@ -2101,31 +2100,31 @@ const QCWashingPage = () => {
         temperature: "",
         time: "",
         silicon: "",
-        softener: ""
+        softener: "",
       },
-      "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+      "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" },
     });
     setActualValues({
       "Washing Machine": {
         temperature: "",
         time: "",
         silicon: "",
-        softener: ""
+        softener: "",
       },
-      "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+      "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" },
     });
     setMachineStatus({
       "Washing Machine": {
         temperature: { ok: true, no: false },
         time: { ok: true, no: false },
         silicon: { ok: true, no: false },
-        softener: { ok: true, no: false }
+        softener: { ok: true, no: false },
       },
       "Tumble Dry": {
         temperature: { ok: true, no: false },
         timeCool: { ok: true, no: false },
-        timeHot: { ok: true, no: false }
-      }
+        timeHot: { ok: true, no: false },
+      },
     });
 
     setReferenceSampleApproveDate(new Date().toISOString().split("T")[0]);
@@ -2150,36 +2149,36 @@ const QCWashingPage = () => {
         defectsByPc: Object.entries(defectsByPc).map(
           ([pcNumber, pcDefects]) => ({
             pcNumber,
-            pcDefects
-          })
-        )
+            pcDefects,
+          }),
+        ),
       };
 
       const measurementDetails = {
         measurement: [
           ...measurementData.beforeWash.map((item) => ({
             ...item,
-            before_after_wash: "beforeWash"
+            before_after_wash: "beforeWash",
           })),
           ...measurementData.afterWash.map((item) => ({
             ...item,
-            before_after_wash: "afterWash"
-          }))
-        ]
+            before_after_wash: "afterWash",
+          })),
+        ],
       };
 
       // Calculate summary from the latest data
       const summary = calculateSummaryData({
         ...formData,
         defectDetails,
-        measurementDetails
+        measurementDetails,
       });
 
       setFormData((prev) => ({
         ...prev,
         defectDetails,
         measurementDetails,
-        ...summary
+        ...summary,
       }));
 
       if (recordId) {
@@ -2195,7 +2194,7 @@ const QCWashingPage = () => {
     formData.checkedQty,
     formData.washQty,
     formData.result,
-    recordId
+    recordId,
   ]);
 
   // Load color-specific data
@@ -2217,7 +2216,7 @@ const QCWashingPage = () => {
       }
       setFormData((prev) => ({
         ...prev,
-        ...(cachedData.formData || {})
+        ...(cachedData.formData || {}),
       }));
       return;
     }
@@ -2226,7 +2225,7 @@ const QCWashingPage = () => {
     setIsDataLoading(true);
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/load-color-data/${orderNo}/${color}`
+        `${API_BASE_URL}/api/qc-washing/load-color-data/${orderNo}/${color}`,
       );
 
       if (response.ok) {
@@ -2268,9 +2267,9 @@ const QCWashingPage = () => {
                     levelUsed:
                       colorData.orderDetails.aqlLevelUsed ||
                       colorData.inspectionDetails?.aqlLevelUsed ||
-                      prev.aqlLevelUsed
-                  }
-                ]
+                      prev.aqlLevelUsed,
+                  },
+                ],
               };
             });
           }
@@ -2282,19 +2281,21 @@ const QCWashingPage = () => {
                 point.decision === true
                   ? "ok"
                   : point.decision === false
-                  ? "no"
-                  : point.decision || "",
+                    ? "no"
+                    : point.decision || "",
               comparisonImages: (point.comparison || [])
                 .filter(Boolean)
                 .map((img) => ({
                   file: null,
                   preview: normalizeImageSrc(img),
                   name:
-                    typeof img === "string" ? img.split("/").pop() : "image.jpg"
+                    typeof img === "string"
+                      ? img.split("/").pop()
+                      : "image.jpg",
                 })),
               approvedDate: point.approvedDate || "",
               na: point.condition === "N/A",
-              remark: point.remark || ""
+              remark: point.remark || "",
             })) || initializeInspectionData(masterChecklist);
 
           // Convert English fiber remarks to current language immediately after loading
@@ -2302,7 +2303,7 @@ const QCWashingPage = () => {
             if (item.checkedList === "Fiber" && item.remark) {
               const translatedRemark = convertEnglishToCurrentLanguage(
                 item.remark,
-                t
+                t,
               );
               if (translatedRemark !== item.remark) {
                 return { ...item, remark: translatedRemark };
@@ -2337,8 +2338,8 @@ const QCWashingPage = () => {
 
           setProcessData(
             machineProcessesToObject(
-              colorData.inspectionDetails?.machineProcesses
-            )
+              colorData.inspectionDetails?.machineProcesses,
+            ),
           );
 
           if (
@@ -2346,7 +2347,7 @@ const QCWashingPage = () => {
             colorData.inspectionDetails.parameters.length > 0
           ) {
             setDefectData(
-              normalizeDefectData(colorData.inspectionDetails.parameters)
+              normalizeDefectData(colorData.inspectionDetails.parameters),
             );
           } else {
             setDefectData(normalizeDefectData(defaultDefectData));
@@ -2356,13 +2357,13 @@ const QCWashingPage = () => {
             colorData.defectDetails?.defects?.map((d) => ({
               defectId: d.defectId,
               defectName: d.defectName,
-              qty: d.defectQty
-            })) || []
+              qty: d.defectQty,
+            })) || [],
           );
 
           if (colorData.defectDetails?.defectsByPc) {
             setDefectsByPc(
-              transformDefectsByPc(colorData.defectDetails.defectsByPc)
+              transformDefectsByPc(colorData.defectDetails.defectsByPc),
             );
           } else {
             setDefectsByPc({});
@@ -2374,41 +2375,41 @@ const QCWashingPage = () => {
                   return {
                     file: null,
                     preview: normalizeImageSrc(img),
-                    name: img.split("/").pop() || "image.jpg"
+                    name: img.split("/").pop() || "image.jpg",
                   };
                 } else if (typeof img === "object" && img !== null) {
                   return {
                     file: null,
                     preview: normalizeImageSrc(img.preview || img),
-                    name: img.name || "image.jpg"
+                    name: img.name || "image.jpg",
                   };
                 }
                 return {
                   file: null,
                   preview: "",
-                  name: "image.jpg"
+                  name: "image.jpg",
                 };
-              })
+              }),
             );
           }
 
           setComment(colorData.defectDetails?.comment || "");
           setMeasurementData(
-            processMeasurementData(colorData.measurementDetails || [])
+            processMeasurementData(colorData.measurementDetails || []),
           );
           setSavedSizes(
             colorData.measurementDetails
               ? [
                   ...new Set([
                     ...(colorData.measurementDetails.beforeWash || []).map(
-                      (m) => m.size
+                      (m) => m.size,
                     ),
                     ...(colorData.measurementDetails.afterWash || []).map(
-                      (m) => m.size
-                    )
-                  ])
+                      (m) => m.size,
+                    ),
+                  ]),
                 ]
-              : []
+              : [],
           );
           setShowMeasurementTable(true);
 
@@ -2424,7 +2425,7 @@ const QCWashingPage = () => {
             machineType: "",
             temperature: "",
             time: "",
-            chemical: ""
+            chemical: "",
           });
           setDefectData(normalizeDefectData(defaultDefectData));
 
@@ -2442,7 +2443,7 @@ const QCWashingPage = () => {
       Swal.fire({
         icon: "error",
         title: "Load Failed",
-        text: `Could not load data for color "${color}". Please try again.`
+        text: `Could not load data for color "${color}". Please try again.`,
       });
     } finally {
       setIsDataLoading(false);
@@ -2453,7 +2454,7 @@ const QCWashingPage = () => {
   const loadSavedSizes = async (orderNo, color) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${color}`
+        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${color}`,
       );
 
       if (!response.ok) {
@@ -2507,20 +2508,26 @@ const QCWashingPage = () => {
       id: "newInspection",
       label: "New Inspection",
       icon: <ClipboardList size={20} />,
-      description: "Create New QC Inspection"
+      description: "Create New QC Inspection",
     },
     {
       id: "subConEditQty",
       label: "Sub_Con Edit",
       icon: <Edit size={20} />,
-      description: "Edit Sub Contractor Data"
+      description: "Edit Sub Contractor Data",
     },
     {
       id: "submittedData",
       label: "Daily View",
       icon: <BarChart3 size={20} />,
-      description: "View Daily Reports"
-    }
+      description: "View Daily Reports",
+    },
+    {
+      id: "washingDashboard",
+      label: "Dashboard",
+      icon: <Monitor size={20} />,
+      description: "Overall Summary",
+    },
   ];
 
   const activeTabData = tabs.find((tab) => tab.id === activeTab);
@@ -2558,9 +2565,16 @@ const QCWashingPage = () => {
                       </span>
                     </div>
                   </div>
-                  <p className="text-[10px] sm:text-xs text-indigo-100 font-medium truncate">
-                    Quality Control & Inspection Management
-                  </p>
+                  {/* Active Tab Indicator - Inline with title */}
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <div className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400"></span>
+                    </div>
+                    <p className="text-[10px] text-indigo-100 font-medium truncate">
+                      {activeTabData?.label} • Active
+                    </p>
+                  </div>
                 </div>
               </div>
               {user && (
@@ -2617,22 +2631,6 @@ const QCWashingPage = () => {
                 })}
               </div>
             </div>
-
-            {/* Active Status Indicator */}
-            <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-3 py-2">
-              <div className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
-              </div>
-              <div>
-                <p className="text-white font-bold text-xs leading-tight">
-                  {activeTabData?.label}
-                </p>
-                <p className="text-indigo-200 text-[10px] font-medium leading-tight">
-                  Active Module
-                </p>
-              </div>
-            </div>
           </div>
 
           {/* DESKTOP LAYOUT (>= lg) */}
@@ -2683,7 +2681,7 @@ const QCWashingPage = () => {
                             }`}
                           >
                             {React.cloneElement(tab.icon, {
-                              className: "w-5 h-5"
+                              className: "w-5 h-5",
                             })}
                           </div>
                           <span
@@ -2746,7 +2744,9 @@ const QCWashingPage = () => {
           {/* Tab Content */}
           <main
             className={`mx-auto py-6 space-y-6 dark:bg-slate-900 ${
-              activeTab === "submittedData" || activeTab === "subConEditQty"
+              activeTab === "submittedData" ||
+              activeTab === "subConEditQty" ||
+              activeTab === "washingDashboard"
                 ? "max-w-none px-2 sm:px-4 lg:px-6"
                 : "max-w-7xl px-4 sm:px-6 lg:px-8"
             }`}
@@ -2824,6 +2824,8 @@ const QCWashingPage = () => {
                       setReferenceSampleApproveDate={
                         setReferenceSampleApproveDate
                       }
+                      formData={formData}
+                      setFormData={setFormData}
                     />
                   )}
 
@@ -2882,7 +2884,7 @@ const QCWashingPage = () => {
                         cancelButtonColor: "#d33",
                         confirmButtonText: "Yes, Submit!",
                         cancelButtonText: "No, Cancel",
-                        reverseButtons: true
+                        reverseButtons: true,
                       });
 
                       // If user clicked "No" or closed the dialog, return early
@@ -2900,28 +2902,28 @@ const QCWashingPage = () => {
                           defectsByPc: Object.entries(defectsByPc).map(
                             ([pcNumber, pcDefects]) => ({
                               pcNumber,
-                              pcDefects
-                            })
-                          )
+                              pcDefects,
+                            }),
+                          ),
                         };
 
                         const measurementDetails = {
                           measurement: [
                             ...measurementData.beforeWash.map((item) => ({
                               ...item,
-                              before_after_wash: "beforeWash"
+                              before_after_wash: "beforeWash",
                             })),
                             ...measurementData.afterWash.map((item) => ({
                               ...item,
-                              before_after_wash: "afterWash"
-                            }))
-                          ]
+                              before_after_wash: "afterWash",
+                            })),
+                          ],
                         };
 
                         const summary = calculateSummaryData({
                           ...formData,
                           defectDetails,
-                          measurementDetails
+                          measurementDetails,
                         });
 
                         // --- 2. Build the submitData payload ---
@@ -2929,7 +2931,7 @@ const QCWashingPage = () => {
                           totalCheckedPoint,
                           totalPass,
                           totalFail,
-                          passRate
+                          passRate,
                         } = getMeasurementStats();
                         const aql = formData.aql && formData.aql[0];
 
@@ -2938,8 +2940,8 @@ const QCWashingPage = () => {
                             sampleSize: Number(aql?.sampleSize) || 0,
                             acceptedDefect: Number(aql?.acceptedDefect) || 0,
                             rejectedDefect: Number(aql?.rejectedDefect) || 0,
-                            levelUsed: Number(aql?.levelUsed) || 0
-                          }
+                            levelUsed: Number(aql?.levelUsed) || 0,
+                          },
                         ];
 
                         const submitData = {
@@ -2968,8 +2970,8 @@ const QCWashingPage = () => {
                               ...formData,
                               inspector: {
                                 empId: user?.emp_id,
-                                name: user?.username
-                              }
+                                name: user?.username,
+                              },
                             },
                             inspectionDetails: {
                               temp: processData.temperature,
@@ -2979,7 +2981,7 @@ const QCWashingPage = () => {
                                 pointName: item.checkedList,
                                 approvedDate: item.approvedDate,
                                 condition: item.na ? "N/A" : "Active",
-                                remark: item.remark
+                                remark: item.remark,
                               })),
                               parameters: defectData.map((item) => {
                                 const checkedQty = Number(item.checkedQty) || 0;
@@ -3008,9 +3010,9 @@ const QCWashingPage = () => {
                                   remark: item.remark,
                                   ok: item.ok,
                                   no: item.no,
-                                  checkboxes: item.checkboxes || {}
+                                  checkboxes: item.checkboxes || {},
                                 };
-                              })
+                              }),
                             },
                             defectDetails: {
                               washQty: formData.washQty,
@@ -3029,32 +3031,32 @@ const QCWashingPage = () => {
                                         defectQty: defect.defectQty,
                                         defectImages: await Promise.all(
                                           (defect.defectImages || []).map(
-                                            (img) => imageToBase64(img)
-                                          )
-                                        )
-                                      }))
-                                    )
-                                  })
-                                )
+                                            (img) => imageToBase64(img),
+                                          ),
+                                        ),
+                                      })),
+                                    ),
+                                  }),
+                                ),
                               ),
                               comment: comment,
                               additionalImages: await Promise.all(
-                                uploadedImages.map((img) => imageToBase64(img))
-                              )
+                                uploadedImages.map((img) => imageToBase64(img)),
+                              ),
                             },
                             measurementDetails: {
                               measurement: [
                                 ...measurementData.beforeWash.map((item) => ({
                                   ...item,
-                                  before_after_wash: "beforeWash"
+                                  before_after_wash: "beforeWash",
                                 })),
                                 ...measurementData.afterWash.map((item) => ({
                                   ...item,
-                                  before_after_wash: "afterWash"
-                                }))
-                              ]
-                            }
-                          }
+                                  before_after_wash: "afterWash",
+                                })),
+                              ],
+                            },
+                          },
                         };
 
                         // --- 3. Submit to the server ---
@@ -3063,8 +3065,8 @@ const QCWashingPage = () => {
                           {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(submitData)
-                          }
+                            body: JSON.stringify(submitData),
+                          },
                         );
 
                         const submitResult = await response.json();
@@ -3074,7 +3076,7 @@ const QCWashingPage = () => {
                             icon: "success",
                             title: "Success!",
                             text: "QC Washing data submitted successfully!",
-                            confirmButtonText: "OK"
+                            confirmButtonText: "OK",
                           });
 
                           // Clear form data and reset states
@@ -3089,7 +3091,7 @@ const QCWashingPage = () => {
                             icon: "error",
                             title: "Submission Failed",
                             text:
-                              submitResult.message || "Failed to submit data"
+                              submitResult.message || "Failed to submit data",
                           });
                         }
                       } catch (error) {
@@ -3097,7 +3099,7 @@ const QCWashingPage = () => {
                         Swal.fire({
                           icon: "error",
                           title: "Error",
-                          text: "Failed to submit data. Please try again."
+                          text: "Failed to submit data. Please try again.",
                         });
                       }
                     }}
@@ -3110,6 +3112,7 @@ const QCWashingPage = () => {
 
             {activeTab === "submittedData" && <SubmittedWashingDataPage />}
             {activeTab === "subConEditQty" && <SubConEdit />}
+            {activeTab === "washingDashboard" && <WashingDashboard />}
           </main>
         </div>
       </div>

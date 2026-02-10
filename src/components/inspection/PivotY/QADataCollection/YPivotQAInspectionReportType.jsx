@@ -3,7 +3,7 @@ import React, {
   useEffect,
   useMemo,
   useCallback,
-  useRef
+  useRef,
 } from "react";
 import {
   FileText,
@@ -19,13 +19,14 @@ import {
   Factory,
   Truck,
   MessageSquare,
-  Layers
+  Layers,
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQAInspectionBuyerDetermination, {
-  determineBuyerFromOrderNo
+  determineBuyerFromOrderNo,
 } from "./YPivotQAInspectionBuyerDetermination";
+import YPivotQAInspectionEMBPrintInfo from "./YPivotQAInspectionEMBPrintInfo";
 
 // ============================================================
 // Sub-Components
@@ -109,7 +110,7 @@ const SearchableSingleSelect = ({
   disabled = false,
   displayKey = "label",
   valueKey = "value",
-  color = "indigo"
+  color = "indigo",
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -117,12 +118,12 @@ const SearchableSingleSelect = ({
   const colorClasses = {
     indigo: {
       bg: "bg-indigo-50 dark:bg-indigo-900/30",
-      text: "text-indigo-600 dark:text-indigo-400"
+      text: "text-indigo-600 dark:text-indigo-400",
     },
     amber: {
       bg: "bg-amber-50 dark:bg-amber-900/30",
-      text: "text-amber-600 dark:text-amber-400"
-    }
+      text: "text-amber-600 dark:text-amber-400",
+    },
   };
 
   const colors = colorClasses[color] || colorClasses.indigo;
@@ -131,7 +132,9 @@ const SearchableSingleSelect = ({
     let filtered = options;
     if (searchTerm) {
       filtered = options.filter((opt) =>
-        String(opt[displayKey]).toLowerCase().includes(searchTerm.toLowerCase())
+        String(opt[displayKey])
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()),
       );
     }
     return filtered;
@@ -191,8 +194,8 @@ const SearchableSingleSelect = ({
             isOpen
               ? searchTerm
               : selectedOption
-              ? selectedOption[displayKey]
-              : ""
+                ? selectedOption[displayKey]
+                : ""
           }
           onChange={(e) => {
             setSearchTerm(e.target.value);
@@ -264,6 +267,86 @@ const SearchableSingleSelect = ({
   );
 };
 
+// ============================================================
+// Multi-Select Dropdown Component
+// ============================================================
+const MultiSelectDropdown = ({
+  options,
+  selectedValues, // Array of strings e.g. ["D1", "D2"]
+  onChange, // Callback with new array
+  placeholder = "Select...",
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleOption = (value) => {
+    let newValues;
+    if (selectedValues.includes(value)) {
+      newValues = selectedValues.filter((v) => v !== value);
+    } else {
+      newValues = [...selectedValues, value];
+    }
+    onChange(newValues);
+  };
+
+  const displayText =
+    selectedValues.length > 0 ? selectedValues.join(", ") : placeholder;
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-left text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-transparent flex items-center justify-between"
+      >
+        <span className="truncate">{displayText}</span>
+        <ChevronDown className="w-4 h-4 text-gray-400" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+          {options.map((opt) => {
+            const isSelected = selectedValues.includes(opt.value);
+            return (
+              <div
+                key={opt.value}
+                onClick={() => toggleOption(opt.value)}
+                className={`px-4 py-2 cursor-pointer flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                  isSelected ? "bg-cyan-50 dark:bg-cyan-900/20" : ""
+                }`}
+              >
+                <span
+                  className={`text-sm ${
+                    isSelected
+                      ? "font-bold text-cyan-700 dark:text-cyan-400"
+                      : "text-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  {opt.label}
+                </span>
+                {isSelected && (
+                  <CheckCircle2 className="w-4 h-4 text-cyan-600" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AQLConfigTable = ({ aqlConfigs, inspectedQty, buyer }) => {
   if (!aqlConfigs || aqlConfigs.length === 0) {
     return (
@@ -278,7 +361,7 @@ const AQLConfigTable = ({ aqlConfigs, inspectedQty, buyer }) => {
   const findMatchingSample = (config) => {
     if (!config?.SampleData || !inspectedQty) return null;
     return config.SampleData.find(
-      (sample) => inspectedQty >= sample.Min && inspectedQty <= sample.Max
+      (sample) => inspectedQty >= sample.Min && inspectedQty <= sample.Max,
     );
   };
 
@@ -434,36 +517,45 @@ const YPivotQAInspectionReportType = ({
   onReportDataChange,
   savedState = {},
   shippingStages = [],
-  loadedReportData = null
+  loadedReportData = null,
 }) => {
   const [reportTemplates, setReportTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(
-    savedState?.selectedTemplate || null
+    savedState?.selectedTemplate || null,
   );
 
   // Configuration State
   const [inspectedQty, setInspectedQty] = useState(
-    savedState?.config?.inspectedQty || ""
+    savedState?.config?.inspectedQty || "",
   );
   const [cartonQty, setCartonQty] = useState(
-    savedState?.config?.cartonQty || ""
+    savedState?.config?.cartonQty || "",
   );
-  const [shippingStage, setShippingStage] = useState(
-    savedState?.config?.shippingStage || null
-  );
+  const [shippingStage, setShippingStage] = useState(() => {
+    const raw = savedState?.config?.shippingStage;
+    if (!raw) return [];
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  });
+
+  // const [shippingStage, setShippingStage] = useState(
+  //   savedState?.config?.shippingStage || null
+  // );
   const [remarks, setRemarks] = useState(savedState?.config?.remarks || "");
 
   // Supplier State
   const [isSubCon, setIsSubCon] = useState(
-    savedState?.config?.isSubCon || false
+    savedState?.config?.isSubCon || false,
   );
   const [selectedSubConFactory, setSelectedSubConFactory] = useState(
-    savedState?.config?.selectedSubConFactory || null
+    savedState?.config?.selectedSubConFactory || null,
   );
 
   // Product Type State
   const [selectedProductTypeId, setSelectedProductTypeId] = useState(
-    savedState?.config?.productTypeId || null
+    savedState?.config?.productTypeId || null,
   );
 
   // Data State
@@ -478,6 +570,12 @@ const YPivotQAInspectionReportType = ({
 
   // Ref to track if we are currently hydrating from QR to block reset logic
   const isHydratingRef = useRef(false);
+
+  // State for EMB and Print Info
+  const [embInfo, setEmbInfo] = useState(savedState?.config?.embInfo || null);
+  const [printInfo, setPrintInfo] = useState(
+    savedState?.config?.printInfo || null,
+  );
 
   // Determine buyer
   const buyer = useMemo(() => {
@@ -496,7 +594,7 @@ const YPivotQAInspectionReportType = ({
       value: factory._id, // This ID is what gets saved into config.selectedSubConFactory
       label: factory.factory_second_name
         ? `${factory.factory} (${factory.factory_second_name})`
-        : factory.factory
+        : factory.factory,
     }));
   }, [subConFactories]);
 
@@ -506,7 +604,7 @@ const YPivotQAInspectionReportType = ({
 
     return sorted.map((stage) => ({
       value: stage.ShippingStage, // Value to store
-      label: stage.ShippingStage // Label to display
+      label: stage.ShippingStage, // Label to display
     }));
   }, [shippingStages]);
 
@@ -543,7 +641,7 @@ const YPivotQAInspectionReportType = ({
         status: "Minor",
         ac: minorSample.Ac,
         re: minorSample.Re,
-        aqlLevel: minorConfig.AQLLevel
+        aqlLevel: minorConfig.AQLLevel,
       });
     }
     if (majorConfig && majorSample) {
@@ -551,7 +649,7 @@ const YPivotQAInspectionReportType = ({
         status: "Major",
         ac: majorSample.Ac,
         re: majorSample.Re,
-        aqlLevel: majorConfig.AQLLevel
+        aqlLevel: majorConfig.AQLLevel,
       });
     }
     if (criticalConfig && criticalSample) {
@@ -559,7 +657,7 @@ const YPivotQAInspectionReportType = ({
         status: "Critical",
         ac: criticalSample.Ac,
         re: criticalSample.Re,
-        aqlLevel: criticalConfig.AQLLevel
+        aqlLevel: criticalConfig.AQLLevel,
       });
     }
 
@@ -573,7 +671,7 @@ const YPivotQAInspectionReportType = ({
       batch: baseSample?.BatchName || "",
       sampleLetter: baseSample?.SampleLetter || "",
       sampleSize: baseSample?.SampleSize || 0,
-      items: items
+      items: items,
     };
   }, [aqlConfigs, inspectedQty]);
 
@@ -589,7 +687,7 @@ const YPivotQAInspectionReportType = ({
       setLoadingTemplates(true);
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/qa-sections-templates`
+          `${API_BASE_URL}/api/qa-sections-templates`,
         );
         if (res.data.success) {
           setReportTemplates(res.data.data);
@@ -610,7 +708,7 @@ const YPivotQAInspectionReportType = ({
       setLoadingSubConFactories(true);
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/subcon-sewing-factories-manage`
+          `${API_BASE_URL}/api/subcon-sewing-factories-manage`,
         );
         if (Array.isArray(res.data)) {
           setSubConFactories(res.data);
@@ -636,7 +734,7 @@ const YPivotQAInspectionReportType = ({
       setLoadingAql(true);
       try {
         const res = await axios.get(
-          `${API_BASE_URL}/api/fincheck-inspection/aql-config?buyer=${buyer}`
+          `${API_BASE_URL}/api/fincheck-inspection/aql-config?buyer=${buyer}`,
         );
         if (res.data.success) {
           setAqlConfigs(res.data.data);
@@ -661,7 +759,7 @@ const YPivotQAInspectionReportType = ({
       if (selectedTemplate?._id !== backendReportTypeId) {
         // 3. Find the matching template object from your API list
         const matchingTemplate = reportTemplates.find(
-          (t) => t._id === backendReportTypeId
+          (t) => t._id === backendReportTypeId,
         );
 
         if (matchingTemplate) {
@@ -678,16 +776,25 @@ const YPivotQAInspectionReportType = ({
 
           // Hydrate the configuration values
           setInspectedQty(
-            details.inspectedQty ? details.inspectedQty.toString() : ""
+            details.inspectedQty ? details.inspectedQty.toString() : "",
           );
           setCartonQty(details.cartonQty ? details.cartonQty.toString() : "");
-          setShippingStage(details.shippingStage || null);
+          setShippingStage(
+            details.shippingStage
+              ? details.shippingStage.split(",").map((s) => s.trim())
+              : [],
+          );
+          //setShippingStage(details.shippingStage || null);
           setRemarks(details.remarks || "");
           setIsSubCon(details.isSubCon || false);
           setSelectedSubConFactory(details.subConFactoryId || null);
           setSelectedProductTypeId(
-            loadedReportData.productTypeId || details.productTypeId || null
+            loadedReportData.productTypeId || details.productTypeId || null,
           ); // Check root or details for productType
+
+          // HYDRATE EMB/PRINT INFO
+          setEmbInfo(details.embInfo || null);
+          setPrintInfo(details.printInfo || null);
 
           // Force Immediate Parent Update
           if (onReportDataChange) {
@@ -707,8 +814,10 @@ const YPivotQAInspectionReportType = ({
                 productTypeId:
                   loadedReportData.productTypeId ||
                   details.productTypeId ||
-                  null
-              }
+                  null,
+                embInfo: details.embInfo || null,
+                printInfo: details.printInfo || null,
+              },
             });
           }
 
@@ -754,6 +863,23 @@ const YPivotQAInspectionReportType = ({
 
   // Pass data to parent
   useEffect(() => {
+    // 1. Find the name based on the selected ID
+    let selectedFactoryName = "";
+    if (isSubCon && selectedSubConFactory && subConFactories.length > 0) {
+      const factoryObj = subConFactories.find(
+        (f) => f._id === selectedSubConFactory,
+      );
+      if (factoryObj) {
+        // Use the same logic as your options label or just the factory name
+        selectedFactoryName = factoryObj.factory;
+      }
+    }
+
+    // JOIN ARRAY TO STRING
+    const shippingStageString = Array.isArray(shippingStage)
+      ? shippingStage.join(", ")
+      : "";
+
     if (onReportDataChange) {
       onReportDataChange({
         selectedTemplate,
@@ -764,10 +890,14 @@ const YPivotQAInspectionReportType = ({
           cartonQty,
           isSubCon,
           selectedSubConFactory,
-          shippingStage,
+          selectedSubConFactoryName: selectedFactoryName,
+          shippingStage: shippingStageString,
+          //shippingStage,
           remarks,
-          productTypeId: selectedProductTypeId
-        }
+          productTypeId: selectedProductTypeId,
+          embInfo: embInfo,
+          printInfo: printInfo,
+        },
       });
     }
   }, [
@@ -778,10 +908,13 @@ const YPivotQAInspectionReportType = ({
     cartonQty,
     isSubCon,
     selectedSubConFactory,
+    subConFactories,
     shippingStage,
     remarks,
     selectedProductTypeId,
-    onReportDataChange
+    embInfo,
+    printInfo,
+    onReportDataChange,
   ]);
 
   const handleInspectedQtyChange = (e) => {
@@ -807,6 +940,13 @@ const YPivotQAInspectionReportType = ({
   const handleProductTypeUpdate = useCallback((id) => {
     setSelectedProductTypeId(id);
   }, []);
+
+  // Handle Updates from the EMB/Print Component
+  const handleEmbPrintUpdate = ({ embInfo, printInfo }) => {
+    setEmbInfo(embInfo);
+    setPrintInfo(printInfo);
+    // Data passed to parent via main useEffect below
+  };
 
   const isAQL = selectedTemplate?.InspectedQtyMethod === "AQL";
   const showShippingStage = selectedTemplate?.ShippingStage === "Yes";
@@ -872,8 +1012,8 @@ const YPivotQAInspectionReportType = ({
 
       {/* Inspection Selection */}
       {showConfigurationSection && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 rounded-t-2xl">
             <h3 className="text-white font-bold text-sm flex items-center gap-2">
               <Box className="w-4 h-4" />
               Inspection Details
@@ -1007,23 +1147,14 @@ const YPivotQAInspectionReportType = ({
                     <Truck className="w-3.5 h-3.5 text-cyan-500" />
                     Shipping Stage
                   </label>
-                  <div className="relative">
-                    <select
-                      value={shippingStage || ""}
-                      onChange={(e) => setShippingStage(e.target.value || null)}
-                      className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-transparent appearance-none"
-                    >
-                      <option value="">Select stage...</option>
-                      {/* Map over the dynamic options */}
-                      {shippingStageOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
 
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                  </div>
+                  {/* USE NEW COMPONENT */}
+                  <MultiSelectDropdown
+                    options={shippingStageOptions}
+                    selectedValues={shippingStage} // Pass array
+                    onChange={setShippingStage} // Receives new array
+                    placeholder="Select stages..."
+                  />
                 </div>
               )}
             </div>
@@ -1073,6 +1204,16 @@ const YPivotQAInspectionReportType = ({
             )}
           </div>
         </div>
+      )}
+
+      {/* NEW: EMB / PRINT INFO SECTION */}
+      {selectedTemplate && (
+        <YPivotQAInspectionEMBPrintInfo
+          reportType={selectedTemplate.ReportType}
+          embData={embInfo}
+          printData={printInfo}
+          onUpdate={handleEmbPrintUpdate}
+        />
       )}
 
       {/* Styles */}

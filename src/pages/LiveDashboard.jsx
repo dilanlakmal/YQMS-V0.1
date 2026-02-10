@@ -68,7 +68,7 @@ const LiveDashboard = () => {
     defectsQty: 0,
     totalBundles: 0,
     defectRate: 0,
-    defectRatio: 0
+    defectRatio: 0,
   });
   const [defectRates, setDefectRates] = useState([]);
   const [moSummaries, setMoSummaries] = useState([]);
@@ -92,7 +92,7 @@ const LiveDashboard = () => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/api/qc2-inspection-summary`,
-        { params: filters }
+        { params: filters },
       );
       setSummaryData(response.data);
     } catch (error) {
@@ -108,7 +108,7 @@ const LiveDashboard = () => {
         defectsQty: 0,
         totalBundles: 0,
         defectRate: 0,
-        defectRatio: 0
+        defectRatio: 0,
       });
     }
   };
@@ -117,7 +117,7 @@ const LiveDashboard = () => {
   const fetchDefectRates = async (filters = {}) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/qc2-defect-rates`, {
-        params: filters
+        params: filters,
       });
       const sorted = response.data.sort((a, b) => b.defectRate - a.defectRate);
       let rank = 1;
@@ -139,7 +139,7 @@ const LiveDashboard = () => {
   const fetchMoSummaries = async (filters = {}) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/qc2-mo-summaries`, {
-        params: { ...filters, groupByMO: "true" }
+        params: { ...filters, groupByMO: "true" },
       });
       setMoSummaries(response.data);
     } catch (error) {
@@ -152,7 +152,7 @@ const LiveDashboard = () => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/api/qc2-defect-rates-by-hour`,
-        { params: filters }
+        { params: filters },
       );
       setHourlyDefectRates(response.data);
     } catch (error) {
@@ -165,7 +165,7 @@ const LiveDashboard = () => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/api/qc2-defect-rates-by-line`,
-        { params: filters }
+        { params: filters },
       );
       setLineDefectRates(response.data);
     } catch (error) {
@@ -177,7 +177,7 @@ const LiveDashboard = () => {
   const fetchInspectors = async (filters = {}) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/qc2-inspection-pass-bundle/filter-options`
+        `${API_BASE_URL}/api/qc2-inspection-pass-bundle/filter-options`,
       );
       const empIds = response.data.emp_id_inspection || [];
       // Filter inspectors based on empId if set
@@ -226,7 +226,7 @@ const LiveDashboard = () => {
       fetchMoSummaries(filters),
       fetchHourlyDefectRates(filters),
       fetchLineDefectRates(filters),
-      fetchInspectors(filters)
+      fetchInspectors(filters),
     ]);
   };
 
@@ -249,7 +249,7 @@ const LiveDashboard = () => {
       fetchMoSummaries(),
       fetchHourlyDefectRates(),
       fetchLineDefectRates(),
-      fetchInspectors()
+      fetchInspectors(),
     ]);
   };
 
@@ -262,7 +262,7 @@ const LiveDashboard = () => {
         fetchMoSummaries(),
         fetchHourlyDefectRates(),
         fetchLineDefectRates(),
-        fetchInspectors()
+        fetchInspectors(),
       ]);
     };
     fetchInitialData();
@@ -275,7 +275,7 @@ const LiveDashboard = () => {
         fetchMoSummaries(currentFilters),
         fetchHourlyDefectRates(currentFilters),
         fetchLineDefectRates(currentFilters),
-        fetchInspectors(currentFilters)
+        fetchInspectors(currentFilters),
       ]);
     }, 5000);
 
@@ -301,7 +301,7 @@ const LiveDashboard = () => {
   useEffect(() => {
     const socket = io(`${API_BASE_URL}`, {
       path: "/socket.io",
-      transports: ["websocket"]
+      transports: ["websocket"],
     });
 
     socket.on("qc2_data_updated", async () => {
@@ -313,7 +313,7 @@ const LiveDashboard = () => {
         fetchMoSummaries(currentFilters),
         fetchHourlyDefectRates(currentFilters),
         fetchLineDefectRates(currentFilters),
-        fetchInspectors(currentFilters)
+        fetchInspectors(currentFilters),
       ]);
     });
 
@@ -468,7 +468,7 @@ const LiveDashboard = () => {
 
                 {/* Job Title */}
                 <p className="text-xs font-semibold text-gray-700 mt-2 text-center break-words">
-                  {user.emp_id === "YM6702" || user.emp_id === "YM7903"
+                  {user.emp_id === "TL04" || user.emp_id === "TL09"
                     ? "Developer - YQMS"
                     : user.job_title || "N/A"}
                 </p>
@@ -489,7 +489,7 @@ const LiveDashboard = () => {
           "Line Hr Trend",
           "Daily Summary",
           "Weekly Analysis",
-          "Monthly Analysis"
+          "Monthly Analysis",
         ].includes(activeSection) && (
           <FilterPane
             startDate={startDate}
@@ -739,7 +739,7 @@ const LiveDashboard = () => {
                                   totalCheckedQty += hourData.checkedQty || 0;
                                   totalDefectsQty += hourData.defects.reduce(
                                     (sum, defect) => sum + defect.count,
-                                    0
+                                    0,
                                   );
                                 }
                               });
@@ -748,7 +748,7 @@ const LiveDashboard = () => {
                           return totalCheckedQty > 0
                             ? totalDefectsQty / totalCheckedQty
                             : 0;
-                        })()
+                        })(),
                       }))
                       .sort((a, b) => b.defectRate - a.defectRate) // Sort by defectRate descending
                       .map(({ lineNo }) => (

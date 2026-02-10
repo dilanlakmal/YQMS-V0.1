@@ -3,13 +3,15 @@ import {
   getHumidityData,
   getHumidityDataByMoNo,
   getHumiditySummaryByMoNo,
-  getReitmansHumidityByMoNo,
   getHumidityReports,
   exportHumidityReportsXlsx,
   createHumidityReport,
   exportHumidityReportsPaper,
-  approveHumidityReport
+  getHumidityReportById,
+  approveHumidityReport,
+  updateHumidityReport,
 } from "../../controller/huminity/huminityController.js";
+import { getReitmansHumidityByMoNo } from "../../controller/huminity/ReitmansController.js";
 
 const router = express.Router();
 router.get("/api/humidity-data", getHumidityData);
@@ -21,6 +23,8 @@ router.post("/api/humidity-reports", createHumidityReport);
 router.get("/api/humidity-reports", getHumidityReports);
 router.get("/api/humidity-reports/export", exportHumidityReportsXlsx);
 router.get("/api/humidity-reports/export-paper", exportHumidityReportsPaper);
+router.get("/api/humidity-reports/:id", getHumidityReportById);
+router.put("/api/humidity-reports/:id", updateHumidityReport);
 router.post("/api/humidity-reports/:id/approve", approveHumidityReport);
 
 export default router;

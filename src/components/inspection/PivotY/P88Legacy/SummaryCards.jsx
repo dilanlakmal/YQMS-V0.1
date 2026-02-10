@@ -7,7 +7,7 @@ const SummaryCard = ({ title, value, colorClass, icon, bgClass }) => (
         <span className={`text-2xl font-bold ${colorClass} mb-2`}>
           {value.toLocaleString()}
         </span>
-        <span className="text-sm font-medium text-gray-600 uppercase tracking-wide">
+        <span className="text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wide">
           {title}
         </span>
       </div>
@@ -22,11 +22,11 @@ const SummaryCard = ({ title, value, colorClass, icon, bgClass }) => (
 const SummaryCards = ({ summary }) => {
   if (!summary) {
     return (
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
-        <div className="text-center text-gray-500">
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <div className="text-center text-gray-500 dark:text-gray-400">
           <div className="text-4xl mb-4">📊</div>
           <p className="text-lg font-medium">No inspection data available</p>
-          <p className="text-sm text-gray-400 mt-2">Data will appear here once inspections are completed</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">Data will appear here once inspections are completed</p>
         </div>
       </div>
     );
@@ -36,35 +36,35 @@ const SummaryCards = ({ summary }) => {
     {
       title: "Total Inspections",
       value: summary.total || 0,
-      colorClass: "text-blue-600",
-      bgClass: "bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200",
+      colorClass: "text-blue-600 dark:text-blue-400",
+      bgClass: "bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border-blue-200 dark:border-blue-800",
       icon: "📋"
     },
     {
       title: "Accepted",
       value: summary.passed || 0,
-      colorClass: "text-green-600",
-      bgClass: "bg-gradient-to-br from-green-50 to-green-100 border border-green-200",
+      colorClass: "text-green-600 dark:text-green-400",
+      bgClass: "bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border border-green-200 dark:border-green-800",
       icon: "✅"
     },
     {
       title: "Reworked",
       value: summary.failed || 0,
-      colorClass: "text-red-600",
-      bgClass: "bg-gradient-to-br from-red-50 to-red-100 border border-red-200",
+      colorClass: "text-red-600 dark:text-red-400",
+      bgClass: "bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border-red-200 dark:border-red-800",
       icon: "❌"
     },
     {
       title: "Pending Approval",
       value: summary.pending || 0,
-      colorClass: "text-amber-600",
-      bgClass: "bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200",
+      colorClass: "text-amber-600 dark:text-amber-400",
+      bgClass: "bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border border-amber-200 dark:border-amber-800",
       icon: "⏳"
     }
   ];
 
   return (
-    <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-100 mb-8">
+    <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 mb-8">
       {/* Header Section */}
       {/* <div className="flex items-center justify-between mb-8"> */}
         {/* <div>

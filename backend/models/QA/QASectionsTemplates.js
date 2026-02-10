@@ -28,12 +28,19 @@ const qaSectionsTemplatesSchema = new mongoose.Schema(
     no: { type: Number, required: true },
     ReportType: { type: String, required: true },
 
-    // Config Fields
+    // Primary Measurement (Tab 1)
     Measurement: {
       type: String,
       enum: ["No", "Before", "After"],
       default: "No"
     },
+    // Secondary Measurement (Tab 2) ***
+    MeasurementAdditional: {
+      type: String,
+      enum: ["No", "Before", "After"],
+      default: "No"
+    },
+
     Header: {
       type: String,
       enum: ["Yes", "No"],

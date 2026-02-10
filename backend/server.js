@@ -199,6 +199,7 @@ import QASections_Shipping_Stage from "./routes/PivotY/QASections/QASections_Shi
 ------------------------------ */
 
 import QASections_Measurement_Specs from "./routes/PivotY/QASections/QASections_Measurement_Specs_Route.js";
+import ModifyDTSpec from "./routes/PivotY/QASections/DTModify/DTModifyRoutes.js";
 
 /* ------------------------------
   PivotY - QA Templates
@@ -210,6 +211,14 @@ PivotY - Fincheck Inspection
 ------------------------------ */
 import FincheckInspection from "./routes/PivotY/FincheckInspection/FincheckInspection_Route.js";
 import FincheckInspection_Report from "./routes/PivotY/FincheckInspection/FincheckInspection_Report_Route.js";
+import FincheckInspection_Approval from "./routes/PivotY/FincheckInspection/FincheckInspection_Approval_Route.js";
+import FincheckNotificationGroup from "./routes/PivotY/FincheckInspection/FincheckNotificationGroup_Routes.js";
+import FincheckAIRoutes from "./routes/PivotY/AI/FincheckAIRoutes.js";
+
+/* ------------------------------
+PivotY - Fincheck Analytics
+------------------------------ */
+import FincheckAnalyticsReport from "./routes/PivotY/FincheckAnalytics/FincheckAnalytics_Routes.js";
 
 /* ------------------------------
  P88 Data Upoad Routes
@@ -217,6 +226,7 @@ import FincheckInspection_Report from "./routes/PivotY/FincheckInspection/Finche
 import p88Upload from "./routes/PivotY/P88Data/uploadP88DataRoutes.js";
 import p88Summarydata from "./routes/PivotY/P88Data/summaryP88DataRoutes.js";
 import downloadP88Report from "./routes/PivotY/P88Data/downloadP88ReportRoutes.js";
+import p88failedReports from "./routes/PivotY/P88Data/p88failedReportsRoutes.js";
 
 /* -----------------------------
 QA Random Inspection Imports
@@ -248,6 +258,7 @@ import qcWashingInspection from "./routes/QCWashing/QCWashing Inspection/qcWashi
 import qcWashingAdmin from "./routes/QCWashing/QCWashing Admin/qcWashingAdminRoutes.js";
 import qcWashingReport from "./routes/QCWashing/QCWashing Report/qcWashingReportRoutes.js";
 import qcWashingOldQty from "./routes/QCWashing/oldQtyRoutes.js";
+import qcWashingDashboard from "./routes/QCWashing/QCWashing Dashboard/QCWashingDashboardRoutes.js";
 
 /* -----------------------------
   After Ironing Import
@@ -511,6 +522,7 @@ app.use(QASections_Shipping_Stage);
   PivotY - QA Measurements routes
 ------------------------------ */
 app.use(QASections_Measurement_Specs);
+app.use(ModifyDTSpec);
 
 /* ------------------------------
   PivotY - QA Templates routes
@@ -522,6 +534,14 @@ PivotY - Fincheck Inspection routes
 ------------------------------ */
 app.use(FincheckInspection);
 app.use(FincheckInspection_Report);
+app.use(FincheckInspection_Approval);
+app.use(FincheckNotificationGroup);
+app.use(FincheckAIRoutes);
+
+/* ------------------------------
+PivotY - Fincheck Analytics
+------------------------------ */
+app.use(FincheckAnalyticsReport);
 
 /* ------------------------------
  P88 Data Upoad Routes
@@ -529,6 +549,7 @@ app.use(FincheckInspection_Report);
 app.use(p88Upload);
 app.use(p88Summarydata);
 app.use(downloadP88Report);
+app.use(p88failedReports);
 
 /* -----------------------------
   QA Random Inspection Routes
@@ -560,6 +581,7 @@ app.use(qcWashingInspection);
 app.use(qcWashingAdmin);
 app.use(qcWashingReport);
 app.use(qcWashingOldQty);
+app.use(qcWashingDashboard);
 
 /* -----------------------------
 After Ironing Routes
@@ -652,5 +674,5 @@ app.get("/api/health", (req, res) => {
 
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`HTTPS Server is running on https://localhost:${PORT}`);
+  console.log(`HTTPS Server is running on PORT:${PORT}`);
 });

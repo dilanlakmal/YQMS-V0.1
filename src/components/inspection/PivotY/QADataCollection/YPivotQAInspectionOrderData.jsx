@@ -358,12 +358,21 @@ const SelectedOrdersChips = ({ orders, onRemove, isLocked }) => {
           className="flex items-center gap-1 px-2 py-1 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-medium"
         >
           <span>{orderNo}</span>
-          <button
+          {/* Only show X if NOT locked */}
+          {!isLocked && (
+            <button
+              onClick={() => onRemove(orderNo)}
+              className="p-0.5 hover:bg-indigo-200 dark:hover:bg-indigo-800 rounded-full transition-colors"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+          {/* <button
             onClick={() => onRemove(orderNo)}
             className="p-0.5 hover:bg-indigo-200 dark:hover:bg-indigo-800 rounded-full transition-colors"
           >
             <X className="w-3 h-3" />
-          </button>
+          </button> */}
         </div>
       ))}
     </div>
@@ -1285,6 +1294,7 @@ const YPivotQAInspectionOrderData = ({
                     <SelectedOrdersChips
                       orders={selectedOrders}
                       onRemove={handleRemoveOrder}
+                      isLocked={isReportSaved}
                     />
                   </div>
                 )}
@@ -1309,13 +1319,23 @@ const YPivotQAInspectionOrderData = ({
                   >
                     <RefreshCw className="w-4 h-4 text-green-600" />
                   </button>
-                  <button
+                  {/* --- Only show X button if NOT saved --- */}
+                  {!isReportSaved && (
+                    <button
+                      onClick={handleClearAll}
+                      className="p-2 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors"
+                      title="Clear Selection"
+                    >
+                      <X className="w-4 h-4 text-red-500" />
+                    </button>
+                  )}
+                  {/* <button
                     onClick={handleClearAll}
                     className="p-2 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors"
                     title="Clear Selection"
                   >
                     <X className="w-4 h-4 text-red-500" />
-                  </button>
+                  </button> */}
                 </div>
               )}
 

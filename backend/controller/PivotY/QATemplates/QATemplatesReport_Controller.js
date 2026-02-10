@@ -12,6 +12,7 @@ export const CreateTemplate = async (req, res) => {
     const {
       ReportType,
       Measurement,
+      MeasurementAdditional,
       Header,
       Photos,
       Line,
@@ -44,6 +45,7 @@ export const CreateTemplate = async (req, res) => {
       no: nextNo,
       ReportType,
       Measurement,
+      MeasurementAdditional: MeasurementAdditional || "No",
       Header,
       Photos,
       Line: Line || "Yes",
