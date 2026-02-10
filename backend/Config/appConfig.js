@@ -28,13 +28,14 @@ export const __backendDir = path.resolve(__dirname, "..");
 
 export const API_BASE_URL =
   process.env.API_BASE_URL || "https://localhost:5001";
+
 const options = {
   key: fs.readFileSync(
-    path.resolve(path.dirname(__filename), "192.167.14.235-key.pem")
+    path.resolve(path.dirname(__filename), "192.167.14.235-key.pem"),
   ),
   cert: fs.readFileSync(
-    path.resolve(path.dirname(__filename), "192.167.14.235.pem")
-  )
+    path.resolve(path.dirname(__filename), "192.167.14.235.pem"),
+  ),
 };
 
 export const server = https.createServer(options, app);
@@ -45,13 +46,15 @@ const allowedOrigins = [
   "http://localhost:3001",
   "https://localhost:3001",
   "https://yqms.yaikh.com",
-  "https://192.167.14.235:3001",
+  "https://192.167.6.207:3001"
 ];
+
 
 // Initialize Socket.io
 export const io = new SocketIO(server, {
   cors: {
-    origin: allowedOrigins,  // Now this works because allowedOrigins is defined above!
+    // origin: "https://192.167.6.207:3001",
+    origin: allowedOrigins,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -62,7 +65,7 @@ export const io = new SocketIO(server, {
 
 // CORS configuration
 const corsOptions = {
-
+  
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin || allowedOrigins.includes(origin)) {

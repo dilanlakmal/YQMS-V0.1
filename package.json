@@ -14,7 +14,7 @@
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
-  "proxy": "https://192.167.14.235:5001",
+  "proxy": "https://192.167.6.207:5001",
   "dependencies": {
     "@base-ui-components/react": "^1.0.0-beta.6",
     "@emotion/react": "^11.14.0",
