@@ -213,6 +213,7 @@ import FincheckInspection from "./routes/PivotY/FincheckInspection/FincheckInspe
 import FincheckInspection_Report from "./routes/PivotY/FincheckInspection/FincheckInspection_Report_Route.js";
 import FincheckInspection_Approval from "./routes/PivotY/FincheckInspection/FincheckInspection_Approval_Route.js";
 import FincheckNotificationGroup from "./routes/PivotY/FincheckInspection/FincheckNotificationGroup_Routes.js";
+import FincheckAIRoutes from "./routes/PivotY/AI/FincheckAIRoutes.js";
 
 /* ------------------------------
 PivotY - Fincheck Analytics
@@ -535,6 +536,7 @@ app.use(FincheckInspection);
 app.use(FincheckInspection_Report);
 app.use(FincheckInspection_Approval);
 app.use(FincheckNotificationGroup);
+app.use(FincheckAIRoutes);
 
 /* ------------------------------
 PivotY - Fincheck Analytics

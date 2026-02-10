@@ -1174,7 +1174,7 @@ const FormPage = () => {
         "image/png",
         "image/webp",
       ].includes(file.type);
-      const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB limit
+      const isValidSize = file.size <= 20 * 1024 * 1024; // 20MB limit
       return isValidType && isValidSize;
     });
 

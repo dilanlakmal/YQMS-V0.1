@@ -9,3 +9,6 @@ JWT_REFRESH_SECRET = xxxxxxxxx
 
 P88_USERNAME= xxxx
 P88_PASSWORD="xxxx"
+
+GEMINI_API_KEY=keyhere
+GROQ_API_KEY=keyhere

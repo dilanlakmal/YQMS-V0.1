@@ -4,9 +4,9 @@ import mongoose from "mongoose";
 const fabricContentSchema = new mongoose.Schema(
   {
     fabricName: { type: String, required: true },
-    percentageValue: { type: Number, required: true, min: 0, max: 100 }
+    percentageValue: { type: Number, required: true, min: 0, max: 100 },
   },
-  { _id: false }
+  { _id: false },
 );
 
 // Sub-schema for MO Summary
@@ -19,9 +19,9 @@ const moSummarySchema = new mongoose.Schema(
     ETAPeriod: { type: String, default: "N/A" },
     TotalColors: { type: Number, required: true, default: 0 },
     TotalPos: { type: Number, required: true, default: 0 },
-    TotalQty: { type: Number, required: true, default: 0 }
+    TotalQty: { type: Number, required: true, default: 0 },
   },
-  { _id: false }
+  { _id: false },
 );
 
 // Sub-schema for SKU Data
@@ -32,18 +32,18 @@ const skuDataSchema = new mongoose.Schema(
     ETA: { type: String, default: "" },
     POLine: { type: String, default: "" },
     Color: { type: String, default: "" },
-    Qty: { type: Number, required: true, default: 0 }
+    Qty: { type: Number, required: true, default: 0 },
   },
-  { _id: false }
+  { _id: false },
 );
 
 // Sub-schema for Color Quantity breakdown
 const colorQtySchema = new mongoose.Schema(
   {
     ColorName: { type: String, required: true },
-    Qty: { type: Number, required: true, default: 0 }
+    Qty: { type: Number, required: true, default: 0 },
   },
-  { _id: false }
+  { _id: false },
 );
 
 // Sub-schema for Order Qty by Country
@@ -51,9 +51,9 @@ const orderQtyByCountrySchema = new mongoose.Schema(
   {
     CountryID: { type: String, required: true },
     TotalQty: { type: Number, required: true, default: 0 },
-    ColorQty: [colorQtySchema]
+    ColorQty: [colorQtySchema],
   },
-  { _id: false }
+  { _id: false },
 );
 
 // --- MAIN SCHEMA ---
@@ -85,21 +85,21 @@ const yorksysOrdersSchema = new mongoose.Schema(
     SKUData: [skuDataSchema],
 
     // Order Qty by Country array
-    OrderQtyByCountry: [orderQtyByCountrySchema]
+    OrderQtyByCountry: [orderQtyByCountrySchema],
   },
   {
     collection: "yorksys_orders",
-    timestamps: true
-  }
+    timestamps: true,
+  },
 );
 
 // Compound unique index to prevent duplicate orders
 yorksysOrdersSchema.index(
   {
     moNo: 1,
-    factory: 1
+    factory: 1,
   },
-  { unique: true, message: "This MO Number already exists for this factory." }
+  { unique: true, message: "This MO Number already exists for this factory." },
 );
 
 export default (connection) =>

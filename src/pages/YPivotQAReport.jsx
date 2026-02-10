@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Bell,
   FileCog,
+  Bot,
 } from "lucide-react";
 import axios from "axios";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -23,6 +24,7 @@ import FincheckApprovalAssignee from "../components/inspection/PivotY/QAReports/
 import FincheckNotificationGroup from "../components/inspection/PivotY/QAReports/FincheckNotificationGroup";
 import FincheckAnalyticsReport from "../components/inspection/PivotY/FincheckAnalytics/FincheckAnalyticsReport";
 import FincheckInspectionReportModify from "../components/inspection/PivotY/QAReports/FincheckInspectionReportModify";
+import FincheckAIChatMain from "../components/inspection/PivotY/AI/FincheckAIChatMain";
 
 // --- Placeholder Components for Future Tabs ---
 const AnalyticsPlaceholder = () => (
@@ -124,6 +126,13 @@ const YPivotQAReport = () => {
         icon: <Download size={18} />,
         component: <ExportPlaceholder />,
         color: "text-orange-600",
+      },
+      {
+        id: "ai_chat",
+        label: "AI",
+        icon: <Bot size={18} />,
+        component: <FincheckAIChatMain />,
+        color: "text-rose-500",
       },
     ];
     if (!isLoadingPermission && isAdmin === true) {
