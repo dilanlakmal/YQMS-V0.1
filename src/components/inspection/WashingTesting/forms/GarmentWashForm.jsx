@@ -102,11 +102,8 @@ const GarmentWashForm = ({
     // Filter users based on assignHistory (report_assign_control collection)
     const getFilteredOptions = (field) => {
         if (!assignHistory || assignHistory.length === 0) {
-            // No history configured? Return all users.
-            return users.map(u => ({
-                value: u.name,
-                label: `(${u.emp_id}) ${u.name}`
-            }));
+            // No history configured? Return empty.
+            return [];
         }
 
         // 1. Process history to find the LATEST state for each user.
@@ -131,24 +128,13 @@ const GarmentWashForm = ({
             if (checkedId) {
                 const current = userRolesMap.get(checkedId) || { checkedBy: false, approvedBy: false };
                 current.checkedBy = true;
-               
-                if (extractId(item.approvedBy) !== checkedId) {
-                    current.approvedBy = false; // Revoke approval role if not implicitly granted here
-                } else {
-                    current.approvedBy = true;
-                }
                 userRolesMap.set(checkedId, current);
             }
 
-            // If approvedId exists and is diff from checkedId (or checkedId was null)
-            if (approvedId && approvedId !== checkedId) {
+            // If approvedId exists
+            if (approvedId) {
                 const current = userRolesMap.get(approvedId) || { checkedBy: false, approvedBy: false };
                 current.approvedBy = true;
-                if (extractId(item.checkedBy) !== approvedId) {
-                    current.checkedBy = false; // Revoke checker role if not implicitly granted here
-                } else {
-                    current.checkedBy = true;
-                }
                 userRolesMap.set(approvedId, current);
             }
         });
@@ -190,10 +176,8 @@ const GarmentWashForm = ({
     }, [approvedByOptions, formData.approvedBy]);
 
     // Validate current selection against allowed options (Real-time cleanup)
-    // If a user was selected, but their permission is revoked (so they disappear from options),
-    // we should clear the selection.
     useEffect(() => {
-        // Only run validation if we actually have Users loaded (to avoid clearing during initial load)
+        // Only run validation if we actually have Users loaded
         if (users.length > 0) {
             // Validate Checked By
             if (formData.checkedBy) {
@@ -1956,7 +1940,7 @@ const GarmentWashForm = ({
 
                         {/* Checked By */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">CHECKED BY:</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 uppercase">CHECKED BY:</label>
                             <Select
                                 showSearch
                                 value={formData.checkedBy || undefined}
@@ -1974,7 +1958,7 @@ const GarmentWashForm = ({
 
                         {/* Approved By */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">APPROVED BY:</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 uppercase">APPROVED BY:</label>
                             <Select
                                 showSearch
                                 value={formData.approvedBy || undefined}
@@ -1992,7 +1976,7 @@ const GarmentWashForm = ({
 
                         {/* Date */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 uppercase">
                                 DATE :
                             </label>
 
@@ -2010,8 +1994,6 @@ const GarmentWashForm = ({
                                 />
                             </div>
                         </div>
-
-
                     </div>
                 </div>
 

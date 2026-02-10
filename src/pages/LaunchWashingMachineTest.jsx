@@ -330,6 +330,7 @@ const LaundryWashingMachineTest = () => {
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [assignData, setAssignData] = useState({
     _id: null,
+    preparedBy: null,
     checkedBy: null,
     approvedBy: null
   });
@@ -385,11 +386,15 @@ const LaundryWashingMachineTest = () => {
   }, [fetchAssignControl]);
 
   // Prepare user options for Select
-  const userOptions = users.map(user => ({
-    value: user.emp_id, // Using emp_id as the value
-    label: `(${user.emp_id}) ${user.name || user.eng_name}`, // Format: (ID) Name
-    key: user._id || user.emp_id
-  }));
+  const userOptions = users.map(user => {
+    const id = user.emp_id;
+    const name = user.name || user.eng_name || 'Unknown';
+    return {
+      value: id || name, // Fallback to name if ID is missing
+      label: id ? `(${id}) ${name}` : name,
+      key: user._id || id || name
+    };
+  });
 
   // Reset page to 1 when filters (except page) change for standard reports
   useEffect(() => {
@@ -2332,10 +2337,10 @@ const LaundryWashingMachineTest = () => {
                 Assign Control
               </h2>
 
-              <div className="max-w-4xl">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+              <div className="max-w-6xl">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
                   {/* User Selection */}
-                  <div className="space-y-4">
+                  <div className="md:col-span-7 space-y-4">
                     <div className="space-y-2">
                       <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                         Select User:
@@ -2363,9 +2368,21 @@ const LaundryWashingMachineTest = () => {
                     {selectedUserForAssign && (
                       <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800/30 flex flex-col gap-3 animate-slideIn">
                         <p className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Define Role for Selected User:</p>
-                        <div className="flex gap-8">
+                        <div className="flex flex-wrap gap-x-8 gap-y-2">
                           <Checkbox
-                            className="text-gray-700 dark:text-gray-300 font-semibold"
+                            className="text-gray-700 dark:text-gray-300 font-semibold whitespace-nowrap"
+                            checked={assignData.preparedBy === selectedUserForAssign}
+                            onChange={(e) => {
+                              setAssignData(prev => ({
+                                ...prev,
+                                preparedBy: e.target.checked ? selectedUserForAssign : (prev.preparedBy === selectedUserForAssign ? null : prev.preparedBy)
+                              }));
+                            }}
+                          >
+                            PREPARED BY
+                          </Checkbox>
+                          <Checkbox
+                            className="text-gray-700 dark:text-gray-300 font-semibold whitespace-nowrap"
                             checked={assignData.checkedBy === selectedUserForAssign}
                             onChange={(e) => {
                               setAssignData(prev => ({
@@ -2377,7 +2394,7 @@ const LaundryWashingMachineTest = () => {
                             CHECKED BY
                           </Checkbox>
                           <Checkbox
-                            className="text-gray-700 dark:text-gray-300 font-semibold"
+                            className="text-gray-700 dark:text-gray-300 font-semibold whitespace-nowrap"
                             checked={assignData.approvedBy === selectedUserForAssign}
                             onChange={(e) => {
                               setAssignData(prev => ({
@@ -2394,9 +2411,18 @@ const LaundryWashingMachineTest = () => {
                   </div>
 
                   {/* Current Selection Summary */}
-                  <div className="bg-gray-50 dark:bg-gray-800/40 p-5 rounded-2xl border border-gray-200 dark:border-gray-700/50 h-full flex flex-col justify-center min-h-[160px]">
+                  <div className="md:col-span-5 bg-gray-50 dark:bg-gray-800/40 p-5 rounded-2xl border border-gray-200 dark:border-gray-700/50 h-full flex flex-col justify-center min-h-[160px]">
                     <h4 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-6 uppercase tracking-widest text-center">Active Assignment View</h4>
                     <div className="grid grid-cols-1 gap-5">
+                      <div className="flex items-center gap-4 group">
+                        <div className={`w-1 h-10 rounded-full transition-colors ${assignData.preparedBy ? 'bg-orange-500' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
+                        <div>
+                          <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Prepared By</p>
+                          <p className={`text-sm font-bold transition-colors ${assignData.preparedBy ? 'text-gray-800 dark:text-gray-200' : 'text-gray-400 font-normal italic'}`}>
+                            {userOptions.find(u => u.value === assignData.preparedBy)?.label || 'Not assigned'}
+                          </p>
+                        </div>
+                      </div>
                       <div className="flex items-center gap-4 group">
                         <div className={`w-1 h-10 rounded-full transition-colors ${assignData.checkedBy ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
                         <div>
@@ -2424,7 +2450,7 @@ const LaundryWashingMachineTest = () => {
                     type="button"
                     className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg shadow-sm hover:shadow-md transform transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
                     onClick={() => {
-                      setAssignData({ _id: null, checkedBy: null, approvedBy: null });
+                      setAssignData({ _id: null, preparedBy: null, checkedBy: null, approvedBy: null });
                       setSelectedUserForAssign(null);
                     }}
                   >
@@ -2433,10 +2459,10 @@ const LaundryWashingMachineTest = () => {
                   <button
                     type="button"
                     className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium rounded-lg shadow-md hover:shadow-lg transform transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!assignData.checkedBy && !assignData.approvedBy}
+                    disabled={!assignData.preparedBy && !assignData.checkedBy && !assignData.approvedBy}
                     onClick={async () => {
-                      if (!assignData.checkedBy && !assignData.approvedBy) {
-                        showToast.error("Please select at least one assignee (Checked By or Approved By).");
+                      if (!assignData.preparedBy && !assignData.checkedBy && !assignData.approvedBy) {
+                        showToast.error("Please select at least one assignee (Prepared By, Checked By or Approved By).");
                         return;
                       }
 
@@ -2444,7 +2470,7 @@ const LaundryWashingMachineTest = () => {
                         await axios.post(`${API_BASE_URL}/api/assign-control`, assignData);
                         showToast.success(assignData._id ? "Assignment updated successfully!" : "New assignment created successfully!");
                         await fetchAssignControl();
-                        setAssignData({ _id: null, checkedBy: null, approvedBy: null });
+                        setAssignData({ _id: null, preparedBy: null, checkedBy: null, approvedBy: null });
                         setSelectedUserForAssign(null);
                       } catch (error) {
                         console.error("Error saving assignments:", error);
@@ -2465,6 +2491,7 @@ const LaundryWashingMachineTest = () => {
                     <thead className="bg-gray-50 dark:bg-gray-800">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Prepared By</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Checked By</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Approved By</th>
                       </tr>
@@ -2476,16 +2503,20 @@ const LaundryWashingMachineTest = () => {
                           onClick={() => {
                             setAssignData({
                               _id: item._id,
+                              preparedBy: item.preparedBy,
                               checkedBy: item.checkedBy,
                               approvedBy: item.approvedBy
                             });
-                            // Default the selection to checkedBy if available, otherwise approvedBy
-                            setSelectedUserForAssign(item.checkedBy || item.approvedBy);
+                            // Default the selection to preparedBy if available, then checkedBy, then approvedBy
+                            setSelectedUserForAssign(item.preparedBy || item.checkedBy || item.approvedBy);
                           }}
                           className={`cursor-pointer transition-colors ${assignData._id === item._id ? 'bg-purple-50 dark:bg-purple-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
                         >
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {new Date(item.updatedAt).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            {userOptions.find(u => u.value === item.preparedBy)?.label || item.preparedBy || '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                             {userOptions.find(u => u.value === item.checkedBy)?.label || item.checkedBy || '-'}

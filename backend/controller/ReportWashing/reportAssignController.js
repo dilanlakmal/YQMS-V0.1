@@ -15,8 +15,8 @@ export const getAssignControl = async (req, res) => {
 // Save Assignment Control Data
 export const saveAssignControl = async (req, res) => {
     try {
-        const { _id, checkedBy, approvedBy } = req.body;
-        console.log(`[AssignControl] Saving: ID=${_id}, CheckedBy=${checkedBy}, ApprovedBy=${approvedBy}`);
+        const { _id, preparedBy, checkedBy, approvedBy } = req.body;
+        console.log(`[AssignControl] Saving: ID=${_id}, PreparedBy=${preparedBy}, CheckedBy=${checkedBy}, ApprovedBy=${approvedBy}`);
 
         let updatedData;
 
@@ -24,13 +24,12 @@ export const saveAssignControl = async (req, res) => {
             // If ID is provided, update that specific document
             updatedData = await ReportAssignControl.findByIdAndUpdate(
                 _id,
-                { checkedBy, approvedBy },
+                { preparedBy, checkedBy, approvedBy },
                 { new: true }
             );
         } else {
             // If no ID, create a NEW record (History/Audit trail)
-            // Do not use findOneAndUpdate({}) because that updates the existing one (Singleton)
-            updatedData = await ReportAssignControl.create({ checkedBy, approvedBy });
+            updatedData = await ReportAssignControl.create({ preparedBy, checkedBy, approvedBy });
         }
 
         console.log("[AssignControl] Saved successfully:", updatedData);

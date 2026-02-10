@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Upload, Camera, X, Send, RotateCw, Plus, Trash2, Calendar } from "lucide-react";
-import { DatePicker as AntDatePicker } from "antd";
+import { DatePicker as AntDatePicker, Select } from "antd";
 import dayjs from "dayjs";
 
 /**
@@ -27,7 +27,128 @@ const PullingTestForm = ({
     handleRemoveImage,
     fileInputRef,
     cameraInputRef,
+    // Search props
+    searchOrderNo,
+    orderNoSuggestions,
+    showOrderNoSuggestions,
+    setShowOrderNoSuggestions,
+    isSearchingOrderNo,
+    handleOrderNoSelect,
+    // Assignment control props
+    users: parentUsers = [],
+    isLoadingUsers = false,
+    assignHistory,
+    causeAssignData,
 }) => {
+    // Use the passed users or fallback
+    const users = parentUsers || [];
+
+    // Filter users based on assignHistory (report_assign_control collection)
+    const getFilteredOptions = (field) => {
+        if (!assignHistory || assignHistory.length === 0) {
+            // No history configured? Return empty.
+            return [];
+        }
+
+        // 1. Process history to find the LATEST state for each user.
+        // Sort chronologically (oldest to newest) to replay inputs
+        const sortedHistory = [...assignHistory].sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt));
+
+        // Map<EmpID, { preparedBy: boolean, checkedBy: boolean, approvedBy: boolean }>
+        const userRolesMap = new Map();
+
+        // Helper to extract ID
+        const extractId = (val) => {
+            if (!val) return null;
+            const match = val.match(/\((.*?)\)/);
+            return match ? match[1] : val;
+        };
+
+        sortedHistory.forEach(item => {
+            const preparedId = extractId(item.preparedBy);
+            const checkedId = extractId(item.checkedBy);
+            const approvedId = extractId(item.approvedBy);
+
+            // If this record has a preparedId, update that user's state
+            if (preparedId) {
+                const current = userRolesMap.get(preparedId) || { preparedBy: false, checkedBy: false, approvedBy: false };
+                current.preparedBy = true;
+                userRolesMap.set(preparedId, current);
+            }
+
+            // If this record has a checkedId, update that user's state
+            if (checkedId) {
+                const current = userRolesMap.get(checkedId) || { preparedBy: false, checkedBy: false, approvedBy: false };
+                current.checkedBy = true;
+                userRolesMap.set(checkedId, current);
+            }
+
+            // If approvedId exists
+            if (approvedId) {
+                const current = userRolesMap.get(approvedId) || { preparedBy: false, checkedBy: false, approvedBy: false };
+                current.approvedBy = true;
+                userRolesMap.set(approvedId, current);
+            }
+        });
+
+        // 2. Now filter users who have the requested permission in their LATEST state
+        const allowedEmpIds = new Set();
+        userRolesMap.forEach((roles, empId) => {
+            if (roles[field]) {
+                allowedEmpIds.add(empId);
+            }
+        });
+
+        // If no valid IDs found, return empty
+        if (allowedEmpIds.size === 0) return [];
+
+        // Filter users who match the allowed IDs
+        const filteredUsers = users.filter(u => allowedEmpIds.has(u.emp_id));
+
+        return filteredUsers.map(u => ({
+            value: u.name,
+            label: `(${u.emp_id}) ${u.name}`
+        }));
+    };
+
+    const preparedByOptions = getFilteredOptions('preparedBy');
+    const checkedByOptions = getFilteredOptions('checkedBy');
+
+    // Auto-populate if only one option exists and field is empty
+    useEffect(() => {
+        if (preparedByOptions.length === 1 && (!formData.preparedBy || formData.preparedBy === '')) {
+            handleInputChange('preparedBy', preparedByOptions[0].value);
+        }
+    }, [preparedByOptions, formData.preparedBy]);
+
+    useEffect(() => {
+        if (checkedByOptions.length === 1 && (!formData.checkedBy || formData.checkedBy === '')) {
+            handleInputChange('checkedBy', checkedByOptions[0].value);
+        }
+    }, [checkedByOptions, formData.checkedBy]);
+
+    // Validate current selection against allowed options (Real-time cleanup)
+    useEffect(() => {
+        // Only run validation if we actually have Users loaded
+        if (users.length > 0) {
+            // Validate Prepared By
+            if (formData.preparedBy) {
+                const isValid = preparedByOptions.some(o => o.value === formData.preparedBy);
+                if (!isValid) {
+                    handleInputChange('preparedBy', '');
+                }
+            }
+
+            // Validate Checked By
+            if (formData.checkedBy) {
+                const isValid = checkedByOptions.some(o => o.value === formData.checkedBy);
+                if (!isValid) {
+                    handleInputChange('checkedBy', '');
+                }
+            }
+        }
+    }, [users.length, preparedByOptions, checkedByOptions, formData.preparedBy, formData.checkedBy]);
+
     // Initialize test rows from formData or with one empty row
     const [testRows, setTestRows] = useState(
         formData.testRows && formData.testRows.length > 0
@@ -85,6 +206,64 @@ const PullingTestForm = ({
                         Basic Information
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* YM Style */}
+                        <div className="relative">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                YM Style
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.ymStyle || ''}
+                                onChange={(e) => handleInputChange("ymStyle", e.target.value)}
+                                onFocus={() => {
+                                    if (formData.ymStyle?.length >= 2) {
+                                        searchOrderNo(formData.ymStyle);
+                                    }
+                                }}
+                                onBlur={() => {
+                                    setTimeout(() => {
+                                        setShowOrderNoSuggestions(false);
+                                    }, 200);
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && showOrderNoSuggestions && orderNoSuggestions?.length > 0) {
+                                        e.preventDefault();
+                                        const firstValidSuggestion = orderNoSuggestions.filter(on => on !== formData.ymStyle)[0];
+                                        if (firstValidSuggestion) {
+                                            if (handleOrderNoSelect) handleOrderNoSelect(firstValidSuggestion);
+                                        }
+                                    }
+                                }}
+                                disabled={isCompleting}
+                                className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white ${isCompleting ? 'cursor-not-allowed bg-gray-100 dark:bg-gray-800 opacity-60' : ''}`}
+                                placeholder="Search from Yorksys"
+                            />
+                            {isSearchingOrderNo && (
+                                <div className="absolute right-3 top-9 text-gray-400">
+                                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                </div>
+                            )}
+                            {showOrderNoSuggestions && orderNoSuggestions &&
+                                orderNoSuggestions.filter(on => on !== formData.ymStyle).length > 0 && (
+                                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+                                        {orderNoSuggestions
+                                            .filter(orderNo => orderNo !== formData.ymStyle)
+                                            .map((orderNo, index) => (
+                                                <div
+                                                    key={index}
+                                                    onClick={() => handleOrderNoSelect(orderNo)}
+                                                    className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-900 dark:text-white"
+                                                >
+                                                    {orderNo}
+                                                </div>
+                                            ))}
+                                    </div>
+                                )}
+                        </div>
+
                         {/* PO# */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -285,7 +464,7 @@ const PullingTestForm = ({
                     </div>
                 </div>
 
-                {/* Section 3: Prepared & Checked By */}
+                {/* Section 3: Approval Information */}
                 <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
                         Approval Information
@@ -294,28 +473,40 @@ const PullingTestForm = ({
                         {/* Prepare by */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Prepare by <span className="text-gray-400 text-xs">(Optional)</span>
+                                PREPARED BY: <span className="text-gray-400 text-xs">(Optional)</span>
                             </label>
-                            <input
-                                type="text"
-                                value={formData.preparedBy || ''}
-                                onChange={(e) => handleInputChange("preparedBy", e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                placeholder="e.g., CHORIDY"
+                            <Select
+                                showSearch
+                                value={formData.preparedBy || undefined}
+                                placeholder="Select User"
+                                optionFilterProp="label"
+                                onChange={(value) => handleInputChange("preparedBy", value)}
+                                filterOption={(input, option) =>
+                                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                }
+                                options={preparedByOptions}
+                                className="w-full h-[42px]"
+                                loading={isLoadingUsers}
                             />
                         </div>
 
                         {/* Check by */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Check by <span className="text-gray-400 text-xs">(Optional)</span>
+                                CHECKED BY: <span className="text-gray-400 text-xs">(Optional)</span>
                             </label>
-                            <input
-                                type="text"
-                                value={formData.checkedBy || ''}
-                                onChange={(e) => handleInputChange("checkedBy", e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                placeholder="e.g., ALONG"
+                            <Select
+                                showSearch
+                                value={formData.checkedBy || undefined}
+                                placeholder="Select User"
+                                optionFilterProp="label"
+                                onChange={(value) => handleInputChange("checkedBy", value)}
+                                filterOption={(input, option) =>
+                                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                }
+                                options={checkedByOptions}
+                                className="w-full h-[42px]"
+                                loading={isLoadingUsers}
                             />
                         </div>
                     </div>
