@@ -5,13 +5,13 @@ import {
   SCCFUOperator,
   SCCElasticOperator,
   SubconSewingQc1Report,
-  SubconSewingQAReport
+  SubconSewingQAReport,
 } from "../controller/MongoDB/dbConnectionController.js";
 import multer from "multer";
 import path from "path";
 import {
   // __dirname,
-  __backendDir
+  __backendDir,
 } from "../Config/appConfig.js";
 
 export const normalizeDateString = (dateStr) => {
@@ -36,23 +36,6 @@ export const normalizeDateString = (dateStr) => {
     return dateStr; // Fallback
   }
 };
-
-// const normalizeDateString = (dateStr) => {
-//   if (!dateStr) return null;
-//   try {
-//     const [month, day, year] = dateStr.split("/").map((part) => part.trim());
-//     if (!month || !day || !year || isNaN(month) || isNaN(day) || isNaN(year)) {
-//       throw new Error("Invalid date format");
-//     }
-//     // Add leading zeros to month and day
-//     const normalizedMonth = ("0" + parseInt(month, 10)).slice(-2);
-//     const normalizedDay = ("0" + parseInt(day, 10)).slice(-2);
-//     return `${normalizedMonth}/${normalizedDay}/${year}`;
-//   } catch (error) {
-//     console.error(`Invalid date string: ${dateStr}`, error);
-//     return null;
-//   }
-// };
 
 export const getResult = (bundleQtyCheck, totalReject) => {
   if (bundleQtyCheck === 5) return totalReject > 1 ? "Fail" : "Pass";
@@ -120,7 +103,7 @@ export async function fetchOrderDetails(mono) {
     if (!colorMap.has(key)) {
       colorMap.set(key, {
         originalColor: c.Color.trim(),
-        sizes: new Map()
+        sizes: new Map(),
       });
     }
 
@@ -143,7 +126,7 @@ export async function fetchOrderDetails(mono) {
     colorSizeMap: Array.from(colorMap.values()).reduce((acc, curr) => {
       acc[curr.originalColor.toLowerCase()] = Array.from(curr.sizes.values());
       return acc;
-    }, {})
+    }, {}),
   };
 }
 
@@ -178,7 +161,7 @@ const BUYER_MAPPINGS = [
   { pattern: "AR", name: "Aritzia" },
   { pattern: "RT", name: "Reitmans" },
   { pattern: "AF", name: "ANF" },
-  { pattern: "NT", name: "STORI" }
+  { pattern: "NT", name: "STORI" },
   // Add more mappings here as needed
 ];
 
@@ -202,28 +185,28 @@ const getBuyerAggregationSwitch = () => {
       branches: [
         {
           case: { $regexMatch: { input: "$moNo", regex: "COM" } },
-          then: "MWW"
+          then: "MWW",
         },
         {
           case: { $regexMatch: { input: "$moNo", regex: "CO" } },
-          then: "Costco"
+          then: "Costco",
         },
         {
           case: { $regexMatch: { input: "$moNo", regex: "AR" } },
-          then: "Aritzia"
+          then: "Aritzia",
         },
         {
           case: { $regexMatch: { input: "$moNo", regex: "RT" } },
-          then: "Reitmans"
+          then: "Reitmans",
         },
         { case: { $regexMatch: { input: "$moNo", regex: "AF" } }, then: "ANF" },
         {
           case: { $regexMatch: { input: "$moNo", regex: "NT" } },
-          then: "STORI"
-        }
+          then: "STORI",
+        },
       ],
-      default: "Other"
-    }
+      default: "Other",
+    },
   };
 };
 
@@ -238,7 +221,7 @@ export const buildReportMatchPipeline = (filters) => {
     color,
     garmentType,
     spreadTable,
-    material
+    material,
   } = filters;
 
   const pipeline = [];
@@ -266,24 +249,24 @@ export const buildReportMatchPipeline = (filters) => {
         dateString: "$inspectionDate",
         format: "%m/%d/%Y",
         onError: new Date(0),
-        onNull: new Date(0)
-      }
+        onNull: new Date(0),
+      },
     };
 
     if (startDate) {
       match.$expr.$and.push({
         $gte: [
           dateFromStringExpr,
-          new Date(new Date(startDate).setHours(0, 0, 0, 0))
-        ]
+          new Date(new Date(startDate).setHours(0, 0, 0, 0)),
+        ],
       });
     }
     if (endDate) {
       match.$expr.$and.push({
         $lte: [
           dateFromStringExpr,
-          new Date(new Date(endDate).setHours(23, 59, 59, 999))
-        ]
+          new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+        ],
       });
     }
   }
@@ -309,7 +292,7 @@ export const uploadQc2Image = multer({
     } else {
       cb(new Error("Only JPEG, PNG, and GIF images are allowed"), false);
     }
-  }
+  },
 });
 
 const rovingStorage = multer.memoryStorage();
@@ -328,11 +311,11 @@ export const rovingUpload = multer({
       cb(null, true);
     } else {
       console.error(
-        `File rejected by filter: name='${file.originalname}', mime='${file.mimetype}', ext='${fileExt}'. IsMimeAllowed: ${isMimeAllowed}, IsExtAllowed: ${isExtAllowed}`
+        `File rejected by filter: name='${file.originalname}', mime='${file.mimetype}', ext='${fileExt}'. IsMimeAllowed: ${isMimeAllowed}, IsExtAllowed: ${isExtAllowed}`,
       );
       cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)"));
     }
-  }
+  },
 });
 
 export const getBuyerFromMoNumber = (moNo) => {
@@ -350,6 +333,9 @@ export const getBuyerFromMoNumber = (moNo) => {
   if (moNo.includes("AF")) return "ANF";
   if (moNo.includes("NT")) return "STORI";
 
+  if (moNo.includes("YMCMH")) return "Elite";
+  if (moNo.includes("YMCMT")) return "Elite";
+
   // Default case if no other rules match
   return "Other";
 };
@@ -358,7 +344,7 @@ export const sccUploadPath = path.join(
   __backendDir,
   "public",
   "storage",
-  "scc_images"
+  "scc_images",
 );
 //fs.mkdirSync(sccUploadPath, { recursive: true }); // Make sure directory exists
 
@@ -366,7 +352,7 @@ export const sccUploadPath = path.join(
 const sccMemoryStorage = multer.memoryStorage();
 export const sccUpload = multer({
   storage: sccMemoryStorage,
-  limits: { fileSize: 25 * 1024 * 1024 } // Optional: Add a limit (e.g., 25MB) to prevent very large files
+  limits: { fileSize: 25 * 1024 * 1024 }, // Optional: Add a limit (e.g., 25MB) to prevent very large files
 });
 
 export const getAqlLevelForBuyer = (buyer) => {
@@ -401,7 +387,7 @@ export const uploadQC2_washing_image = multer({
     } else {
       cb(new Error("Only JPEG, PNG, and GIF images are allowed"), false);
     }
-  }
+  },
 });
 
 const inspectionMemoryStorage = multer.memoryStorage();
@@ -416,7 +402,7 @@ export const uploadInspectionImage = multer({
     } else {
       cb(new Error("Only JPEG, PNG, and GIF images are allowed"), false);
     }
-  }
+  },
 });
 
 const defectMemoryStorage = multer.memoryStorage();
@@ -430,7 +416,7 @@ export const uploadDefectImage = multer({
     } else {
       cb(new Error("Only JPEG, PNG, and GIF images are allowed"), false);
     }
-  }
+  },
 });
 
 export const getMimeType = (filePath) => {
@@ -442,7 +428,7 @@ export const getMimeType = (filePath) => {
     ".gif": "image/gif",
     ".webp": "image/webp",
     ".bmp": "image/bmp",
-    ".svg": "image/svg+xml"
+    ".svg": "image/svg+xml",
   };
   return mimeTypes[ext] || "image/jpeg";
 };
@@ -474,7 +460,7 @@ export const generateSubconReportID = async () => {
 const qaImageStorage = multer.memoryStorage();
 export const qaImageUpload = multer({
   storage: qaImageStorage,
-  limits: { fileSize: 25 * 1024 * 1024 } // 25MB limit
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit
 });
 
 // Helper function to generate a unique Report ID for QA
@@ -515,14 +501,14 @@ export const uploadRovingImage = multer({
     } else {
       cb(new Error("Only JPEG, PNG, GIF, and WebP images are allowed"), false);
     }
-  }
+  },
 });
 
 // MODIFIED: Use memoryStorage to handle the file in memory for processing.
 const cuttingMemoryStorage = multer.memoryStorage();
 export const cutting_upload = multer({
   storage: cuttingMemoryStorage,
-  limits: { fileSize: 25 * 1024 * 1024 } // Increased limit to 25MB to handle uncompressed files from client
+  limits: { fileSize: 25 * 1024 * 1024 }, // Increased limit to 25MB to handle uncompressed files from client
 });
 
 // Helper to parse pressure string to number (if needed, but schema now enforces Number)
@@ -546,7 +532,7 @@ export const getConsolidatedDateFormats = (dateInput) => {
 
   // Format for schemas WITH leading zeros: 'MM/DD/YYYY'
   const paddedStringDate = `${String(month).padStart(2, "0")}/${String(
-    day
+    day,
   ).padStart(2, "0")}/${year}`;
 
   // Format for ISODate-based schemas (timestamp)
@@ -560,7 +546,7 @@ export const getConsolidatedDateFormats = (dateInput) => {
     stringDate,
     paddedStringDate,
     isoStartDate: startOfDay,
-    isoEndDate: endOfDay
+    isoEndDate: endOfDay,
   };
 };
 
@@ -569,7 +555,7 @@ const auditUploadPath = path.join(
   __backendDir,
   "public",
   "storage",
-  "audit_images"
+  "audit_images",
 );
 //fs.mkdirSync(auditUploadPath, { recursive: true }); // This is the correct way to ensure the directory exists
 
@@ -584,9 +570,9 @@ const audit_storage = multer.diskStorage({
     const requirementId = req.body.requirementId || "unknown";
     cb(
       null,
-      `audit-${requirementId}-${Date.now()}${path.extname(file.originalname)}`
+      `audit-${requirementId}-${Date.now()}${path.extname(file.originalname)}`,
     );
-  }
+  },
 });
 
 export const audit_image_upload = multer({
@@ -600,7 +586,7 @@ export const audit_image_upload = multer({
       cb(new Error("Only JPEG, PNG, GIF images are allowed"), false);
     }
   },
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 });
 
 // Helper function to map page identifiers to keywords in processName
@@ -611,7 +597,7 @@ export const getProcessKeywordForPage = (pageIdentifier) => {
     opa: "opa",
     ironing: "ironing",
     packing: "packing", // The keyword remains the same
-    "qc2-inspection": "qc2"
+    "qc2-inspection": "qc2",
   };
   return keywordMap[pageIdentifier.toLowerCase()];
 };
@@ -620,7 +606,7 @@ export const getProcessKeywordForPage = (pageIdentifier) => {
 const qaAccuracyStorage = multer.memoryStorage();
 export const qaAccuracyUpload = multer({
   storage: qaAccuracyStorage,
-  limits: { fileSize: 25 * 1024 * 1024 }
+  limits: { fileSize: 25 * 1024 * 1024 },
 });
 
 // Helper function to generate date strings in M/D/YYYY format for filtering
@@ -651,21 +637,21 @@ export const derivedBuyerLogic = {
       { case: { $regexMatch: { input: "$moNo", regex: "COM" } }, then: "MWW" },
       {
         case: { $regexMatch: { input: "$moNo", regex: "CO" } },
-        then: "Costco"
+        then: "Costco",
       },
       {
         case: { $regexMatch: { input: "$moNo", regex: "AR" } },
-        then: "Aritzia"
+        then: "Aritzia",
       },
       {
         case: { $regexMatch: { input: "$moNo", regex: "RT" } },
-        then: "Reitmans"
+        then: "Reitmans",
       },
       { case: { $regexMatch: { input: "$moNo", regex: "AF" } }, then: "ANF" },
-      { case: { $regexMatch: { input: "$moNo", regex: "NT" } }, then: "STORI" }
+      { case: { $regexMatch: { input: "$moNo", regex: "NT" } }, then: "STORI" },
     ],
-    default: "Other"
-  }
+    default: "Other",
+  },
 };
 
 //AfterIroning Overall summary card calculation
@@ -675,7 +661,7 @@ export const calculateOverallSummary = (data) => {
     measurementDetails = {},
     checkedQty = 0,
     ironingQty = 0,
-    washQty = 0
+    washQty = 0,
   } = data;
 
   // 1. Calculate totalCheckedPcs from measurement data
@@ -734,7 +720,7 @@ export const calculateOverallSummary = (data) => {
             ? pc.pcDefects.reduce(
                 (defSum, defect) =>
                   defSum + (parseInt(defect.defectQty, 10) || 0),
-                0
+                0,
               )
             : 0)
         );
@@ -774,7 +760,7 @@ export const calculateOverallSummary = (data) => {
     passRate,
     overallFinalResult,
     // For compatibility
-    overallResult: overallFinalResult
+    overallResult: overallFinalResult,
   };
 };
 
@@ -782,7 +768,7 @@ export const calculateOverallSummary = (data) => {
 export const tanslatorImage = multer({
   storage: multer.memoryStorage(), // Store in memory instead of disk
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith("image/")) {
@@ -790,7 +776,7 @@ export const tanslatorImage = multer({
     } else {
       cb(new Error("Only image files are allowed!"), false);
     }
-  }
+  },
 });
 
 //YDT - Cover Page
@@ -806,7 +792,7 @@ export const uploadCoverPageImage = multer({
     } else {
       cb(new Error("Only JPEG, PNG, GIF, and WebP images are allowed"), false);
     }
-  }
+  },
 });
 
 export const processImageBuffer = async (buffer, filename, directory) => {
@@ -843,7 +829,7 @@ export const validateImageBuffer = (buffer, maxSizeInMB = 5) => {
     if (sizeInMB > maxSizeInMB) {
       return {
         isValid: false,
-        error: `Image size exceeds ${maxSizeInMB}MB limit`
+        error: `Image size exceeds ${maxSizeInMB}MB limit`,
       };
     }
 
@@ -851,7 +837,7 @@ export const validateImageBuffer = (buffer, maxSizeInMB = 5) => {
   } catch (error) {
     return {
       isValid: false,
-      error: "Error validating image buffer"
+      error: "Error validating image buffer",
     };
   }
 };
