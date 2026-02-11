@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { Select } from 'antd';
@@ -41,6 +41,18 @@ const TrashIcon = () => (
     </svg>
 );
 
+const LeftArrowIcon = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M15 19L8 12L15 5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+);
+
+const RightArrowIcon = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 5L16 12L9 19" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+);
+
 const GameAssignControl = ({ socket }) => {
     const [users, setUsers] = useState([]);
     const [assignments, setAssignments] = useState([]);
@@ -65,6 +77,22 @@ const GameAssignControl = ({ socket }) => {
     });
 
     const [activeAssignmentId, setActiveAssignmentId] = useState(null);
+
+    const scrollContainerRef = useRef(null);
+
+    const scrollLeft = () => {
+        if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollBy({ left: -300, behavior: 'smooth' });
+        }
+    };
+
+    const scrollRight = () => {
+        if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollBy({ left: 300, behavior: 'smooth' });
+        }
+    };
+
+
 
     useEffect(() => {
         if (!socket) return;
@@ -405,6 +433,7 @@ const GameAssignControl = ({ socket }) => {
                             className="user-select-compact"
                             size="large"
                             allowClear
+                            disabled={!!selectedUser}
                         />
                     </div>
 
@@ -564,38 +593,49 @@ const GameAssignControl = ({ socket }) => {
                         transition={{ delay: 0.6 }}
                     >
                         <h4 className="history-title">Recent Assignments</h4>
-                        <div className="history-scroll">
-                            {assignments.slice(0, 5).map((assignment, index) => (
-                                <motion.div
-                                    key={assignment._id}
-                                    className="history-card"
-                                    onClick={() => handleLoadAssignment(assignment)}
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: 0.7 + index * 0.05 }}
-                                    whileHover={{ scale: 1.02, y: -2 }}
-                                    style={{ cursor: 'pointer' }}
-                                >
-                                    {/* Delete Button */}
-                                    <button
-                                        className="assignment-delete-btn"
-                                        onClick={(e) => handleDeleteAssignment(e, assignment._id)}
-                                        title="Delete Assignment"
-                                    >
-                                        <TrashIcon />
-                                    </button>
 
-                                    <div className="history-time">
-                                        {new Date(assignment.updatedAt).toLocaleTimeString()}
-                                        {activeAssignmentId === assignment._id && <span className="active-dot" style={{ marginLeft: 'auto', color: '#4ECDC4' }}>●</span>}
-                                    </div>
-                                    <div className="history-badges">
-                                        <span className="badge prepared">{getDisplayName(assignment.preparedBy)}</span>
-                                        <span className="badge checked">{getDisplayName(assignment.checkedBy)}</span>
-                                        <span className="badge approved">{getDisplayName(assignment.approvedBy)}</span>
-                                    </div>
-                                </motion.div>
-                            ))}
+                        <div className="history-scroll-wrapper">
+                            <button className="scroll-btn left" onClick={scrollLeft} aria-label="Scroll Left">
+                                <LeftArrowIcon />
+                            </button>
+
+                            <div className="history-scroll" ref={scrollContainerRef}>
+                                {assignments.map((assignment, index) => (
+                                    <motion.div
+                                        key={assignment._id}
+                                        className="history-card"
+                                        onClick={() => handleLoadAssignment(assignment)}
+                                        initial={{ opacity: 0, x: -20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: 0.7 + index * 0.05 }}
+                                        whileHover={{ scale: 1.02, y: -2 }}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        {/* Delete Button */}
+                                        <button
+                                            className="assignment-delete-btn"
+                                            onClick={(e) => handleDeleteAssignment(e, assignment._id)}
+                                            title="Delete Assignment"
+                                        >
+                                            <TrashIcon />
+                                        </button>
+
+                                        <div className="history-time">
+                                            {new Date(assignment.updatedAt).toLocaleTimeString()}
+                                            {activeAssignmentId === assignment._id && <span className="active-dot" style={{ marginLeft: 'auto', color: '#4ECDC4' }}>●</span>}
+                                        </div>
+                                        <div className="history-badges">
+                                            <span className="badge prepared">{getDisplayName(assignment.preparedBy)}</span>
+                                            <span className="badge checked">{getDisplayName(assignment.checkedBy)}</span>
+                                            <span className="badge approved">{getDisplayName(assignment.approvedBy)}</span>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+
+                            <button className="scroll-btn right" onClick={scrollRight} aria-label="Scroll Right">
+                                <RightArrowIcon />
+                            </button>
                         </div>
                     </motion.div>
                 )

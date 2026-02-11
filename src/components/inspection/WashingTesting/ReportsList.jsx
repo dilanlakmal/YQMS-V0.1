@@ -26,6 +26,8 @@ const ReportsList = ({
   onEditInitialImages,
   onEditReceivedImages,
   onEditCompletionImages,
+  restrictDeleteStatuses = [], // Default to empty array (no restriction)
+  restrictEditStatuses = [], // Default to empty array (no restriction)
   // Filter props
   filterStartDate,
   setFilterStartDate,
@@ -499,6 +501,8 @@ const ReportsList = ({
                 onEditInitialImages={onEditInitialImages}
                 onEditReceivedImages={onEditReceivedImages}
                 onEditCompletionImages={onEditCompletionImages}
+                restrictDeleteStatuses={restrictDeleteStatuses}
+                restrictEditStatuses={restrictEditStatuses}
               />
             );
           })}

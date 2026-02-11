@@ -561,25 +561,53 @@
     margin-bottom: 12px;
 }
 
+.history-scroll-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+}
+
+.scroll-btn {
+    background: white;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    color: #667eea;
+    transition: all 0.2s ease;
+    z-index: 5;
+    flex-shrink: 0;
+}
+
+.scroll-btn:hover {
+    background: #667eea;
+    color: white;
+    transform: scale(1.1);
+}
+
+.scroll-btn:active {
+    transform: scale(0.95);
+}
+
 .history-scroll {
     display: flex;
     gap: 12px;
     overflow-x: auto;
     padding-bottom: 8px;
+    scroll-behavior: smooth;
+    flex: 1;
+    /* Hide scrollbar for cleaner look if buttons are used */
+    scrollbar-width: none; /* Firefox */
 }
 
 .history-scroll::-webkit-scrollbar {
-    height: 6px;
-}
-
-.history-scroll::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 10px;
-}
-
-.history-scroll::-webkit-scrollbar-thumb {
-    background: linear-gradient(90deg, #667eea, #764ba2);
-    border-radius: 10px;
+    display: none; /* Chrome/Safari */
 }
 
 .history-card {

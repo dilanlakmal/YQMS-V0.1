@@ -85,6 +85,8 @@ const ReportCard = ({
   onEditInitialImages,
   onEditReceivedImages,
   onEditCompletionImages,
+  restrictDeleteStatuses = [], // List of statuses that prevent deletion
+  restrictEditStatuses = [], // List of statuses that prevent editing
 }) => {
   const reportId = report._id || report.id;
 
@@ -161,19 +163,21 @@ const ReportCard = ({
               <FileSpreadsheet size={14} />
               <span className="hidden sm:inline">Excel</span>
             </button>
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onEdit(report);
-              }}
-              className="px-2 md:px-3 py-1.5 text-xs md:text-sm bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-md hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors flex items-center gap-1"
-              title="Edit Report"
-            >
-              <Pencil size={14} />
-              <span className="hidden sm:inline">Edit</span>
-            </button>
-            {onDelete && (
+            {(!restrictEditStatuses || !restrictEditStatuses.includes(report.status)) && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onEdit(report);
+                }}
+                className="px-2 md:px-3 py-1.5 text-xs md:text-sm bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-md hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors flex items-center gap-1"
+                title="Edit Report"
+              >
+                <Pencil size={14} />
+                <span className="hidden sm:inline">Edit</span>
+              </button>
+            )}
+            {onDelete && (!restrictDeleteStatuses || !restrictDeleteStatuses.includes(report.status)) && (
               <button
                 onClick={() => onDelete(reportId)}
                 className="px-2 md:px-3 py-1.5 text-xs md:text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-md hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors flex items-center gap-1"

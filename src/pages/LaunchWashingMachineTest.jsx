@@ -2292,12 +2292,14 @@ const LaundryWashingMachineTest = () => {
               onDownloadPDF={handleDownloadPDF}
               onExportExcel={handleExportExcel}
               onEdit={handleEditReport}
-              onDelete={null} // Keep delete disabled for warehouse
+              onDelete={handleDelete}
               onShowQRCode={(reportId) => setShowReportDateQR(showReportDateQR === reportId ? null : reportId)}
               printingReportId={whPrintingReportId}
               savedImageRotations={savedImageRotations}
               openImageViewer={openImageViewer}
               setActiveTab={setActiveTab}
+              restrictDeleteStatuses={["received", "completed"]} // Only hide delete for these statuses in Warehouse tab
+              restrictEditStatuses={["completed"]} // Hide edit for completed statuses in Warehouse tab
               onEditInitialImages={handleEditInitialImages}
               onEditReceivedImages={handleEditReceivedImages}
               onEditCompletionImages={handleEditCompletionImages}
