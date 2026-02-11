@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { io } from "socket.io-client";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -20,6 +20,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import { QRCodeCanvas } from "qrcode.react";
 import WashingMachineTestPDF from "../components/inspection/WashingTesting/WashingMachineTestPDF";
 import generateWashingMachineTestExcel from "../components/inspection/WashingTesting/WashingMachineTestExcel";
+import GameAssignControl from "../components/inspection/WashingTesting/assign_control/GameAssignControl";
 import {
   ImageViewerModal,
   useImageViewer,
@@ -87,7 +88,7 @@ const LaundryWashingMachineTest = () => {
     const newSocket = io(API_BASE_URL);
 
     newSocket.on("connect", () => {
-      console.log("✅ Socket connected to:", API_BASE_URL);
+      console.log("? Socket connected to:", API_BASE_URL);
     });
 
     setSocket(newSocket);
@@ -1156,7 +1157,7 @@ const LaundryWashingMachineTest = () => {
 
             // If status changed, close the QR modal and refresh
             if (newStatus !== currentKnownStatus) {
-              console.log(`[QR Polling] âœ“ Status changed from ${currentKnownStatus} to ${newStatus} - closing QR modal`);
+              console.log(`[QR Polling] ✓ Status changed from ${currentKnownStatus} to ${newStatus} - closing QR modal`);
 
               // Clear interval first
               if (statusCheckIntervalRef.current) {
@@ -1169,7 +1170,7 @@ const LaundryWashingMachineTest = () => {
               setShowReportDateScanner(null);
 
               // Show notification
-              showToast.success(`âœ“ QR Scanned! Report status updated to "${newStatus}"`);
+              showToast.success(`✓ QR Scanned! Report status updated to "${newStatus}"`);
 
               // Refresh reports
               await fetchReports();
@@ -1280,7 +1281,7 @@ const LaundryWashingMachineTest = () => {
         // 4. Switch to Reports tab
         setActiveTab("reports");
 
-        showToast.success(`âœ“ QR Scan Success! Please add images and notes, then save to update status to "Received".`);
+        showToast.success(`✓ QR Scan Success! Please add images and notes, then save to update status to "Received".`);
       } else if (currentStatus === "received") {
         // Second scan - Open completion mode in form
         // 1. Close QR code modal
@@ -2331,214 +2332,9 @@ const LaundryWashingMachineTest = () => {
 
           {/* Assign Control Tab */}
           {activeTab === "assign_control" && (
-            <div className="bg-white p-6 rounded-lg border border-gray-200 dark:border-gray-700 animate-fadeIn">
-              <h2 className="text-xl font-semibold mb-6 text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                <MdAssignmentInd className="w-6 h-6 text-purple-500" />
-                Assign Control
-              </h2>
-
-              <div className="max-w-6xl">
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-                  {/* User Selection */}
-                  <div className="md:col-span-7 space-y-4">
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                        Select User:
-                      </label>
-                      <div className="relative">
-                        <Select
-                          className="w-full h-12"
-                          placeholder="Search and select a user"
-                          loading={isLoadingUsers}
-                          showSearch
-                          optionFilterProp="label"
-                          filterOption={(input, option) =>
-                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                          }
-                          options={userOptions}
-                          value={selectedUserForAssign}
-                          onChange={(value) => setSelectedUserForAssign(value)}
-                          size="large"
-                          style={{ width: '100%', height: '48px' }}
-                          allowClear
-                        />
-                      </div>
-                    </div>
-
-                    {selectedUserForAssign && (
-                      <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800/30 flex flex-col gap-3 animate-slideIn">
-                        <p className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Define Role for Selected User:</p>
-                        <div className="flex flex-wrap gap-x-8 gap-y-2">
-                          <Checkbox
-                            className="text-gray-700 dark:text-gray-300 font-semibold whitespace-nowrap"
-                            checked={assignData.preparedBy === selectedUserForAssign}
-                            onChange={(e) => {
-                              setAssignData(prev => ({
-                                ...prev,
-                                preparedBy: e.target.checked ? selectedUserForAssign : (prev.preparedBy === selectedUserForAssign ? null : prev.preparedBy)
-                              }));
-                            }}
-                          >
-                            PREPARED BY
-                          </Checkbox>
-                          <Checkbox
-                            className="text-gray-700 dark:text-gray-300 font-semibold whitespace-nowrap"
-                            checked={assignData.checkedBy === selectedUserForAssign}
-                            onChange={(e) => {
-                              setAssignData(prev => ({
-                                ...prev,
-                                checkedBy: e.target.checked ? selectedUserForAssign : (prev.checkedBy === selectedUserForAssign ? null : prev.checkedBy)
-                              }));
-                            }}
-                          >
-                            CHECKED BY
-                          </Checkbox>
-                          <Checkbox
-                            className="text-gray-700 dark:text-gray-300 font-semibold whitespace-nowrap"
-                            checked={assignData.approvedBy === selectedUserForAssign}
-                            onChange={(e) => {
-                              setAssignData(prev => ({
-                                ...prev,
-                                approvedBy: e.target.checked ? selectedUserForAssign : (prev.approvedBy === selectedUserForAssign ? null : prev.approvedBy)
-                              }));
-                            }}
-                          >
-                            APPROVED BY
-                          </Checkbox>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Current Selection Summary */}
-                  <div className="md:col-span-5 bg-gray-50 dark:bg-gray-800/40 p-5 rounded-2xl border border-gray-200 dark:border-gray-700/50 h-full flex flex-col justify-center min-h-[160px]">
-                    <h4 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-6 uppercase tracking-widest text-center">Active Assignment View</h4>
-                    <div className="grid grid-cols-1 gap-5">
-                      <div className="flex items-center gap-4 group">
-                        <div className={`w-1 h-10 rounded-full transition-colors ${assignData.preparedBy ? 'bg-orange-500' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
-                        <div>
-                          <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Prepared By</p>
-                          <p className={`text-sm font-bold transition-colors ${assignData.preparedBy ? 'text-gray-800 dark:text-gray-200' : 'text-gray-400 font-normal italic'}`}>
-                            {userOptions.find(u => u.value === assignData.preparedBy)?.label || 'Not assigned'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4 group">
-                        <div className={`w-1 h-10 rounded-full transition-colors ${assignData.checkedBy ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
-                        <div>
-                          <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Checked By</p>
-                          <p className={`text-sm font-bold transition-colors ${assignData.checkedBy ? 'text-gray-800 dark:text-gray-200' : 'text-gray-400 font-normal italic'}`}>
-                            {userOptions.find(u => u.value === assignData.checkedBy)?.label || 'Not assigned'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4 group">
-                        <div className={`w-1 h-10 rounded-full transition-colors ${assignData.approvedBy ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
-                        <div>
-                          <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Approved By</p>
-                          <p className={`text-sm font-bold transition-colors ${assignData.approvedBy ? 'text-gray-800 dark:text-gray-200' : 'text-gray-400 font-normal italic'}`}>
-                            {userOptions.find(u => u.value === assignData.approvedBy)?.label || 'Not assigned'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-10 flex justify-end gap-3 pt-6 border-t border-gray-100 dark:border-gray-800">
-                  <button
-                    type="button"
-                    className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg shadow-sm hover:shadow-md transform transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
-                    onClick={() => {
-                      setAssignData({ _id: null, preparedBy: null, checkedBy: null, approvedBy: null });
-                      setSelectedUserForAssign(null);
-                    }}
-                  >
-                    Clear / New Record
-                  </button>
-                  <button
-                    type="button"
-                    className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium rounded-lg shadow-md hover:shadow-lg transform transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!assignData.preparedBy && !assignData.checkedBy && !assignData.approvedBy}
-                    onClick={async () => {
-                      if (!assignData.preparedBy && !assignData.checkedBy && !assignData.approvedBy) {
-                        showToast.error("Please select at least one assignee (Prepared By, Checked By or Approved By).");
-                        return;
-                      }
-
-                      try {
-                        await axios.post(`${API_BASE_URL}/api/assign-control`, assignData);
-                        showToast.success(assignData._id ? "Assignment updated successfully!" : "New assignment created successfully!");
-                        await fetchAssignControl();
-                        setAssignData({ _id: null, preparedBy: null, checkedBy: null, approvedBy: null });
-                        setSelectedUserForAssign(null);
-                      } catch (error) {
-                        console.error("Error saving assignments:", error);
-                        showToast.error("Failed to save assignments.");
-                      }
-                    }}
-                  >
-                    {assignData._id ? "Update Assignment" : "Save New Assignment"}
-                  </button>
-                </div>
-              </div>
-
-              {/* Assignments History Table */}
-              <div className="mt-10 border-t border-gray-200 dark:border-gray-700 pt-6">
-                <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-200">Assignment History (Click row to edit)</h3>
-                <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-800">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Prepared By</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Checked By</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Approved By</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                      {causeAssignHistory.map((item) => (
-                        <tr
-                          key={item._id}
-                          onClick={() => {
-                            setAssignData({
-                              _id: item._id,
-                              preparedBy: item.preparedBy,
-                              checkedBy: item.checkedBy,
-                              approvedBy: item.approvedBy
-                            });
-                            // Default the selection to preparedBy if available, then checkedBy, then approvedBy
-                            setSelectedUserForAssign(item.preparedBy || item.checkedBy || item.approvedBy);
-                          }}
-                          className={`cursor-pointer transition-colors ${assignData._id === item._id ? 'bg-purple-50 dark:bg-purple-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
-                        >
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {new Date(item.updatedAt).toLocaleString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {userOptions.find(u => u.value === item.preparedBy)?.label || item.preparedBy || '-'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {userOptions.find(u => u.value === item.checkedBy)?.label || item.checkedBy || '-'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {userOptions.find(u => u.value === item.approvedBy)?.label || item.approvedBy || '-'}
-                          </td>
-                        </tr>
-                      ))}
-                      {causeAssignHistory.length === 0 && (
-                        <tr>
-                          <td colSpan="3" className="px-6 py-4 text-center text-sm text-gray-500">
-                            No history found
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            <GameAssignControl socket={socket} />
           )}
+
 
           {/* Modals */}
           <ReceivedModal

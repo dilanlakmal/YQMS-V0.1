@@ -1,0 +1,700 @@
+.game-assign-control-compact {
+    max-width: 100%;
+    margin: 0;
+    padding: 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    min-height: 100vh;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Animated background */
+.game-assign-control-compact::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: grid-move 20s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes grid-move {
+    0% {
+        transform: translate(0, 0);
+    }
+
+    100% {
+        transform: translate(40px, 40px);
+    }
+}
+
+/* Floating bubbles */
+.background-bubble {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.03));
+    pointer-events: none;
+    animation: float-up 12s ease-in-out infinite;
+}
+
+.background-bubble:nth-child(1) {
+    width: 80px;
+    height: 80px;
+    top: 70%;
+    left: 5%;
+    animation-delay: 0s;
+}
+
+.background-bubble:nth-child(2) {
+    width: 60px;
+    height: 60px;
+    top: 80%;
+    right: 10%;
+    animation-delay: 4s;
+}
+
+.background-bubble:nth-child(3) {
+    width: 50px;
+    height: 50px;
+    top: 60%;
+    left: 50%;
+    animation-delay: 8s;
+}
+
+@keyframes float-up {
+    0% {
+        transform: translateY(0) scale(1);
+        opacity: 0;
+    }
+
+    10% {
+        opacity: 0.5;
+    }
+
+    90% {
+        opacity: 0.2;
+    }
+
+    100% {
+        transform: translateY(-100vh) scale(1.3);
+        opacity: 0;
+    }
+}
+
+/* Main Game Container - Horizontal Layout */
+.game-container {
+    display: flex;
+    gap: 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 10;
+}
+
+/* Left Panel - User Selection & Bubble */
+.left-panel {
+    flex: 0 0 350px;
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25),
+        0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+    backdrop-filter: blur(15px);
+}
+
+.game-title {
+    font-size: 22px;
+    font-weight: 900;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.select-section {
+    margin-bottom: 20px;
+}
+
+.select-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 900;
+    color: #667eea;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.user-select-compact {
+    width: 100%;
+    border-radius: 10px;
+}
+
+/* Draggable Bubble Zone */
+.bubble-zone {
+    text-align: center;
+    margin: 20px 0;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 165, 0, 0.1));
+    border-radius: 16px;
+    border: 2px dashed rgba(255, 165, 0, 0.3);
+}
+
+.bubble-label {
+    font-size: 10px;
+    font-weight: 900;
+    color: #FF8C00;
+    letter-spacing: 1.5px;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+}
+
+.game-bubble {
+    width: 130px;
+    height: 130px;
+    margin: 0 auto;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #FFD700, #FFA500);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    position: relative;
+    box-shadow: 0 8px 30px rgba(255, 165, 0, 0.5),
+        inset 0 0 25px rgba(255, 255, 255, 0.4);
+    border: 3px solid rgba(255, 255, 255, 0.7);
+    transition: all 0.3s ease;
+}
+
+.game-bubble:active {
+    cursor: grabbing;
+}
+
+.game-bubble.dragging {
+    opacity: 0.4;
+    transform: scale(0.85);
+}
+
+.bubble-shine {
+    position: absolute;
+    top: 12%;
+    left: 18%;
+    width: 45%;
+    height: 45%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%,
+            rgba(255, 255, 255, 0.95) 0%,
+            rgba(255, 255, 255, 0.6) 30%,
+            transparent 70%);
+    pointer-events: none;
+    animation: shine 2s ease-in-out infinite;
+}
+
+@keyframes shine {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.7;
+        transform: scale(1.1);
+    }
+}
+
+.bubble-icon {
+    color: white;
+    margin-bottom: 6px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+    animation: bounce-hand 1.5s ease-in-out infinite;
+}
+
+@keyframes bounce-hand {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-6px);
+    }
+}
+
+.bubble-user {
+    font-size: 12px;
+    font-weight: 900;
+    color: white;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 8px;
+}
+
+.clear-btn {
+    width: 100%;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 800;
+    color: white;
+    background: linear-gradient(135deg, #718096, #4a5568);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(113, 128, 150, 0.4);
+    transition: all 0.3s ease;
+    margin-top: 20px;
+}
+
+.clear-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(113, 128, 150, 0.6);
+}
+
+/* Right Panel - Drop Buckets */
+.right-panel {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25),
+        0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+    backdrop-filter: blur(15px);
+}
+
+.buckets-title {
+    font-size: 16px;
+    font-weight: 900;
+    color: #2d3748;
+    text-align: center;
+    margin-bottom: 20px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.buckets-row {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+}
+
+/* Individual Bucket */
+.bucket {
+    flex: 1;
+    max-width: 220px;
+    min-height: 240px;
+    border-radius: 16px;
+    padding: 16px;
+    border: 3px dashed rgba(255, 255, 255, 0.6);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2),
+        inset 0 0 20px rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.bucket::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+    background-size: 15px 15px;
+    animation: bucket-grid 8s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes bucket-grid {
+    0% {
+        transform: translate(0, 0);
+    }
+
+    100% {
+        transform: translate(15px, 15px);
+    }
+}
+
+.bucket.active {
+    border-style: solid;
+    border-width: 4px;
+    transform: scale(1.05);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.35),
+        inset 0 0 30px rgba(255, 255, 255, 0.4);
+    animation: pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        transform: scale(1.05);
+    }
+
+    50% {
+        transform: scale(1.08);
+    }
+}
+
+.bucket.filled {
+    border-style: solid;
+}
+
+.bucket.success {
+    animation: success-pop 0.6s ease-out;
+}
+
+@keyframes success-pop {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.15);
+        box-shadow: 0 15px 50px rgba(72, 187, 120, 0.6),
+            inset 0 0 40px rgba(72, 187, 120, 0.4);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.bucket-top {
+    text-align: center;
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 2;
+}
+
+.bucket-icon {
+    color: white;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
+    animation: rotate-target 4s ease-in-out infinite;
+}
+
+@keyframes rotate-target {
+
+    0%,
+    100% {
+        transform: rotate(0deg);
+    }
+
+    50% {
+        transform: rotate(20deg);
+    }
+}
+
+.bucket-name {
+    font-size: 12px;
+    font-weight: 900;
+    color: white;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+}
+
+.bucket-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 140px;
+    opacity: 0.8;
+}
+
+.empty-icon {
+    color: white;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
+    animation: bounce-arrow 1.5s ease-in-out infinite;
+}
+
+@keyframes bounce-arrow {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(8px);
+    }
+}
+
+.empty-text {
+    font-size: 13px;
+    font-weight: 800;
+    color: white;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.bucket-filled {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 140px;
+    position: relative;
+}
+
+.filled-bubble {
+    width: 95px;
+    height: 95px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.98);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3),
+        inset 0 0 15px rgba(255, 255, 255, 0.5);
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    position: relative;
+    animation: float-bubble 2s ease-in-out infinite;
+}
+
+@keyframes float-bubble {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-6px);
+    }
+}
+
+.filled-shine {
+    position: absolute;
+    top: 12%;
+    left: 18%;
+    width: 40%;
+    height: 40%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%,
+            rgba(102, 126, 234, 0.3) 0%,
+            transparent 70%);
+    pointer-events: none;
+}
+
+.filled-check {
+    color: #48BB78;
+    margin-bottom: 4px;
+    filter: drop-shadow(0 2px 4px rgba(72, 187, 120, 0.4));
+}
+
+.filled-user {
+    font-size: 10px;
+    font-weight: 900;
+    color: #2d3748;
+    text-align: center;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 6px;
+}
+
+.remove-btn {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #f56565, #e53e3e);
+    color: white;
+    border: 2px solid white;
+    font-size: 14px;
+    font-weight: 900;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 10px rgba(245, 101, 101, 0.5);
+    transition: all 0.3s ease;
+}
+
+.remove-btn:hover {
+    transform: rotate(90deg) scale(1.1);
+    background: linear-gradient(135deg, #e53e3e, #c53030);
+}
+
+/* History - Compact Horizontal */
+.history-compact {
+    max-width: 1400px;
+    margin: 20px auto 0;
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 16px;
+    padding: 16px 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2),
+        0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+    backdrop-filter: blur(15px);
+    position: relative;
+    z-index: 10;
+}
+
+.history-title {
+    font-size: 14px;
+    font-weight: 900;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+}
+
+.history-scroll {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+}
+
+.history-scroll::-webkit-scrollbar {
+    height: 6px;
+}
+
+.history-scroll::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.history-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    border-radius: 10px;
+}
+
+.history-card {
+    flex: 0 0 auto;
+    min-width: 200px;
+    background: linear-gradient(135deg, #f7fafc, #edf2f7);
+    border-radius: 10px;
+    padding: 12px;
+    border-left: 4px solid #667eea;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.history-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    border-left-color: #4ECDC4;
+    background: linear-gradient(135deg, #fff, #f0fff4);
+}
+
+.history-card::after {
+    content: '👆 Click to Load';
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-size: 8px;
+    font-weight: 800;
+    background: #4ECDC4;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    opacity: 0;
+    transform: translateY(5px);
+    transition: all 0.3s ease;
+}
+
+.history-card:hover::after {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.history-time {
+    font-size: 10px;
+    color: #718096;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.history-badges {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.badge {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 4px 8px;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.badge.prepared {
+    color: #FF6B6B;
+    background: rgba(255, 107, 107, 0.15);
+    border: 1px solid #FF6B6B;
+}
+
+.badge.checked {
+    color: #4ECDC4;
+    background: rgba(78, 205, 196, 0.15);
+    border: 1px solid #4ECDC4;
+}
+
+.badge.approved {
+    color: #45B7D1;
+    background: rgba(69, 183, 209, 0.15);
+    border: 1px solid #45B7D1;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .game-container {
+        flex-direction: column;
+    }
+
+    .left-panel {
+        flex: 1;
+    }
+
+    .buckets-row {
+        flex-wrap: wrap;
+    }
+
+    .bucket {
+        flex: 1 1 calc(50% - 8px);
+        min-width: 180px;
+    }
+}
+
+@media (max-width: 768px) {
+    .game-assign-control-compact {
+        padding: 16px;
+    }
+
+    .buckets-row {
+        flex-direction: column;
+    }
+
+    .bucket {
+        max-width: none;
+    }
+
+    .game-bubble {
+        width: 110px;
+        height: 110px;
+    }
+}

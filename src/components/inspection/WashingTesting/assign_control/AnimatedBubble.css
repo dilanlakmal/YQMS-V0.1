@@ -1,0 +1,265 @@
+.bubble-container {
+  position: relative;
+  width: 120px;
+  /* Smaller size */
+  height: 120px;
+  cursor: pointer;
+  user-select: none;
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.25));
+  transition: all 0.3s ease;
+}
+
+.bubble-container:hover {
+  filter: drop-shadow(0 12px 30px rgba(0, 0, 0, 0.4));
+  z-index: 100;
+}
+
+.bubble-container.optimistic {
+  pointer-events: none;
+}
+
+.bubble {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: visible;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(8px);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Multiple shine layers for realistic bubble effect */
+.bubble-shine {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.bubble-shine-1 {
+  top: 12%;
+  left: 18%;
+  width: 40%;
+  height: 40%;
+  background: radial-gradient(circle at 30% 30%,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(255, 255, 255, 0.7) 25%,
+      transparent 65%);
+  animation: shine-pulse 2.5s ease-in-out infinite;
+}
+
+.bubble-shine-2 {
+  top: 45%;
+  left: 8%;
+  width: 25%;
+  height: 25%;
+  background: radial-gradient(circle,
+      rgba(255, 255, 255, 0.7) 0%,
+      transparent 65%);
+  animation: shine-pulse 2.5s ease-in-out infinite 0.4s;
+}
+
+.bubble-shine-3 {
+  bottom: 18%;
+  right: 22%;
+  width: 18%;
+  height: 18%;
+  background: radial-gradient(circle,
+      rgba(255, 255, 255, 0.5) 0%,
+      transparent 65%);
+  animation: shine-pulse 2.5s ease-in-out infinite 0.8s;
+}
+
+@keyframes shine-pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.8;
+    transform: scale(1.08);
+  }
+}
+
+/* Animated ring pulse */
+.bubble-ring {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  border: 2px solid;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.bubble-content {
+  z-index: 10;
+  text-align: center;
+  color: white;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.role-label {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  margin-bottom: 4px;
+  opacity: 0.98;
+  text-transform: uppercase;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 3px 10px;
+  border-radius: 12px;
+  backdrop-filter: blur(4px);
+}
+
+.user-name {
+  font-size: 12px;
+  font-weight: 800;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 8px;
+  line-height: 1.2;
+}
+
+/* Floating particles - smaller and faster */
+.bubble-particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 8px currentColor;
+}
+
+/* Explosion particles */
+.explosion-particle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 15px currentColor;
+}
+
+/* Optimistic loading spinner - smaller */
+.optimistic-spinner {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  z-index: 20;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.6);
+}
+
+/* Glow effect underneath bubble */
+.bubble-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 140%;
+  height: 140%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  z-index: -1;
+  filter: blur(25px);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .bubble-container {
+    width: 100px;
+    height: 100px;
+  }
+
+  .role-label {
+    font-size: 8px;
+    padding: 2px 8px;
+  }
+
+  .user-name {
+    font-size: 11px;
+    max-width: 75px;
+  }
+}
+
+@media (max-width: 480px) {
+  .bubble-container {
+    width: 90px;
+    height: 90px;
+  }
+
+  .role-label {
+    font-size: 7px;
+    padding: 2px 6px;
+  }
+
+  .user-name {
+    font-size: 10px;
+    max-width: 65px;
+  }
+}
+
+/* Add bounce animation on hover */
+@keyframes bounce {
+
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-10px) scale(1.1);
+  }
+}
+
+.bubble-container:hover .bubble {
+  animation: bounce 0.6s ease-in-out;
+}
+
+/* Shake animation for active bubbles */
+@keyframes shake {
+
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  10% {
+    transform: rotate(-3deg);
+  }
+
+  20% {
+    transform: rotate(3deg);
+  }
+
+  30% {
+    transform: rotate(-3deg);
+  }
+
+  40% {
+    transform: rotate(3deg);
+  }
+
+  50% {
+    transform: rotate(0deg);
+  }
+}
