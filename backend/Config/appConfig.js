@@ -46,7 +46,9 @@ const allowedOrigins = [
   "http://localhost:3001",
   "https://localhost:3001",
   "https://yqms.yaikh.com",
-  "https://192.167.6.207:3001"
+  "https://192.167.6.207:3001",
+  
+  "https://192.167.7.200:3001"
 ];
 
 

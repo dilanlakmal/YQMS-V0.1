@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { Select } from 'antd';
@@ -7,51 +7,58 @@ import showToast from '../../../../utils/toast';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
 
-// SVG Icons
-const TargetIcon = () => (
+// SVG Icons - Memoized to prevent re-renders
+const TargetIcon = React.memo(() => (
     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
         <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="2" />
         <circle cx="12" cy="12" r="2" fill="currentColor" />
     </svg>
-);
+));
 
-const HandIcon = () => (
+const HandIcon = React.memo(() => (
     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M9 11V6C9 4.89543 9.89543 4 11 4C12.1046 4 13 4.89543 13 6V11M13 11V4C13 2.89543 13.8954 2 15 2C16.1046 2 17 2.89543 17 4V11M13 11V8C13 6.89543 13.8954 6 15 6C16.1046 6 17 6.89543 17 8V11M17 11V9C17 7.89543 17.8954 7 19 7C20.1046 7 21 7.89543 21 9V15C21 18.866 17.866 22 14 22H12C8.13401 22 5 18.866 5 15V12C5 10.8954 5.89543 10 7 10C8.10457 10 9 10.8954 9 12V11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
-);
+));
 
-const DownArrowIcon = () => (
+const DownArrowIcon = React.memo(() => (
     <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M12 5V19M12 19L19 12M12 19L5 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-);
+));
 
-const CheckIcon = () => (
+const CheckIcon = React.memo(() => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M5 13L9 17L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-);
+));
 
-const TrashIcon = () => (
+const TrashIcon = React.memo(() => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M3 6H5H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M8 6V4C8 3.46957 8.21071 3 8.58579 2.62563C8.96086 2.25126 9.46957 2.04095 10 2.04095H14C14.5304 2.04095 15.0391 2.25126 15.4142 2.62563C15.7893 3 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-);
+));
 
-const LeftArrowIcon = () => (
+const LeftArrowIcon = React.memo(() => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M15 19L8 12L15 5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-);
+));
 
-const RightArrowIcon = () => (
+const RightArrowIcon = React.memo(() => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M9 5L16 12L9 19" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-);
+));
+
+// Bucket colors configuration - moved outside component to prevent recreation
+const BUCKET_COLORS = {
+    prepared: { primary: '#FF6B6B', secondary: '#FF8E53', name: 'Prepared' },
+    checked: { primary: '#4ECDC4', secondary: '#44A08D', name: 'Checked' },
+    approved: { primary: '#45B7D1', secondary: '#5F27CD', name: 'Approved' }
+};
 
 const GameAssignControl = ({ socket }) => {
     const [users, setUsers] = useState([]);
@@ -80,41 +87,38 @@ const GameAssignControl = ({ socket }) => {
 
     const scrollContainerRef = useRef(null);
 
-    const scrollLeft = () => {
+    const scrollLeft = useCallback(() => {
         if (scrollContainerRef.current) {
             scrollContainerRef.current.scrollBy({ left: -300, behavior: 'smooth' });
         }
-    };
+    }, []);
 
-    const scrollRight = () => {
+    const scrollRight = useCallback(() => {
         if (scrollContainerRef.current) {
             scrollContainerRef.current.scrollBy({ left: 300, behavior: 'smooth' });
         }
-    };
+    }, []);
 
 
+
+    // Memoized socket event handlers to prevent recreation on every render
+    const handleAssignmentCreated = useCallback((assignment) => {
+        setAssignments(prev => [assignment, ...prev]);
+    }, []);
+
+    const handleAssignmentUpdated = useCallback((assignment) => {
+        setAssignments(prev =>
+            prev.map(a => a._id === assignment._id ? assignment : a)
+        );
+    }, []);
+
+    const handleAssignmentDeleted = useCallback(({ id }) => {
+        setAssignments(prev => prev.filter(a => a._id !== id));
+    }, []);
 
     useEffect(() => {
         if (!socket) return;
         socket.emit('join:assignments');
-
-        const handleAssignmentCreated = (assignment) => {
-            setAssignments(prev => [assignment, ...prev]);
-            // Only update buckets if user is actively assigning
-            // Don't auto-fill on socket events
-        };
-
-        const handleAssignmentUpdated = (assignment) => {
-            setAssignments(prev =>
-                prev.map(a => a._id === assignment._id ? assignment : a)
-            );
-            // Only update buckets if user is actively assigning
-            // Don't auto-fill on socket events
-        };
-
-        const handleAssignmentDeleted = ({ id }) => {
-            setAssignments(prev => prev.filter(a => a._id !== id));
-        };
 
         socket.on('assignment:created', handleAssignmentCreated);
         socket.on('assignment:updated', handleAssignmentUpdated);
@@ -125,14 +129,14 @@ const GameAssignControl = ({ socket }) => {
             socket.off('assignment:updated', handleAssignmentUpdated);
             socket.off('assignment:deleted', handleAssignmentDeleted);
         };
-    }, [socket]);
+    }, [socket, handleAssignmentCreated, handleAssignmentUpdated, handleAssignmentDeleted]);
 
     useEffect(() => {
         fetchUsers();
         fetchAssignments();
     }, []);
 
-    const fetchUsers = async () => {
+    const fetchUsers = useCallback(async () => {
         try {
             const response = await axios.get(`${API_BASE_URL}/api/users`);
             setUsers(response.data);
@@ -140,9 +144,9 @@ const GameAssignControl = ({ socket }) => {
             console.error('Error fetching users:', error);
             showToast.error('Failed to load users');
         }
-    };
+    }, []);
 
-    const fetchAssignments = async () => {
+    const fetchAssignments = useCallback(async () => {
         try {
             const response = await axios.get(`${API_BASE_URL}/api/assign-control`);
             const data = Array.isArray(response.data)
@@ -163,9 +167,9 @@ const GameAssignControl = ({ socket }) => {
         } catch (error) {
             console.error('Error fetching assignments:', error);
         }
-    };
+    }, []);
 
-    const updateCurrentAssignment = (assignment) => {
+    const updateCurrentAssignment = useCallback((assignment) => {
         setCurrentAssignment({
             preparedBy: assignment.preparedBy,
             checkedBy: assignment.checkedBy,
@@ -176,9 +180,9 @@ const GameAssignControl = ({ socket }) => {
             checked: assignment.checkedBy,
             approved: assignment.approvedBy
         });
-    };
+    }, []);
 
-    const handleUserSelect = (value) => {
+    const handleUserSelect = useCallback((value) => {
         setSelectedUser(value);
         if (!value) {
             setSelectedUserName('');
@@ -190,32 +194,45 @@ const GameAssignControl = ({ socket }) => {
             // Show only name in bubble
             setSelectedUserName(name);
         }
-    };
 
-    const handleDragStart = (e) => {
+        // Check if this user already has an existing assignment
+        const existingAssignment = assignments.find(assignment =>
+            assignment.preparedBy === value ||
+            assignment.checkedBy === value ||
+            assignment.approvedBy === value
+        );
+
+        if (existingAssignment) {
+            // User already has a record - load it automatically
+            handleLoadAssignment(existingAssignment);
+            // showToast.success(`✓ Found existing assignment for ${user?.name || value}!`);
+        }
+    }, [users, assignments]);
+
+    const handleDragStart = useCallback((e) => {
         if (!selectedUser) return;
         setDraggedUser(selectedUser);
         setIsDragging(true);
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', selectedUser);
-    };
+    }, [selectedUser]);
 
-    const handleDragEnd = () => {
+    const handleDragEnd = useCallback(() => {
         setIsDragging(false);
         setDragOverTarget(null);
-    };
+    }, []);
 
-    const handleDragOver = (e, target) => {
+    const handleDragOver = useCallback((e, target) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         setDragOverTarget(target);
-    };
+    }, []);
 
-    const handleDragLeave = () => {
+    const handleDragLeave = useCallback(() => {
         setDragOverTarget(null);
-    };
+    }, []);
 
-    const handleDrop = async (e, target) => {
+    const handleDrop = useCallback(async (e, target) => {
         e.preventDefault();
         const userId = e.dataTransfer.getData('text/plain');
 
@@ -236,16 +253,26 @@ const GameAssignControl = ({ socket }) => {
 
         // Keep the user selected for multiple assignments 
         // (lines removed to prevent auto-clearing)
-    };
+    }, [dropTargets]);
 
-    const submitAssignment = async (targets = dropTargets) => {
+    // Memoize getUserName helper to prevent recreation
+    const getUserName = useCallback((userId) => {
+        if (!userId) return null;
+        const user = users.find(u => (u.emp_id || u.name) === userId);
+        return user ? (user.name || user.eng_name || userId) : userId;
+    }, [users]);
+
+    const submitAssignment = useCallback(async (targets = dropTargets) => {
         setIsSubmitting(true);
 
         try {
             const payload = {
                 preparedBy: targets.prepared,
+                preparedByName: getUserName(targets.prepared),
                 checkedBy: targets.checked,
+                checkedByName: getUserName(targets.checked),
                 approvedBy: targets.approved,
+                approvedByName: getUserName(targets.approved),
                 updatedBy: selectedUser || targets.prepared || targets.checked || targets.approved
             };
 
@@ -279,15 +306,15 @@ const GameAssignControl = ({ socket }) => {
         } finally {
             setIsSubmitting(false);
         }
-    };
+    }, [dropTargets, getUserName, selectedUser, activeAssignmentId]);
 
-    const handleClearBucket = (bucket) => {
+    const handleClearBucket = useCallback((bucket) => {
         const newTargets = { ...dropTargets, [bucket]: null };
         setDropTargets(newTargets);
         submitAssignment(newTargets);
-    };
+    }, [dropTargets]);
 
-    const handleClearAll = () => {
+    const handleClearAll = useCallback(() => {
         setDropTargets({
             prepared: null,
             checked: null,
@@ -301,9 +328,9 @@ const GameAssignControl = ({ socket }) => {
         setSelectedUser(null);
         setSelectedUserName('');
         setActiveAssignmentId(null); // CRITICAL: Reset ID so next submit creates NEW record
-    };
+    }, []);
 
-    const handleLoadAssignment = (assignment) => {
+    const handleLoadAssignment = useCallback((assignment) => {
         // Create a copy of the assignment data to ensure valid string values
         // Sometimes values might be objects if populated, though here they seem to be strings
         const safeAssignment = {
@@ -348,40 +375,57 @@ const GameAssignControl = ({ socket }) => {
         }
 
         // showToast.success('✓ Assignment loaded! User selected.');
-    };
+    }, [users]);
 
-    const userOptions = users.map(user => {
-        const id = user.emp_id;
-        const name = user.name || user.eng_name || 'Unknown';
-        return {
-            value: id || name,
-            label: id ? `(${id}) ${name}` : name,
-            key: user._id || id || name
-        };
-    });
+    // Memoize user options to prevent recalculation on every render
+    const userOptions = useMemo(() => {
+        return users.map(user => {
+            const id = user.emp_id;
+            const name = user.name || user.eng_name || 'Unknown';
+            return {
+                value: id || name,
+                label: id ? `(${id}) ${name}` : name,
+                key: user._id || id || name
+            };
+        });
+    }, [users]);
 
-    const getDisplayName = (value) => {
+    // Memoize getDisplayName to prevent recalculation
+    const getDisplayName = useCallback((value, nameField = null) => {
+        // If we have the name field directly, use it
+        if (nameField) return nameField;
+
         if (!value) return '-';
         if (typeof value === 'object') return value.name || value.eng_name || '-';
-        const user = users.find(u => (u.emp_id || u.name) === value);
-        return user ? (user.name || user.eng_name || value) : value;
-    };
 
-    const bucketColors = {
-        prepared: { primary: '#FF6B6B', secondary: '#FF8E53', name: 'Prepared' },
-        checked: { primary: '#4ECDC4', secondary: '#44A08D', name: 'Checked' },
-        approved: { primary: '#45B7D1', secondary: '#5F27CD', name: 'Approved' }
-    };
+        // Convert to string for comparison (handles both string and number emp_ids)
+        const valueStr = String(value);
+
+        // Try to find user by emp_id or name
+        const user = users.find(u => {
+            const empId = u.emp_id ? String(u.emp_id) : null;
+            const name = u.name || u.eng_name;
+            return empId === valueStr || name === valueStr;
+        });
+
+        if (user) {
+            return user.name || user.eng_name || value;
+        } else {
+            // If we can't find the user, just return the value
+            // (This handles cases where users are deleted)
+            return value;
+        }
+    }, [users]);
 
     // Delete Confirmation State
     const [deleteConfirmation, setDeleteConfirmation] = useState({ isOpen: false, id: null });
 
-    const handleDeleteAssignment = (e, id) => {
+    const handleDeleteAssignment = useCallback((e, id) => {
         e.stopPropagation();
         setDeleteConfirmation({ isOpen: true, id });
-    };
+    }, []);
 
-    const confirmDelete = async () => {
+    const confirmDelete = useCallback(async () => {
         const id = deleteConfirmation.id;
         if (!id) return;
 
@@ -399,7 +443,7 @@ const GameAssignControl = ({ socket }) => {
         } finally {
             setDeleteConfirmation({ isOpen: false, id: null });
         }
-    };
+    }, [deleteConfirmation.id, activeAssignmentId, handleClearAll]);
 
     return (
         <div className="game-assign-control-compact1">
@@ -514,7 +558,7 @@ const GameAssignControl = ({ socket }) => {
                 >
                     <h3 className="buckets-title">DROP ZONES</h3>
                     <div className="buckets-row">
-                        {Object.entries(bucketColors).map(([key, color]) => (
+                        {Object.entries(BUCKET_COLORS).map(([key, color]) => (
                             <motion.div
                                 key={key}
                                 className={`bucket ${dragOverTarget === key ? 'active' : ''} ${dropTargets[key] ? 'filled' : ''} ${successBucket === key ? 'success' : ''}`}
@@ -526,7 +570,7 @@ const GameAssignControl = ({ socket }) => {
                                 }}
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.3 + Object.keys(bucketColors).indexOf(key) * 0.1 }}
+                                transition={{ delay: 0.3 + Object.keys(BUCKET_COLORS).indexOf(key) * 0.1 }}
                             >
                                 <div className="bucket-top">
                                     <div className="bucket-name">{color.name}</div>
@@ -544,7 +588,7 @@ const GameAssignControl = ({ socket }) => {
                                                 className="filled-bubble"
                                                 onClick={() => {
                                                     handleUserSelect(dropTargets[key]);
-                                                    showToast.success('User picked up!');
+                                                    // showToast.success('User picked up!');
                                                 }}
                                                 style={{ cursor: 'pointer' }}
                                                 title="Click to pick up user"
@@ -595,7 +639,13 @@ const GameAssignControl = ({ socket }) => {
                         <h4 className="history-title">Recent Assignments</h4>
 
                         <div className="history-scroll-wrapper">
-                            <button className="scroll-btn left" onClick={scrollLeft} aria-label="Scroll Left">
+                            {/* Only show scroll buttons if there are more than 5 assignments */}
+                            <button
+                                className="scroll-btn left"
+                                onClick={scrollLeft}
+                                aria-label="Scroll Left"
+                                style={{ display: assignments.length > 5 ? 'flex' : 'none' }}
+                            >
                                 <LeftArrowIcon />
                             </button>
 
@@ -625,15 +675,21 @@ const GameAssignControl = ({ socket }) => {
                                             {activeAssignmentId === assignment._id && <span className="active-dot" style={{ marginLeft: 'auto', color: '#4ECDC4' }}>●</span>}
                                         </div>
                                         <div className="history-badges">
-                                            <span className="badge prepared">{getDisplayName(assignment.preparedBy)}</span>
-                                            <span className="badge checked">{getDisplayName(assignment.checkedBy)}</span>
-                                            <span className="badge approved">{getDisplayName(assignment.approvedBy)}</span>
+                                            <span className="badge prepared">{getDisplayName(assignment.preparedBy, assignment.preparedByName)}</span>
+                                            <span className="badge checked">{getDisplayName(assignment.checkedBy, assignment.checkedByName)}</span>
+                                            <span className="badge approved">{getDisplayName(assignment.approvedBy, assignment.approvedByName)}</span>
                                         </div>
                                     </motion.div>
                                 ))}
                             </div>
 
-                            <button className="scroll-btn right" onClick={scrollRight} aria-label="Scroll Right">
+                            {/* Only show scroll buttons if there are more than 5 assignments */}
+                            <button
+                                className="scroll-btn right"
+                                onClick={scrollRight}
+                                aria-label="Scroll Right"
+                                style={{ display: assignments.length > 5 ? 'flex' : 'none' }}
+                            >
                                 <RightArrowIcon />
                             </button>
                         </div>

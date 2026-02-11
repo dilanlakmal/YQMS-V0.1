@@ -17,8 +17,17 @@ export const getAssignControl = async (req, res) => {
 // Save Assignment Control Data
 export const saveAssignControl = async (req, res) => {
     try {
-        const { _id, preparedBy, checkedBy, approvedBy } = req.body;
-        console.log(`[AssignControl] Saving: ID=${_id}, PreparedBy=${preparedBy}, CheckedBy=${checkedBy}, ApprovedBy=${approvedBy}`);
+        const {
+            _id,
+            preparedBy, preparedByName,
+            checkedBy, checkedByName,
+            approvedBy, approvedByName
+        } = req.body;
+
+        console.log(`[AssignControl] Saving: ID=${_id}`);
+        console.log(`  PreparedBy=${preparedBy} (${preparedByName})`);
+        console.log(`  CheckedBy=${checkedBy} (${checkedByName})`);
+        console.log(`  ApprovedBy=${approvedBy} (${approvedByName})`);
 
         let updatedData;
 
@@ -26,13 +35,21 @@ export const saveAssignControl = async (req, res) => {
             // If ID is provided, update that specific document
             updatedData = await ReportAssignControl.findByIdAndUpdate(
                 _id,
-                { preparedBy, checkedBy, approvedBy },
+                {
+                    preparedBy, preparedByName,
+                    checkedBy, checkedByName,
+                    approvedBy, approvedByName
+                },
                 { new: true }
             );
             io.emit('assignment:updated', updatedData);
         } else {
             // If no ID, create a NEW record (History/Audit trail)
-            updatedData = await ReportAssignControl.create({ preparedBy, checkedBy, approvedBy });
+            updatedData = await ReportAssignControl.create({
+                preparedBy, preparedByName,
+                checkedBy, checkedByName,
+                approvedBy, approvedByName
+            });
             io.emit('assignment:created', updatedData);
         }
 
@@ -48,12 +65,24 @@ export const saveAssignControl = async (req, res) => {
 export const updateAssignControl = async (req, res) => {
     try {
         const { id } = req.params;
-        const { preparedBy, checkedBy, approvedBy } = req.body;
-        console.log(`[AssignControl] Updating: ID=${id}, PreparedBy=${preparedBy}, CheckedBy=${checkedBy}, ApprovedBy=${approvedBy}`);
+        const {
+            preparedBy, preparedByName,
+            checkedBy, checkedByName,
+            approvedBy, approvedByName
+        } = req.body;
+
+        console.log(`[AssignControl] Updating: ID=${id}`);
+        console.log(`  PreparedBy=${preparedBy} (${preparedByName})`);
+        console.log(`  CheckedBy=${checkedBy} (${checkedByName})`);
+        console.log(`  ApprovedBy=${approvedBy} (${approvedByName})`);
 
         const updatedData = await ReportAssignControl.findByIdAndUpdate(
             id,
-            { preparedBy, checkedBy, approvedBy },
+            {
+                preparedBy, preparedByName,
+                checkedBy, checkedByName,
+                approvedBy, approvedByName
+            },
             { new: true }
         );
 
