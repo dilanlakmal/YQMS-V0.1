@@ -70,3 +70,25 @@ export const updateAssignControl = async (req, res) => {
         res.status(500).json({ message: "Error updating assignment control data", error: error.message });
     }
 };
+
+// Delete Assignment Control Data (DELETE)
+export const deleteAssignControl = async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(`[AssignControl] Deleting ID=${id}`);
+
+        const deletedData = await ReportAssignControl.findByIdAndDelete(id);
+
+        if (!deletedData) {
+            return res.status(404).json({ message: "Assignment not found" });
+        }
+
+        io.emit('assignment:deleted', { id: deletedData._id });
+
+        console.log("[AssignControl] Deleted successfully:", id);
+        res.status(200).json({ message: "Assignment deleted successfully", id: deletedData._id });
+    } catch (error) {
+        console.error("[AssignControl] Error deleting assign control:", error);
+        res.status(500).json({ message: "Error deleting assignment control data", error: error.message });
+    }
+};

@@ -34,6 +34,13 @@ const CheckIcon = () => (
     </svg>
 );
 
+const TrashIcon = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 6H5H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M8 6V4C8 3.46957 8.21071 3 8.58579 2.62563C8.96086 2.25126 9.46957 2.04095 10 2.04095H14C14.5304 2.04095 15.0391 2.25126 15.4142 2.62563C15.7893 3 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+);
+
 const GameAssignControl = ({ socket }) => {
     const [users, setUsers] = useState([]);
     const [assignments, setAssignments] = useState([]);
@@ -338,6 +345,34 @@ const GameAssignControl = ({ socket }) => {
         approved: { primary: '#45B7D1', secondary: '#5F27CD', name: 'Approved' }
     };
 
+    // Delete Confirmation State
+    const [deleteConfirmation, setDeleteConfirmation] = useState({ isOpen: false, id: null });
+
+    const handleDeleteAssignment = (e, id) => {
+        e.stopPropagation();
+        setDeleteConfirmation({ isOpen: true, id });
+    };
+
+    const confirmDelete = async () => {
+        const id = deleteConfirmation.id;
+        if (!id) return;
+
+        try {
+            await axios.delete(`${API_BASE_URL}/api/assign-control/${id}`);
+            showToast.success('Assignment deleted');
+
+            // If we deleted the active assignment, clear the board
+            if (activeAssignmentId === id) {
+                handleClearAll();
+            }
+        } catch (error) {
+            console.error('Error deleting assignment:', error);
+            showToast.error('Failed to delete assignment');
+        } finally {
+            setDeleteConfirmation({ isOpen: false, id: null });
+        }
+    };
+
     return (
         <div className="game-assign-control-compact1">
             {/* Floating Background Bubbles */}
@@ -541,6 +576,15 @@ const GameAssignControl = ({ socket }) => {
                                     whileHover={{ scale: 1.02, y: -2 }}
                                     style={{ cursor: 'pointer' }}
                                 >
+                                    {/* Delete Button */}
+                                    <button
+                                        className="assignment-delete-btn"
+                                        onClick={(e) => handleDeleteAssignment(e, assignment._id)}
+                                        title="Delete Assignment"
+                                    >
+                                        <TrashIcon />
+                                    </button>
+
                                     <div className="history-time">
                                         {new Date(assignment.updatedAt).toLocaleTimeString()}
                                         {activeAssignmentId === assignment._id && <span className="active-dot" style={{ marginLeft: 'auto', color: '#4ECDC4' }}>●</span>}
@@ -556,6 +600,101 @@ const GameAssignControl = ({ socket }) => {
                     </motion.div>
                 )
             }
+
+            {/* Custom Delete Confirmation Modal */}
+            <AnimatePresence>
+                {deleteConfirmation.isOpen && (
+                    <motion.div
+                        className="modal-backdrop"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'rgba(0, 0, 0, 0.5)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 100,
+                            backdropFilter: 'blur(5px)'
+                        }}
+                        onClick={() => setDeleteConfirmation({ isOpen: false, id: null })}
+                    >
+                        <motion.div
+                            className="delete-modal"
+                            initial={{ scale: 0.8, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.8, opacity: 0, y: 20 }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                                background: 'white',
+                                padding: '24px',
+                                borderRadius: '16px',
+                                width: '90%',
+                                maxWidth: '320px',
+                                textAlign: 'center',
+                                boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+                                border: '1px solid rgba(0,0,0,0.1)'
+                            }}
+                        >
+                            <div style={{
+                                width: '60px',
+                                height: '60px',
+                                background: '#fee2e2',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 16px',
+                                color: '#ef4444'
+                            }}>
+                                <TrashIcon />
+                            </div>
+                            <h3 style={{ margin: '0 0 8px', fontSize: '18px', color: '#1f2937' }}>Delete Assignment?</h3>
+                            <p style={{ margin: '0 0 24px', fontSize: '14px', color: '#6b7280' }}>
+                                Are you sure you want to remove this assignment history?
+                            </p>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button
+                                    onClick={() => setDeleteConfirmation({ isOpen: false, id: null })}
+                                    style={{
+                                        flex: 1,
+                                        padding: '10px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #d1d5db',
+                                        background: 'white',
+                                        color: '#374151',
+                                        fontWeight: '600',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmDelete}
+                                    style={{
+                                        flex: 1,
+                                        padding: '10px',
+                                        borderRadius: '8px',
+                                        border: 'none',
+                                        background: '#ef4444',
+                                        color: 'white',
+                                        fontWeight: '600',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+                                    }}
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div >
     );
 };
