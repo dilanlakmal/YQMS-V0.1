@@ -642,38 +642,48 @@ const DesktopNavItem = ({ section, isActive, onClick }) => {
 // --- Desktop Grid Item Component ---
 const DesktopGridItem = ({ item, onClick, fincheckActionCount }) => {
   return (
+    // 1. Outer Wrapper (Acts as the trigger for 'group' hover effects)
     <div
       onClick={onClick}
-      className="group relative flex flex-col items-center justify-center p-6 rounded-2xl shadow-sm transition-all duration-300 bg-white dark:bg-slate-800/80 cursor-pointer hover:shadow-xl hover:-translate-y-1 border border-slate-100 dark:border-slate-700/50 hover:border-blue-200 dark:hover:border-blue-800"
+      className="group relative w-full h-full cursor-pointer"
     >
-      {/* Notification Badge for Fincheck Inspection */}
-      {item.path === "/fincheck-inspection" && fincheckActionCount > 0 && (
-        <div className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full min-w-[24px] h-6 flex items-center justify-center px-2 shadow-lg animate-pulse">
-          {fincheckActionCount}
+      {/* 2. NEW ANIMATION LAYER: Glowing/Rotating Gradient Background */}
+      {/* This sits behind the card. On hover, it appears with a blur, creating a glowing border effect */}
+      <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 rounded-2xl opacity-0 group-hover:opacity-100 blur transition duration-1000 group-hover:duration-200" />
+
+      {/* 3. Main Content Card (The visible white box) */}
+      <div className="relative flex flex-col items-center justify-center p-6 rounded-2xl bg-white dark:bg-slate-800 h-full border border-slate-100 dark:border-slate-700 shadow-sm transition-all duration-300 hover:-translate-y-1">
+        {/* Notification Badge */}
+        {item.path === "/fincheck-inspection" && fincheckActionCount > 0 && (
+          <div className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full min-w-[24px] h-6 flex items-center justify-center px-2 shadow-lg animate-pulse z-10">
+            {fincheckActionCount}
+          </div>
+        )}
+
+        {/* --- Image Container & Image Size --- */}
+        {/* Container increased to w-24 h-24 (96px) */}
+        <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-inner">
+          <img
+            src={item.image}
+            alt={item.title}
+            /* Image increased to w-20 h-20 (80px) */
+            className="w-20 h-20 object-contain"
+          />
         </div>
-      )}
 
-      {/* Image Container */}
-      <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-inner">
-        <img
-          src={item.image}
-          alt={item.title}
-          className="w-12 h-12 object-contain"
-        />
+        {/* Title */}
+        <h3 className="text-sm font-bold text-center text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+          {item.title}
+        </h3>
+
+        {/* Description */}
+        <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-2">
+          {item.description}
+        </p>
+
+        {/* Bottom Line Indicator (Optional - kept from original) */}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full group-hover:w-1/2 transition-all duration-300" />
       </div>
-
-      {/* Title */}
-      <h3 className="text-sm font-bold text-center text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-        {item.title}
-      </h3>
-
-      {/* Description */}
-      <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-2">
-        {item.description}
-      </p>
-
-      {/* Hover Indicator */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full group-hover:w-1/2 transition-all duration-300" />
     </div>
   );
 };
@@ -715,7 +725,7 @@ function Home() {
           {
             path: "/Development",
             roles: ["Development"],
-            image: "assets/Home/fabric-logo.png",
+            image: "assets/Home/development.png",
             title: "Development",
             description: "---",
           },
