@@ -3,7 +3,7 @@
  * Handles CRUD operations for translation glossaries
  */
 
-import pdf from 'pdf-parse';
+import pdf from 'pdf-parse/lib/pdf-parse.js';
 
 import { randomUUID } from "crypto";
 import {

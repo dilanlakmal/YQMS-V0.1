@@ -1,5 +1,5 @@
 import fs from 'fs';
-import pdf from 'pdf-parse'; // Using pdf-parse for density check and digital extraction
+import pdf from 'pdf-parse/lib/pdf-parse.js'; // Using pdf-parse for density check and digital extraction
 import DocumentIntelligence, { getLongRunningPoller, isUnexpected } from "@azure-rest/ai-document-intelligence";
 
 const endpoint = process.env.DOCUMENT_INTELLIGENCE_ENDPOINT;
