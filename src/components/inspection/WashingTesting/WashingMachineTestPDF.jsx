@@ -272,7 +272,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
           <View style={styles.row}>
             <View style={[styles.col, { flexDirection: "row", alignItems: "baseline" }]}>
               <Text style={[styles.label, { marginRight: 5, marginBottom: 0 }]}>Submitted By:</Text>
-              <Text style={[styles.value, { marginBottom: 0 }]}>{report.engName || report.userName || report.userId || "N/A"}</Text>
+              <Text style={[styles.value, { marginBottom: 0 }]}>{report.reporter_name || report.reporter_emp_id || "N/A"}</Text>
             </View>
             <View style={[styles.col, { flexDirection: "row", alignItems: "baseline" }]}>
               <Text style={[styles.label, { marginRight: 5, marginBottom: 0 }]}>Submitted At:</Text>

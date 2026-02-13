@@ -56,7 +56,7 @@ export const saveReportWashing = async (req, res) => {
       reportDate,
       sendToHomeWashingDate,
       notes,
-      userId,
+      userId, // Accept userId from frontend (will be stored as report_emp_id)
       userName
     } = req.body;
 
@@ -212,10 +212,17 @@ export const saveReportWashing = async (req, res) => {
       visualAssessmentRows: parsedVisualAssessmentRows,
 
       notes: notes ? notes.trim() : "", // Notes field
-      userId: userId || "",
-      userName: userName || "",
+      reporter_emp_id: req.body.reporter_emp_id || userId || "", // Priority to new field
+      reporter_status: "done",
+      reporter_name: req.body.reporter_name || userName || "",
       submittedAt: new Date()
     };
+
+    // Remove legacy/redundant fields from the final object
+    delete reportData.userId;
+    delete reportData.userName;
+    delete reportData.userSubmit;
+    delete reportData.userSubmitName;
 
     // Determine Model based on Report Type
     console.log("Saving Report - Type:", reportData.reportType);
@@ -271,9 +278,7 @@ export const getReportWashing = async (req, res) => {
       query.color = { $regex: req.query.color, $options: "i" };
     }
 
-    if (req.query.status) {
-      query.status = req.query.status;
-    }
+
 
     if (startDate || endDate) {
       query.reportDate = {};
@@ -775,6 +780,19 @@ export const updateReportWashing = async (req, res) => {
       }
     }
 
+    // Automatically map the submitter info from req.body if available
+    if (updateData.userId) {
+      updateData.reporter_emp_id = updateData.userId;
+      delete updateData.userId;
+    }
+    if (updateData.userName) {
+      updateData.reporter_name = updateData.userName;
+      delete updateData.userName;
+    }
+    // Clean up other obsolete fields if they leak in
+    delete updateData.userSubmit;
+    delete updateData.userSubmitName;
+
     // Find and update the report using the correct model
     const updatedReport = await ReportModel.findByIdAndUpdate(
       id,
@@ -964,6 +982,81 @@ export const getUniqueStyles = async (req, res) => {
   }
 };
 
+// Handle QR Code Scan - Mark report as received
+export const scanReceived = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { receiver_emp_id } = req.body;
+
+    // Validate receiver_emp_id
+    if (!receiver_emp_id) {
+      return res.status(400).json({
+        success: false,
+        message: "receiver_emp_id is required"
+      });
+    }
+
+    // Find the report
+    const { model: ReportModel, doc: existingReport } = await findReportById(id);
+
+    if (!ReportModel || !existingReport) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found"
+      });
+    }
+
+    // Check if already received
+    if (existingReport.status === "received" || existingReport.status === "completed") {
+      return res.status(400).json({
+        success: false,
+        message: `Report already ${existingReport.status}`,
+        data: existingReport
+      });
+    }
+
+    // Update the report
+    const now = new Date();
+    const updateData = {
+      status: "received",
+      receivedDate: now.toISOString().split('T')[0], // YYYY-MM-DD format
+      receivedAt: now,
+      receiver_emp_id: receiver_emp_id
+    };
+
+    const updatedReport = await ReportModel.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedReport) {
+      return res.status(404).json({
+        success: false,
+        message: "Failed to update report"
+      });
+    }
+
+    // Emit socket event for real-time updates
+    io.emit("washing-report-updated", updatedReport);
+
+    res.status(200).json({
+      success: true,
+      message: "Report marked as received successfully",
+      data: updatedReport
+    });
+  } catch (error) {
+    console.error("Error marking report as received:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to mark report as received",
+      error: error.message
+    });
+  }
+};
+
+
+
 // Get unique colors for autocomplete
 export const getUniqueColors = async (req, res) => {
   try {
@@ -1010,3 +1103,4 @@ export const getUniqueColors = async (req, res) => {
     });
   }
 };
+

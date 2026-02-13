@@ -193,7 +193,7 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "") => {
       ? new Date(report.createdAt).toLocaleString('en-GB', { hour12: true })
       : (report.submittedAt ? new Date(report.submittedAt).toLocaleString('en-GB', { hour12: true }) : "N/A");
 
-    addInfoRow("Submitted By:", report.engName || report.userName || report.userId || "N/A", "Submitted At:", submittedAt);
+    addInfoRow("Submitted By:", report.reporter_name || report.reporter_emp_id || "N/A", "Submitted At:", submittedAt);
 
     currentRow++;
 
@@ -206,9 +206,10 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "") => {
     // --- Dynamic Extra Fields Section ---
     const skipFields = [
       "reportType", "ymStyle", "buyerStyle", "color", "po", "exFtyDate", "factory", "status",
-      "createdAt", "updatedAt", "submittedAt", "userId", "userName", "engName", "notes",
+      "createdAt", "updatedAt", "submittedAt", "reporter_emp_id", "reporter_name", "reporter_status", "notes",
       "images", "receivedImages", "completionImages", "receivedNotes", "completionNotes",
-      "receivedDate", "receivedAt", "completedDate", "completedAt", "_id", "id", "__v"
+      "receivedDate", "receivedAt", "completedDate", "completedAt", "_id", "id", "__v",
+      "userId", "userName", "engName" // Legacy fields
     ];
 
     const extraFields = Object.keys(report).filter(key => !skipFields.includes(key));

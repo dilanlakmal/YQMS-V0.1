@@ -57,10 +57,12 @@ const RightArrowIcon = React.memo(() => (
 const BUCKET_COLORS = {
     prepared: { primary: '#FF6B6B', secondary: '#FF8E53', name: 'Prepared' },
     checked: { primary: '#4ECDC4', secondary: '#44A08D', name: 'Checked' },
-    approved: { primary: '#45B7D1', secondary: '#5F27CD', name: 'Approved' }
+    approved: { primary: '#45B7D1', secondary: '#5F27CD', name: 'Approved' },
+    admin: { primary: '#F093FB', secondary: '#F5576C', name: 'Admin' },
+    userWarehouse: { primary: '#FFA726', secondary: '#FB8C00', name: 'Warehouse' }
 };
 
-const GameAssignControl = ({ socket }) => {
+const GameAssignControl = ({ socket, user }) => {
     const [users, setUsers] = useState([]);
     const [assignments, setAssignments] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null);
@@ -70,7 +72,9 @@ const GameAssignControl = ({ socket }) => {
     const [dropTargets, setDropTargets] = useState({
         prepared: null,
         checked: null,
-        approved: null
+        approved: null,
+        admin: null,
+        userWarehouse: null
     });
     const [isDragging, setIsDragging] = useState(false);
     const [dragOverTarget, setDragOverTarget] = useState(null);
@@ -80,10 +84,14 @@ const GameAssignControl = ({ socket }) => {
     const [currentAssignment, setCurrentAssignment] = useState({
         preparedBy: null,
         checkedBy: null,
-        approvedBy: null
+        approvedBy: null,
+        admin: null,
+        userWarehouse: null
     });
 
     const [activeAssignmentId, setActiveAssignmentId] = useState(null);
+    // Use ref to prevent race conditions when dropping multiple bubbles quickly
+    const activeAssignmentIdRef = useRef(null);
 
     const scrollContainerRef = useRef(null);
 
@@ -136,6 +144,41 @@ const GameAssignControl = ({ socket }) => {
         fetchAssignments();
     }, []);
 
+    // Filter assignments based on user role
+    const filteredAssignments = useMemo(() => {
+        if (!user || !assignments.length) return [];
+
+        // Admin sees all
+        // Check both role AND specific admin IDs
+        if (user.role === 'admin' || user.role === 'super_admin' || user.role === 'user_admin' || user.emp_id === 'TYM055') {
+            return assignments;
+        }
+
+        // Regular users see only assignments where they are involved OR where they performed the update
+        const userId = user.emp_id;
+        const userName = user.name || user.eng_name;
+
+        return assignments.filter(assignment => {
+            // Check if user ID or Name matches any role field
+            // Helper to check a field
+            const checkField = (fieldValue) => {
+                if (!fieldValue) return false;
+                // Field value could be object or string/number
+                const val = typeof fieldValue === 'object' ? (fieldValue.emp_id || fieldValue.name) : fieldValue;
+                return String(val) === String(userId) || String(val) === String(userName);
+            };
+
+            return (
+                checkField(assignment.preparedBy) ||
+                checkField(assignment.checkedBy) ||
+                checkField(assignment.approvedBy) ||
+                checkField(assignment.admin) ||
+                checkField(assignment.userWarehouse) ||
+                checkField(assignment.updatedBy) // This should cover the creator/updater
+            );
+        });
+    }, [assignments, user]);
+
     const fetchUsers = useCallback(async () => {
         try {
             const response = await axios.get(`${API_BASE_URL}/api/users`);
@@ -173,12 +216,16 @@ const GameAssignControl = ({ socket }) => {
         setCurrentAssignment({
             preparedBy: assignment.preparedBy,
             checkedBy: assignment.checkedBy,
-            approvedBy: assignment.approvedBy
+            approvedBy: assignment.approvedBy,
+            admin: assignment.admin,
+            userWarehouse: assignment.userWarehouse
         });
         setDropTargets({
             prepared: assignment.preparedBy,
             checked: assignment.checkedBy,
-            approved: assignment.approvedBy
+            approved: assignment.approvedBy,
+            admin: assignment.admin,
+            userWarehouse: assignment.userWarehouse
         });
     }, []);
 
@@ -199,7 +246,9 @@ const GameAssignControl = ({ socket }) => {
         const existingAssignment = assignments.find(assignment =>
             assignment.preparedBy === value ||
             assignment.checkedBy === value ||
-            assignment.approvedBy === value
+            assignment.approvedBy === value ||
+            assignment.admin === value ||
+            assignment.userWarehouse === value
         );
 
         if (existingAssignment) {
@@ -238,6 +287,12 @@ const GameAssignControl = ({ socket }) => {
 
         if (!userId) return;
 
+        // Prevent concurrent drops (race condition protection)
+        if (isSubmitting) {
+            console.log('[Frontend] Drop ignored - submission in progress');
+            return;
+        }
+
         // Update drop targets
         const newTargets = { ...dropTargets, [target]: userId };
         setDropTargets(newTargets);
@@ -253,7 +308,7 @@ const GameAssignControl = ({ socket }) => {
 
         // Keep the user selected for multiple assignments 
         // (lines removed to prevent auto-clearing)
-    }, [dropTargets]);
+    }, [dropTargets, isSubmitting]);
 
     // Memoize getUserName helper to prevent recreation
     const getUserName = useCallback((userId) => {
@@ -273,40 +328,50 @@ const GameAssignControl = ({ socket }) => {
                 checkedByName: getUserName(targets.checked),
                 approvedBy: targets.approved,
                 approvedByName: getUserName(targets.approved),
-                updatedBy: selectedUser || targets.prepared || targets.checked || targets.approved
+                admin: targets.admin,
+                adminName: getUserName(targets.admin),
+                userWarehouse: targets.userWarehouse,
+                userWarehouseName: getUserName(targets.userWarehouse),
+                updatedBy: selectedUser || targets.prepared || targets.checked || targets.approved || targets.admin || targets.userWarehouse
             };
 
-            // Determine which ID to update:
-            // ONLY explicitly specified ID activeAssignmentId
-            // If activeAssignmentId is null, we CREATE NEW (POST)
-            const targetId = activeAssignmentId;
+            // Use ref to check current ID (prevents race conditions)
+            const currentId = activeAssignmentIdRef.current;
 
-            if (targetId) {
+            // Clear logic: If we have an activeAssignmentId, UPDATE it. Otherwise, CREATE new.
+            if (currentId) {
+                // UPDATE existing assignment using PUT endpoint
+                console.log(`[Frontend] UPDATING assignment ID: ${currentId}`);
                 await axios.put(
-                    `${API_BASE_URL}/api/assign-control/${targetId}`,
+                    `${API_BASE_URL}/api/assign-control/${currentId}`,
                     payload
                 );
-
-                // If we didn't have an active ID (fallback case), set it now
-                if (!activeAssignmentId) setActiveAssignmentId(targetId);
+                showToast.success('✓ Assignment updated!');
 
             } else {
+                // CREATE new assignment using POST endpoint
+                console.log('[Frontend] CREATING new assignment');
                 const response = await axios.post(`${API_BASE_URL}/api/assign-control`, payload);
-                // Set the new assignment as active
+
+                // Set the newly created assignment as active for future updates
                 if (response.data && response.data._id) {
-                    setActiveAssignmentId(response.data._id);
+                    const newId = response.data._id;
+                    console.log(`[Frontend] New assignment created with ID: ${newId}`);
+
+                    // Update BOTH state and ref immediately
+                    activeAssignmentIdRef.current = newId;
+                    setActiveAssignmentId(newId);
                 }
+                showToast.success('✓ New assignment created!');
             }
 
-            showToast.success('✓ Assignment updated!');
-
         } catch (error) {
-            console.error('Error submitting assignment:', error);
-            showToast.error('Failed to update assignment');
+            console.error('[Frontend] Error submitting assignment:', error);
+            showToast.error('Failed to save assignment');
         } finally {
             setIsSubmitting(false);
         }
-    }, [dropTargets, getUserName, selectedUser, activeAssignmentId]);
+    }, [dropTargets, getUserName, selectedUser]);
 
     const handleClearBucket = useCallback((bucket) => {
         const newTargets = { ...dropTargets, [bucket]: null };
@@ -314,21 +379,38 @@ const GameAssignControl = ({ socket }) => {
         submitAssignment(newTargets);
     }, [dropTargets]);
 
-    const handleClearAll = useCallback(() => {
+    const resetForm = useCallback(() => {
         setDropTargets({
             prepared: null,
             checked: null,
-            approved: null
+            approved: null,
+            admin: null,
+            userWarehouse: null
         });
         setCurrentAssignment({
             preparedBy: null,
             checkedBy: null,
-            approvedBy: null
+            approvedBy: null,
+            admin: null,
+            userWarehouse: null
         });
         setSelectedUser(null);
         setSelectedUserName('');
-        setActiveAssignmentId(null); // CRITICAL: Reset ID so next submit creates NEW record
+
+        // Reset BOTH state and ref
+        activeAssignmentIdRef.current = null;
+        setActiveAssignmentId(null);
     }, []);
+
+    const handleClearAll = useCallback(() => {
+        if (isSubmitting) return;
+
+        if (activeAssignmentId) {
+            setDeleteConfirmation({ isOpen: true, id: activeAssignmentId });
+        } else {
+            resetForm();
+        }
+    }, [activeAssignmentId, resetForm, isSubmitting]);
 
     const handleLoadAssignment = useCallback((assignment) => {
         // Create a copy of the assignment data to ensure valid string values
@@ -337,28 +419,35 @@ const GameAssignControl = ({ socket }) => {
             preparedBy: typeof assignment.preparedBy === 'object' ? assignment.preparedBy?.name : assignment.preparedBy,
             checkedBy: typeof assignment.checkedBy === 'object' ? assignment.checkedBy?.name : assignment.checkedBy,
             approvedBy: typeof assignment.approvedBy === 'object' ? assignment.approvedBy?.name : assignment.approvedBy,
+            admin: typeof assignment.admin === 'object' ? assignment.admin?.name : assignment.admin,
+            userWarehouse: typeof assignment.userWarehouse === 'object' ? assignment.userWarehouse?.name : assignment.userWarehouse,
             updatedBy: typeof assignment.updatedBy === 'object' ? assignment.updatedBy?.name : assignment.updatedBy,
             _id: assignment._id
         };
 
-        // Set this as the active assignment for updates
+        // Set this as the active assignment for updates (both state and ref)
+        activeAssignmentIdRef.current = safeAssignment._id;
         setActiveAssignmentId(safeAssignment._id);
 
         // Load assignment values into buckets
         setDropTargets({
             prepared: safeAssignment.preparedBy,
             checked: safeAssignment.checkedBy,
-            approved: safeAssignment.approvedBy
+            approved: safeAssignment.approvedBy,
+            admin: safeAssignment.admin,
+            userWarehouse: safeAssignment.userWarehouse
         });
         setCurrentAssignment({
             preparedBy: safeAssignment.preparedBy,
             checkedBy: safeAssignment.checkedBy,
-            approved: safeAssignment.approvedBy
+            approved: safeAssignment.approvedBy,
+            admin: safeAssignment.admin,
+            userWarehouse: safeAssignment.userWarehouse
         });
 
         // SMART SELECT: Prioritize selecting a user who is actually in this assignment
         // This lets you immediately "pick up" where you left off
-        const activeUser = assignment.preparedBy || assignment.checkedBy || assignment.approvedBy || assignment.updatedBy;
+        const activeUser = assignment.preparedBy || assignment.checkedBy || assignment.approvedBy || assignment.admin || assignment.userWarehouse || assignment.updatedBy;
 
         if (activeUser) {
             setSelectedUser(activeUser);
@@ -435,7 +524,7 @@ const GameAssignControl = ({ socket }) => {
 
             // If we deleted the active assignment, clear the board
             if (activeAssignmentId === id) {
-                handleClearAll();
+                resetForm();
             }
         } catch (error) {
             console.error('Error deleting assignment:', error);
@@ -443,7 +532,7 @@ const GameAssignControl = ({ socket }) => {
         } finally {
             setDeleteConfirmation({ isOpen: false, id: null });
         }
-    }, [deleteConfirmation.id, activeAssignmentId, handleClearAll]);
+    }, [deleteConfirmation.id, activeAssignmentId, resetForm]);
 
     return (
         <div className="game-assign-control-compact1">
@@ -629,7 +718,7 @@ const GameAssignControl = ({ socket }) => {
 
             {/* Assignment History - Compact Horizontal */}
             {
-                assignments.length > 0 && (
+                filteredAssignments.length > 0 && (
                     <motion.div
                         className="history-compact"
                         initial={{ opacity: 0, y: 20 }}
@@ -644,13 +733,13 @@ const GameAssignControl = ({ socket }) => {
                                 className="scroll-btn left"
                                 onClick={scrollLeft}
                                 aria-label="Scroll Left"
-                                style={{ display: assignments.length > 5 ? 'flex' : 'none' }}
+                                style={{ display: filteredAssignments.length > 5 ? 'flex' : 'none' }}
                             >
                                 <LeftArrowIcon />
                             </button>
 
                             <div className="history-scroll" ref={scrollContainerRef}>
-                                {assignments.map((assignment, index) => (
+                                {filteredAssignments.map((assignment, index) => (
                                     <motion.div
                                         key={assignment._id}
                                         className="history-card"
@@ -678,6 +767,8 @@ const GameAssignControl = ({ socket }) => {
                                             <span className="badge prepared">{getDisplayName(assignment.preparedBy, assignment.preparedByName)}</span>
                                             <span className="badge checked">{getDisplayName(assignment.checkedBy, assignment.checkedByName)}</span>
                                             <span className="badge approved">{getDisplayName(assignment.approvedBy, assignment.approvedByName)}</span>
+                                            <span className="badge admin">{getDisplayName(assignment.admin, assignment.adminName)}</span>
+                                            <span className="badge userWarehouse">{getDisplayName(assignment.userWarehouse, assignment.userWarehouseName)}</span>
                                         </div>
                                     </motion.div>
                                 ))}
@@ -688,7 +779,7 @@ const GameAssignControl = ({ socket }) => {
                                 className="scroll-btn right"
                                 onClick={scrollRight}
                                 aria-label="Scroll Right"
-                                style={{ display: assignments.length > 5 ? 'flex' : 'none' }}
+                                style={{ display: filteredAssignments.length > 5 ? 'flex' : 'none' }}
                             >
                                 <RightArrowIcon />
                             </button>

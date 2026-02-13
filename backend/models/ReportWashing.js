@@ -12,8 +12,9 @@ const reportWashingSchema = new mongoose.Schema(
     sendToHomeWashingDate: { type: Date, default: Date.now },
     images: { type: [String], default: [] }, // Array of base64 image strings
     notes: { type: String, default: "" }, // Notes added during initial form submission
-    userId: { type: String, default: "" },
-    userName: { type: String, default: "" },
+    reporter_emp_id: { type: String, default: "" }, // Employee ID of user who submitted the report
+    reporter_status: { type: String, default: "done" },
+    reporter_name: { type: String, default: "" },
     submittedAt: { type: Date, default: Date.now },
 
     // Explicit Schema Definitions for Complex Fields
@@ -25,15 +26,17 @@ const reportWashingSchema = new mongoose.Schema(
     shrinkageRows: { type: Array, default: [] },
     visualAssessmentRows: { type: Array, default: [] },
     // QR Scan Status Fields
-    status: { type: String, default: "pending", enum: ["pending", "received", "completed"] },
+
     receivedDate: { type: String, default: null }, // Date string when first scanned
     receivedAt: { type: Date, default: null }, // Full timestamp when first scanned
+    receiver_emp_id: { type: String, default: null }, // Employee ID of user who scanned/received
+    receiver_status: { type: String, default: "pending" },
     receivedNotes: { type: String, default: "" }, // Notes added during received status
     receivedImages: { type: [String], default: [] }, // Images added during received status
     completedDate: { type: String, default: null }, // Date string when completed
     completedAt: { type: Date, default: null }, // Full timestamp when completed
+    completionImages: { type: [String], default: [] }, // Images added during completion
     completionNotes: { type: String, default: "" }, // Notes added during completion
-    completionImages: { type: [String], default: [] } // Images added during completion
   },
   {
     strict: false,

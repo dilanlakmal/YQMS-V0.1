@@ -1,4 +1,5 @@
 import React from "react";
+import { useAuth } from "../../authentication/AuthContext";
 import { ChevronDown, ChevronUp, Printer, FileText, FileSpreadsheet, Pencil, Trash2, QrCode, CheckCircle } from "lucide-react";
 import ReportTimeline from "./ReportTimeline";
 
@@ -87,8 +88,51 @@ const ReportCard = ({
   onEditCompletionImages,
   restrictDeleteStatuses = [], // List of statuses that prevent deletion
   restrictEditStatuses = [], // List of statuses that prevent editing
+  enableRoleLocking = false, // If true, applies reporter/receiver status locking
+  isAdminUser = false,
+  isWarehouseUser = false,
 }) => {
+  const { user } = useAuth();
   const reportId = report._id || report.id;
+
+  // Check if edit should be locked based on user role and status
+  const isEditLocked = () => {
+    if (isAdminUser) return false; // Admins are NEVER locked
+    if (!enableRoleLocking) return false;
+    if (!user) return false;
+    const empId = user.emp_id || user.id; // handle both emp_id or id if prevalent
+
+    // Reporter Logic: Lock if reporter_status is 'done'
+    if (report.reporter_emp_id === empId && report.reporter_status === 'done') {
+      return true;
+    }
+
+    // Receiver Logic: Lock if receiver_status is 'received' or 'completed' (assuming 'completed' implies deeper lock)
+    // The user requirement: "receiverempid receiver status = pending edit still can click and if receiver status = received it will locked"
+    if (report.receiver_emp_id === empId && (report.receiver_status === 'received' || report.receiver_status === 'completed')) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // Permissions Calculation
+  const isCreator = (report.userSubmit && String(user?.emp_id) === String(report.userSubmit)) ||
+    (report.reporter_emp_id && String(user?.emp_id) === String(report.reporter_emp_id));
+
+  // canUserEdit/Delete should allow admins regardless of anything
+  const canUserEdit = isAdminUser || isCreator || isWarehouseUser;
+  const canUserDelete = isAdminUser || isCreator || isWarehouseUser;
+
+  // Hard rule: Completed reports cannot be edited or deleted by anyone, including admins
+  const isCompleted = report.status === 'completed';
+
+  // Buttons are hidden based on status restrictions, OR if report is completed
+  const shouldHideEditButton = !canUserEdit || isCompleted || (!isAdminUser && restrictEditStatuses && restrictEditStatuses.includes(report.status));
+  const shouldHideDeleteButton = !canUserDelete || isCompleted || (!isAdminUser && restrictDeleteStatuses && restrictDeleteStatuses.includes(report.status));
+
+  // Timeline uploads/edits follow the same "canUserEdit" logic
+  const isActionLocked = isEditLocked(); // Use more granular isEditLocked instead of just canUserEdit
 
   return (
     <div
@@ -163,7 +207,7 @@ const ReportCard = ({
               <FileSpreadsheet size={14} />
               <span className="hidden sm:inline">Excel</span>
             </button>
-            {(!restrictEditStatuses || !restrictEditStatuses.includes(report.status)) && (
+            {!shouldHideEditButton && (
               <button
                 onClick={(e) => {
                   e.preventDefault();
@@ -177,7 +221,7 @@ const ReportCard = ({
                 <span className="hidden sm:inline">Edit</span>
               </button>
             )}
-            {onDelete && (!restrictDeleteStatuses || !restrictDeleteStatuses.includes(report.status)) && (
+            {onDelete && !shouldHideDeleteButton && (
               <button
                 onClick={() => onDelete(reportId)}
                 className="px-2 md:px-3 py-1.5 text-xs md:text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-md hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors flex items-center gap-1"
@@ -343,7 +387,7 @@ const ReportCard = ({
                 Submitted By
               </p>
               <p className="text-sm text-gray-900 dark:text-white">
-                {report.userName || report.userId || "N/A"}
+                {report.reporter_name || report.reporter_emp_id || "N/A"}
               </p>
             </div>
           </div>
@@ -478,9 +522,10 @@ const ReportCard = ({
             report={report}
             savedImageRotations={savedImageRotations}
             openImageViewer={openImageViewer}
-            onEditInitialImages={onEditInitialImages}
-            onEditReceivedImages={onEditReceivedImages}
-            onEditCompletionImages={onEditCompletionImages}
+            onEditInitialImages={isActionLocked ? null : onEditInitialImages}
+            onEditReceivedImages={isActionLocked ? null : onEditReceivedImages}
+            onEditCompletionImages={isActionLocked ? null : onEditCompletionImages}
+            isAdminUser={isAdminUser}
           />
         </>
       )

@@ -13,6 +13,7 @@ const QRCodeModal = ({
   onOpenScanner,
   getQRCodeBaseURL,
   fileInputRef,
+  isLocked = false,
 }) => {
   const qrCodeContainerRef = useRef(null);
   // Animated Logo Component for the QR center
@@ -125,16 +126,18 @@ const QRCodeModal = ({
 
             </div>
 
-            <div className="mt-0 flex justify-center">
-              <button
-                type="button"
-                onClick={() => onOpenScanner(reportId)}
-                className="p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transform transition-all duration-300 hover:scale-125 active:scale-95 group"
-                title="Open Live Camera Scanner"
-              >
-                <Camera size={32} className="group-hover:rotate-12 transition-transform" />
-              </button>
-            </div>
+            {!isLocked && (
+              <div className="mt-0 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => onOpenScanner(reportId)}
+                  className="p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transform transition-all duration-300 hover:scale-125 active:scale-95 group"
+                  title="Open Live Camera Scanner"
+                >
+                  <Camera size={32} className="group-hover:rotate-12 transition-transform" />
+                </button>
+              </div>
+            )}
 
             <div className="w-full mt-1 space-y-2">
               <div className="relative">
@@ -158,26 +161,30 @@ const QRCodeModal = ({
                 <span className="font-bold text-sm tracking-wide">Print QR Stamp</span>
               </button>
 
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                onChange={(e) => onUploadQRCode(e, reportId)}
-                className="hidden"
-                id={`qr-upload-${reportId}`}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const input = document.getElementById(`qr-upload-${reportId}`);
-                  if (input) input.click();
-                }}
-                className="group relative w-full px-6 py-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-xl transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden shadow-sm hover:shadow-md"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <Upload size={18} className="group-hover:scale-110 transition-transform" />
-                <span className="font-semibold text-sm">Upload QR Image</span>
-              </button>
+              {!isLocked && (
+                <>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={(e) => onUploadQRCode(e, reportId)}
+                    className="hidden"
+                    id={`qr-upload-${reportId}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const input = document.getElementById(`qr-upload-${reportId}`);
+                      if (input) input.click();
+                    }}
+                    className="group relative w-full px-6 py-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-xl transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden shadow-sm hover:shadow-md"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <Upload size={18} className="group-hover:scale-110 transition-transform" />
+                    <span className="font-semibold text-sm">Upload QR Image</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

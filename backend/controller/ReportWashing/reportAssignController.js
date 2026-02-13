@@ -14,50 +14,43 @@ export const getAssignControl = async (req, res) => {
     }
 };
 
-// Save Assignment Control Data
+// Save Assignment Control Data (CREATE NEW ONLY)
 export const saveAssignControl = async (req, res) => {
     try {
         const {
-            _id,
             preparedBy, preparedByName,
             checkedBy, checkedByName,
-            approvedBy, approvedByName
+            approvedBy, approvedByName,
+            admin, adminName,
+            userWarehouse, userWarehouseName
         } = req.body;
 
-        console.log(`[AssignControl] Saving: ID=${_id}`);
+        console.log('[AssignControl] CREATING new assignment:');
         console.log(`  PreparedBy=${preparedBy} (${preparedByName})`);
         console.log(`  CheckedBy=${checkedBy} (${checkedByName})`);
         console.log(`  ApprovedBy=${approvedBy} (${approvedByName})`);
+        console.log(`  Admin=${admin} (${adminName})`);
+        console.log(`  UserWarehouse=${userWarehouse} (${userWarehouseName})`);
+        console.log(`  UserWarehouse=${userWarehouse} (${userWarehouseName})`);
 
-        let updatedData;
+        // Create a NEW record (History/Audit trail)
+        const newAssignment = await ReportAssignControl.create({
+            preparedBy, preparedByName,
+            checkedBy, checkedByName,
+            approvedBy, approvedByName,
+            admin, adminName,
+            userWarehouse, userWarehouseName
+        });
 
-        if (_id) {
-            // If ID is provided, update that specific document
-            updatedData = await ReportAssignControl.findByIdAndUpdate(
-                _id,
-                {
-                    preparedBy, preparedByName,
-                    checkedBy, checkedByName,
-                    approvedBy, approvedByName
-                },
-                { new: true }
-            );
-            io.emit('assignment:updated', updatedData);
-        } else {
-            // If no ID, create a NEW record (History/Audit trail)
-            updatedData = await ReportAssignControl.create({
-                preparedBy, preparedByName,
-                checkedBy, checkedByName,
-                approvedBy, approvedByName
-            });
-            io.emit('assignment:created', updatedData);
-        }
+        console.log('[AssignControl] Created successfully with ID:', newAssignment._id);
 
-        console.log("[AssignControl] Saved successfully:", updatedData);
-        res.status(200).json(updatedData);
+        // Emit socket event for real-time updates
+        io.emit('assignment:created', newAssignment);
+
+        res.status(201).json(newAssignment);
     } catch (error) {
-        console.error("[AssignControl] Error saving assign control:", error);
-        res.status(500).json({ message: "Error saving assignment control data", error: error.message });
+        console.error('[AssignControl] Error creating assignment:', error);
+        res.status(500).json({ message: "Error creating assignment control data", error: error.message });
     }
 };
 
@@ -68,20 +61,27 @@ export const updateAssignControl = async (req, res) => {
         const {
             preparedBy, preparedByName,
             checkedBy, checkedByName,
-            approvedBy, approvedByName
+            approvedBy, approvedByName,
+            admin, adminName,
+            userWarehouse, userWarehouseName
         } = req.body;
 
         console.log(`[AssignControl] Updating: ID=${id}`);
         console.log(`  PreparedBy=${preparedBy} (${preparedByName})`);
         console.log(`  CheckedBy=${checkedBy} (${checkedByName})`);
         console.log(`  ApprovedBy=${approvedBy} (${approvedByName})`);
+        console.log(`  Admin=${admin} (${adminName})`);
+        console.log(`  UserWarehouse=${userWarehouse} (${userWarehouseName})`);
+        console.log(`  UserWarehouse=${userWarehouse} (${userWarehouseName})`);
 
         const updatedData = await ReportAssignControl.findByIdAndUpdate(
             id,
             {
                 preparedBy, preparedByName,
                 checkedBy, checkedByName,
-                approvedBy, approvedByName
+                approvedBy, approvedByName,
+                admin, adminName,
+                userWarehouse, userWarehouseName
             },
             { new: true }
         );

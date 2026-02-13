@@ -27,6 +27,22 @@ const reportAssignControlSchema = new mongoose.Schema(
             type: String,
             default: null
         },
+        admin: {
+            type: String,
+            default: null
+        },
+        adminName: {
+            type: String,
+            default: null
+        },
+        userWarehouse: {
+            type: String,
+            default: null
+        },
+        userWarehouseName: {
+            type: String,
+            default: null
+        },
         updatedAt: { type: Date, default: Date.now }
     },
     {

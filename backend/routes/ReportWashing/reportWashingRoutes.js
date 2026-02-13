@@ -7,7 +7,8 @@ import {
   deleteReportWashing,
   getWashingMachineTestImage,
   getUniqueStyles,
-  getUniqueColors
+  getUniqueColors,
+  scanReceived
 } from "../../controller/ReportWashing/reportWashingController.js";
 import { uploadWashingMachineTestImage } from "../../helpers/helperFunctions.js";
 
@@ -34,6 +35,9 @@ router.put(
   updateReportWashing
 );
 router.delete("/api/report-washing/:id", deleteReportWashing);
+
+// QR Code Scan route
+router.patch("/api/report-washing/:id/scan-received", scanReceived);
 
 // Route to serve washing machine test images
 router.get("/api/report-washing/image/:filename", getWashingMachineTestImage);

@@ -578,7 +578,7 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     color: #667eea;
     transition: all 0.2s ease;
     z-index: 5;
@@ -603,11 +603,13 @@
     scroll-behavior: smooth;
     flex: 1;
     /* Hide scrollbar for cleaner look if buttons are used */
-    scrollbar-width: none; /* Firefox */
+    scrollbar-width: none;
+    /* Firefox */
 }
 
 .history-scroll::-webkit-scrollbar {
-    display: none; /* Chrome/Safari */
+    display: none;
+    /* Chrome/Safari */
 }
 
 .history-card {
@@ -718,6 +720,21 @@
     background: rgba(69, 183, 209, 0.15);
     border: 1px solid #45B7D1;
 }
+
+.badge.admin {
+    color: #F093FB;
+    background: rgba(240, 147, 251, 0.15);
+    border: 1px solid #F093FB;
+}
+
+.badge.userWarehouse {
+    color: #FFA726;
+    background: rgba(255, 167, 38, 0.15);
+    border: 1px solid #FFA726;
+}
+
+
+
 
 /* Responsive */
 @media (max-width: 1024px) {

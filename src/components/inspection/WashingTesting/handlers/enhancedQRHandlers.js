@@ -15,13 +15,15 @@ import showToast from '../../../../utils/toast';
  * @param {function} setShowReportDateScanner - Scanner modal state setter
  * @param {function} stopScanner - Function to stop scanner
  * @param {object} statusCheckIntervalRef - Ref for status check interval
+ * @param {string} receiver_emp_id - Employee ID of user who scanned the QR code
  */
 export const processQRScanFromURL = async (
     targetReportId,
     fetchReports,
     setShowReportDateScanner,
     stopScanner,
-    statusCheckIntervalRef
+    statusCheckIntervalRef,
+    receiver_emp_id
 ) => {
     try {
         // Update the report's receivedDate
@@ -32,6 +34,7 @@ export const processQRScanFromURL = async (
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                body: JSON.stringify({ receiver_emp_id })
             }
         );
 

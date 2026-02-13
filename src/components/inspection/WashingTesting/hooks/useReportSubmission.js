@@ -32,11 +32,11 @@ export const useReportSubmission = (user, fetchReports) => {
       formDataToSubmit.append("factory", formData.factory || "");
       formDataToSubmit.append("sendToHomeWashingDate", formData.sendToHomeWashingDate || "");
       formDataToSubmit.append("notes", formData.notes || "");
-      formDataToSubmit.append("userId", user?.id || user?._id || "");
-      formDataToSubmit.append("userName", user?.name || user?.username || "");
+      formDataToSubmit.append("reporter_emp_id", user?.emp_id || user?.id || user?._id || "");
+      formDataToSubmit.append("reporter_name", user?.name || user?.username || "");
 
       // Add all other fields dynamically (avoiding already added ones, images, and complex objects)
-      const skipFields = ["reportType", "ymStyle", "buyerStyle", "color", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "notes", "images", "userId", "userName", "careLabelImage"];
+      const skipFields = ["reportType", "ymStyle", "buyerStyle", "color", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "notes", "images", "userId", "userName", "reporter_emp_id", "reporter_name", "careLabelImage"];
       Object.keys(formData).forEach(key => {
         if (!skipFields.includes(key) && formData[key] !== undefined && formData[key] !== null) {
           if (key === 'shrinkageRows' && Array.isArray(formData[key])) {
@@ -157,6 +157,11 @@ export const useReportSubmission = (user, fetchReports) => {
         formDataToSubmit.append("status", "received");
         formDataToSubmit.append("receivedDate", currentDateOnly);
         formDataToSubmit.append("receivedAt", currentDate);
+        // Add receiver_emp_id and update receiver_status
+        if (user?.emp_id) {
+          formDataToSubmit.append("receiver_emp_id", user.emp_id);
+          formDataToSubmit.append("receiver_status", "received");
+        }
       }
 
       const response = await fetch(`${API_BASE_URL}/api/report-washing/${reportId}`, {
@@ -236,6 +241,12 @@ export const useReportSubmission = (user, fetchReports) => {
       formDataToSubmit.append("completedDate", new Date().toISOString().split("T")[0]);
       formDataToSubmit.append("completedAt", new Date().toISOString());
 
+      // Add completer_emp_id and update receiver_status to completed
+      if (user?.emp_id) {
+        formDataToSubmit.append("completer_emp_id", user.emp_id);
+        formDataToSubmit.append("receiver_status", "completed");
+      }
+
       // Use the dynamic field name
       formDataToSubmit.append(noteFieldName, completionNotes || "");
 
@@ -308,7 +319,7 @@ export const useReportSubmission = (user, fetchReports) => {
       formDataToSubmit.append("sendToHomeWashingDate", editFormData.sendToHomeWashingDate || "");
 
       // Add all other fields dynamically
-      const skipFields = ["reportType", "color", "buyerStyle", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "images", "completionNotes", "careLabelImage"];
+      const skipFields = ["reportType", "color", "buyerStyle", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "images", "receivedImages", "completionImages", "completionNotes", "careLabelImage"];
       Object.keys(editFormData).forEach(key => {
         if (!skipFields.includes(key) && editFormData[key] !== undefined && editFormData[key] !== null) {
           if (key === 'shrinkageRows' && Array.isArray(editFormData[key])) {
@@ -324,6 +335,45 @@ export const useReportSubmission = (user, fetchReports) => {
           }
         }
       });
+
+      // Handle images (initial)
+      if (editFormData.images && Array.isArray(editFormData.images)) {
+        const existingUrls = editFormData.images.filter(item => typeof item === 'string');
+        if (existingUrls.length > 0) {
+          formDataToSubmit.append("imagesUrls", JSON.stringify(existingUrls));
+        }
+        editFormData.images.forEach(item => {
+          if (item instanceof File) {
+            formDataToSubmit.append("images", item);
+          }
+        });
+      }
+
+      // Handle receivedImages
+      if (editFormData.receivedImages && Array.isArray(editFormData.receivedImages)) {
+        const existingUrls = editFormData.receivedImages.filter(item => typeof item === 'string');
+        if (existingUrls.length > 0) {
+          formDataToSubmit.append("receivedImagesUrls", JSON.stringify(existingUrls));
+        }
+        editFormData.receivedImages.forEach(item => {
+          if (item instanceof File) {
+            formDataToSubmit.append("receivedImages", item);
+          }
+        });
+      }
+
+      // Handle completionImages
+      if (editFormData.completionImages && Array.isArray(editFormData.completionImages)) {
+        const existingUrls = editFormData.completionImages.filter(item => typeof item === 'string');
+        if (existingUrls.length > 0) {
+          formDataToSubmit.append("completionImagesUrls", JSON.stringify(existingUrls));
+        }
+        editFormData.completionImages.forEach(item => {
+          if (item instanceof File) {
+            formDataToSubmit.append("completionImages", item);
+          }
+        });
+      }
 
       // Handle careLabelImage as an array of files or URLs
       if (editFormData.careLabelImage && Array.isArray(editFormData.careLabelImage)) {

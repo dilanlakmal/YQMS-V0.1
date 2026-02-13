@@ -2,7 +2,7 @@ import React from "react";
 import { Pencil, Plus } from "lucide-react";
 import { normalizeImageUrl, getImageFilename, getCompletionNotesField } from "./utils";
 
-const ReportTimeline = ({ report, savedImageRotations, openImageViewer, onEditInitialImages, onEditReceivedImages, onEditCompletionImages }) => {
+const ReportTimeline = ({ report, savedImageRotations, openImageViewer, onEditInitialImages, onEditReceivedImages, onEditCompletionImages, isAdminUser = false }) => {
   return (
     <div className="mt-4 space-y-3">
       {/* Step 1: Initial Submission */}

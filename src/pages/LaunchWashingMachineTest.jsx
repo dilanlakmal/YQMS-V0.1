@@ -339,6 +339,21 @@ const LaundryWashingMachineTest = () => {
 
   const [causeAssignHistory, setCauseAssignHistory] = useState([]);
 
+  // Determine current user role restrictions based on active assignment
+  const activeAssign = causeAssignHistory.length > 0 ? causeAssignHistory[0] : null;
+  const isAdminUser = user?.emp_id === "TYM055" || user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'user_admin';
+  const isWarehouseUser = activeAssign && (String(user?.emp_id) === String(activeAssign.userWarehouse)) && !isAdminUser;
+
+  // Handle tab access based on assigned roles
+  useEffect(() => {
+    if (isWarehouseUser && activeTab === "reports") {
+      setActiveTab("warehouse_reports");
+    } else if (!isAdminUser && !isWarehouseUser && activeTab === "warehouse_reports") {
+      // Unassigned users should not see warehouse reports
+      setActiveTab("reports");
+    }
+  }, [isWarehouseUser, activeTab, isAdminUser]);
+
   const fetchAssignControl = useCallback(async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/assign-control`);
@@ -2047,6 +2062,10 @@ const LaundryWashingMachineTest = () => {
 
   // Keyboard and wheel support is now handled in ImageViewerModal component
 
+  // Check if QR actions should be locked (hidden) for Standard Users
+  // Only Admin or Warehouse users can Scan/Upload via QR Modal
+  const isQRLocked = !isAdminUser && !isWarehouseUser;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-gray-100 p-2 sm:p-4 md:p-6">
       <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-lg">
@@ -2096,23 +2115,25 @@ const LaundryWashingMachineTest = () => {
                   <span className="sm:hidden">Create</span>
                 </span>
               </button>
-              <button
-                onClick={() => setActiveTab("reports")}
-                className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "reports"
-                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
-              >
-                <span className="flex items-center gap-1.5 sm:gap-2">
-                  <HiClipboardList className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "reports" ? "text-blue-600" : "text-blue-500/70"}`} />
-                  <span className="hidden sm:inline">Reports ({pagination.totalRecords})</span>
-                  <span className="sm:hidden">Reports <span className="text-[10px] bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded-full">{pagination.totalRecords}</span></span>
-                </span>
-              </button>
 
-              {/* Warehouse Report Tab - Conditionally Hidden based on Role */}
-              {/* Example: Only show warehouse tab if user has permission. Modify the condition as needed. */}
-              {(!user?.role || user?.role !== 'user_assigned_to_hide_warehouse') && (
+              {(isAdminUser || !isWarehouseUser) && (
+                <button
+                  onClick={() => setActiveTab("reports")}
+                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "reports"
+                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+                    }`}
+                >
+                  <span className="flex items-center gap-1.5 sm:gap-2">
+                    <HiClipboardList className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "reports" ? "text-blue-600" : "text-blue-500/70"}`} />
+                    <span className="hidden sm:inline">Reports ({pagination.totalRecords})</span>
+                    <span className="sm:hidden">Reports <span className="text-[10px] bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded-full">{pagination.totalRecords}</span></span>
+                  </span>
+                </button>
+              )}
+
+              {/* Warehouse Report Tab - Show if restricted OR meets other criteria */}
+              {(isAdminUser || isWarehouseUser) && (
                 <button
                   onClick={() => setActiveTab("warehouse_reports")}
                   className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "warehouse_reports"
@@ -2127,19 +2148,22 @@ const LaundryWashingMachineTest = () => {
                   </span>
                 </button>
               )}
-              <button
-                onClick={() => setActiveTab("assign_control")}
-                className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "assign_control"
-                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
-              >
-                <span className="flex items-center gap-1.5 sm:gap-2">
-                  <MdAssignmentInd className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "assign_control" ? "text-purple-600" : "text-purple-500/70"}`} />
-                  <span className="hidden sm:inline">Assign Control</span>
-                  <span className="sm:hidden">Assign</span>
-                </span>
-              </button>
+
+              {isAdminUser && (
+                <button
+                  onClick={() => setActiveTab("assign_control")}
+                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "assign_control"
+                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+                    }`}
+                >
+                  <span className="flex items-center gap-1.5 sm:gap-2">
+                    <MdAssignmentInd className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "assign_control" ? "text-purple-600" : "text-purple-500/70"}`} />
+                    <span className="hidden sm:inline">Assign Control</span>
+                    <span className="sm:hidden">Assign</span>
+                  </span>
+                </button>
+              )}
             </nav>
           </div>
 
@@ -2242,6 +2266,8 @@ const LaundryWashingMachineTest = () => {
               savedImageRotations={savedImageRotations}
               openImageViewer={openImageViewer}
               setActiveTab={setActiveTab}
+              restrictDeleteStatuses={["received", "completed"]}
+              restrictEditStatuses={["received", "completed"]}
               onEditInitialImages={handleEditInitialImages}
               onEditReceivedImages={handleEditReceivedImages}
               onEditCompletionImages={handleEditCompletionImages}
@@ -2266,6 +2292,8 @@ const LaundryWashingMachineTest = () => {
               factories={factories}
               filterReportType={filterReportType}
               setFilterReportType={setFilterReportType}
+              isAdminUser={isAdminUser}
+              isWarehouseUser={isWarehouseUser}
             />
           )}
 
@@ -2298,8 +2326,8 @@ const LaundryWashingMachineTest = () => {
               savedImageRotations={savedImageRotations}
               openImageViewer={openImageViewer}
               setActiveTab={setActiveTab}
-              restrictDeleteStatuses={["received", "completed"]} // Only hide delete for these statuses in Warehouse tab
-              restrictEditStatuses={["completed"]} // Hide edit for completed statuses in Warehouse tab
+              restrictDeleteStatuses={["received", "completed"]}
+              restrictEditStatuses={["received", "completed"]}
               onEditInitialImages={handleEditInitialImages}
               onEditReceivedImages={handleEditReceivedImages}
               onEditCompletionImages={handleEditCompletionImages}
@@ -2324,6 +2352,9 @@ const LaundryWashingMachineTest = () => {
               factories={factories}
               filterReportType={whFilterReportType}
               setFilterReportType={setWhFilterReportType}
+              enableRoleLocking={true}
+              isAdminUser={isAdminUser}
+              isWarehouseUser={isWarehouseUser}
             />
           )}
 
@@ -2334,7 +2365,7 @@ const LaundryWashingMachineTest = () => {
 
           {/* Assign Control Tab */}
           {activeTab === "assign_control" && (
-            <GameAssignControl socket={socket} />
+            <GameAssignControl socket={socket} user={user} />
           )}
 
 
@@ -2439,6 +2470,7 @@ const LaundryWashingMachineTest = () => {
             }}
             getQRCodeBaseURL={() => getQRCodeBaseURL(QR_CODE_BASE_URL)}
             fileInputRef={fileInputRef}
+            isLocked={isQRLocked}
           />
 
           <QRScannerModal
