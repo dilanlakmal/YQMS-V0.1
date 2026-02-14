@@ -12,7 +12,9 @@ import {
   Edit,
   Check,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Download,
+  RefreshCw,
 } from "lucide-react";
 import axios from "axios";
 import Swal from "sweetalert2";
@@ -45,6 +47,10 @@ const YPivotQASectionsProductLocationManagement = () => {
   const frontImageRef = useRef(null);
   const backImageRef = useRef(null);
 
+  // Refs for hidden file inputs
+  const frontFileInputRef = useRef(null);
+  const backFileInputRef = useRef(null);
+
   // Fetch product types on mount
   useEffect(() => {
     fetchProductTypes();
@@ -54,7 +60,7 @@ const YPivotQASectionsProductLocationManagement = () => {
   const fetchProductTypes = async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/qa-sections-product-type`
+        `${API_BASE_URL}/api/qa-sections-product-type`,
       );
       if (response.data.success) {
         setProductTypes(response.data.data);
@@ -64,7 +70,7 @@ const YPivotQASectionsProductLocationManagement = () => {
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: "Failed to load product types"
+        text: "Failed to load product types",
       });
     }
   };
@@ -72,7 +78,7 @@ const YPivotQASectionsProductLocationManagement = () => {
   const fetchSavedConfigurations = async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/qa-sections-product-location`
+        `${API_BASE_URL}/api/qa-sections-product-location`,
       );
       if (response.data.success) {
         setSavedConfigurations(response.data.data);
@@ -91,7 +97,7 @@ const YPivotQASectionsProductLocationManagement = () => {
       Swal.fire({
         icon: "error",
         title: "Invalid File",
-        text: "Please upload an image file"
+        text: "Please upload an image file",
       });
       return;
     }
@@ -100,7 +106,7 @@ const YPivotQASectionsProductLocationManagement = () => {
       Swal.fire({
         icon: "error",
         title: "File Too Large",
-        text: "Please upload an image smaller than 10MB"
+        text: "Please upload an image smaller than 10MB",
       });
       return;
     }
@@ -118,6 +124,47 @@ const YPivotQASectionsProductLocationManagement = () => {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  //hanlde image change
+  const handleImageChange = (e, view) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid File",
+        text: "Please upload an image file",
+      });
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      Swal.fire({
+        icon: "error",
+        title: "File Too Large",
+        text: "Please upload an image smaller than 10MB",
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (view === "front") {
+        setFrontImage(file); // Update state for upload
+        setFrontImagePreview(reader.result); // Update preview
+        // NOTE: We do NOT clear locations here, unlike handleImageUpload
+      } else {
+        setBackImage(file);
+        setBackImagePreview(reader.result);
+        // NOTE: We do NOT clear locations here
+      }
+    };
+    reader.readAsDataURL(file);
+
+    // Reset input so you can select the same file again if needed
+    e.target.value = null;
   };
 
   // Handle image click to mark location
@@ -144,7 +191,7 @@ const YPivotQASectionsProductLocationManagement = () => {
         if (!value) {
           return "Please enter a location name";
         }
-      }
+      },
     }).then((result) => {
       if (result.isConfirmed) {
         const locations = view === "front" ? frontLocations : backLocations;
@@ -153,7 +200,7 @@ const YPivotQASectionsProductLocationManagement = () => {
           LocationName: result.value,
           x: x,
           y: y,
-          tempId: Date.now()
+          tempId: Date.now(),
         };
 
         if (view === "front") {
@@ -167,7 +214,7 @@ const YPivotQASectionsProductLocationManagement = () => {
           title: "Location Added",
           text: `Location "${result.value}" has been marked`,
           timer: 1500,
-          showConfirmButton: false
+          showConfirmButton: false,
         });
       }
     });
@@ -180,7 +227,7 @@ const YPivotQASectionsProductLocationManagement = () => {
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#ef4444",
-      confirmButtonText: "Yes, remove it"
+      confirmButtonText: "Yes, remove it",
     }).then((result) => {
       if (result.isConfirmed) {
         const idToRemove = location._id || location.tempId;
@@ -210,7 +257,7 @@ const YPivotQASectionsProductLocationManagement = () => {
       locations.map((loc) =>
         (loc._id || loc.tempId) === idToUpdate
           ? { ...loc, LocationName: editingLocationName }
-          : loc
+          : loc,
       );
 
     if (view === "front") {
@@ -244,7 +291,7 @@ const YPivotQASectionsProductLocationManagement = () => {
     const idToUpdate = draggingLocation._id || draggingLocation.tempId;
     const updateFn = (locations) =>
       locations.map((loc) =>
-        (loc._id || loc.tempId) === idToUpdate ? { ...loc, x, y } : loc
+        (loc._id || loc.tempId) === idToUpdate ? { ...loc, x, y } : loc,
       );
 
     if (view === "front") {
@@ -264,7 +311,7 @@ const YPivotQASectionsProductLocationManagement = () => {
       Swal.fire({
         icon: "error",
         title: "Validation Error",
-        text: "Please select a product type"
+        text: "Please select a product type",
       });
       return;
     }
@@ -273,7 +320,7 @@ const YPivotQASectionsProductLocationManagement = () => {
       Swal.fire({
         icon: "error",
         title: "Validation Error",
-        text: "Please upload both front and back view images"
+        text: "Please upload both front and back view images",
       });
       return;
     }
@@ -287,7 +334,7 @@ const YPivotQASectionsProductLocationManagement = () => {
         confirmButtonText: "Yes, Continue",
         cancelButtonText: "Go Back",
         confirmButtonColor: "#6366f1",
-        cancelButtonColor: "#6b7280"
+        cancelButtonColor: "#6b7280",
       });
       if (!result.isConfirmed) return;
     }
@@ -303,13 +350,13 @@ const YPivotQASectionsProductLocationManagement = () => {
     setLoading(true);
     try {
       const productTypeObj = productTypes.find(
-        (pt) => pt._id === selectedProductType
+        (pt) => pt._id === selectedProductType,
       );
       const formData = new FormData();
       formData.append("productTypeId", selectedProductType);
       formData.append(
         "productTypeName",
-        productTypeObj?.EnglishProductName || "Unknown"
+        productTypeObj?.EnglishProductName || "Unknown",
       );
       formData.append("frontView", frontImage);
       formData.append("backView", backImage);
@@ -320,15 +367,15 @@ const YPivotQASectionsProductLocationManagement = () => {
         `${API_BASE_URL}/api/qa-sections-product-location`,
         formData,
         {
-          headers: { "Content-Type": "multipart/form-data" }
-        }
+          headers: { "Content-Type": "multipart/form-data" },
+        },
       );
 
       if (response.data.success) {
         await Swal.fire({
           icon: "success",
           title: "Success!",
-          text: "Configuration saved successfully"
+          text: "Configuration saved successfully",
         });
         resetForm();
         fetchSavedConfigurations();
@@ -338,7 +385,7 @@ const YPivotQASectionsProductLocationManagement = () => {
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: error.response?.data?.message || "Failed to save configuration"
+        text: error.response?.data?.message || "Failed to save configuration",
       });
     } finally {
       setLoading(false);
@@ -359,15 +406,15 @@ const YPivotQASectionsProductLocationManagement = () => {
         `${API_BASE_URL}/api/qa-sections-product-location/${editingConfigId}`,
         formData,
         {
-          headers: { "Content-Type": "multipart/form-data" }
-        }
+          headers: { "Content-Type": "multipart/form-data" },
+        },
       );
 
       if (response.data.success) {
         await Swal.fire({
           icon: "success",
           title: "Updated!",
-          text: "Configuration updated successfully"
+          text: "Configuration updated successfully",
         });
         resetForm();
         fetchSavedConfigurations();
@@ -377,7 +424,7 @@ const YPivotQASectionsProductLocationManagement = () => {
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: error.response?.data?.message || "Failed to update configuration"
+        text: error.response?.data?.message || "Failed to update configuration",
       });
     } finally {
       setLoading(false);
@@ -405,13 +452,13 @@ const YPivotQASectionsProductLocationManagement = () => {
       showCancelButton: true,
       confirmButtonColor: "#ef4444",
       cancelButtonColor: "#6b7280",
-      confirmButtonText: "Yes, delete it!"
+      confirmButtonText: "Yes, delete it!",
     });
 
     if (result.isConfirmed) {
       try {
         const response = await axios.delete(
-          `${API_BASE_URL}/api/qa-sections-product-location/${id}`
+          `${API_BASE_URL}/api/qa-sections-product-location/${id}`,
         );
 
         if (response.data.success) {
@@ -420,7 +467,7 @@ const YPivotQASectionsProductLocationManagement = () => {
             title: "Deleted!",
             text: "Configuration has been deleted.",
             timer: 1500,
-            showConfirmButton: false
+            showConfirmButton: false,
           });
           fetchSavedConfigurations();
         }
@@ -429,7 +476,7 @@ const YPivotQASectionsProductLocationManagement = () => {
           icon: "error",
           title: "Error",
           text:
-            error.response?.data?.message || "Failed to delete configuration"
+            error.response?.data?.message || "Failed to delete configuration",
         });
       }
     }
@@ -444,12 +491,12 @@ const YPivotQASectionsProductLocationManagement = () => {
     setFrontImagePreview(
       `${API_BASE_URL}/api/qa-sections-product-location/image/${config.frontView.imagePath
         .split("/")
-        .pop()}`
+        .pop()}`,
     );
     setBackImagePreview(
       `${API_BASE_URL}/api/qa-sections-product-location/image/${config.backView.imagePath
         .split("/")
-        .pop()}`
+        .pop()}`,
     );
 
     setFrontImage(null);
@@ -469,7 +516,7 @@ const YPivotQASectionsProductLocationManagement = () => {
           className="absolute transform -translate-x-1/2 -translate-y-1/2 group"
           style={{
             left: `${location.x}%`,
-            top: `${location.y}%`
+            top: `${location.y}%`,
           }}
           onMouseEnter={() => setHoveredLocation(location)}
           onMouseLeave={() => setHoveredLocation(null)}
@@ -487,7 +534,7 @@ const YPivotQASectionsProductLocationManagement = () => {
                   : ""
               }`}
               style={{
-                backgroundColor: color === "red" ? "#ef4444" : "#3b82f6"
+                backgroundColor: color === "red" ? "#ef4444" : "#3b82f6",
               }}
             >
               {location.LocationNo}
@@ -511,6 +558,41 @@ const YPivotQASectionsProductLocationManagement = () => {
     const isExpanded = expandedCardId === config._id;
     const totalLocations =
       config.frontView.locations.length + config.backView.locations.length;
+
+    // Helper to handle image download
+    const handleDownloadImage = async (imagePath, type, productName) => {
+      try {
+        // Extract filename from the relative path stored in DB
+        const filename = imagePath.split("/").pop();
+        const url = `${API_BASE_URL}/api/qa-sections-product-location/image/${filename}`;
+
+        const response = await axios.get(url, {
+          responseType: "blob", // Important for handling binary data
+        });
+
+        // Create a temporary URL for the blob
+        const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement("a");
+        link.href = blobUrl;
+
+        // Set download filename (e.g., Hoodie_FrontView.jpg)
+        link.setAttribute("download", `${productName}_${type}_${filename}`);
+
+        document.body.appendChild(link);
+        link.click();
+
+        // Cleanup
+        link.parentNode.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+      } catch (error) {
+        console.error("Download failed:", error);
+        Swal.fire({
+          icon: "error",
+          title: "Download Failed",
+          text: "Could not download the image.",
+        });
+      }
+    };
 
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden transform hover:scale-105 transition-all duration-300">
@@ -548,11 +630,26 @@ const YPivotQASectionsProductLocationManagement = () => {
         <div className="px-5 py-4 space-y-4">
           {/* Front View */}
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                Front View ({config.frontView.locations.length})
-              </span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  Front View ({config.frontView.locations.length})
+                </span>
+              </div>
+              <button
+                onClick={() =>
+                  handleDownloadImage(
+                    config.frontView.imagePath,
+                    "FrontView",
+                    config.productTypeName,
+                  )
+                }
+                className="p-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-md transition-colors"
+                title="Download Front View"
+              >
+                <Download size={14} />
+              </button>
             </div>
 
             {/* FIXED: Using Flex center + relative inline-block wrapper to ensure perfect positioning */}
@@ -576,11 +673,26 @@ const YPivotQASectionsProductLocationManagement = () => {
 
           {/* Back View */}
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                Back View ({config.backView.locations.length})
-              </span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  Back View ({config.backView.locations.length})
+                </span>
+              </div>
+              <button
+                onClick={() =>
+                  handleDownloadImage(
+                    config.backView.imagePath,
+                    "BackView",
+                    config.productTypeName,
+                  )
+                }
+                className="p-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-md transition-colors"
+                title="Download Back View"
+              >
+                <Download size={14} />
+              </button>
             </div>
 
             {/* FIXED: Using Flex center + relative inline-block wrapper */}
@@ -776,7 +888,7 @@ const YPivotQASectionsProductLocationManagement = () => {
               <option value="">-- Select a Product Type --</option>
               {productTypes.map((type) => {
                 const configuredTypeIds = savedConfigurations.map(
-                  (c) => c.productTypeId._id
+                  (c) => c.productTypeId._id,
                 );
                 const isConfigured = configuredTypeIds.includes(type._id);
                 const isCurrentlyEditing =
@@ -859,12 +971,22 @@ const YPivotQASectionsProductLocationManagement = () => {
                           {renderLocationMarkers(
                             frontLocations,
                             "red",
-                            "front"
+                            "front",
                           )}
                         </div>
                       </div>
 
+                      {/* Hidden Input for Back View Change */}
+                      <input
+                        type="file"
+                        ref={frontFileInputRef}
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => handleImageChange(e, "front")}
+                      />
+
                       <div className="flex gap-2">
+                        {/* Mark Button */}
                         <button
                           onClick={() => setIsMarkingFront(!isMarkingFront)}
                           className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all ${
@@ -876,6 +998,16 @@ const YPivotQASectionsProductLocationManagement = () => {
                           <MapPin className="w-4 h-4 inline mr-1.5" />
                           {isMarkingFront ? "Marking ON" : "Mark Locations"}
                         </button>
+
+                        {/* Change Image Button (NEW) */}
+                        <button
+                          onClick={() => frontFileInputRef.current.click()}
+                          className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                          title="Change image (keep locations)"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+                        {/* Delete Button */}
                         <button
                           onClick={() => {
                             setFrontImage(null);
@@ -1032,7 +1164,17 @@ const YPivotQASectionsProductLocationManagement = () => {
                         </div>
                       </div>
 
+                      {/* Hidden Input for Back View Change */}
+                      <input
+                        type="file"
+                        ref={backFileInputRef}
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => handleImageChange(e, "back")}
+                      />
+
                       <div className="flex gap-2">
+                        {/* Mark Button */}
                         <button
                           onClick={() => setIsMarkingBack(!isMarkingBack)}
                           className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all ${
@@ -1044,6 +1186,16 @@ const YPivotQASectionsProductLocationManagement = () => {
                           <MapPin className="w-4 h-4 inline mr-1.5" />
                           {isMarkingBack ? "Marking ON" : "Mark Locations"}
                         </button>
+                        {/* Change Image Button (NEW) */}
+                        <button
+                          onClick={() => backFileInputRef.current.click()}
+                          className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                          title="Change image (keep locations)"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+
+                        {/* Delete Button */}
                         <button
                           onClick={() => {
                             setBackImage(null);
@@ -1180,7 +1332,7 @@ const YPivotQASectionsProductLocationManagement = () => {
                         <span className="font-semibold text-gray-800 dark:text-white">
                           {
                             productTypes.find(
-                              (pt) => pt._id === selectedProductType
+                              (pt) => pt._id === selectedProductType,
                             )?.EnglishProductName
                           }
                         </span>
