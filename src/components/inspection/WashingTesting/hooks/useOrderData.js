@@ -14,6 +14,7 @@ export const useOrderData = () => {
   const [styleDescription, setStyleDescription] = useState("");
   const [custStyle, setCustStyle] = useState("");
   const [availableSizes, setAvailableSizes] = useState([]);
+  const [usedColors, setUsedColors] = useState([]);
   const [isLoadingColors, setIsLoadingColors] = useState(false);
   const lastFetchedColorStyleRef = useRef(null);
   const lastFetchedYorksysStyleRef = useRef(null);
@@ -87,7 +88,7 @@ export const useOrderData = () => {
         // Extract colors from colorOptions array (returned by new strict endpoint)
         if (orderData.colorOptions && Array.isArray(orderData.colorOptions)) {
           const colorNames = orderData.colorOptions
-            .map(c => c.value || c.label)
+            .map(c => (c.value || c.label || "").trim())
             .filter(Boolean);
           const uniqueColors = [...new Set(colorNames)];
           setAvailableColors(uniqueColors);
@@ -145,6 +146,29 @@ export const useOrderData = () => {
       setIsLoadingColors(false);
     }
   }, [isValidStyleFormat, isLoadingColors, availableColors.length]);
+
+  // Fetch colors that are already used in reports for this style
+  const fetchUsedColors = useCallback(async (orderNo) => {
+    if (!orderNo) {
+      setUsedColors([]);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/report-washing/used-colors?ymStyle=${encodeURIComponent(orderNo.trim())}`
+      );
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setUsedColors(result.usedColors || []);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching used colors:", error);
+      setUsedColors([]);
+    }
+  }, []);
 
   // Fetch ETD and PO from yorksys_orders by Style (YM Style)
   const fetchYorksysOrderETD = useCallback(async (orderNo, setFormData) => {
@@ -434,6 +458,7 @@ export const useOrderData = () => {
     availablePOs,
     availableETDs,
     availableSizes,
+    usedColors,
     fabrication,
     season,
     styleDescription,
@@ -442,6 +467,7 @@ export const useOrderData = () => {
     isLoadingColors,
     isLoadingSpecs,
     fetchOrderColors,
+    fetchUsedColors,
     fetchYorksysOrderETD,
     fetchAnfSpecs,
     resetOrderData,

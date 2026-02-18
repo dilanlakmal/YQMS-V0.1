@@ -52,12 +52,22 @@ const fetchImageBuffer = async (url) => {
 };
 
 /**
+// Resolve emp_id to display name from users list; fallback to id
+const getNameForView = (empId, storedName, users = []) => {
+  if (storedName && String(storedName).trim()) return storedName;
+  if (!empId) return null;
+  const u = users.find((user) => String(user.emp_id) === String(empId) || String(user.id) === String(empId));
+  return u ? (u.name || u.eng_name || u.emp_id) : null;
+};
+
+/**
  * Generates and downloads an Excel file for a Washing Machine Test Report
  * @param {Object} report - The report data object
  * @param {string} apiBaseUrl - Base URL for API calls
+ * @param {Array} users - Optional list of users to resolve emp_id to name for Submitted/Checked/Approved By
  * @returns {Promise<void>}
  */
-const generateWashingMachineTestExcel = async (report, apiBaseUrl = "") => {
+const generateWashingMachineTestExcel = async (report, apiBaseUrl = "", users = []) => {
   try {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Report Detail");
@@ -193,7 +203,16 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "") => {
       ? new Date(report.createdAt).toLocaleString('en-GB', { hour12: true })
       : (report.submittedAt ? new Date(report.submittedAt).toLocaleString('en-GB', { hour12: true }) : "N/A");
 
-    addInfoRow("Submitted By:", report.reporter_name || report.reporter_emp_id || "N/A", "Submitted At:", submittedAt);
+    const submittedByDisplay = getNameForView(report.reporter_emp_id, report.reporter_name, users) || report.reporter_emp_id || "N/A";
+    addInfoRow("Submitted By:", submittedByDisplay, "Submitted At:", submittedAt);
+
+    if (report.status === "completed" && (report.checkedBy || report.approvedBy)) {
+      const checkedByName = getNameForView(report.checkedBy, report.checkedByName, users);
+      const approvedByName = getNameForView(report.approvedBy, report.approvedByName, users);
+      const checkedByDisplay = checkedByName ? (checkedByName !== report.checkedBy ? `${checkedByName} (${report.checkedBy})` : checkedByName) : (report.checkedBy || "N/A");
+      const approvedByDisplay = approvedByName ? (approvedByName !== report.approvedBy ? `${approvedByName} (${report.approvedBy})` : approvedByName) : (report.approvedBy || "N/A");
+      addInfoRow("Checked By:", checkedByDisplay, "Approved By:", approvedByDisplay);
+    }
 
     currentRow++;
 
@@ -209,7 +228,7 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "") => {
       "createdAt", "updatedAt", "submittedAt", "reporter_emp_id", "reporter_name", "reporter_status", "notes",
       "images", "receivedImages", "completionImages", "receivedNotes", "completionNotes",
       "receivedDate", "receivedAt", "completedDate", "completedAt", "_id", "id", "__v",
-      "userId", "userName", "engName" // Legacy fields
+      "userId", "userName", "engName", "checkedBy", "approvedBy", "checkedByName", "approvedByName" // Legacy / shown above
     ];
 
     const extraFields = Object.keys(report).filter(key => !skipFields.includes(key));

@@ -70,6 +70,14 @@ const getIconScale = (iconName) => {
   return CUSTOM_SCALES[iconName] || DEFAULT_SCALE;
 };
 
+// Resolve emp_id to display name from users list (name or eng_name), fallback to id
+const getNameForView = (empId, storedName, users = []) => {
+  if (storedName && String(storedName).trim()) return storedName;
+  if (!empId) return null;
+  const u = users.find((user) => String(user.emp_id) === String(empId) || String(user.id) === String(empId));
+  return u ? (u.name || u.eng_name || u.emp_id) : null;
+};
+
 const ReportCard = ({
   report,
   isExpanded,
@@ -91,6 +99,7 @@ const ReportCard = ({
   enableRoleLocking = false, // If true, applies reporter/receiver status locking
   isAdminUser = false,
   isWarehouseUser = false,
+  users = [],
 }) => {
   const { user } = useAuth();
   const reportId = report._id || report.id;
@@ -152,7 +161,7 @@ const ReportCard = ({
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-base md:text-lg font-semibold text-gray-800 dark:text-white truncate">
+              <h3 className="text-base md:text-lg font-semibold text-gray-800 dark:text-white truncate uppercase">
                 {report.ymStyle || "N/A"}
               </h3>
               {/* Status Badge */}
@@ -387,9 +396,37 @@ const ReportCard = ({
                 Submitted By
               </p>
               <p className="text-sm text-gray-900 dark:text-white">
-                {report.reporter_name || report.reporter_emp_id || "N/A"}
+                {getNameForView(report.reporter_emp_id, report.reporter_name, users) || report.reporter_emp_id || "N/A"}
               </p>
             </div>
+
+            {/* Checked By & Approved By (for completed reports) - show name for view, ID when known */}
+            {report.status === "completed" && (report.checkedBy || report.approvedBy) && (
+              <>
+                <div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    Checked By
+                  </p>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    {(() => {
+                      const name = getNameForView(report.checkedBy, report.checkedByName, users);
+                      return name ? (name !== report.checkedBy ? `${name} (${report.checkedBy})` : name) : (report.checkedBy || "N/A");
+                    })()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    Approved By
+                  </p>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    {(() => {
+                      const name = getNameForView(report.approvedBy, report.approvedByName, users);
+                      return name ? (name !== report.approvedBy ? `${name} (${report.approvedBy})` : name) : (report.approvedBy || "N/A");
+                    })()}
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
 

@@ -22,6 +22,7 @@ const FormSection = ({
   fetchYorksysOrderETD,
   // Colors
   availableColors,
+  usedColors, // Added prop
   isLoadingColors,
   showColorDropdown,
   setShowColorDropdown,
@@ -92,6 +93,14 @@ const FormSection = ({
     setShowOrderNoSuggestions,
     isSearchingOrderNo,
     handleOrderNoSelect,
+    fetchOrderColors,
+    fetchYorksysOrderETD,
+    // Colors
+    availableColors,
+    usedColors,
+    isLoadingColors,
+    showColorDropdown,
+    setShowColorDropdown,
     // Data props
     season,
     styleDescription,
@@ -111,6 +120,7 @@ const FormSection = ({
     fetchOrderColors,
     fetchYorksysOrderETD,
     availableColors,
+    usedColors,
     isLoadingColors,
     showColorDropdown,
     setShowColorDropdown,
@@ -150,6 +160,7 @@ const FormSection = ({
             fetchOrderColors={fetchOrderColors}
             fetchYorksysOrderETD={fetchYorksysOrderETD}
             availableColors={availableColors}
+            usedColors={usedColors}
             isLoadingColors={isLoadingColors}
             showOrderNoSuggestions={showOrderNoSuggestions}
             setShowOrderNoSuggestions={setShowOrderNoSuggestions}
@@ -225,33 +236,35 @@ const FormSection = ({
             {isReportTypeOpen && reportTypes && (
               <div className="absolute top-full right-0 mt-1.5 z-50 overflow-hidden bg-white/98 dark:bg-gray-800/98 backdrop-blur-xl rounded-xl border-2 border-blue-100 dark:border-gray-600 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 min-w-[200px] sm:min-w-[260px]">
                 <div className="p-1.5 space-y-0.5">
-                  {reportTypes.map((type) => (
-                    <button
-                      key={type.val}
-                      type="button"
-                      onClick={() => {
-                        handleInputChange("reportType", type.val);
-                        setIsReportTypeOpen(false);
-                      }}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group
+                  {reportTypes
+                    .filter(type => type.val !== "Home Wash Test")
+                    .map((type) => (
+                      <button
+                        key={type.val}
+                        type="button"
+                        onClick={() => {
+                          handleInputChange("reportType", type.val);
+                          setIsReportTypeOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group
                         ${formData.reportType === type.val
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'hover:bg-blue-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                        }`}
-                    >
-                      <span className={`text-lg ${formData.reportType === type.val ? 'text-white' : 'text-blue-500/70 group-hover:text-blue-600'}`}>
-                        {type.icon}
-                      </span>
-                      <span className={`flex-1 text-left font-semibold text-[11px] ${formData.reportType === type.val ? 'text-white' : ''}`}>
-                        {type.val}
-                      </span>
-                      {formData.reportType === type.val && (
-                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </button>
-                  ))}
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'hover:bg-blue-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                          }`}
+                      >
+                        <span className={`text-lg ${formData.reportType === type.val ? 'text-white' : 'text-blue-500/70 group-hover:text-blue-600'}`}>
+                          {type.icon}
+                        </span>
+                        <span className={`flex-1 text-left font-semibold text-[11px] ${formData.reportType === type.val ? 'text-white' : ''}`}>
+                          {type.val}
+                        </span>
+                        {formData.reportType === type.val && (
+                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </button>
+                    ))}
                 </div>
               </div>
             )}

@@ -242,6 +242,36 @@
     padding: 0 8px;
 }
 
+.actions-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.new-btn {
+    width: 100%;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 800;
+    color: white;
+    background: linear-gradient(135deg, #48bb78, #38a169);
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.new-btn:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(72, 187, 120, 0.6);
+}
+
 .clear-btn {
     width: 100%;
     padding: 12px;
@@ -250,16 +280,28 @@
     color: white;
     background: linear-gradient(135deg, #718096, #4a5568);
     border: none;
-    border-radius: 10px;
+    border-radius: 12px;
     cursor: pointer;
     box-shadow: 0 4px 15px rgba(113, 128, 150, 0.4);
     transition: all 0.3s ease;
-    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.clear-btn.delete {
+    background: linear-gradient(135deg, #f56565, #c53030);
+    box-shadow: 0 4px 15px rgba(245, 101, 101, 0.4);
 }
 
 .clear-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(113, 128, 150, 0.6);
+}
+
+.clear-btn.delete:hover {
+    box-shadow: 0 6px 20px rgba(245, 101, 101, 0.6);
 }
 
 /* Right Panel - Drop Buckets */

@@ -28,20 +28,21 @@ const EditReportModal = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto"
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 overflow-y-auto overflow-x-hidden"
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full my-8"
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[calc(100vh-1.5rem)] my-6 flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6">
-          <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
+        <div className="flex-shrink-0 p-4 pb-0">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">
             Edit Report - {editingReport.ymStyle || "N/A"}
           </h3>
-
-          <form onSubmit={onSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        </div>
+        <div className="p-4 pt-3 overflow-y-auto overflow-x-hidden min-h-0 flex-1">
+          <form onSubmit={onSubmit} className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Report Type */}
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -57,7 +58,6 @@ const EditReportModal = ({
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
                   required
                 >
-                  <option value="Home Wash Test">Home Wash Test</option>
                   <option value="Garment Wash Report">Garment Wash Report</option>
                   <option value="HT Testing">HT Testing</option>
                   <option value="EMB testing">EMB testing</option>
@@ -478,24 +478,25 @@ const EditReportModal = ({
 
               {/* Care Label Section for Garment Wash */}
               {editFormData.reportType === "Garment Wash Report" && (
-                <div className="md:col-span-2 bg-blue-50 dark:bg-gray-700/30 p-4 rounded-md border border-blue-200 dark:border-gray-600 mt-2">
-                  <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-3 border-b border-blue-100 dark:border-gray-600 pb-2">
+                <div className="md:col-span-2 bg-blue-50 dark:bg-gray-700/30 p-3 rounded-md border border-blue-200 dark:border-gray-600 mt-2">
+                  <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2 border-b border-blue-100 dark:border-gray-600 pb-2">
                     Care Label Information
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {/* Care Symbols Selector - Added to View/Edit */}
                     <div className="md:col-span-2 mb-2">
                       <CareSymbolsSelector
+                        compact
                         value={typeof editFormData.careSymbols === 'string' ? JSON.parse(editFormData.careSymbols || '{}') : (editFormData.careSymbols || {})}
                         onChange={(newSymbols) => setEditFormData(prev => ({ ...prev, careSymbols: newSymbols }))}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wider">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">
                         Care Label Gallery
                       </label>
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         {/* 1. Gallery Grid (Appears Above) */}
                         {(Array.isArray(editFormData.careLabelImage) && editFormData.careLabelImage.length > 0) && (
                           <div className="grid grid-cols-2 gap-3">
@@ -544,7 +545,7 @@ const EditReportModal = ({
                             };
                             input.click();
                           }}
-                          className="w-full py-4 border-2 border-dashed border-blue-200 dark:border-gray-700 rounded-xl flex items-center justify-center gap-2 bg-blue-50/20 dark:bg-gray-800/40 hover:bg-blue-50/50 dark:hover:bg-gray-800/20 hover:border-blue-400 dark:hover:border-blue-500 transition-all group"
+                          className="w-full py-3 border-2 border-dashed border-blue-200 dark:border-gray-700 rounded-xl flex items-center justify-center gap-2 bg-blue-50/20 dark:bg-gray-800/40 hover:bg-blue-50/50 dark:hover:bg-gray-800/20 hover:border-blue-400 dark:hover:border-blue-500 transition-all group"
                         >
                           <Plus size={18} className="text-blue-500 group-hover:scale-110 transition-transform" />
                           <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">ADD CARE LABEL PHOTOS</span>
@@ -558,7 +559,7 @@ const EditReportModal = ({
                       <textarea
                         value={editFormData.careLabelNotes || ""}
                         onChange={(e) => setEditFormData(prev => ({ ...prev, careLabelNotes: e.target.value }))}
-                        rows={4}
+                        rows={3}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
                         placeholder="Care label notes..."
                       />
@@ -569,7 +570,7 @@ const EditReportModal = ({
             </div>
 
             {/* Modal Actions */}
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="flex justify-end gap-3 mt-4">
               <button
                 type="button"
                 onClick={onClose}

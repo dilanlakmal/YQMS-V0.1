@@ -108,28 +108,82 @@ const CARE_CATEGORIES = [
     }
 ];
 
-// Simplified Grid View for the Dropdown
+// Compact (edit modal) vs normal (create form) scales
+const DEFAULT_SCALE_COMPACT = 'scale-100';
+const DEFAULT_SCALE_NORMAL = 'scale-125';
 
-const DEFAULT_SCALE = 'scale-125';
-
-const CUSTOM_SCALES = {
+const CUSTOM_SCALES_COMPACT = {
     // Machine Wash
+    'machine-wash.png': 'scale-100',
+    'hand-wasing.png': 'scale-100',
+    'do-not-wash.png': 'scale-100',
+
+    // Water Temp
+    'water-temperature30.png': 'scale-100',
+    'water-temperature40.png': 'scale-100',
+    'water-temperature50.png': 'scale-100',
+
+    // Bleach
+    'bleach.png': 'scale-[0.9]',
+    'non-chlorine-bleach.png': 'scale-[0.9]',
+    'not-bleach.png': 'scale-[0.9]',
+    'not-bleach1.png': 'scale-[0.9]',
+
+    // Tumble Dry
+    'tumble-dry.png': 'scale-[0.95]',
+    'tb-dry-normal-no-heat.png': 'scale-[0.95]',
+    'tb-dry-permanent-press-no-heat.png': 'scale-[1.0]',
+    'tb-dry-gentle-no-heat.png': 'scale-[1.0]',
+    'low-heat1.png': 'scale-[0.9]',
+    'medium-heat.png': 'scale-[0.9]',
+    'high-heat.png': 'scale-[0.9]',
+    'tb-dry-permanent-press-low-heat.png': 'scale-[1.05]',
+    'tb-dry-permanent-press-medium-heat.png': 'scale-[1.05]',
+    'tb-dry-gentle-low-heat.png': 'scale-[1.05]',
+    'tb-dry-gentle-medium-heat.png': 'scale-[1.05]',
+    'do-not-tumble-dry.png': 'scale-[0.9]',
+
+    // Dry
+    'line-dry.png': 'scale-[1.0]',
+    'dry-flat.png': 'scale-[1.0]',
+    'dry.png': 'scale-[1.0]',
+    'do-not-dry.png': 'scale-[1.0]',
+
+    // Iron
+    'iron-empty.png': 'scale-[1.1]',
+    'iron-low-temp.png': 'scale-[1.1]',
+    'iron-medium-temp.png': 'scale-[1.1]',
+    'iron-hight-temp.png': 'scale-[1.1]',
+    'no-steam.png': 'scale-[1.1]',
+    'do-not-iron.png': 'scale-[1.1]',
+
+    // Dry Clean
+    'dry-clean.png': 'scale-[0.75]',
+    'do-not-dryclean.png': 'scale-[1.2]',
+    'wet-cleaning.png': 'scale-[0.9]',
+    'any-solvent.png': 'scale-[0.9]',
+    'petroleum-sovent-only.png': 'scale-[0.8]',
+    'Any-sx-tetrachlorethylene.png': 'scale-[0.85]',
+    'reduced.png': 'scale-[0.85]',
+    'short-cycle.png': 'scale-[0.85]',
+    'low-heat.png': 'scale-[0.85]',
+    'no-steam-finishing.png': 'scale-[0.85]',
+    'gentle-cleaning-pce.png': 'scale-[0.85]',
+    'very-gentle-cleaning-pce.png': 'scale-[0.9]',
+};
+
+// Normal (create form) – larger symbols
+const CUSTOM_SCALES_NORMAL = {
     'machine-wash.png': 'scale-125',
     'hand-wasing.png': 'scale-125',
     'do-not-wash.png': 'scale-125',
-
-    // Water Temp
     'water-temperature30.png': 'scale-125',
     'water-temperature40.png': 'scale-125',
     'water-temperature50.png': 'scale-125',
-
-    // Bleach (Triangles often need to be visually larger)
     'bleach.png': 'scale-[1.0]',
     'non-chlorine-bleach.png': 'scale-[1.0]',
     'not-bleach.png': 'scale-[1.0]',
     'not-bleach1.png': 'scale-[1.0]',
-
-    // Tumble Dry
     'tumble-dry.png': 'scale-[1.1]',
     'tb-dry-normal-no-heat.png': 'scale-[1.1]',
     'tb-dry-permanent-press-no-heat.png': 'scale-[1.2]',
@@ -142,27 +196,18 @@ const CUSTOM_SCALES = {
     'tb-dry-gentle-low-heat.png': 'scale-[1.3]',
     'tb-dry-gentle-medium-heat.png': 'scale-[1.3]',
     'do-not-tumble-dry.png': 'scale-[1.0]',
-
-
-    // Dry
     'line-dry.png': 'scale-[1.2]',
     'dry-flat.png': 'scale-[1.2]',
     'dry.png': 'scale-[1.2]',
     'do-not-dry.png': 'scale-[1.2]',
-
-
-    // Iron
     'iron-empty.png': 'scale-[1.5]',
     'iron-low-temp.png': 'scale-[1.5]',
     'iron-medium-temp.png': 'scale-[1.5]',
     'iron-hight-temp.png': 'scale-[1.5]',
     'no-steam.png': 'scale-[1.5]',
     'do-not-iron.png': 'scale-[1.5]',
-
-    // Dry Clean
     'dry-clean.png': 'scale-[0.8]',
     'do-not-dryclean.png': 'scale-[1.9]',
-    // 'do-not-dry.png': 'scale-[2.4]', // Duplicate removed
     'wet-cleaning.png': 'scale-[1.1]',
     'any-solvent.png': 'scale-[1.1]',
     'petroleum-sovent-only.png': 'scale-[0.9]',
@@ -173,13 +218,15 @@ const CUSTOM_SCALES = {
     'no-steam-finishing.png': 'scale-[1.0]',
     'gentle-cleaning-pce.png': 'scale-[1.0]',
     'very-gentle-cleaning-pce.png': 'scale-[1.1]',
-    // 'dry.png': 'scale-[1.0]', // Shared with Dry category - Duplicate removed
 };
 
-const getIconScale = (iconName) => {
-    return CUSTOM_SCALES[iconName] || DEFAULT_SCALE;
+const getIconScale = (iconName, compact) => {
+    const map = compact ? CUSTOM_SCALES_COMPACT : CUSTOM_SCALES_NORMAL;
+    const defaultScale = compact ? DEFAULT_SCALE_COMPACT : DEFAULT_SCALE_NORMAL;
+    return map[iconName] || defaultScale;
 };
-const CareSymbolsSelector = ({ value = {}, onChange }) => {
+
+const CareSymbolsSelector = ({ value = {}, onChange, compact = false }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
 
@@ -220,7 +267,7 @@ const CareSymbolsSelector = ({ value = {}, onChange }) => {
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full min-h-[50px] px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-left flex items-center justify-between hover:border-blue-400 transition-colors shadow-sm"
+                className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-left flex items-center justify-between hover:border-blue-400 transition-colors shadow-sm ${compact ? 'min-h-[42px]' : 'min-h-[50px]'}`}
             >
                 <div className="flex flex-wrap gap-2 items-center">
                     {selectedCount === 0 ? (
@@ -231,7 +278,7 @@ const CareSymbolsSelector = ({ value = {}, onChange }) => {
                                 <img
                                     src={`${ASSET_PATH}${icon}`}
                                     alt={category}
-                                    className={`w-8 h-8 object-contain transform ${getIconScale(icon)} origin-center`}
+                                    className={`object-contain transform ${getIconScale(icon, compact)} origin-center ${compact ? 'w-6 h-6' : 'w-8 h-8'}`}
                                     onError={(e) => e.target.style.display = 'none'}
                                 />
                             </div>
@@ -243,36 +290,31 @@ const CareSymbolsSelector = ({ value = {}, onChange }) => {
 
             {/* Dropdown Content - The Grid */}
             {isOpen && (
-                <div className="absolute z-50 mt-2 w-full min-w-[600px] lg:min-w-[800px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
-                    <div className="p-4 overflow-x-auto">
-                        <div className="grid grid-cols-6 gap-4 min-w-[700px]">
+                <div className={`absolute z-50 mt-2 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 ${compact ? 'max-w-[520px]' : 'min-w-[600px] lg:min-w-[800px]'}`}>
+                    <div className={`overflow-x-auto overflow-y-auto ${compact ? 'p-2 max-h-[70vh]' : 'p-4'}`}>
+                        <div className={`grid grid-cols-6 ${compact ? 'gap-2' : 'gap-4'} ${compact ? '' : 'min-w-[700px]'}`}>
                             {CARE_CATEGORIES.map(cat => (
-                                <div key={cat.id} className="flex flex-col gap-2">
+                                <div key={cat.id} className={`flex flex-col ${compact ? 'gap-1' : 'gap-2'}`}>
                                     {/* Header */}
-                                    <div className="pb-2 text-center border-b dark:border-gray-700">
-                                        <span className="text-xs font-black text-gray-500 uppercase tracking-wider">{cat.label}</span>
+                                    <div className={`text-center border-b dark:border-gray-700 ${compact ? 'pb-1' : 'pb-2'}`}>
+                                        <span className={`font-bold text-gray-500 uppercase tracking-wider ${compact ? 'text-[10px]' : 'text-xs'}`}>{cat.label}</span>
                                     </div>
 
-                                    <div className="flex flex-col gap-3 py-2 items-center">
+                                    <div className={`flex flex-col items-center ${compact ? 'gap-1.5 py-1' : 'gap-3 py-2'}`}>
                                         {cat.options.map((opt, idx) => (
-                                            <div key={idx} className="flex flex-col gap-2 items-center w-full">
-                                                {/* Render all items in this option group, or just the main one? 
-                                                     The user image shows individual symbols.
-                                                     My data 'items' array implies variants.
-                                                     Let's flatten the list for selection.
-                                                 */}
+                                            <div key={idx} className={`flex flex-col items-center w-full ${compact ? 'gap-1' : 'gap-2'}`}>
                                                 {opt.items.map((itemIcon) => (
                                                     <button
                                                         key={itemIcon}
                                                         type="button"
                                                         onClick={() => handleSelect(cat.id, itemIcon)}
-                                                        className={`p-2 rounded-lg transition-all hover:bg-blue-50 dark:hover:bg-gray-700 border-2 ${value[cat.id] === itemIcon ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-transparent'}`}
+                                                        className={`transition-all hover:bg-blue-50 dark:hover:bg-gray-700 border-2 ${value[cat.id] === itemIcon ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-transparent'} ${compact ? 'p-1 rounded-md' : 'p-2 rounded-lg'}`}
                                                         title={itemIcon}
                                                     >
                                                         <img
                                                             src={`${ASSET_PATH}${itemIcon}`}
                                                             alt={itemIcon}
-                                                            className={`w-8 h-8 md:w-10 md:h-10 object-contain block mx-auto transform ${getIconScale(itemIcon)} origin-center transition-transform hover:scale-[1.8]`}
+                                                            className={`object-contain block mx-auto transform ${getIconScale(itemIcon, compact)} origin-center transition-transform ${compact ? 'w-6 h-6 hover:scale-110' : 'w-8 h-8 md:w-10 md:h-10 hover:scale-[1.8]'}`}
                                                         />
                                                     </button>
                                                 ))}
@@ -285,7 +327,7 @@ const CareSymbolsSelector = ({ value = {}, onChange }) => {
                     </div>
 
                     {/* Footer / clear */}
-                    <div className="p-3 bg-gray-50 dark:bg-gray-700/50 border-t flex justify-between items-center">
+                    <div className={`bg-gray-50 dark:bg-gray-700/50 border-t flex justify-between items-center ${compact ? 'p-2' : 'p-3'}`}>
                         <span className="text-xs text-gray-500">Select one symbol per column</span>
                         <button
                             type="button"

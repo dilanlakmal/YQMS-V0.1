@@ -10,7 +10,7 @@ import {
   MdOutlineDeviceThermostat,
   MdOutlineImagesearchRoller,
   MdOutlineExpand,
-  MdAssignmentInd
+  MdAssignmentInd,
 } from "react-icons/md";
 import { Select, Checkbox } from "antd";
 import axios from "axios";
@@ -77,9 +77,14 @@ const LaundryWashingMachineTest = () => {
   const completionImageInputRef = useRef(null);
 
   // Initialize custom hooks
-  const initialFormData = getInitialFormData(REPORT_TYPES.HOME_WASH);
+  const initialFormData = getInitialFormData(REPORT_TYPES.GARMENT_WASH);
 
-  const { formData, setFormData, handleInputChange: handleFormInputChange, resetForm } = useFormState(initialFormData);
+  const {
+    formData,
+    setFormData,
+    handleInputChange: handleFormInputChange,
+    resetForm,
+  } = useFormState(initialFormData);
 
   // Initialize Socket.IO connection once for the component
   const [socket, setSocket] = useState(null);
@@ -131,6 +136,7 @@ const LaundryWashingMachineTest = () => {
     availablePOs,
     availableETDs,
     availableSizes,
+    usedColors,
     fabrication,
     season,
     styleDescription,
@@ -138,6 +144,7 @@ const LaundryWashingMachineTest = () => {
     isLoadingColors,
     isLoadingSpecs,
     fetchOrderColors,
+    fetchUsedColors,
     fetchYorksysOrderETD,
     fetchAnfSpecs,
     resetOrderData,
@@ -198,7 +205,7 @@ const LaundryWashingMachineTest = () => {
   // Create a combined fetch function to refresh both or active tab
   const refreshAllReports = useCallback(async () => {
     // We refresh both to ensure consistency across tabs
-    await Promise.all([
+    const promises = [
       fetchReports({
         startDate: filterStartDate,
         endDate: filterEndDate,
@@ -220,11 +227,39 @@ const LaundryWashingMachineTest = () => {
         reportType: whFilterReportType,
         page: whFilterPage,
         limit: whFilterLimit,
-      })
-    ]);
+      }),
+    ];
+
+    // Also refresh used colors if a style is currently being edited/selected
+    if (formData.ymStyle || formData.style) {
+      promises.push(fetchUsedColors(formData.ymStyle || formData.style));
+    }
+
+    await Promise.all(promises);
   }, [
-    fetchReports, filterStartDate, filterEndDate, filterSearch, filterColor, filterFactory, filterStatus, filterReportType, filterPage, filterLimit,
-    fetchWhReports, whFilterStartDate, whFilterEndDate, whFilterSearch, whFilterColor, whFilterFactory, whFilterStatus, whFilterReportType, whFilterPage, whFilterLimit
+    formData.ymStyle,
+    formData.style,
+    fetchUsedColors,
+    fetchReports,
+    filterStartDate,
+    filterEndDate,
+    filterSearch,
+    filterColor,
+    filterFactory,
+    filterStatus,
+    filterReportType,
+    filterPage,
+    filterLimit,
+    fetchWhReports,
+    whFilterStartDate,
+    whFilterEndDate,
+    whFilterSearch,
+    whFilterColor,
+    whFilterFactory,
+    whFilterStatus,
+    whFilterReportType,
+    whFilterPage,
+    whFilterLimit,
   ]);
 
   const {
@@ -242,7 +277,8 @@ const LaundryWashingMachineTest = () => {
   const [receivedReportId, setReceivedReportId] = useState(null);
   const [receivedImages, setReceivedImages] = useState([]);
   const [receivedNotes, setReceivedNotes] = useState("");
-  const [shouldUpdateReceivedStatus, setShouldUpdateReceivedStatus] = useState(false);
+  const [shouldUpdateReceivedStatus, setShouldUpdateReceivedStatus] =
+    useState(false);
 
   // Completion modal state
   const [showCompletionModal, setShowCompletionModal] = useState(false);
@@ -280,11 +316,14 @@ const LaundryWashingMachineTest = () => {
   const [editingReport, setEditingReport] = useState(null);
 
   // Edit image modals state
-  const [showEditInitialImagesModal, setShowEditInitialImagesModal] = useState(false);
-  const [showEditReceivedImagesModal, setShowEditReceivedImagesModal] = useState(false);
-  const [showEditCompletionImagesModal, setShowEditCompletionImagesModal] = useState(false);
+  const [showEditInitialImagesModal, setShowEditInitialImagesModal] =
+    useState(false);
+  const [showEditReceivedImagesModal, setShowEditReceivedImagesModal] =
+    useState(false);
+  const [showEditCompletionImagesModal, setShowEditCompletionImagesModal] =
+    useState(false);
   const [editingImageReport, setEditingImageReport] = useState(null);
-  const [editingImageType, setEditingImageType] = useState(null); // 'initial', 'received', 'completion'  
+  const [editingImageType, setEditingImageType] = useState(null); // 'initial', 'received', 'completion'
   const [editingImages, setEditingImages] = useState([]);
   const [editingNotes, setEditingNotes] = useState("");
   const [isUpdatingImages, setIsUpdatingImages] = useState(false);
@@ -303,7 +342,6 @@ const LaundryWashingMachineTest = () => {
   const [showEditPODropdown, setShowEditPODropdown] = useState(false);
   const [showEditETDDropdown, setShowEditETDDropdown] = useState(false);
 
-
   // Tab state
   const [activeTab, setActiveTab] = useState("form"); // "form" or "reports"
 
@@ -321,7 +359,6 @@ const LaundryWashingMachineTest = () => {
   // Debounce timer for auto-fetching colors when typing
   const colorFetchTimerRef = useRef(null);
 
-
   // Factory dropdown state
   const [factories, setFactories] = useState([]);
   const [isLoadingFactories, setIsLoadingFactories] = useState(false);
@@ -333,22 +370,37 @@ const LaundryWashingMachineTest = () => {
     _id: null,
     preparedBy: null,
     checkedBy: null,
-    approvedBy: null
+    approvedBy: null,
+    admin: null,
+    userWarehouse: null,
   });
   const [selectedUserForAssign, setSelectedUserForAssign] = useState(null);
 
   const [causeAssignHistory, setCauseAssignHistory] = useState([]);
 
   // Determine current user role restrictions based on active assignment
-  const activeAssign = causeAssignHistory.length > 0 ? causeAssignHistory[0] : null;
-  const isAdminUser = user?.emp_id === "TYM055" || user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'user_admin';
-  const isWarehouseUser = activeAssign && (String(user?.emp_id) === String(activeAssign.userWarehouse)) && !isAdminUser;
+  const activeAssign =
+    causeAssignHistory.length > 0 ? causeAssignHistory[0] : null;
+  const isAdminUser =
+    user?.emp_id === "TYM055" ||
+    user?.role === "admin" ||
+    user?.role === "super_admin" ||
+    user?.role === "user_admin" ||
+    (activeAssign && String(user?.emp_id) === String(activeAssign.admin));
+  const isWarehouseUser =
+    activeAssign &&
+    String(user?.emp_id) === String(activeAssign.userWarehouse) &&
+    !isAdminUser;
 
   // Handle tab access based on assigned roles
   useEffect(() => {
     if (isWarehouseUser && activeTab === "reports") {
       setActiveTab("warehouse_reports");
-    } else if (!isAdminUser && !isWarehouseUser && activeTab === "warehouse_reports") {
+    } else if (
+      !isAdminUser &&
+      !isWarehouseUser &&
+      activeTab === "warehouse_reports"
+    ) {
       // Unassigned users should not see warehouse reports
       setActiveTab("reports");
     }
@@ -376,7 +428,7 @@ const LaundryWashingMachineTest = () => {
     const handleFocus = () => {
       fetchAssignControl();
     };
-    window.addEventListener('focus', handleFocus);
+    window.addEventListener("focus", handleFocus);
 
     const fetchUsers = async () => {
       setIsLoadingUsers(true);
@@ -397,30 +449,48 @@ const LaundryWashingMachineTest = () => {
     // Cleanup
     return () => {
       clearInterval(intervalId);
-      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener("focus", handleFocus);
     };
   }, [fetchAssignControl]);
 
   // Prepare user options for Select
-  const userOptions = users.map(user => {
+  const userOptions = users.map((user) => {
     const id = user.emp_id;
-    const name = user.name || user.eng_name || 'Unknown';
+    const name = user.name || user.eng_name || "Unknown";
     return {
       value: id || name, // Fallback to name if ID is missing
       label: id ? `(${id}) ${name}` : name,
-      key: user._id || id || name
+      key: user._id || id || name,
     };
   });
 
   // Reset page to 1 when filters (except page) change for standard reports
   useEffect(() => {
     setFilterPage(1);
-  }, [filterStartDate, filterEndDate, filterSearch, filterColor, filterFactory, filterStatus, filterReportType, filterLimit]);
+  }, [
+    filterStartDate,
+    filterEndDate,
+    filterSearch,
+    filterColor,
+    filterFactory,
+    filterStatus,
+    filterReportType,
+    filterLimit,
+  ]);
 
   // Reset page to 1 when filters (except page) change for warehouse reports
   useEffect(() => {
     setWhFilterPage(1);
-  }, [whFilterStartDate, whFilterEndDate, whFilterSearch, whFilterColor, whFilterFactory, whFilterStatus, whFilterReportType, whFilterLimit]);
+  }, [
+    whFilterStartDate,
+    whFilterEndDate,
+    whFilterSearch,
+    whFilterColor,
+    whFilterFactory,
+    whFilterStatus,
+    whFilterReportType,
+    whFilterLimit,
+  ]);
 
   // Fetch standard reports when filters or page change
   useEffect(() => {
@@ -434,11 +504,22 @@ const LaundryWashingMachineTest = () => {
         status: filterStatus,
         reportType: filterReportType,
         page: filterPage,
-        limit: filterLimit
+        limit: filterLimit,
       });
     }, 500); // Debounce
     return () => clearTimeout(timer);
-  }, [filterStartDate, filterEndDate, filterSearch, filterColor, filterFactory, filterStatus, filterReportType, filterPage, filterLimit, fetchReports]);
+  }, [
+    filterStartDate,
+    filterEndDate,
+    filterSearch,
+    filterColor,
+    filterFactory,
+    filterStatus,
+    filterReportType,
+    filterPage,
+    filterLimit,
+    fetchReports,
+  ]);
 
   // Fetch warehouse reports when filters or page change
   useEffect(() => {
@@ -452,11 +533,47 @@ const LaundryWashingMachineTest = () => {
         status: whFilterStatus,
         reportType: whFilterReportType,
         page: whFilterPage,
-        limit: whFilterLimit
+        limit: whFilterLimit,
       });
     }, 500); // Debounce
     return () => clearTimeout(timer);
-  }, [whFilterStartDate, whFilterEndDate, whFilterSearch, whFilterColor, whFilterFactory, whFilterStatus, whFilterReportType, whFilterPage, whFilterLimit, fetchWhReports]);
+  }, [
+    whFilterStartDate,
+    whFilterEndDate,
+    whFilterSearch,
+    whFilterColor,
+    whFilterFactory,
+    whFilterStatus,
+    whFilterReportType,
+    whFilterPage,
+    whFilterLimit,
+    fetchWhReports,
+  ]);
+
+  // Proactively prevent duplicate color reporting in real-time when usedColors load
+  /* 
+  Removed this useEffect as it was blocking the manual re-selection of colors.
+  Duplicate handling is now managed by the color selection UI.
+  useEffect(() => {
+    if (usedColors && usedColors.length > 0 && formData.color && formData.color.length > 0 && !completingReport) {
+      const selectedColors = Array.isArray(formData.color) ? formData.color : [formData.color];
+      const duplicates = selectedColors.filter(c =>
+        usedColors.some(uc => uc.trim().toUpperCase() === String(c).trim().toUpperCase())
+      );
+
+      if (duplicates.length > 0) {
+        const filteredColors = selectedColors.filter(c =>
+          !usedColors.some(uc => uc.trim().toUpperCase() === String(c).trim().toUpperCase())
+        );
+        showToast.warning(`Already reported color(s) removed: ${duplicates.join(', ')}`);
+        setFormData(prev => ({
+          ...prev,
+          color: filteredColors
+        }));
+      }
+    }
+  }, [usedColors, formData.color, completingReport, setFormData]);
+  */
 
   // Dropdown states
   const [showColorDropdown, setShowColorDropdown] = useState(false);
@@ -468,32 +585,40 @@ const LaundryWashingMachineTest = () => {
     // 1. Handle Report Type Change - ONLY UPDATE THE REPORT TYPE VALUE, DON'T RESET FORM
     if (field === "reportType") {
       // Just update the reportType field, keep all other form data intact
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        reportType: value
+        reportType: value,
       }));
 
       // Stop here - don't reset anything else
       return;
     }
 
+    // Proactively prevent selecting already reported colors
+    /* 
+    The UI now handles this by filtering availableColors based on usedColors 
+    and providing a re-select button. Removing this block to allow re-selection.
+    */
+
     handleFormInputChange(field, value, (field, value, newData, prev) => {
       // Clear user-selected choices (color, PO, ETD) when Style changes manually
       // But keep metadata (season, description) until new search results arrive
-      if ((field === "ymStyle" && prev.ymStyle !== value) ||
-        (field === "style" && prev.style !== value)) {
+      if (
+        (field === "ymStyle" && prev.ymStyle !== value) ||
+        (field === "style" && prev.style !== value)
+      ) {
         newData.color = [];
         newData.po = [];
         newData.exFtyDate = [];
-        newData.washType = 'Before Wash';
-        newData.sampleSize = '';
+        newData.washType = "Before Wash";
+        newData.sampleSize = "";
 
         // IMMEDIATELY clear metadata if style is cleared or too short
         if (!value || value.length < 2) {
-          newData.season = '';
-          newData.styleDescription = '';
-          newData.custStyle = '';
-          newData.buyerStyle = '';
+          newData.season = "";
+          newData.styleDescription = "";
+          newData.custStyle = "";
+          newData.buyerStyle = "";
         }
       }
     });
@@ -507,7 +632,7 @@ const LaundryWashingMachineTest = () => {
         value,
         setOrderNoSuggestions,
         setShowOrderNoSuggestions,
-        setIsSearchingOrderNo
+        setIsSearchingOrderNo,
       );
 
       // Clear any existing timer
@@ -526,24 +651,36 @@ const LaundryWashingMachineTest = () => {
               value,
               setOrderNoSuggestions,
               setShowOrderNoSuggestions,
-              setIsSearchingOrderNo
+              setIsSearchingOrderNo,
             );
 
             // If exactly one suggestion or the exact match is in the list, auto-select it
             if (suggestions && suggestions.length === 1) {
               handleOrderNoSelect(suggestions[0]);
-            } else if (suggestions && suggestions.some(s => s.toUpperCase() === value.toUpperCase())) {
-              const exactMatch = suggestions.find(s => s.toUpperCase() === value.toUpperCase());
+            } else if (
+              suggestions &&
+              suggestions.some((s) => s.toUpperCase() === value.toUpperCase())
+            ) {
+              const exactMatch = suggestions.find(
+                (s) => s.toUpperCase() === value.toUpperCase(),
+              );
               handleOrderNoSelect(exactMatch);
             } else {
               // Check if the current value is a prefix of any suggestion
               // If it is, user is likely still typing, so don't fetch yet to avoid 404s
-              const isPrefix = suggestions && suggestions.some(s => s.toUpperCase().startsWith(value.toUpperCase()) && s.length > value.length);
+              const isPrefix =
+                suggestions &&
+                suggestions.some(
+                  (s) =>
+                    s.toUpperCase().startsWith(value.toUpperCase()) &&
+                    s.length > value.length,
+                );
 
               if (!isPrefix) {
                 // No auto-select, just fetch data for what we have
                 fetchOrderColors(value, setFormData);
                 fetchYorksysOrderETD(value, setFormData);
+                fetchUsedColors(value);
               }
             }
           }
@@ -560,15 +697,15 @@ const LaundryWashingMachineTest = () => {
       setShowETDDropdown(false);
 
       // Clear auto-populated fields in form data as well
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        season: '',
-        styleDescription: '',
-        custStyle: '',
-        buyerStyle: '',
+        season: "",
+        styleDescription: "",
+        custStyle: "",
+        buyerStyle: "",
         color: [],
         po: [],
-        exFtyDate: []
+        exFtyDate: [],
       }));
 
       // Clear timer if user deletes the value
@@ -586,7 +723,7 @@ const LaundryWashingMachineTest = () => {
         value,
         setOrderNoSuggestions,
         setShowOrderNoSuggestions,
-        setIsSearchingOrderNo
+        setIsSearchingOrderNo,
       );
     }
   };
@@ -599,6 +736,15 @@ const LaundryWashingMachineTest = () => {
       colorFetchTimerRef.current = null;
     }
 
+    // Immediately reflect selection in the UI for any of the common style fields
+    setFormData((prev) => ({
+      ...prev,
+      moNo: orderNo,
+      ymStyle: orderNo,
+      style: orderNo,
+      styleNo: orderNo,
+    }));
+
     // Use handler function
     await handleOrderNoSelection(
       orderNo,
@@ -608,7 +754,8 @@ const LaundryWashingMachineTest = () => {
       setOrderNoSuggestions,
       fetchOrderColors,
       fetchYorksysOrderETD,
-      resetOrderData
+      resetOrderData,
+      fetchUsedColors,
     );
   };
 
@@ -616,38 +763,61 @@ const LaundryWashingMachineTest = () => {
   const handleImageUploadWrapper = (files) => {
     handleImageUpload(files, (prev) => ({
       ...prev,
-      images: [...prev.images, ...Array.from(files).filter(f => validateImageFile(f))],
+      images: [
+        ...prev.images,
+        ...Array.from(files).filter((f) => validateImageFile(f)),
+      ],
     }));
   };
 
   // Use imported handlers for file/camera inputs
-  const handleFileInputChange = (e) => handleFileInputChangeHandler(
-    e, formData.images, setFormData, fileInputRef, IMAGE_LIMITS.INITIAL
-  );
+  const handleFileInputChange = (e) =>
+    handleFileInputChangeHandler(
+      e,
+      formData.images,
+      setFormData,
+      fileInputRef,
+      IMAGE_LIMITS.INITIAL,
+    );
 
-  const handleCameraInputChange = (e) => handleCameraInputChangeHandler(
-    e, formData.images, setFormData, cameraInputRef, IMAGE_LIMITS.INITIAL
-  );
+  const handleCameraInputChange = (e) =>
+    handleCameraInputChangeHandler(
+      e,
+      formData.images,
+      setFormData,
+      cameraInputRef,
+      IMAGE_LIMITS.INITIAL,
+    );
 
-  const triggerFileInput = () => triggerFileInputHandler(
-    formData.images, fileInputRef, IMAGE_LIMITS.INITIAL, "Initial Step"
-  );
+  const triggerFileInput = () =>
+    triggerFileInputHandler(
+      formData.images,
+      fileInputRef,
+      IMAGE_LIMITS.INITIAL,
+      "Initial Step",
+    );
 
-  const triggerCameraInput = () => triggerCameraInputHandler(
-    formData.images, cameraInputRef, IMAGE_LIMITS.INITIAL, "Initial Step"
-  );
+  const triggerCameraInput = () =>
+    triggerCameraInputHandler(
+      formData.images,
+      cameraInputRef,
+      IMAGE_LIMITS.INITIAL,
+      "Initial Step",
+    );
 
   // Handle image remove
   const handleRemoveImageWrapper = (index) => {
     handleRemoveImage(
       index,
       formData.images,
-      (updater) => setFormData((prevData) => ({
-        ...prevData,
-        images: typeof updater === 'function' ? updater(prevData.images) : updater
-      })),
+      (updater) =>
+        setFormData((prevData) => ({
+          ...prevData,
+          images:
+            typeof updater === "function" ? updater(prevData.images) : updater,
+        })),
       imageRotations,
-      setImageRotations
+      setImageRotations,
     );
   };
 
@@ -669,7 +839,8 @@ const LaundryWashingMachineTest = () => {
       if (success) {
         setCompletingReport(null);
         // Reset form
-        const currentReportType = formData.reportType || REPORT_TYPES.HOME_WASH;
+        const currentReportType =
+          formData.reportType || REPORT_TYPES.GARMENT_WASH;
         resetForm(getInitialFormData(currentReportType));
 
         // Switch to reports tab
@@ -685,7 +856,7 @@ const LaundryWashingMachineTest = () => {
       return;
     }
 
-    const currentReportType = formData.reportType || REPORT_TYPES.HOME_WASH;
+    const currentReportType = formData.reportType || REPORT_TYPES.GARMENT_WASH;
     const success = await submitReport(formData, () => {
       // Keep on the form tab for faster subsequent entries
       // setActiveTab("reports"); // Removed per request
@@ -721,7 +892,7 @@ const LaundryWashingMachineTest = () => {
         factory: whFilterFactory,
         status: whFilterStatus,
         page: whFilterPage,
-        limit: whFilterLimit
+        limit: whFilterLimit,
       });
     }
   };
@@ -736,7 +907,7 @@ const LaundryWashingMachineTest = () => {
       setEditFormData,
       setEditAvailableColors,
       setEditAvailablePOs,
-      setEditAvailableETDs
+      setEditAvailableETDs,
     );
 
     setShowEditModal(true);
@@ -758,14 +929,15 @@ const LaundryWashingMachineTest = () => {
     setEditAvailableETDs([]);
   };
 
-  const handleEditSubmit = (e) => handleEditFormSubmit(
-    e,
-    editingReport,
-    editFormData,
-    refreshAllReports,
-    setShowEditModal,
-    resetEditState
-  );
+  const handleEditSubmit = (e) =>
+    handleEditFormSubmit(
+      e,
+      editingReport,
+      editFormData,
+      refreshAllReports,
+      setShowEditModal,
+      resetEditState,
+    );
 
   // Initialize QR Code Scanner for a specific report
   const initializeScanner = async (reportId) => {
@@ -786,7 +958,7 @@ const LaundryWashingMachineTest = () => {
         const backCamera = cameras.find(
           (device) =>
             device.label.toLowerCase().includes("back") ||
-            device.label.toLowerCase().includes("environment")
+            device.label.toLowerCase().includes("environment"),
         );
         const cameraId = backCamera ? backCamera.id : cameras[0].id;
 
@@ -799,13 +971,13 @@ const LaundryWashingMachineTest = () => {
               const qrboxSize = Math.floor(minEdgeSize * 0.7);
               return {
                 width: qrboxSize,
-                height: qrboxSize
+                height: qrboxSize,
               };
             },
             aspectRatio: 1.0,
             experimentalFeatures: {
-              useBarCodeDetectorIfSupported: true // Use native browser API if available (faster/better)
-            }
+              useBarCodeDetectorIfSupported: true, // Use native browser API if available (faster/better)
+            },
           },
           async (decodedText) => {
             // Check if scanned QR code is the Report Date QR
@@ -823,7 +995,9 @@ const LaundryWashingMachineTest = () => {
                 if (scanParam) {
                   targetReportId = scanParam;
                 } else {
-                  showToast.warning("Invalid QR code. Missing report ID in URL.");
+                  showToast.warning(
+                    "Invalid QR code. Missing report ID in URL.",
+                  );
                   return;
                 }
               } catch (error) {
@@ -841,13 +1015,17 @@ const LaundryWashingMachineTest = () => {
               }
             } else {
               // Not a valid report date QR code
-              showToast.warning("Invalid QR code. Please scan the Report Date QR code.");
+              showToast.warning(
+                "Invalid QR code. Please scan the Report Date QR code.",
+              );
               return;
             }
 
             // Fetch current report to check status
             try {
-              const reportResponse = await fetch(`${API_BASE_URL}/api/report-washing/${targetReportId}`);
+              const reportResponse = await fetch(
+                `${API_BASE_URL}/api/report-washing/${targetReportId}`,
+              );
               if (!reportResponse.ok) {
                 showToast.error("Failed to fetch report details.");
                 return;
@@ -876,7 +1054,9 @@ const LaundryWashingMachineTest = () => {
                 // Switch to Reports tab
                 setActiveTab("reports");
 
-                showToast.success(`QR Scan Success! Please add images and notes, then save to update status to "Received".`);
+                showToast.success(
+                  `QR Scan Success! Please add images and notes, then save to update status to "Received".`,
+                );
               } else if (currentStatus === "received") {
                 // Second scan - Load report into form for completion
                 stopScanner();
@@ -889,7 +1069,7 @@ const LaundryWashingMachineTest = () => {
                 // Populate form data (form will always show HomeWashForm regardless of reportType)
                 setFormData({
                   ...currentReport,
-                  reportType: currentReport.reportType || "Home Wash Test",
+                  reportType: currentReport.reportType || "Garment Wash Report",
                   color: currentReport.color || [],
                   po: currentReport.po || [],
                   exFtyDate: currentReport.exFtyDate || [],
@@ -906,8 +1086,9 @@ const LaundryWashingMachineTest = () => {
                 // Switch to Form tab
                 setActiveTab("form");
 
-                showToast.success("Report loaded for completion. Please fill in the results and submit.");
-
+                showToast.success(
+                  "Report loaded for completion. Please fill in the results and submit.",
+                );
               } else if (currentStatus === "completed") {
                 showToast.info("This report is already completed.");
                 stopScanner();
@@ -915,23 +1096,29 @@ const LaundryWashingMachineTest = () => {
                 // Switch to Reports tab to show the completed report
                 setActiveTab("reports");
               } else {
-                showToast.warning(`Report status is "${currentStatus}". Cannot process.`);
+                showToast.warning(
+                  `Report status is "${currentStatus}". Cannot process.`,
+                );
                 // Switch to Reports tab anyway
                 setActiveTab("reports");
               }
             } catch (error) {
               console.error("Error processing QR scan:", error);
-              showToast.error("Failed to process QR code scan. Please try again.");
+              showToast.error(
+                "Failed to process QR code scan. Please try again.",
+              );
             }
           },
           (errorMessage) => {
             // Ignore scan errors (continuous scanning)
-          }
+          },
         );
       }
     } catch (error) {
       console.error("Error initializing scanner:", error);
-      showToast.error("Failed to initialize scanner. Please check camera permissions.");
+      showToast.error(
+        "Failed to initialize scanner. Please check camera permissions.",
+      );
       setShowReportDateScanner(null);
       setScanningReportId(null);
     }
@@ -960,21 +1147,26 @@ const LaundryWashingMachineTest = () => {
     if (!file) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
-      showToast.error("Invalid file type. Please upload an image file (PNG, JPG, JPEG, etc.).");
+    if (!file.type.startsWith("image/")) {
+      showToast.error(
+        "Invalid file type. Please upload an image file (PNG, JPG, JPEG, etc.).",
+      );
       event.target.value = "";
       return;
     }
 
-    const { parseQRCodeScanResult } = await import("../components/inspection/WashingTesting/lib");
+    const { parseQRCodeScanResult } =
+      await import("../components/inspection/WashingTesting/lib");
 
     // Helper to process scan result
     const processResult = async (decodedText) => {
       const result = parseQRCodeScanResult(decodedText, reportId);
 
       if (!result.isValid) {
-        if (result.format === 'invalid_url' || result.format === 'unknown') {
-          showToast.warning("This QR code is not valid. Please upload the QR code that is displayed in the current modal window.");
+        if (result.format === "invalid_url" || result.format === "unknown") {
+          showToast.warning(
+            "This QR code is not valid. Please upload the QR code that is displayed in the current modal window.",
+          );
         } else {
           showToast.warning("Invalid QR code format.");
         }
@@ -985,17 +1177,23 @@ const LaundryWashingMachineTest = () => {
 
       // Check if the scanned QR code belongs to the current report
       if (targetReportId !== reportId) {
-        showToast.error("This QR code is from a different report. Please upload the QR code that is displayed in the current modal window.");
+        showToast.error(
+          "This QR code is from a different report. Please upload the QR code that is displayed in the current modal window.",
+        );
         return;
       }
 
       // Fetch current report to check status
       let reportResponse;
       try {
-        reportResponse = await fetch(`${API_BASE_URL}/api/report-washing/${targetReportId}`);
+        reportResponse = await fetch(
+          `${API_BASE_URL}/api/report-washing/${targetReportId}`,
+        );
         if (!reportResponse.ok) {
           if (reportResponse.status === 404) {
-            showToast.error("This QR code is from an old or deleted report. Please upload the QR code that is displayed in the current modal window.");
+            showToast.error(
+              "This QR code is from an old or deleted report. Please upload the QR code that is displayed in the current modal window.",
+            );
           } else {
             showToast.error("Unable to verify the report. Please try again.");
           }
@@ -1003,7 +1201,9 @@ const LaundryWashingMachineTest = () => {
         }
       } catch (fetchError) {
         console.error("Error fetching report:", fetchError);
-        showToast.error("Network error. Failed to verify the report. Please check your connection and try again.");
+        showToast.error(
+          "Network error. Failed to verify the report. Please check your connection and try again.",
+        );
         return;
       }
 
@@ -1019,7 +1219,9 @@ const LaundryWashingMachineTest = () => {
         setShouldUpdateReceivedStatus(true);
         setShowReceivedModal(true);
         setActiveTab("reports");
-        showToast.success(`QR Scan Success! Please add images and notes, then save to update status to "Received".`);
+        showToast.success(
+          `QR Scan Success! Please add images and notes, then save to update status to "Received".`,
+        );
       } else if (currentStatus === "received") {
         setShowReportDateQR(null);
 
@@ -1029,7 +1231,7 @@ const LaundryWashingMachineTest = () => {
         // Populate form data (form will always show HomeWashForm regardless of reportType)
         setFormData({
           ...currentReport,
-          reportType: currentReport.reportType || "Home Wash Test",
+          reportType: currentReport.reportType || "Garment Wash Report",
           color: currentReport.color || [],
           po: currentReport.po || [],
           exFtyDate: currentReport.exFtyDate || [],
@@ -1044,13 +1246,17 @@ const LaundryWashingMachineTest = () => {
 
         // Switch to Form tab
         setActiveTab("form");
-        showToast.success("Report loaded for completion. Please fill in the results and submit.");
+        showToast.success(
+          "Report loaded for completion. Please fill in the results and submit.",
+        );
       } else if (currentStatus === "completed") {
         showToast.info("This report is already completed.");
         setShowReportDateQR(null);
         setActiveTab("reports");
       } else {
-        showToast.warning(`Report status is "${currentStatus}". Cannot process.`);
+        showToast.warning(
+          `Report status is "${currentStatus}". Cannot process.`,
+        );
         setShowReportDateQR(null);
         setActiveTab("reports");
       }
@@ -1058,12 +1264,12 @@ const LaundryWashingMachineTest = () => {
 
     try {
       // Method 1: Try Html5Qrcode first (fastest)
-      const tempContainer = document.createElement('div');
-      tempContainer.id = 'temp-qr-file-scanner';
-      tempContainer.style.display = 'none';
+      const tempContainer = document.createElement("div");
+      tempContainer.id = "temp-qr-file-scanner";
+      tempContainer.style.display = "none";
       document.body.appendChild(tempContainer);
 
-      const html5QrCode = new Html5Qrcode('temp-qr-file-scanner');
+      const html5QrCode = new Html5Qrcode("temp-qr-file-scanner");
       try {
         const decodedText = await html5QrCode.scanFile(file, false);
         document.body.removeChild(tempContainer);
@@ -1088,12 +1294,17 @@ const LaundryWashingMachineTest = () => {
           img.src = objectUrl;
         });
 
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
         canvas.width = img.width;
         canvas.height = img.height;
         context.drawImage(img, 0, 0);
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const imageData = context.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+        );
 
         const code = jsQR(imageData.data, imageData.width, imageData.height, {
           inversionAttempts: "dontInvert",
@@ -1111,8 +1322,9 @@ const LaundryWashingMachineTest = () => {
       }
 
       // If both failed
-      showToast.error("Failed to scan QR code. The image may be corrupted or the QR code is not readable.");
-
+      showToast.error(
+        "Failed to scan QR code. The image may be corrupted or the QR code is not readable.",
+      );
     } catch (error) {
       console.error("Error in QR scan process:", error);
       showToast.error("An error occurred while scanning. Please try again.");
@@ -1149,10 +1361,14 @@ const LaundryWashingMachineTest = () => {
       const reportId = showReportDateQR;
 
       // Store initial status using ref to avoid re-renders
-      const currentReport = reports.find(r => (r._id === reportId || r.id === reportId));
+      const currentReport = reports.find(
+        (r) => r._id === reportId || r.id === reportId,
+      );
       const initialStatus = currentReport?.status || "pending";
 
-      console.log(`[QR Polling] Started for report ${reportId}, initial status: ${initialStatus}`);
+      console.log(
+        `[QR Polling] Started for report ${reportId}, initial status: ${initialStatus}`,
+      );
 
       // Use a ref to track status within the interval (avoids stale closure)
       let currentKnownStatus = initialStatus;
@@ -1162,17 +1378,23 @@ const LaundryWashingMachineTest = () => {
         try {
           console.log(`[QR Polling] Checking status for report ${reportId}...`);
 
-          const response = await fetch(`${API_BASE_URL}/api/report-washing/${reportId}`);
+          const response = await fetch(
+            `${API_BASE_URL}/api/report-washing/${reportId}`,
+          );
           if (response.ok) {
             const result = await response.json();
             const report = result.data || result;
             const newStatus = report.status || "pending";
 
-            console.log(`[QR Polling] Current status: ${currentKnownStatus}, New status: ${newStatus}`);
+            console.log(
+              `[QR Polling] Current status: ${currentKnownStatus}, New status: ${newStatus}`,
+            );
 
             // If status changed, close the QR modal and refresh
             if (newStatus !== currentKnownStatus) {
-              console.log(`[QR Polling] ✓ Status changed from ${currentKnownStatus} to ${newStatus} - closing QR modal`);
+              console.log(
+                `[QR Polling] ✓ Status changed from ${currentKnownStatus} to ${newStatus} - closing QR modal`,
+              );
 
               // Clear interval first
               if (statusCheckIntervalRef.current) {
@@ -1185,7 +1407,9 @@ const LaundryWashingMachineTest = () => {
               setShowReportDateScanner(null);
 
               // Show notification
-              showToast.success(`✓ QR Scanned! Report status updated to "${newStatus}"`);
+              showToast.success(
+                `✓ QR Scanned! Report status updated to "${newStatus}"`,
+              );
 
               // Refresh reports
               await fetchReports();
@@ -1195,9 +1419,14 @@ const LaundryWashingMachineTest = () => {
 
               // Scroll to updated report with highlight
               setTimeout(() => {
-                const reportElement = document.querySelector(`[data-report-id="${reportId}"]`);
+                const reportElement = document.querySelector(
+                  `[data-report-id="${reportId}"]`,
+                );
                 if (reportElement) {
-                  reportElement.scrollIntoView({ behavior: "smooth", block: "center" });
+                  reportElement.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center",
+                  });
                   reportElement.style.transition = "background-color 0.5s ease";
                   reportElement.style.backgroundColor = "#d4edda";
                   setTimeout(() => {
@@ -1206,10 +1435,14 @@ const LaundryWashingMachineTest = () => {
                 }
               }, 200);
             } else {
-              console.log(`[QR Polling] No status change detected, continuing to poll...`);
+              console.log(
+                `[QR Polling] No status change detected, continuing to poll...`,
+              );
             }
           } else {
-            console.error(`[QR Polling] Failed to fetch report: ${response.status}`);
+            console.error(
+              `[QR Polling] Failed to fetch report: ${response.status}`,
+            );
           }
         } catch (error) {
           console.error("[QR Polling] Error checking report status:", error);
@@ -1227,7 +1460,6 @@ const LaundryWashingMachineTest = () => {
     };
   }, [showReportDateQR, reports]);
 
-
   // Handle URL-based QR code scan (when page is opened via QR code URL)
   useEffect(() => {
     const scanReportId = searchParams.get("scan");
@@ -1237,7 +1469,9 @@ const LaundryWashingMachineTest = () => {
 
       if (reports.length > 0) {
         // Find the report
-        const report = reports.find(r => (r._id === scanReportId || r.id === scanReportId));
+        const report = reports.find(
+          (r) => r._id === scanReportId || r.id === scanReportId,
+        );
         if (report) {
           // Process the scan automatically
           processQRScanFromURL(scanReportId);
@@ -1257,7 +1491,9 @@ const LaundryWashingMachineTest = () => {
       showToast.info("Processing QR code...");
 
       // Fetch current report to check status
-      const reportResponse = await fetch(`${API_BASE_URL}/api/report-washing/${targetReportId}`);
+      const reportResponse = await fetch(
+        `${API_BASE_URL}/api/report-washing/${targetReportId}`,
+      );
       if (!reportResponse.ok) {
         showToast.error("Failed to fetch report details.");
         return;
@@ -1296,7 +1532,9 @@ const LaundryWashingMachineTest = () => {
         // 4. Switch to Reports tab
         setActiveTab("reports");
 
-        showToast.success(`✓ QR Scan Success! Please add images and notes, then save to update status to "Received".`);
+        showToast.success(
+          `✓ QR Scan Success! Please add images and notes, then save to update status to "Received".`,
+        );
       } else if (currentStatus === "received") {
         // Second scan - Open completion mode in form
         // 1. Close QR code modal
@@ -1320,7 +1558,7 @@ const LaundryWashingMachineTest = () => {
         // Populate form data
         setFormData({
           ...currentReport,
-          reportType: currentReport.reportType || "Home Wash Test",
+          reportType: currentReport.reportType || "Garment Wash Report",
           color: currentReport.color || [],
           po: currentReport.po || [],
           exFtyDate: currentReport.exFtyDate || [],
@@ -1336,7 +1574,9 @@ const LaundryWashingMachineTest = () => {
         // 4. Switch to Form tab
         setActiveTab("form");
 
-        showToast.success("Report loaded for completion. Please fill in the results and submit.");
+        showToast.success(
+          "Report loaded for completion. Please fill in the results and submit.",
+        );
       } else if (currentStatus === "completed") {
         // Close modal and show info
         setShowReportDateQR(null);
@@ -1349,9 +1589,14 @@ const LaundryWashingMachineTest = () => {
 
         // Scroll to the report
         setTimeout(() => {
-          const reportElement = document.querySelector(`[data-report-id="${targetReportId}"]`);
+          const reportElement = document.querySelector(
+            `[data-report-id="${targetReportId}"]`,
+          );
           if (reportElement) {
-            reportElement.scrollIntoView({ behavior: "smooth", block: "center" });
+            reportElement.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
           }
         }, 200);
       } else {
@@ -1359,7 +1604,9 @@ const LaundryWashingMachineTest = () => {
         setShowReportDateQR(null);
         setShowReportDateScanner(null);
 
-        showToast.warning(`Report status is "${currentStatus}". Cannot process.`);
+        showToast.warning(
+          `Report status is "${currentStatus}". Cannot process.`,
+        );
 
         // Switch to Reports tab anyway
         setActiveTab("reports");
@@ -1384,19 +1631,29 @@ const LaundryWashingMachineTest = () => {
       return;
     }
 
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+    ];
     const filesArray = Array.from(files);
     const availableSlots = 5 - currentCount;
     const filesToProcess = filesArray.slice(0, availableSlots);
 
     if (filesArray.length > availableSlots) {
-      showToast.info(`Only ${availableSlots} more image(s) can be added (Limit: 5).`);
+      showToast.info(
+        `Only ${availableSlots} more image(s) can be added (Limit: 5).`,
+      );
     }
 
     filesToProcess.forEach((file) => {
       const isValidType = allowedTypes.includes(file.type.toLowerCase());
       if (!isValidType) {
-        showToast.error(`Invalid file type: ${file.name}. Only JPEG, PNG, GIF, and WebP images are allowed.`);
+        showToast.error(
+          `Invalid file type: ${file.name}. Only JPEG, PNG, GIF, and WebP images are allowed.`,
+        );
         return;
       }
       setReceivedImages((prev) => [...prev, file]);
@@ -1431,9 +1688,14 @@ const LaundryWashingMachineTest = () => {
 
         // 4. Scroll to updated report with visual feedback
         setTimeout(() => {
-          const reportElement = document.querySelector(`[data-report-id="${reportId}"]`);
+          const reportElement = document.querySelector(
+            `[data-report-id="${reportId}"]`,
+          );
           if (reportElement) {
-            reportElement.scrollIntoView({ behavior: "smooth", block: "center" });
+            reportElement.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
             // Add a temporary highlight effect
             reportElement.style.transition = "background-color 0.5s ease";
             reportElement.style.backgroundColor = "#d4edda";
@@ -1442,7 +1704,7 @@ const LaundryWashingMachineTest = () => {
             }, 2000);
           }
         }, 200);
-      }
+      },
     );
   };
 
@@ -1456,19 +1718,29 @@ const LaundryWashingMachineTest = () => {
       return;
     }
 
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+    ];
     const filesArray = Array.from(files);
     const availableSlots = 5 - currentCount;
     const filesToProcess = filesArray.slice(0, availableSlots);
 
     if (filesArray.length > availableSlots) {
-      showToast.info(`Only ${availableSlots} more image(s) can be added (Limit: 5).`);
+      showToast.info(
+        `Only ${availableSlots} more image(s) can be added (Limit: 5).`,
+      );
     }
 
     filesToProcess.forEach((file) => {
       const isValidType = allowedTypes.includes(file.type.toLowerCase());
       if (!isValidType) {
-        showToast.error(`Invalid file type: ${file.name}. Only JPEG, PNG, GIF, and WebP images are allowed.`);
+        showToast.error(
+          `Invalid file type: ${file.name}. Only JPEG, PNG, GIF, and WebP images are allowed.`,
+        );
         return;
       }
       setCompletionImages((prev) => [...prev, file]);
@@ -1481,13 +1753,26 @@ const LaundryWashingMachineTest = () => {
     if (!completionReportId) return;
 
     // Find the report to get its type so we can save notes to the correct field
-    let report = reports.find(r => (r._id === completionReportId || r.id === completionReportId));
+    let report = reports.find(
+      (r) => r._id === completionReportId || r.id === completionReportId,
+    );
     if (!report) {
-      report = whReports.find(r => (r._id === completionReportId || r.id === completionReportId));
+      report = whReports.find(
+        (r) => r._id === completionReportId || r.id === completionReportId,
+      );
     }
 
-    // Default to Home Wash if not found (though it should be found)
-    const reportType = report?.reportType || "Home Wash Test";
+    // Default to Garment Wash Report if not found (though it should be found)
+    const reportType = report?.reportType || "Garment Wash Report";
+
+    // Current assignment's checker/approver to store on report when completing
+    const activeAssign = causeAssignHistory && causeAssignHistory.length > 0 ? causeAssignHistory[0] : null;
+    const completionAssign = activeAssign ? {
+      checkedBy: activeAssign.checkedBy ?? null,
+      approvedBy: activeAssign.approvedBy ?? null,
+      checkedByName: activeAssign.checkedByName ?? null,
+      approvedByName: activeAssign.approvedByName ?? null,
+    } : null;
 
     const success = await saveCompletionStatus(
       completionReportId,
@@ -1511,9 +1796,14 @@ const LaundryWashingMachineTest = () => {
 
         // 4. Scroll to updated report with visual feedback
         setTimeout(() => {
-          const reportElement = document.querySelector(`[data-report-id="${reportId}"]`);
+          const reportElement = document.querySelector(
+            `[data-report-id="${reportId}"]`,
+          );
           if (reportElement) {
-            reportElement.scrollIntoView({ behavior: "smooth", block: "center" });
+            reportElement.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
             // Add a temporary highlight effect
             reportElement.style.transition = "background-color 0.5s ease";
             reportElement.style.backgroundColor = "#d1ecf1";
@@ -1523,14 +1813,15 @@ const LaundryWashingMachineTest = () => {
           }
         }, 200);
       },
-      reportType // Pass the report type to saveCompletionStatus
+      reportType, // Pass the report type to saveCompletionStatus
+      completionAssign, // Pass assignment checkedBy/approvedBy and names for completed report view
     );
   };
 
   // Handle edit initial images
   const handleEditInitialImages = (report) => {
     setEditingImageReport(report);
-    setEditingImageType('initial');
+    setEditingImageType("initial");
     setEditingImages(report.images || []);
     setEditingNotes(report.notes || "");
     setShowEditInitialImagesModal(true);
@@ -1539,18 +1830,16 @@ const LaundryWashingMachineTest = () => {
   // Handle edit received images
   const handleEditReceivedImages = (report) => {
     setEditingImageReport(report);
-    setEditingImageType('received');
+    setEditingImageType("received");
     setEditingImages(report.receivedImages || []);
     setEditingNotes(report.receivedNotes || "");
     setShowEditReceivedImagesModal(true);
   };
 
-
-
   // Handle edit completion images
   const handleEditCompletionImages = (report) => {
     setEditingImageReport(report);
-    setEditingImageType('completion');
+    setEditingImageType("completion");
     setEditingImages(report.completionImages || []);
 
     // Get notes from the specific field based on report type, fallback to generic completionNotes
@@ -1570,19 +1859,29 @@ const LaundryWashingMachineTest = () => {
       return;
     }
 
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+    ];
     const filesArray = Array.from(files);
     const availableSlots = 5 - currentCount;
     const filesToProcess = filesArray.slice(0, availableSlots);
 
     if (filesArray.length > availableSlots) {
-      showToast.info(`Only ${availableSlots} more image(s) can be added (Limit: 5).`);
+      showToast.info(
+        `Only ${availableSlots} more image(s) can be added (Limit: 5).`,
+      );
     }
 
     filesToProcess.forEach((file) => {
       const isValidType = allowedTypes.includes(file.type.toLowerCase());
       if (!isValidType) {
-        showToast.error(`Invalid file type: ${file.name}. Only JPEG, PNG, GIF, and WebP images are allowed.`);
+        showToast.error(
+          `Invalid file type: ${file.name}. Only JPEG, PNG, GIF, and WebP images are allowed.`,
+        );
         return;
       }
       setEditingImages((prev) => [...prev, file]);
@@ -1605,15 +1904,18 @@ const LaundryWashingMachineTest = () => {
       const formDataToSubmit = new FormData();
 
       // Determine which field name to use based on type
-      const fieldName = editingImageType === 'initial'
-        ? 'images'
-        : editingImageType === 'received'
-          ? 'receivedImages'
-          : 'completionImages';
+      const fieldName =
+        editingImageType === "initial"
+          ? "images"
+          : editingImageType === "received"
+            ? "receivedImages"
+            : "completionImages";
 
       // Separate new File objects from existing URLs
-      const newImageFiles = editingImages.filter(img => img instanceof File);
-      const existingImageUrls = editingImages.filter(img => typeof img === 'string');
+      const newImageFiles = editingImages.filter((img) => img instanceof File);
+      const existingImageUrls = editingImages.filter(
+        (img) => typeof img === "string",
+      );
 
       // Add new images (File objects) - these will be uploaded
       newImageFiles.forEach((file) => {
@@ -1623,15 +1925,18 @@ const LaundryWashingMachineTest = () => {
       // Send the list of existing URLs to keep (so backend knows which ones to preserve)
       // We'll send this as a JSON string in a separate field
       if (existingImageUrls.length > 0) {
-        formDataToSubmit.append(`${fieldName}Urls`, JSON.stringify(existingImageUrls));
+        formDataToSubmit.append(
+          `${fieldName}Urls`,
+          JSON.stringify(existingImageUrls),
+        );
       }
 
       // Add notes using correct field name
       let notesFieldName;
-      if (editingImageType === 'initial') {
-        notesFieldName = 'notes';
-      } else if (editingImageType === 'received') {
-        notesFieldName = 'receivedNotes';
+      if (editingImageType === "initial") {
+        notesFieldName = "notes";
+      } else if (editingImageType === "received") {
+        notesFieldName = "receivedNotes";
       } else {
         // completion
         notesFieldName = getCompletionNotesField(editingImageReport.reportType);
@@ -1639,10 +1944,13 @@ const LaundryWashingMachineTest = () => {
 
       formDataToSubmit.append(notesFieldName, editingNotes);
 
-      const response = await fetch(`${API_BASE_URL}/api/report-washing/${reportId}`, {
-        method: "PUT",
-        body: formDataToSubmit,
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/report-washing/${reportId}`,
+        {
+          method: "PUT",
+          body: formDataToSubmit,
+        },
+      );
 
       const contentType = response.headers.get("content-type");
       let result;
@@ -1660,7 +1968,7 @@ const LaundryWashingMachineTest = () => {
           if (errorMatch) {
             errorMessage = errorMatch[1].trim();
           } else {
-            errorMessage = errorText.split('<br>')[0].trim();
+            errorMessage = errorText.split("<br>")[0].trim();
           }
         }
         throw new Error(errorMessage);
@@ -1680,13 +1988,18 @@ const LaundryWashingMachineTest = () => {
         // Refresh all reports
         await refreshAllReports();
       } else {
-        const errorMessage = result?.message || result?.error || `Server error (${response.status}): ${response.statusText}`;
+        const errorMessage =
+          result?.message ||
+          result?.error ||
+          `Server error (${response.status}): ${response.statusText}`;
         showToast.error(errorMessage);
         console.error("Error updating images:", result);
       }
     } catch (error) {
       console.error("Error updating images:", error);
-      const errorMessage = error.message || "An error occurred while updating images. Please try again.";
+      const errorMessage =
+        error.message ||
+        "An error occurred while updating images. Please try again.";
       showToast.error(errorMessage);
     } finally {
       setIsUpdatingImages(false);
@@ -1715,46 +2028,48 @@ const LaundryWashingMachineTest = () => {
         document.body.appendChild(container);
 
         // Dynamically import react-dom/client and render QR code
-        import("react-dom/client").then(({ createRoot }) => {
-          const root = createRoot(container);
-          root.render(
-            React.createElement(QRCodeCanvas, {
-              value: value,
-              size: highResSize,
-              level: "H",
-              includeMargin: true,
-              imageSettings: {
-                src: "/assets/Home/YQMSLogoEdit.png",
-                x: undefined,
-                y: undefined,
-                height: highResSize * 0.2,
-                width: highResSize * 0.2,
-                excavate: true,
-              }
-            })
-          );
+        import("react-dom/client")
+          .then(({ createRoot }) => {
+            const root = createRoot(container);
+            root.render(
+              React.createElement(QRCodeCanvas, {
+                value: value,
+                size: highResSize,
+                level: "H",
+                includeMargin: true,
+                imageSettings: {
+                  src: "/assets/Home/YQMSLogoEdit.png",
+                  x: undefined,
+                  y: undefined,
+                  height: highResSize * 0.2,
+                  width: highResSize * 0.2,
+                  excavate: true,
+                },
+              }),
+            );
 
-          // Wait for QR code to render, then get canvas data
-          setTimeout(() => {
-            const canvas = container.querySelector("canvas");
-            if (canvas) {
-              const dataURL = canvas.toDataURL("image/png");
-              root.unmount();
+            // Wait for QR code to render, then get canvas data
+            setTimeout(() => {
+              const canvas = container.querySelector("canvas");
+              if (canvas) {
+                const dataURL = canvas.toDataURL("image/png");
+                root.unmount();
+                document.body.removeChild(container);
+                resolve(dataURL);
+              } else {
+                root.unmount();
+                document.body.removeChild(container);
+                resolve(null);
+              }
+            }, 300);
+          })
+          .catch((error) => {
+            console.error("Error importing react-dom/client:", error);
+            if (document.body.contains(container)) {
               document.body.removeChild(container);
-              resolve(dataURL);
-            } else {
-              root.unmount();
-              document.body.removeChild(container);
-              resolve(null);
             }
-          }, 300);
-        }).catch((error) => {
-          console.error("Error importing react-dom/client:", error);
-          if (document.body.contains(container)) {
-            document.body.removeChild(container);
-          }
-          resolve(null);
-        });
+            resolve(null);
+          });
       } catch (error) {
         console.error("Error generating QR code:", error);
         resolve(null);
@@ -1766,8 +2081,12 @@ const LaundryWashingMachineTest = () => {
   const handlePrintPDF = async (report) => {
     const reportId = report._id || report.id;
 
-    const currentPrintingId = activeTab === "warehouse_reports" ? whPrintingReportId : printingReportId;
-    const currentSetPrintingId = activeTab === "warehouse_reports" ? setWhPrintingReportId : setPrintingReportId;
+    const currentPrintingId =
+      activeTab === "warehouse_reports" ? whPrintingReportId : printingReportId;
+    const currentSetPrintingId =
+      activeTab === "warehouse_reports"
+        ? setWhPrintingReportId
+        : setPrintingReportId;
 
     // Prevent multiple clicks
     if (currentPrintingId === reportId) {
@@ -1781,12 +2100,22 @@ const LaundryWashingMachineTest = () => {
       const qrCodeValue = `${getQRCodeBaseURL(QR_CODE_BASE_URL)}/Launch-washing-machine-test?scan=${reportId}`;
       const qrCodeDataURL = await generateQRCodeDataURL(qrCodeValue, 100);
 
-      const blob = await pdf(<WashingMachineTestPDF report={report} apiBaseUrl={API_BASE_URL} qrCodeDataURL={qrCodeDataURL} savedImageRotations={savedImageRotations} />).toBlob();
+      const blob = await pdf(
+        <WashingMachineTestPDF
+          report={report}
+          apiBaseUrl={API_BASE_URL}
+          qrCodeDataURL={qrCodeDataURL}
+          savedImageRotations={savedImageRotations}
+          users={users}
+        />,
+      ).toBlob();
       const url = URL.createObjectURL(blob);
 
       // Clean up any existing print iframes first
-      const existingIframes = document.querySelectorAll('iframe[id^="print-iframe-"]');
-      existingIframes.forEach(iframe => {
+      const existingIframes = document.querySelectorAll(
+        'iframe[id^="print-iframe-"]',
+      );
+      existingIframes.forEach((iframe) => {
         try {
           if (iframe.parentNode) {
             iframe.parentNode.removeChild(iframe);
@@ -1926,7 +2255,15 @@ const LaundryWashingMachineTest = () => {
       const qrCodeValue = `REPORT_DATE_SCAN:${reportId}`;
       const qrCodeDataURL = await generateQRCodeDataURL(qrCodeValue, 100);
 
-      const blob = await pdf(<WashingMachineTestPDF report={report} apiBaseUrl={API_BASE_URL} qrCodeDataURL={qrCodeDataURL} savedImageRotations={savedImageRotations} />).toBlob();
+      const blob = await pdf(
+        <WashingMachineTestPDF
+          report={report}
+          apiBaseUrl={API_BASE_URL}
+          qrCodeDataURL={qrCodeDataURL}
+          savedImageRotations={savedImageRotations}
+          users={users}
+        />,
+      ).toBlob();
 
       // Create download link
       const url = URL.createObjectURL(blob);
@@ -1950,7 +2287,7 @@ const LaundryWashingMachineTest = () => {
   // Handle Export Excel for single report
   const handleExportExcel = async (report) => {
     try {
-      await generateWashingMachineTestExcel(report, API_BASE_URL);
+      await generateWashingMachineTestExcel(report, API_BASE_URL, users);
       showToast.success("Excel file downloaded successfully!");
     } catch (error) {
       console.error("Error exporting Excel:", error);
@@ -1964,20 +2301,27 @@ const LaundryWashingMachineTest = () => {
       setIsLoadingFactories(true);
       try {
         const response = await fetch(
-          `${API_BASE_URL}/api/subcon-sewing-factories-manage`
+          `${API_BASE_URL}/api/subcon-sewing-factories-manage`,
         );
         if (response.ok) {
           const data = await response.json();
           setFactories(data);
         } else {
           console.error("Failed to fetch factories");
-          showToast.error("Failed to load factories. Please check your connection.");
+          showToast.error(
+            "Failed to load factories. Please check your connection.",
+          );
         }
       } catch (error) {
         console.error("Error fetching factories:", error);
         // Check if it's a connection error
-        if (error.message.includes("Failed to fetch") || error.message.includes("ERR_CONNECTION_REFUSED")) {
-          showToast.error(`Cannot connect to backend server at ${API_BASE_URL}. Please ensure the backend server is running on port 5001.`);
+        if (
+          error.message.includes("Failed to fetch") ||
+          error.message.includes("ERR_CONNECTION_REFUSED")
+        ) {
+          showToast.error(
+            `Cannot connect to backend server at ${API_BASE_URL}. Please ensure the backend server is running on port 5001.`,
+          );
         } else {
           showToast.error("Error loading factories. Please try again.");
         }
@@ -2000,40 +2344,52 @@ const LaundryWashingMachineTest = () => {
   // Close color, PO, and ETD dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (showColorDropdown && !event.target.closest('.color-dropdown-container')) {
+      if (
+        showColorDropdown &&
+        !event.target.closest(".color-dropdown-container")
+      ) {
         setShowColorDropdown(false);
       }
-      if (showPODropdown && !event.target.closest('.po-dropdown-container')) {
+      if (showPODropdown && !event.target.closest(".po-dropdown-container")) {
         setShowPODropdown(false);
       }
-      if (showETDDropdown && !event.target.closest('.etd-dropdown-container')) {
+      if (showETDDropdown && !event.target.closest(".etd-dropdown-container")) {
         setShowETDDropdown(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showColorDropdown, showPODropdown, showETDDropdown]);
 
   // Close edit color, PO, and ETD dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (showEditColorDropdown && !event.target.closest('.color-dropdown-container')) {
+      if (
+        showEditColorDropdown &&
+        !event.target.closest(".color-dropdown-container")
+      ) {
         setShowEditColorDropdown(false);
       }
-      if (showEditPODropdown && !event.target.closest('.po-dropdown-container')) {
+      if (
+        showEditPODropdown &&
+        !event.target.closest(".po-dropdown-container")
+      ) {
         setShowEditPODropdown(false);
       }
-      if (showEditETDDropdown && !event.target.closest('.etd-dropdown-container')) {
+      if (
+        showEditETDDropdown &&
+        !event.target.closest(".etd-dropdown-container")
+      ) {
         setShowEditETDDropdown(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showEditColorDropdown, showEditPODropdown, showEditETDDropdown]);
 
@@ -2045,15 +2401,17 @@ const LaundryWashingMachineTest = () => {
       }
     };
     if (isReportTypeOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isReportTypeOpen]);
 
   // Close QR code modal if report becomes completed
   useEffect(() => {
     if (showReportDateQR) {
-      const report = reports.find(r => (r._id === showReportDateQR || r.id === showReportDateQR));
+      const report = reports.find(
+        (r) => r._id === showReportDateQR || r.id === showReportDateQR,
+      );
       if (report && report.status === "completed") {
         setShowReportDateQR(null);
       }
@@ -2094,23 +2452,25 @@ const LaundryWashingMachineTest = () => {
         </div>
 
         <div className="p-4 md:p-6">
-
           {/* Tab Navigation - Mobile Optimized */}
           <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
             <nav
               className="flex overflow-x-auto scrollbar-hide -mb-px"
               aria-label="Tabs"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             >
               <button
                 onClick={() => setActiveTab("form")}
-                className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "form"
-                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
+                className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
+                  activeTab === "form"
+                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+                }`}
               >
                 <span className="flex items-center gap-1.5 sm:gap-2">
-                  <HiDocumentAdd className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "form" ? "text-emerald-600" : "text-emerald-500/70"}`} />
+                  <HiDocumentAdd
+                    className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "form" ? "text-emerald-600" : "text-emerald-500/70"}`}
+                  />
                   <span className="hidden sm:inline">Create New Report</span>
                   <span className="sm:hidden">Create</span>
                 </span>
@@ -2119,15 +2479,25 @@ const LaundryWashingMachineTest = () => {
               {(isAdminUser || !isWarehouseUser) && (
                 <button
                   onClick={() => setActiveTab("reports")}
-                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "reports"
-                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                    }`}
+                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
+                    activeTab === "reports"
+                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+                  }`}
                 >
                   <span className="flex items-center gap-1.5 sm:gap-2">
-                    <HiClipboardList className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "reports" ? "text-blue-600" : "text-blue-500/70"}`} />
-                    <span className="hidden sm:inline">Reports ({pagination.totalRecords})</span>
-                    <span className="sm:hidden">Reports <span className="text-[10px] bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded-full">{pagination.totalRecords}</span></span>
+                    <HiClipboardList
+                      className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "reports" ? "text-blue-600" : "text-blue-500/70"}`}
+                    />
+                    <span className="hidden sm:inline">
+                      Reports ({pagination.totalRecords})
+                    </span>
+                    <span className="sm:hidden">
+                      Reports{" "}
+                      <span className="text-[10px] bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded-full">
+                        {pagination.totalRecords}
+                      </span>
+                    </span>
                   </span>
                 </button>
               )}
@@ -2136,13 +2506,16 @@ const LaundryWashingMachineTest = () => {
               {(isAdminUser || isWarehouseUser) && (
                 <button
                   onClick={() => setActiveTab("warehouse_reports")}
-                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "warehouse_reports"
-                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                    }`}
+                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
+                    activeTab === "warehouse_reports"
+                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+                  }`}
                 >
                   <span className="flex items-center gap-1.5 sm:gap-2">
-                    <MdWarehouse className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "warehouse_reports" ? "text-amber-600" : "text-amber-500/70"}`} />
+                    <MdWarehouse
+                      className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "warehouse_reports" ? "text-amber-600" : "text-amber-500/70"}`}
+                    />
                     <span className="hidden sm:inline">Warehouse Report</span>
                     <span className="sm:hidden">Warehouse</span>
                   </span>
@@ -2152,13 +2525,16 @@ const LaundryWashingMachineTest = () => {
               {isAdminUser && (
                 <button
                   onClick={() => setActiveTab("assign_control")}
-                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "assign_control"
-                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                    }`}
+                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
+                    activeTab === "assign_control"
+                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+                  }`}
                 >
                   <span className="flex items-center gap-1.5 sm:gap-2">
-                    <MdAssignmentInd className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "assign_control" ? "text-purple-600" : "text-purple-500/70"}`} />
+                    <MdAssignmentInd
+                      className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "assign_control" ? "text-purple-600" : "text-purple-500/70"}`}
+                    />
                     <span className="hidden sm:inline">Assign Control</span>
                     <span className="sm:hidden">Assign</span>
                   </span>
@@ -2184,6 +2560,7 @@ const LaundryWashingMachineTest = () => {
               fetchOrderColors={fetchOrderColors}
               fetchYorksysOrderETD={fetchYorksysOrderETD}
               availableColors={availableColors}
+              usedColors={usedColors}
               isLoadingColors={isLoadingColors}
               showColorDropdown={showColorDropdown}
               setShowColorDropdown={setShowColorDropdown}
@@ -2219,14 +2596,16 @@ const LaundryWashingMachineTest = () => {
                 "Garment Wash Report": <MdLocalLaundryService />,
                 "HT Testing": <MdOutlineDeviceThermostat />,
                 "EMB/Printing Testing": <MdOutlineImagesearchRoller />,
-                "Pulling Test": <MdOutlineExpand />
+                "Pulling Test": <MdOutlineExpand />,
               }}
               reportTypes={[
-                { val: "Home Wash Test", icon: <MdLocalLaundryService /> },
                 { val: "Garment Wash Report", icon: <MdLocalLaundryService /> },
                 { val: "HT Testing", icon: <MdOutlineDeviceThermostat /> },
-                { val: "EMB/Printing Testing", icon: <MdOutlineImagesearchRoller /> },
-                { val: "Pulling Test", icon: <MdOutlineExpand /> }
+                {
+                  val: "EMB/Printing Testing",
+                  icon: <MdOutlineImagesearchRoller />,
+                },
+                { val: "Pulling Test", icon: <MdOutlineExpand /> },
               ]}
               causeAssignData={assignData}
               assignHistory={causeAssignHistory}
@@ -2243,17 +2622,19 @@ const LaundryWashingMachineTest = () => {
               activeTab={activeTab}
               reports={reports}
               isLoadingReports={isLoadingReports}
-              onRefresh={() => fetchReports({
-                startDate: filterStartDate,
-                endDate: filterEndDate,
-                search: filterSearch,
-                color: filterColor,
-                factory: filterFactory,
-                status: filterStatus,
-                reportType: filterReportType,
-                page: filterPage,
-                limit: filterLimit
-              })}
+              onRefresh={() =>
+                fetchReports({
+                  startDate: filterStartDate,
+                  endDate: filterEndDate,
+                  search: filterSearch,
+                  color: filterColor,
+                  factory: filterFactory,
+                  status: filterStatus,
+                  reportType: filterReportType,
+                  page: filterPage,
+                  limit: filterLimit,
+                })
+              }
               expandedReports={expandedReports}
               onToggleReport={toggleReport}
               onPrintPDF={handlePrintPDF}
@@ -2261,7 +2642,11 @@ const LaundryWashingMachineTest = () => {
               onExportExcel={handleExportExcel}
               onEdit={handleEditReport}
               onDelete={handleDelete}
-              onShowQRCode={(reportId) => setShowReportDateQR(showReportDateQR === reportId ? null : reportId)}
+              onShowQRCode={(reportId) =>
+                setShowReportDateQR(
+                  showReportDateQR === reportId ? null : reportId,
+                )
+              }
               printingReportId={printingReportId}
               savedImageRotations={savedImageRotations}
               openImageViewer={openImageViewer}
@@ -2294,6 +2679,7 @@ const LaundryWashingMachineTest = () => {
               setFilterReportType={setFilterReportType}
               isAdminUser={isAdminUser}
               isWarehouseUser={isWarehouseUser}
+              users={users}
             />
           )}
 
@@ -2303,17 +2689,19 @@ const LaundryWashingMachineTest = () => {
               activeTab={activeTab}
               reports={whReports}
               isLoadingReports={isLoadingWhReports}
-              onRefresh={() => fetchWhReports({
-                startDate: whFilterStartDate,
-                endDate: whFilterEndDate,
-                search: whFilterSearch,
-                color: whFilterColor,
-                factory: whFilterFactory,
-                status: whFilterStatus,
-                reportType: whFilterReportType,
-                page: whFilterPage,
-                limit: whFilterLimit
-              })}
+              onRefresh={() =>
+                fetchWhReports({
+                  startDate: whFilterStartDate,
+                  endDate: whFilterEndDate,
+                  search: whFilterSearch,
+                  color: whFilterColor,
+                  factory: whFilterFactory,
+                  status: whFilterStatus,
+                  reportType: whFilterReportType,
+                  page: whFilterPage,
+                  limit: whFilterLimit,
+                })
+              }
               expandedReports={whExpandedReports}
               onToggleReport={toggleWhReport}
               onPrintPDF={handlePrintPDF}
@@ -2321,7 +2709,11 @@ const LaundryWashingMachineTest = () => {
               onExportExcel={handleExportExcel}
               onEdit={handleEditReport}
               onDelete={handleDelete}
-              onShowQRCode={(reportId) => setShowReportDateQR(showReportDateQR === reportId ? null : reportId)}
+              onShowQRCode={(reportId) =>
+                setShowReportDateQR(
+                  showReportDateQR === reportId ? null : reportId,
+                )
+              }
               printingReportId={whPrintingReportId}
               savedImageRotations={savedImageRotations}
               openImageViewer={openImageViewer}
@@ -2355,19 +2747,14 @@ const LaundryWashingMachineTest = () => {
               enableRoleLocking={true}
               isAdminUser={isAdminUser}
               isWarehouseUser={isWarehouseUser}
+              users={users}
             />
           )}
-
-
-
-
-
 
           {/* Assign Control Tab */}
           {activeTab === "assign_control" && (
             <GameAssignControl socket={socket} user={user} />
           )}
-
 
           {/* Modals */}
           <ReceivedModal
@@ -2480,9 +2867,12 @@ const LaundryWashingMachineTest = () => {
               stopScanner();
               setShowReportDateScanner(null);
             }}
-            scannerElementId={showReportDateScanner ? `report-date-scanner-${showReportDateScanner}` : ""}
+            scannerElementId={
+              showReportDateScanner
+                ? `report-date-scanner-${showReportDateScanner}`
+                : ""
+            }
           />
-
 
           {/* Edit Initial Images Modal */}
           <EditImagesModal
@@ -2499,7 +2889,7 @@ const LaundryWashingMachineTest = () => {
             notes={editingNotes}
             onNotesChange={setEditingNotes}
             onRemoveImage={handleRemoveEditImage}
-            onUploadImage={(files) => handleEditImageUpload(files, 'initial')}
+            onUploadImage={(files) => handleEditImageUpload(files, "initial")}
             onSave={handleUpdateImages}
             isSaving={isUpdatingImages}
             saveButtonColor="blue"
@@ -2520,7 +2910,7 @@ const LaundryWashingMachineTest = () => {
             notes={editingNotes}
             onNotesChange={setEditingNotes}
             onRemoveImage={handleRemoveEditImage}
-            onUploadImage={(files) => handleEditImageUpload(files, 'received')}
+            onUploadImage={(files) => handleEditImageUpload(files, "received")}
             onSave={handleUpdateImages}
             isSaving={isUpdatingImages}
             saveButtonColor="yellow"
@@ -2541,7 +2931,9 @@ const LaundryWashingMachineTest = () => {
             notes={editingNotes}
             onNotesChange={setEditingNotes}
             onRemoveImage={handleRemoveEditImage}
-            onUploadImage={(files) => handleEditImageUpload(files, 'completion')}
+            onUploadImage={(files) =>
+              handleEditImageUpload(files, "completion")
+            }
             onSave={handleUpdateImages}
             isSaving={isUpdatingImages}
             saveButtonColor="green"
@@ -2570,10 +2962,9 @@ const LaundryWashingMachineTest = () => {
             onToggleZoom={toggleZoom}
             onDownload={downloadImageViewer}
           />
-
         </div>
       </div>
-    </div >
+    </div>
   );
 };
 

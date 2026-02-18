@@ -53,6 +53,7 @@ const ReportsList = ({
   enableRoleLocking,
   isAdminUser,
   isWarehouseUser,
+  users = [],
 }) => {
   const [styleSuggestions, setStyleSuggestions] = React.useState([]);
   const [colorSuggestions, setColorSuggestions] = React.useState([]);
@@ -510,6 +511,7 @@ const ReportsList = ({
                 enableRoleLocking={enableRoleLocking}
                 isAdminUser={isAdminUser}
                 isWarehouseUser={isWarehouseUser}
+                users={users}
               />
             );
           })}

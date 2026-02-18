@@ -34,12 +34,34 @@ const PullingTestForm = ({
     setShowOrderNoSuggestions,
     isSearchingOrderNo,
     handleOrderNoSelect,
+    // Color props
+    availableColors = [],
+    usedColors = [],
+    isLoadingColors = false,
+    showColorDropdown,
+    setShowColorDropdown,
     // Assignment control props
     users: parentUsers = [],
     isLoadingUsers = false,
     assignHistory,
     causeAssignData,
 }) => {
+    // Filter colors that have already been reported
+    // Filter colors that have already been reported, but ALWAYS include currently selected colors
+    const filteredColors = Array.from(new Set([
+        ...(availableColors || []),
+        ...(Array.isArray(formData.color) ? formData.color : (formData.color ? [formData.color] : []))
+    ])).filter(color => {
+        const colorStr = String(color).trim().toUpperCase();
+        const isAlreadySelected = Array.isArray(formData.color)
+            ? formData.color.some(c => String(c).trim().toUpperCase() === colorStr)
+            : String(formData.color).trim().toUpperCase() === colorStr;
+
+        const isUsed = usedColors?.some(uc => String(uc).trim().toUpperCase() === colorStr);
+
+        return isAlreadySelected || !isUsed;
+    });
+
     // Use the passed users or fallback
     const users = parentUsers || [];
 
@@ -106,7 +128,7 @@ const PullingTestForm = ({
         const filteredUsers = users.filter(u => allowedEmpIds.has(u.emp_id));
 
         return filteredUsers.map(u => ({
-            value: u.name,
+            value: u.emp_id,
             label: `(${u.emp_id}) ${u.name}`
         }));
     };
@@ -114,37 +136,27 @@ const PullingTestForm = ({
     const preparedByOptions = getFilteredOptions('preparedBy');
     const checkedByOptions = getFilteredOptions('checkedBy');
 
-    // Auto-populate if only one option exists and field is empty
-    useEffect(() => {
-        if (preparedByOptions.length === 1 && (!formData.preparedBy || formData.preparedBy === '')) {
-            handleInputChange('preparedBy', preparedByOptions[0].value);
-        }
-    }, [preparedByOptions, formData.preparedBy]);
+    // Do not pre-fill PREPARED BY / CHECKED BY from assignment; keep default placeholder "Select User"
 
+    // Validate and normalize legacy name to emp_id
     useEffect(() => {
-        if (checkedByOptions.length === 1 && (!formData.checkedBy || formData.checkedBy === '')) {
-            handleInputChange('checkedBy', checkedByOptions[0].value);
-        }
-    }, [checkedByOptions, formData.checkedBy]);
-
-    // Validate current selection against allowed options (Real-time cleanup)
-    useEffect(() => {
-        // Only run validation if we actually have Users loaded
-        if (users.length > 0) {
-            // Validate Prepared By
-            if (formData.preparedBy) {
-                const isValid = preparedByOptions.some(o => o.value === formData.preparedBy);
-                if (!isValid) {
-                    handleInputChange('preparedBy', '');
-                }
+        if (users.length === 0) return;
+        if (formData.preparedBy) {
+            if (preparedByOptions.some(o => o.value === formData.preparedBy)) return;
+            const byName = users.find(u => u.name === formData.preparedBy || formData.preparedBy === `(${u.emp_id}) ${u.name}`);
+            if (byName && preparedByOptions.some(o => o.value === byName.emp_id)) {
+                handleInputChange('preparedBy', byName.emp_id);
+            } else {
+                handleInputChange('preparedBy', '');
             }
-
-            // Validate Checked By
-            if (formData.checkedBy) {
-                const isValid = checkedByOptions.some(o => o.value === formData.checkedBy);
-                if (!isValid) {
-                    handleInputChange('checkedBy', '');
-                }
+        }
+        if (formData.checkedBy) {
+            if (checkedByOptions.some(o => o.value === formData.checkedBy)) return;
+            const byName = users.find(u => u.name === formData.checkedBy || formData.checkedBy === `(${u.emp_id}) ${u.name}`);
+            if (byName && checkedByOptions.some(o => o.value === byName.emp_id)) {
+                handleInputChange('checkedBy', byName.emp_id);
+            } else {
+                handleInputChange('checkedBy', '');
             }
         }
     }, [users.length, preparedByOptions, checkedByOptions, formData.preparedBy, formData.checkedBy]);
@@ -254,7 +266,16 @@ const PullingTestForm = ({
                                             .map((orderNo, index) => (
                                                 <div
                                                     key={index}
-                                                    onClick={() => handleOrderNoSelect(orderNo)}
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                    }}
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        if (handleOrderNoSelect) {
+                                                            handleOrderNoSelect(orderNo);
+                                                        }
+                                                    }}
                                                     className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-900 dark:text-white"
                                                 >
                                                     {orderNo}
@@ -281,18 +302,145 @@ const PullingTestForm = ({
                         </div>
 
                         {/* COLOR */}
-                        <div>
+                        <div className="relative">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 COLOR <span className="text-red-500">*</span>
                             </label>
-                            <input
-                                type="text"
-                                value={formData.color || ''}
-                                onChange={(e) => handleInputChange("color", e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                required
-                                placeholder="Enter Color"
-                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowColorDropdown(!showColorDropdown)}
+                                disabled={isLoadingColors || !formData.ymStyle || (filteredColors.length === 0 && usedColors?.length === 0)}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <span className="truncate">
+                                    {isLoadingColors
+                                        ? "Loading colors..."
+                                        : !formData.ymStyle
+                                            ? "Select Style first"
+                                            : formData.color?.length > 0
+                                                ? (Array.isArray(formData.color) && formData.color.length === filteredColors.length && filteredColors.length === availableColors.length
+                                                    ? "All colors selected"
+                                                    : (Array.isArray(formData.color) && formData.color.length === filteredColors.length
+                                                        ? "All available colors selected"
+                                                        : `${formData.color.length} color(s) selected`))
+                                                : filteredColors.length === 0 && availableColors?.length > 0
+                                                    ? "All colors already reported"
+                                                    : filteredColors.length === 0
+                                                        ? "No colors available"
+                                                        : "Select Color(s)"}
+                                </span>
+                                <svg
+                                    className={`w-4 h-4 transition-transform ${showColorDropdown ? 'rotate-180' : ''}`}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+
+                            {showColorDropdown && (filteredColors.length > 0 || usedColors?.length > 0) && (
+                                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto font-normal">
+                                    {filteredColors.length > 0 && (
+                                        <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    handleInputChange("color", [...filteredColors]);
+                                                }}
+                                                className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                                            >
+                                                Select All
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    handleInputChange("color", []);
+                                                }}
+                                                className="px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                                            >
+                                                Clear All
+                                            </button>
+                                        </div>
+                                    )}
+                                    <div className="p-2">
+                                        <div className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400 mb-2 px-1">
+                                            Available Colors:
+                                        </div>
+                                        <div className="space-y-0.5">
+                                            {filteredColors.map((color, index) => {
+                                                const isSelected = Array.isArray(formData.color)
+                                                    ? formData.color.includes(color)
+                                                    : formData.color === color;
+
+                                                return (
+                                                    <label
+                                                        key={index}
+                                                        className="flex items-center px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected}
+                                                            onChange={(e) => {
+                                                                let newColors = Array.isArray(formData.color) ? [...formData.color] : (formData.color ? [formData.color] : []);
+
+                                                                if (e.target.checked) {
+                                                                    if (!newColors.includes(color)) {
+                                                                        newColors.push(color);
+                                                                    }
+                                                                } else {
+                                                                    newColors = newColors.filter((c) => c !== color);
+                                                                }
+                                                                handleInputChange("color", newColors);
+                                                            }}
+                                                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                                                        />
+                                                        <span className="ml-2 text-sm text-gray-900 dark:text-white">
+                                                            {color}
+                                                        </span>
+                                                    </label>
+                                                )
+                                            })}
+                                        </div>
+                                        {usedColors.filter(uc => {
+                                            const ucStr = String(uc).trim().toUpperCase();
+                                            return !formData.color?.some(c => String(c).trim().toUpperCase() === ucStr);
+                                        }).length > 0 && (
+                                                <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                                                    <div className="text-[10px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider px-1">
+                                                        Already Reported:
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1 mt-1 px-1">
+                                                        {usedColors.filter(uc => {
+                                                            const ucStr = String(uc).trim().toUpperCase();
+                                                            return !formData.color?.some(c => String(c).trim().toUpperCase() === ucStr);
+                                                        }).map((uc, i) => (
+                                                            <div key={i} className="flex items-center gap-1">
+                                                                <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px] rounded border border-gray-200 dark:border-gray-600 line-through">
+                                                                    {uc}
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const currentColors = Array.isArray(formData.color) ? [...formData.color] : (formData.color ? [formData.color] : []);
+                                                                        const ucStr = String(uc).trim().toUpperCase();
+                                                                        if (!currentColors.some(c => String(c).trim().toUpperCase() === ucStr)) {
+                                                                            handleInputChange("color", [...currentColors, uc]);
+                                                                        }
+                                                                    }}
+                                                                    className="p-1 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-500 rounded-full transition-colors"
+                                                                    title="Re-select this color"
+                                                                >
+                                                                    <RotateCw className="w-2.5 h-2.5" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* BUYER */}

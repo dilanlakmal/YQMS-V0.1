@@ -23,7 +23,7 @@ export const useReportSubmission = (user, fetchReports) => {
       const formDataToSubmit = new FormData();
 
       // Add common form fields
-      formDataToSubmit.append("reportType", formData.reportType || "Home Wash Test");
+      formDataToSubmit.append("reportType", formData.reportType || "Garment Wash Report");
       formDataToSubmit.append("ymStyle", formData.ymStyle || formData.style || "");
       formDataToSubmit.append("buyerStyle", formData.buyerStyle || "");
       formDataToSubmit.append("color", JSON.stringify(formData.color || []));
@@ -225,7 +225,8 @@ export const useReportSubmission = (user, fetchReports) => {
   };
 
   // Save completion status
-  const saveCompletionStatus = useCallback(async (reportId, completionImages, completionNotes, onSuccess, reportType) => {
+  // completionAssign: optional { checkedBy, approvedBy, checkedByName, approvedByName } from assignment to store on report
+  const saveCompletionStatus = useCallback(async (reportId, completionImages, completionNotes, onSuccess, reportType, completionAssign) => {
     if (!reportId) return false;
 
     // Determine the field name for completion notes
@@ -245,6 +246,14 @@ export const useReportSubmission = (user, fetchReports) => {
       if (user?.emp_id) {
         formDataToSubmit.append("completer_emp_id", user.emp_id);
         formDataToSubmit.append("receiver_status", "completed");
+      }
+
+      // Store assignment checkedBy/approvedBy and names for view on completed report
+      if (completionAssign) {
+        if (completionAssign.checkedBy != null && completionAssign.checkedBy !== "") formDataToSubmit.append("checkedBy", completionAssign.checkedBy);
+        if (completionAssign.approvedBy != null && completionAssign.approvedBy !== "") formDataToSubmit.append("approvedBy", completionAssign.approvedBy);
+        if (completionAssign.checkedByName != null && completionAssign.checkedByName !== "") formDataToSubmit.append("checkedByName", completionAssign.checkedByName);
+        if (completionAssign.approvedByName != null && completionAssign.approvedByName !== "") formDataToSubmit.append("approvedByName", completionAssign.approvedByName);
       }
 
       // Use the dynamic field name
@@ -308,7 +317,7 @@ export const useReportSubmission = (user, fetchReports) => {
 
     try {
       const formDataToSubmit = new FormData();
-      const reportType = editFormData.reportType || "Home Wash Test";
+      const reportType = editFormData.reportType || "Garment Wash Report";
       formDataToSubmit.append("reportType", reportType);
 
       formDataToSubmit.append("color", JSON.stringify(editFormData.color || []));

@@ -611,6 +611,7 @@ export const REPORT_TYPE_CONFIGS = {
             'finalDate',
             'images',
             'notes',
+            'sendToHomeWashingDate',
         ],
         fieldDefinitions: { ...COMMON_FIELDS, ...HT_TESTING_FIELDS },
         useDefaultForm: false, // Will use custom HT Testing form
@@ -658,6 +659,7 @@ export const REPORT_TYPE_CONFIGS = {
             'checkedDate',
             'images',
             'notes',
+            'sendToHomeWashingDate',
         ],
         fieldDefinitions: { ...COMMON_FIELDS, ...EMB_TESTING_FIELDS },
         useDefaultForm: false,
@@ -683,6 +685,7 @@ export const REPORT_TYPE_CONFIGS = {
             'checkedBy',
             'images',
             'notes',
+            'sendToHomeWashingDate',
         ],
         fieldDefinitions: { ...COMMON_FIELDS, ...PULLING_TEST_FIELDS },
         useDefaultForm: false,
@@ -703,7 +706,7 @@ export const REPORT_TYPE_CONFIGS = {
             'colorFastnessRows', 'colorStainingRows', 'visualAssessmentRows', 'shrinkageRows',
             'beforeWashComments', 'afterWashComments',
             'finalResult', 'date', 'checkedBy', 'approvedBy',
-            'images', 'notes'
+            'images', 'notes', 'sendToHomeWashingDate'
         ],
         fieldDefinitions: { ...COMMON_FIELDS, ...GARMENT_WASH_FIELDS },
         useDefaultForm: false,
@@ -767,8 +770,8 @@ export const getInitialFormData = (reportType) => {
                     break;
                 case FIELD_TYPES.DATE:
                     // Specific logic for different report types
-                    if (reportType === REPORT_TYPES.HOME_WASH && fieldName === 'sendToHomeWashingDate') {
-                        // Home Wash: Send date defaults to today
+                    if (fieldName === 'sendToHomeWashingDate') {
+                        // All reports: Send date defaults to today
                         initialData[fieldName] = new Date().toISOString().split('T')[0];
                     } else if (reportType === REPORT_TYPES.HT_TESTING && fieldName === 'finalDate') {
                         // HT Testing: Only the final approval date defaults to today

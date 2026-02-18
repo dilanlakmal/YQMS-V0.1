@@ -33,13 +33,19 @@ export const saveAssignControl = async (req, res) => {
         console.log(`  UserWarehouse=${userWarehouse} (${userWarehouseName})`);
         console.log(`  UserWarehouse=${userWarehouse} (${userWarehouseName})`);
 
+        // Mutual exclusion: admin and userWarehouse cannot both have a value
+        const finalAdmin = admin || null;
+        const finalAdminName = admin ? adminName : null;
+        const finalUserWarehouse = admin ? null : (userWarehouse || null);
+        const finalUserWarehouseName = admin ? null : (userWarehouse ? userWarehouseName : null);
+
         // Create a NEW record (History/Audit trail)
         const newAssignment = await ReportAssignControl.create({
             preparedBy, preparedByName,
             checkedBy, checkedByName,
             approvedBy, approvedByName,
-            admin, adminName,
-            userWarehouse, userWarehouseName
+            admin: finalAdmin, adminName: finalAdminName,
+            userWarehouse: finalUserWarehouse, userWarehouseName: finalUserWarehouseName
         });
 
         console.log('[AssignControl] Created successfully with ID:', newAssignment._id);
@@ -74,14 +80,20 @@ export const updateAssignControl = async (req, res) => {
         console.log(`  UserWarehouse=${userWarehouse} (${userWarehouseName})`);
         console.log(`  UserWarehouse=${userWarehouse} (${userWarehouseName})`);
 
+        // Mutual exclusion: admin and userWarehouse cannot both have a value
+        const finalAdmin = admin || null;
+        const finalAdminName = admin ? adminName : null;
+        const finalUserWarehouse = admin ? null : (userWarehouse || null);
+        const finalUserWarehouseName = admin ? null : (userWarehouse ? userWarehouseName : null);
+
         const updatedData = await ReportAssignControl.findByIdAndUpdate(
             id,
             {
                 preparedBy, preparedByName,
                 checkedBy, checkedByName,
                 approvedBy, approvedByName,
-                admin, adminName,
-                userWarehouse, userWarehouseName
+                admin: finalAdmin, adminName: finalAdminName,
+                userWarehouse: finalUserWarehouse, userWarehouseName: finalUserWarehouseName
             },
             { new: true }
         );

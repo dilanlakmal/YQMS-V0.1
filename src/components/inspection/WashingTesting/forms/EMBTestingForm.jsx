@@ -88,7 +88,16 @@ const EMBTestingForm = ({
                                     {orderNoSuggestions.map((item, index) => (
                                         <li
                                             key={index}
-                                            onClick={() => handleOrderNoSelect(item)}
+                                            onMouseDown={(e) => {
+                                                e.preventDefault();
+                                            }}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                if (handleOrderNoSelect) {
+                                                    handleOrderNoSelect(item);
+                                                }
+                                            }}
                                             className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-700 dark:text-gray-200"
                                         >
                                             {item}
@@ -837,7 +846,7 @@ const EMBTestingForm = ({
                                     type="text"
                                     value={formData.checkedBy || ''}
                                     onChange={(e) => handleInputChange("checkedBy", e.target.value)}
-                                    className="w-full pl-3 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white outline-none transition-all text-gray-800 dark:text-white placeholder:font-normal placeholder:text-gray-400"
+                                    className="w-full pl-3 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 outline-none transition-all text-gray-800 dark:text-white placeholder:font-normal placeholder:text-gray-400"
                                     placeholder="e.g., LONG"
                                 />
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 transition-opacity">

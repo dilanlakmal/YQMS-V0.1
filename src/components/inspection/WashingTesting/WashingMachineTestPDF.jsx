@@ -148,7 +148,15 @@ const styles = StyleSheet.create({
   }
 });
 
-const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, savedImageRotations = {} }) => {
+// Resolve emp_id to display name from users list; fallback to id
+const getNameForView = (empId, storedName, users = []) => {
+  if (storedName && String(storedName).trim()) return storedName;
+  if (!empId) return null;
+  const u = users.find((user) => String(user.emp_id) === String(empId) || String(user.id) === String(empId));
+  return u ? (u.name || u.eng_name || u.emp_id) : null;
+};
+
+const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, savedImageRotations = {}, users = [] }) => {
   // Helper to get rotation for an image URL
   const getImageRotation = (imageUrl) => {
     if (!imageUrl || !savedImageRotations) return 0;
@@ -180,7 +188,9 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
     return savedImageRotations[key] || 0;
   };
 
-  // Normalize image URL for PDF rendering - use image-proxy for better compatibility
+  // Normalize image URL for PDF rendering
+  // Uses /api/report-washing/image/:filename endpoint which converts WebP→JPEG on the fly.
+  // Appends .jpg to the URL path so @react-pdf/renderer passes its extension validation.
   const normalizeImageUrl = (imageUrl) => {
     if (!imageUrl || typeof imageUrl !== 'string') return null;
 
@@ -189,46 +199,33 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
       return imageUrl;
     }
 
-    // Build the full URL first
-    let fullUrl = imageUrl;
+    // Extract just the filename from whatever URL format is stored
+    let filename = null;
 
-    // Extract filename from URL if it contains washing_machine_test
     if (imageUrl.includes("/washing_machine_test/")) {
-      const parts = imageUrl.split("/washing_machine_test/");
-      if (parts.length > 1 && apiBaseUrl) {
-        // We MUST provide the full URL so the backend can either detect it as local 
-        // (if it matches backend API_BASE_URL) or fetch it via HTTP
-        fullUrl = `${apiBaseUrl}/storage/washing_machine_test/${parts[1]}`;
-      } else if (parts.length > 1) {
-        fullUrl = `/storage/washing_machine_test/${parts[1]}`;
-      } else {
-        fullUrl = imageUrl;
-      }
-    }
-    // If already a full URL, use it
-    else if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
-      fullUrl = imageUrl;
-    }
-    // If starts with /storage/, prepend API_BASE_URL
-    else if (imageUrl.startsWith("/storage/") && apiBaseUrl) {
-      fullUrl = `${apiBaseUrl}${imageUrl}`;
-    }
-    // If starts with /, prepend API_BASE_URL
-    else if (imageUrl.startsWith("/") && apiBaseUrl) {
-      fullUrl = `${apiBaseUrl}${imageUrl}`;
-    }
-    // Otherwise, assume it's a filename and prepend the storage path
-    else if (apiBaseUrl) {
-      fullUrl = `${apiBaseUrl}/storage/washing_machine_test/${imageUrl}`;
+      filename = imageUrl.split("/washing_machine_test/")[1];
+    } else if (imageUrl.includes("washing-test-")) {
+      filename = imageUrl.split("/").pop();
+    } else if (imageUrl.startsWith("/storage/")) {
+      filename = imageUrl.split("/").pop();
+    } else if (!imageUrl.includes("/")) {
+      // Already just a filename
+      filename = imageUrl;
     }
 
-    // Use image-proxy endpoint for better compatibility with @react-pdf/renderer
-    // This helps with CORS and ensures images load properly
-    if (apiBaseUrl && fullUrl) {
-      return `${apiBaseUrl}/api/image-proxy?url=${encodeURIComponent(fullUrl)}`;
+    // Remove any query params from filename
+    if (filename && filename.includes("?")) {
+      filename = filename.split("?")[0];
     }
 
-    return fullUrl;
+    if (filename && apiBaseUrl) {
+      // Append .jpg so @react-pdf/renderer passes its URL extension check.
+      // The backend strips this suffix and serves the real file converted to JPEG.
+      return `${apiBaseUrl}/api/report-washing/image/${filename}.jpg`;
+    }
+
+    // Fallback: return the original URL
+    return imageUrl;
   };
 
   const useCompactLayout = (report.images?.length || 0) <= 1 &&
@@ -272,7 +269,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
           <View style={styles.row}>
             <View style={[styles.col, { flexDirection: "row", alignItems: "baseline" }]}>
               <Text style={[styles.label, { marginRight: 5, marginBottom: 0 }]}>Submitted By:</Text>
-              <Text style={[styles.value, { marginBottom: 0 }]}>{report.reporter_name || report.reporter_emp_id || "N/A"}</Text>
+              <Text style={[styles.value, { marginBottom: 0 }]}>{getNameForView(report.reporter_emp_id, report.reporter_name, users) || report.reporter_emp_id || "N/A"}</Text>
             </View>
             <View style={[styles.col, { flexDirection: "row", alignItems: "baseline" }]}>
               <Text style={[styles.label, { marginRight: 5, marginBottom: 0 }]}>Submitted At:</Text>
@@ -297,6 +294,29 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
                   marginBottom: 0
                 }}>
                   {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {report.status === 'completed' && (report.checkedBy || report.approvedBy) && (
+            <View style={styles.row}>
+              <View style={[styles.col, { flexDirection: "row", alignItems: "baseline" }]}>
+                <Text style={[styles.label, { marginRight: 5, marginBottom: 0 }]}>Checked By:</Text>
+                <Text style={[styles.value, { marginBottom: 0 }]}>
+                  {(() => {
+                    const name = getNameForView(report.checkedBy, report.checkedByName, users);
+                    return name ? (name !== report.checkedBy ? `${name} (${report.checkedBy})` : name) : (report.checkedBy || "N/A");
+                  })()}
+                </Text>
+              </View>
+              <View style={[styles.col, { flexDirection: "row", alignItems: "baseline" }]}>
+                <Text style={[styles.label, { marginRight: 5, marginBottom: 0 }]}>Approved By:</Text>
+                <Text style={[styles.value, { marginBottom: 0 }]}>
+                  {(() => {
+                    const name = getNameForView(report.approvedBy, report.approvedByName, users);
+                    return name ? (name !== report.approvedBy ? `${name} (${report.approvedBy})` : name) : (report.approvedBy || "N/A");
+                  })()}
                 </Text>
               </View>
             </View>

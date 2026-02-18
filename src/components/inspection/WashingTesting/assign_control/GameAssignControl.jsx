@@ -124,191 +124,11 @@ const GameAssignControl = ({ socket, user }) => {
         setAssignments(prev => prev.filter(a => a._id !== id));
     }, []);
 
-    useEffect(() => {
-        if (!socket) return;
-        socket.emit('join:assignments');
 
-        socket.on('assignment:created', handleAssignmentCreated);
-        socket.on('assignment:updated', handleAssignmentUpdated);
-        socket.on('assignment:deleted', handleAssignmentDeleted);
 
-        return () => {
-            socket.off('assignment:created', handleAssignmentCreated);
-            socket.off('assignment:updated', handleAssignmentUpdated);
-            socket.off('assignment:deleted', handleAssignmentDeleted);
-        };
-    }, [socket, handleAssignmentCreated, handleAssignmentUpdated, handleAssignmentDeleted]);
 
-    useEffect(() => {
-        fetchUsers();
-        fetchAssignments();
-    }, []);
 
-    // Filter assignments based on user role
-    const filteredAssignments = useMemo(() => {
-        if (!user || !assignments.length) return [];
 
-        // Admin sees all
-        // Check both role AND specific admin IDs
-        if (user.role === 'admin' || user.role === 'super_admin' || user.role === 'user_admin' || user.emp_id === 'TYM055') {
-            return assignments;
-        }
-
-        // Regular users see only assignments where they are involved OR where they performed the update
-        const userId = user.emp_id;
-        const userName = user.name || user.eng_name;
-
-        return assignments.filter(assignment => {
-            // Check if user ID or Name matches any role field
-            // Helper to check a field
-            const checkField = (fieldValue) => {
-                if (!fieldValue) return false;
-                // Field value could be object or string/number
-                const val = typeof fieldValue === 'object' ? (fieldValue.emp_id || fieldValue.name) : fieldValue;
-                return String(val) === String(userId) || String(val) === String(userName);
-            };
-
-            return (
-                checkField(assignment.preparedBy) ||
-                checkField(assignment.checkedBy) ||
-                checkField(assignment.approvedBy) ||
-                checkField(assignment.admin) ||
-                checkField(assignment.userWarehouse) ||
-                checkField(assignment.updatedBy) // This should cover the creator/updater
-            );
-        });
-    }, [assignments, user]);
-
-    const fetchUsers = useCallback(async () => {
-        try {
-            const response = await axios.get(`${API_BASE_URL}/api/users`);
-            setUsers(response.data);
-        } catch (error) {
-            console.error('Error fetching users:', error);
-            showToast.error('Failed to load users');
-        }
-    }, []);
-
-    const fetchAssignments = useCallback(async () => {
-        try {
-            const response = await axios.get(`${API_BASE_URL}/api/assign-control`);
-            const data = Array.isArray(response.data)
-                ? response.data
-                : response.data.assignments || [];
-
-            setAssignments(data);
-
-            // Default to the latest assignment if available
-            /*
-            if (data.length > 0) {
-                // Ensure we call handleLoadAssignment to populate state fully
-                // Need to defer this slightly or ensure render order? No, plain set is fine.
-                // But handleLoadAssignment depends on users potentially? No, it just sets IDs.
-                handleLoadAssignment(data[0]);
-            }
-            */
-        } catch (error) {
-            console.error('Error fetching assignments:', error);
-        }
-    }, []);
-
-    const updateCurrentAssignment = useCallback((assignment) => {
-        setCurrentAssignment({
-            preparedBy: assignment.preparedBy,
-            checkedBy: assignment.checkedBy,
-            approvedBy: assignment.approvedBy,
-            admin: assignment.admin,
-            userWarehouse: assignment.userWarehouse
-        });
-        setDropTargets({
-            prepared: assignment.preparedBy,
-            checked: assignment.checkedBy,
-            approved: assignment.approvedBy,
-            admin: assignment.admin,
-            userWarehouse: assignment.userWarehouse
-        });
-    }, []);
-
-    const handleUserSelect = useCallback((value) => {
-        setSelectedUser(value);
-        if (!value) {
-            setSelectedUserName('');
-            return;
-        }
-        const user = users.find(u => (u.emp_id || u.name) === value);
-        if (user) {
-            const name = user.name || user.eng_name || value;
-            // Show only name in bubble
-            setSelectedUserName(name);
-        }
-
-        // Check if this user already has an existing assignment
-        const existingAssignment = assignments.find(assignment =>
-            assignment.preparedBy === value ||
-            assignment.checkedBy === value ||
-            assignment.approvedBy === value ||
-            assignment.admin === value ||
-            assignment.userWarehouse === value
-        );
-
-        if (existingAssignment) {
-            // User already has a record - load it automatically
-            handleLoadAssignment(existingAssignment);
-            // showToast.success(`✓ Found existing assignment for ${user?.name || value}!`);
-        }
-    }, [users, assignments]);
-
-    const handleDragStart = useCallback((e) => {
-        if (!selectedUser) return;
-        setDraggedUser(selectedUser);
-        setIsDragging(true);
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', selectedUser);
-    }, [selectedUser]);
-
-    const handleDragEnd = useCallback(() => {
-        setIsDragging(false);
-        setDragOverTarget(null);
-    }, []);
-
-    const handleDragOver = useCallback((e, target) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        setDragOverTarget(target);
-    }, []);
-
-    const handleDragLeave = useCallback(() => {
-        setDragOverTarget(null);
-    }, []);
-
-    const handleDrop = useCallback(async (e, target) => {
-        e.preventDefault();
-        const userId = e.dataTransfer.getData('text/plain');
-
-        if (!userId) return;
-
-        // Prevent concurrent drops (race condition protection)
-        if (isSubmitting) {
-            console.log('[Frontend] Drop ignored - submission in progress');
-            return;
-        }
-
-        // Update drop targets
-        const newTargets = { ...dropTargets, [target]: userId };
-        setDropTargets(newTargets);
-        setDragOverTarget(null);
-        setIsDragging(false);
-
-        // Show success animation
-        setSuccessBucket(target);
-        setTimeout(() => setSuccessBucket(null), 1000);
-
-        // Auto-submit
-        await submitAssignment(newTargets);
-
-        // Keep the user selected for multiple assignments 
-        // (lines removed to prevent auto-clearing)
-    }, [dropTargets, isSubmitting]);
 
     // Memoize getUserName helper to prevent recreation
     const getUserName = useCallback((userId) => {
@@ -332,7 +152,7 @@ const GameAssignControl = ({ socket, user }) => {
                 adminName: getUserName(targets.admin),
                 userWarehouse: targets.userWarehouse,
                 userWarehouseName: getUserName(targets.userWarehouse),
-                updatedBy: selectedUser || targets.prepared || targets.checked || targets.approved || targets.admin || targets.userWarehouse
+                updatedBy: user?.emp_id || user?.name || selectedUser || 'System'
             };
 
             // Use ref to check current ID (prevents race conditions)
@@ -371,13 +191,7 @@ const GameAssignControl = ({ socket, user }) => {
         } finally {
             setIsSubmitting(false);
         }
-    }, [dropTargets, getUserName, selectedUser]);
-
-    const handleClearBucket = useCallback((bucket) => {
-        const newTargets = { ...dropTargets, [bucket]: null };
-        setDropTargets(newTargets);
-        submitAssignment(newTargets);
-    }, [dropTargets]);
+    }, [dropTargets, getUserName, selectedUser, user?.emp_id, user?.name]);
 
     const resetForm = useCallback(() => {
         setDropTargets({
@@ -402,26 +216,16 @@ const GameAssignControl = ({ socket, user }) => {
         setActiveAssignmentId(null);
     }, []);
 
-    const handleClearAll = useCallback(() => {
-        if (isSubmitting) return;
-
-        if (activeAssignmentId) {
-            setDeleteConfirmation({ isOpen: true, id: activeAssignmentId });
-        } else {
-            resetForm();
-        }
-    }, [activeAssignmentId, resetForm, isSubmitting]);
-
     const handleLoadAssignment = useCallback((assignment) => {
-        // Create a copy of the assignment data to ensure valid string values
-        // Sometimes values might be objects if populated, though here they seem to be strings
+        // Create a copy of the assignment data - DO NOT convert IDs to names here
+        // as we need the IDs for the dropTargets to work correctly with searching
         const safeAssignment = {
-            preparedBy: typeof assignment.preparedBy === 'object' ? assignment.preparedBy?.name : assignment.preparedBy,
-            checkedBy: typeof assignment.checkedBy === 'object' ? assignment.checkedBy?.name : assignment.checkedBy,
-            approvedBy: typeof assignment.approvedBy === 'object' ? assignment.approvedBy?.name : assignment.approvedBy,
-            admin: typeof assignment.admin === 'object' ? assignment.admin?.name : assignment.admin,
-            userWarehouse: typeof assignment.userWarehouse === 'object' ? assignment.userWarehouse?.name : assignment.userWarehouse,
-            updatedBy: typeof assignment.updatedBy === 'object' ? assignment.updatedBy?.name : assignment.updatedBy,
+            preparedBy: typeof assignment.preparedBy === 'object' ? (assignment.preparedBy?.emp_id || assignment.preparedBy?._id) : assignment.preparedBy,
+            checkedBy: typeof assignment.checkedBy === 'object' ? (assignment.checkedBy?.emp_id || assignment.checkedBy?._id) : assignment.checkedBy,
+            approvedBy: typeof assignment.approvedBy === 'object' ? (assignment.approvedBy?.emp_id || assignment.approvedBy?._id) : assignment.approvedBy,
+            admin: typeof assignment.admin === 'object' ? (assignment.admin?.emp_id || assignment.admin?._id) : assignment.admin,
+            userWarehouse: typeof assignment.userWarehouse === 'object' ? (assignment.userWarehouse?.emp_id || assignment.userWarehouse?._id) : assignment.userWarehouse,
+            updatedBy: typeof assignment.updatedBy === 'object' ? (assignment.updatedBy?.emp_id || assignment.updatedBy?._id) : assignment.updatedBy,
             _id: assignment._id
         };
 
@@ -440,31 +244,183 @@ const GameAssignControl = ({ socket, user }) => {
         setCurrentAssignment({
             preparedBy: safeAssignment.preparedBy,
             checkedBy: safeAssignment.checkedBy,
-            approved: safeAssignment.approvedBy,
+            approvedBy: safeAssignment.approvedBy,
             admin: safeAssignment.admin,
             userWarehouse: safeAssignment.userWarehouse
         });
 
-        // SMART SELECT: Prioritize selecting a user who is actually in this assignment
-        // This lets you immediately "pick up" where you left off
-        const activeUser = assignment.preparedBy || assignment.checkedBy || assignment.approvedBy || assignment.admin || assignment.userWarehouse || assignment.updatedBy;
+        // Sync SELECT USER dropdown with the loaded assignment so it shows who the assignment is for
+        const firstUserId = safeAssignment.checkedBy || safeAssignment.approvedBy || safeAssignment.preparedBy || safeAssignment.admin || safeAssignment.userWarehouse;
+        if (firstUserId) {
+            // Use the same value format as userOptions (emp_id or name) so the Select displays correctly
+            const matchedUser = users.find(u => (u.emp_id || u.name) === firstUserId || String(u.emp_id) === String(firstUserId));
+            const valueToSet = matchedUser ? (matchedUser.emp_id || matchedUser.name) : firstUserId;
+            setSelectedUser(valueToSet);
+            setSelectedUserName(getUserName(valueToSet) || valueToSet);
+        } else {
+            setSelectedUser(null);
+            setSelectedUserName('');
+        }
+    }, [users, getUserName]);
 
-        if (activeUser) {
-            setSelectedUser(activeUser);
+    const fetchUsers = useCallback(async () => {
+        try {
+            const response = await axios.get(`${API_BASE_URL}/api/users`);
+            setUsers(response.data);
+        } catch (error) {
+            console.error('Error fetching users:', error);
+            showToast.error('Failed to load users');
+        }
+    }, []);
 
-            // Find user details to show name in bubble
-            const user = users.find(u => (u.emp_id || u.name) === activeUser);
-            if (user) {
-                const name = user.name || user.eng_name || activeUser;
-                // Show only name in bubble
-                setSelectedUserName(name);
-            } else {
-                setSelectedUserName(activeUser);
+    const fetchAssignments = useCallback(async () => {
+        try {
+            const response = await axios.get(`${API_BASE_URL}/api/assign-control`);
+            const data = Array.isArray(response.data)
+                ? response.data
+                : response.data.assignments || [];
+
+            setAssignments(data);
+
+            // Default to the latest assignment if available
+            /*
+            if (data.length > 0) {
+                // Ensure we call handleLoadAssignment to populate state fully
+                // Need to defer this slightly or ensure render order? No, plain set is fine.
+                // But handleLoadAssignment depends on users potentially? No, it just sets IDs.
+                handleLoadAssignment(data[0]);
             }
+            */
+        } catch (error) {
+            console.error('Error fetching assignments:', error);
+        }
+    }, [handleLoadAssignment]);
+
+    const updateCurrentAssignment = useCallback((assignment) => {
+        setCurrentAssignment({
+            preparedBy: assignment.preparedBy,
+            checkedBy: assignment.checkedBy,
+            approvedBy: assignment.approvedBy,
+            admin: assignment.admin,
+            userWarehouse: assignment.userWarehouse
+        });
+        setDropTargets({
+            prepared: assignment.preparedBy,
+            checked: assignment.checkedBy,
+            approved: assignment.approvedBy,
+            admin: assignment.admin,
+            userWarehouse: assignment.userWarehouse
+        });
+    }, []);
+
+    const handleUserSelect = useCallback((value) => {
+        setSelectedUser(value);
+        if (!value) {
+            setSelectedUserName('');
+            return;
+        }
+        const user = users.find(u => (u.emp_id || u.name) === value);
+        if (user) {
+            const name = user.name || user.eng_name || value;
+            // Show only name in bubble
+            setSelectedUserName(name);
         }
 
-        // showToast.success('✓ Assignment loaded! User selected.');
-    }, [users]);
+        // Check if this user already has an existing assignment
+        // ONLY jump if we are not currently editing a record
+        if (!activeAssignmentIdRef.current) {
+            const existingAssignment = assignments.find(assignment =>
+                assignment.preparedBy === value ||
+                assignment.checkedBy === value ||
+                assignment.approvedBy === value ||
+                assignment.admin === value ||
+                assignment.userWarehouse === value
+            );
+
+            if (existingAssignment) {
+                // User already has a record - load it automatically
+                handleLoadAssignment(existingAssignment);
+            }
+        }
+    }, [users, assignments, handleLoadAssignment]);
+
+    const handleDragStart = useCallback((e) => {
+        if (!selectedUser) return;
+        setDraggedUser(selectedUser);
+        setIsDragging(true);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', selectedUser);
+    }, [selectedUser]);
+
+    const handleDragEnd = useCallback(() => {
+        setIsDragging(false);
+        setDragOverTarget(null);
+    }, []);
+
+    const handleDragOver = useCallback((e, target) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setDragOverTarget(target);
+    }, []);
+
+    const handleDragLeave = useCallback(() => {
+        setDragOverTarget(null);
+    }, []);
+
+    const handleDrop = useCallback(async (e, target) => {
+        e.preventDefault();
+        const userId = e.dataTransfer.getData('text/plain');
+
+        if (!userId) return;
+
+        // Prevent concurrent drops (race condition protection)
+        if (isSubmitting) {
+            console.log('[Frontend] Drop ignored - submission in progress');
+            return;
+        }
+
+        // Mutual exclusion: admin and userWarehouse cannot both have a value
+        let newTargets = { ...dropTargets, [target]: userId };
+        if (target === 'admin') {
+            newTargets.userWarehouse = null;
+        } else if (target === 'userWarehouse') {
+            newTargets.admin = null;
+        }
+        setDropTargets(newTargets);
+        setDragOverTarget(null);
+        setIsDragging(false);
+
+        // Show success animation
+        setSuccessBucket(target);
+        setTimeout(() => setSuccessBucket(null), 1000);
+
+        // Auto-submit
+        await submitAssignment(newTargets);
+
+        // Keep the user selected for multiple assignments 
+        // (lines removed to prevent auto-clearing)
+    }, [dropTargets, isSubmitting]);
+
+
+
+    const handleClearBucket = useCallback((bucket) => {
+        const newTargets = { ...dropTargets, [bucket]: null };
+        setDropTargets(newTargets);
+        submitAssignment(newTargets);
+    }, [dropTargets]);
+
+
+
+    const handleClearAll = useCallback(() => {
+        if (isSubmitting) return;
+
+        if (activeAssignmentId) {
+            setDeleteConfirmation({ isOpen: true, id: activeAssignmentId });
+        } else {
+            resetForm();
+        }
+    }, [activeAssignmentId, resetForm, isSubmitting]);
+
 
     // Memoize user options to prevent recalculation on every render
     const userOptions = useMemo(() => {
@@ -534,6 +490,61 @@ const GameAssignControl = ({ socket, user }) => {
         }
     }, [deleteConfirmation.id, activeAssignmentId, resetForm]);
 
+    useEffect(() => {
+        if (!socket) return;
+        socket.emit('join:assignments');
+
+        socket.on('assignment:created', handleAssignmentCreated);
+        socket.on('assignment:updated', handleAssignmentUpdated);
+        socket.on('assignment:deleted', handleAssignmentDeleted);
+
+        return () => {
+            socket.off('assignment:created', handleAssignmentCreated);
+            socket.off('assignment:updated', handleAssignmentUpdated);
+            socket.off('assignment:deleted', handleAssignmentDeleted);
+        };
+    }, [socket, handleAssignmentCreated, handleAssignmentUpdated, handleAssignmentDeleted]);
+
+    useEffect(() => {
+        fetchUsers();
+        fetchAssignments();
+    }, [fetchUsers, fetchAssignments]);
+
+    // Filter assignments based on user role
+    const filteredAssignments = useMemo(() => {
+        if (!user || !assignments.length) return [];
+
+        // Admin sees all
+        // Check both role AND specific admin IDs
+        if (user.role === 'admin' || user.role === 'super_admin' || user.role === 'user_admin' || user.emp_id === 'TYM055') {
+            return assignments;
+        }
+
+        // Regular users see only assignments where they are involved OR where they performed the update
+        const userId = user.emp_id;
+        const userName = user.name || user.eng_name;
+
+        return assignments.filter(assignment => {
+            // Check if user ID or Name matches any role field
+            // Helper to check a field
+            const checkField = (fieldValue) => {
+                if (!fieldValue) return false;
+                // Field value could be object or string/number
+                const val = typeof fieldValue === 'object' ? (fieldValue.emp_id || fieldValue.name) : fieldValue;
+                return String(val) === String(userId) || String(val) === String(userName);
+            };
+
+            return (
+                checkField(assignment.preparedBy) ||
+                checkField(assignment.checkedBy) ||
+                checkField(assignment.approvedBy) ||
+                checkField(assignment.admin) ||
+                checkField(assignment.userWarehouse) ||
+                checkField(assignment.updatedBy) // This should cover the creator/updater
+            );
+        });
+    }, [assignments, user]);
+
     return (
         <div className="game-assign-control-compact1">
             {/* Floating Background Bubbles */}
@@ -558,7 +569,7 @@ const GameAssignControl = ({ socket, user }) => {
                         <label className="select-label">SELECT USER:</label>
                         <Select
                             showSearch
-                            placeholder="Choose user..."
+                            placeholder="Select User"
                             optionFilterProp="label"
                             value={selectedUser}
                             onChange={handleUserSelect}
@@ -566,7 +577,7 @@ const GameAssignControl = ({ socket, user }) => {
                             className="user-select-compact"
                             size="large"
                             allowClear
-                            disabled={!!selectedUser}
+                            disabled={!!activeAssignmentId || isSubmitting}
                         />
                     </div>
 
@@ -603,39 +614,38 @@ const GameAssignControl = ({ socket, user }) => {
                                     </div>
                                     <div className="bubble-user">{selectedUserName}</div>
                                 </motion.div>
-                                <button
-                                    className="deselect-btn"
-                                    onClick={() => handleUserSelect(null)}
-                                    style={{
-                                        marginTop: '10px',
-                                        background: 'rgba(255, 255, 255, 0.2)',
-                                        border: '1px solid rgba(255, 255, 255, 0.4)',
-                                        borderRadius: '20px',
-                                        padding: '5px 15px',
-                                        color: 'white',
-                                        cursor: 'pointer',
-                                        fontSize: '0.8rem',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '5px',
-                                        margin: '10px auto 0'
-                                    }}
-                                >
-                                    ✕ Done
-                                </button>
+
                             </motion.div>
                         )}
                     </AnimatePresence>
 
-                    {/* Clear Button */}
-                    <motion.button
-                        className="clear-btn"
-                        onClick={handleClearAll}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                    >
-                        🗑️ Clear All
-                    </motion.button>
+                    {/* Control Buttons Container */}
+                    <div className="actions-group">
+                        {/* New / Reset View Button - Shown only when editing to allow unlocking 'Search' */}
+                        {activeAssignmentId && (
+                            <motion.button
+                                className="new-btn"
+                                onClick={resetForm}
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                            >
+                                New Assignment
+                            </motion.button>
+                        )}
+
+                        {/* Clear All / Delete Button - Label changes if editing */}
+                        <motion.button
+                            className={`clear-btn ${activeAssignmentId ? 'delete' : ''}`}
+                            onClick={handleClearAll}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                        >
+                            {activeAssignmentId ? '🗑️ Delete Record' : '🧹 Clear All'}
+                        </motion.button>
+                    </div>
                 </motion.div>
 
                 {/* Right Side: Drop Buckets (Horizontal) */}

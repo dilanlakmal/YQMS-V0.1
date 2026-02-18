@@ -921,8 +921,22 @@ export const getWashingMachineTestImage = async (req, res) => {
 
     // Determine content type
     const ext = path.extname(filename).toLowerCase();
-    let contentType = "image/webp";
-    if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
+
+    // Convert WebP to JPEG on-the-fly (react-pdf doesn't support WebP)
+    if (ext === ".webp") {
+      try {
+        const convertedBuffer = await sharp(filePath)
+          .jpeg({ quality: 90 })
+          .toBuffer();
+        res.setHeader("Content-Type", "image/jpeg");
+        return res.send(convertedBuffer);
+      } catch (conversionError) {
+        console.error("Error converting WebP to JPEG:", conversionError);
+        return res.status(500).json({ success: false, message: "Failed to convert image" });
+      }
+    }
+
+    let contentType = "image/jpeg";
     if (ext === ".png") contentType = "image/png";
     if (ext === ".gif") contentType = "image/gif";
 
@@ -1095,12 +1109,66 @@ export const getUniqueColors = async (req, res) => {
       data: suggestions
     });
   } catch (error) {
-    console.error("Error fetching unique styles:", error);
+    console.error("Error fetching unique colors:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch styles",
+      message: "Failed to fetch colors",
       error: error.message
     });
   }
 };
+
+// Get colors already used for a specific style to prevent duplicates
+export const getUsedColors = async (req, res) => {
+  try {
+    const { ymStyle } = req.query;
+
+    if (!ymStyle) {
+      return res.status(400).json({
+        success: false,
+        message: "YM Style is required"
+      });
+    }
+
+    const models = [
+      ReportHomeWash,
+      ReportGarmentWash,
+      ReportHTTesting,
+      ReportEMBPrinting,
+      ReportPullingTest,
+      ReportWashing
+    ];
+
+    let usedColorsSet = new Set();
+
+    // Query each model for this style
+    for (const model of models) {
+      const reports = await model.find(
+        { ymStyle: ymStyle.trim() },
+        { color: 1 }
+      ).lean();
+
+      reports.forEach(report => {
+        if (Array.isArray(report.color)) {
+          report.color.forEach(c => usedColorsSet.add(c));
+        } else if (report.color) {
+          usedColorsSet.add(report.color);
+        }
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      usedColors: Array.from(usedColorsSet)
+    });
+  } catch (error) {
+    console.error("Error fetching used colors:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch used colors",
+      error: error.message
+    });
+  }
+};
+
 
