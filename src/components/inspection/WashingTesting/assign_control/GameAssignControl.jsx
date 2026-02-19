@@ -636,15 +636,17 @@ const GameAssignControl = ({ socket, user }) => {
                             </motion.button>
                         )}
 
-                        {/* Clear All / Delete Button - Label changes if editing */}
-                        <motion.button
-                            className={`clear-btn ${activeAssignmentId ? 'delete' : ''}`}
-                            onClick={handleClearAll}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                        >
-                            {activeAssignmentId ? '🗑️ Delete Record' : '🧹 Clear All'}
-                        </motion.button>
+                        {/* Clear All - Delete Record button hidden per requirement */}
+                        {!activeAssignmentId && (
+                            <motion.button
+                                className="clear-btn"
+                                onClick={handleClearAll}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                            >
+                                🧹 Clear All
+                            </motion.button>
+                        )}
                     </div>
                 </motion.div>
 

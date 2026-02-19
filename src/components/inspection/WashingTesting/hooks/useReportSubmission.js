@@ -259,9 +259,12 @@ export const useReportSubmission = (user, fetchReports) => {
       // Use the dynamic field name
       formDataToSubmit.append(noteFieldName, completionNotes || "");
 
-      completionImages.forEach((imageFile) => {
+      completionImages.forEach((imageFile, index) => {
         if (imageFile instanceof File) {
           formDataToSubmit.append("completionImages", imageFile);
+        } else if (imageFile && typeof imageFile === "object" && imageFile instanceof Blob) {
+          // Some capture APIs return Blob; append with a filename so multer receives it
+          formDataToSubmit.append("completionImages", imageFile, `completion-${index}.webp`);
         }
       });
 
@@ -377,9 +380,11 @@ export const useReportSubmission = (user, fetchReports) => {
         if (existingUrls.length > 0) {
           formDataToSubmit.append("completionImagesUrls", JSON.stringify(existingUrls));
         }
-        editFormData.completionImages.forEach(item => {
+        editFormData.completionImages.forEach((item, index) => {
           if (item instanceof File) {
             formDataToSubmit.append("completionImages", item);
+          } else if (item && typeof item === "object" && item instanceof Blob) {
+            formDataToSubmit.append("completionImages", item, `completion-${index}.webp`);
           }
         });
       }

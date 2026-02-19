@@ -145,7 +145,39 @@ const styles = StyleSheet.create({
   stepDate: {
     fontSize: 7.5,
     color: "#666"
-  }
+  },
+  careSymbolsSection: {
+    marginTop: 12,
+    marginBottom: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+    paddingTop: 8,
+  },
+  careSymbolsLabel: {
+    fontSize: 9,
+    fontWeight: "bold",
+    marginBottom: 5,
+    color: "#333",
+  },
+  careSymbolsImage: {
+    width: 200,
+    height: 28,
+    objectFit: "contain",
+  },
+  careSymbolsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  careSymbolItemWrapper: {
+    marginRight: 6,
+    marginBottom: 2,
+  },
+  careSymbolItem: {
+    width: 28,
+    height: 28,
+    objectFit: "contain",
+  },
 });
 
 // Resolve emp_id to display name from users list; fallback to id
@@ -156,7 +188,24 @@ const getNameForView = (empId, storedName, users = []) => {
   return u ? (u.name || u.eng_name || u.emp_id) : null;
 };
 
-const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, savedImageRotations = {}, users = [] }) => {
+const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, savedImageRotations = {}, users = [], careSymbolsSrc = null }) => {
+  // Care symbols: use this report's recorded symbols (careSymbolsImages) when present
+  const careSymbolsObj = report.careSymbols
+    ? (typeof report.careSymbols === "string"
+        ? (() => { try { return JSON.parse(report.careSymbols); } catch (e) { return {}; } })()
+        : report.careSymbols)
+    : {};
+  const careEntries =
+    report.careSymbolsImages && Object.keys(careSymbolsObj).length > 0
+      ? Object.entries(careSymbolsObj).filter(
+          ([key]) =>
+            report.careSymbolsImages[key] &&
+            String(report.careSymbolsImages[key]).startsWith("data:")
+        )
+      : [];
+  const hasReportCareSymbols = careEntries.length > 0;
+  const showCareSymbolsSection = hasReportCareSymbols || !!careSymbolsSrc;
+
   // Helper to get rotation for an image URL
   const getImageRotation = (imageUrl) => {
     if (!imageUrl || !savedImageRotations) return 0;
@@ -655,6 +704,35 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
               </View>
             )}
           </>
+        )}
+
+        {showCareSymbolsSection && (
+          <View style={styles.careSymbolsSection} wrap={false}>
+            <Text style={styles.careSymbolsLabel}>Care instructions</Text>
+            {hasReportCareSymbols ? (
+              <View style={styles.careSymbolsRow}>
+                {careEntries.map(([key]) => {
+                  const dataUrl = report.careSymbolsImages[key];
+                  if (!dataUrl || !String(dataUrl).startsWith("data:")) return null;
+                  return (
+                    <View key={key} style={styles.careSymbolItemWrapper}>
+                      <Image
+                        src={dataUrl}
+                        style={styles.careSymbolItem}
+                        cache={false}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+            ) : (
+              <Image
+                src={careSymbolsSrc}
+                style={styles.careSymbolsImage}
+                cache={false}
+              />
+            )}
+          </View>
         )}
       </Page>
     </Document>

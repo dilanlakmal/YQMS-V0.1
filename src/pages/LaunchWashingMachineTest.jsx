@@ -381,15 +381,48 @@ const LaundryWashingMachineTest = () => {
   // Determine current user role restrictions based on active assignment
   const activeAssign =
     causeAssignHistory.length > 0 ? causeAssignHistory[0] : null;
+  
+  // Find the most recent assignment where current user is assigned as warehouse
+  // (assignments are already sorted by updatedAt descending, so first match is most recent)
+  const warehouseAssignment = causeAssignHistory.find(assign => 
+    assign.userWarehouse && 
+    String(user?.emp_id) === String(assign.userWarehouse)
+  );
+  
+  // Debug logging for warehouse user detection
+  if (user?.emp_id && causeAssignHistory.length > 0) {
+    console.log('[Warehouse Check]', {
+      userEmpId: user?.emp_id,
+      activeAssign: activeAssign ? {
+        userWarehouse: activeAssign.userWarehouse,
+        admin: activeAssign.admin,
+        updatedAt: activeAssign.updatedAt,
+      } : null,
+      warehouseAssignment: warehouseAssignment ? {
+        userWarehouse: warehouseAssignment.userWarehouse,
+        admin: warehouseAssignment.admin,
+        updatedAt: warehouseAssignment.updatedAt,
+      } : null,
+      recentAssignments: causeAssignHistory.slice(0, 3).map(a => ({
+        userWarehouse: a.userWarehouse,
+        admin: a.admin,
+        updatedAt: a.updatedAt,
+      }))
+    });
+  }
+  
   const isAdminUser =
     user?.emp_id === "TYM055" ||
     user?.role === "admin" ||
     user?.role === "super_admin" ||
     user?.role === "user_admin" ||
     (activeAssign && String(user?.emp_id) === String(activeAssign.admin));
+  
+  // User is warehouse if they're assigned as warehouse in any recent assignment
+  // and they're not currently an admin (admin takes precedence)
   const isWarehouseUser =
-    activeAssign &&
-    String(user?.emp_id) === String(activeAssign.userWarehouse) &&
+    warehouseAssignment &&
+    String(user?.emp_id) === String(warehouseAssignment.userWarehouse) &&
     !isAdminUser;
 
   // Handle tab access based on assigned roles
@@ -826,15 +859,20 @@ const LaundryWashingMachineTest = () => {
   // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // Check if we are completing a report
+    
+    // Check if we are completing a report (e.g. after QR scan on "received" report)
     if (completingReport) {
-      const success = await updateReport(completingReport._id, {
+      // Send form-uploaded images as completionImages (so they get completion-* prefix and show in Step 3)
+      // Keep existing report.images so we don't overwrite Step 1 images
+      const completionPayload = {
         ...formData,
+        images: completingReport.images || [], // keep existing initial images (URLs)
+        completionImages: formData.images || [], // form uploads go to Step 3 completion
         status: "completed",
         completedDate: new Date().toISOString().split("T")[0],
         completedAt: new Date().toISOString(),
-      });
+      };
+      const success = await updateReport(completingReport._id, completionPayload);
 
       if (success) {
         setCompletingReport(null);
@@ -2111,131 +2149,53 @@ const LaundryWashingMachineTest = () => {
       ).toBlob();
       const url = URL.createObjectURL(blob);
 
-      // Clean up any existing print iframes first
-      const existingIframes = document.querySelectorAll(
-        'iframe[id^="print-iframe-"]',
-      );
-      existingIframes.forEach((iframe) => {
+      // Open PDF in a new window for printing (reliable in Chrome/Edge; iframe + blob URL often fails)
+      const printWin = window.open(url, "_blank", "noopener,noreferrer");
+      if (!printWin) {
         try {
-          if (iframe.parentNode) {
-            iframe.parentNode.removeChild(iframe);
-          }
+          URL.revokeObjectURL(url);
         } catch (e) {
-          // Ignore cleanup errors
+          // Ignore
         }
-      });
-
-      // Create a temporary iframe for printing
-      const iframeId = `print-iframe-${Date.now()}`;
-      const iframe = document.createElement("iframe");
-      iframe.id = iframeId;
-      iframe.style.position = "fixed";
-      iframe.style.right = "0";
-      iframe.style.bottom = "0";
-      iframe.style.width = "0";
-      iframe.style.height = "0";
-      iframe.style.border = "none";
-      iframe.style.opacity = "0";
-      iframe.style.pointerEvents = "none";
+        showToast.error(
+          "Pop-up blocked. Allow pop-ups for this site and try again, or use the PDF button to download and print."
+        );
+        return;
+      }
 
       let printTriggered = false;
-      let cleanupDone = false;
-
-      // Function to cleanup
-      const cleanup = () => {
-        if (cleanupDone) return;
-        cleanupDone = true;
-
-        setTimeout(() => {
-          try {
-            if (iframe && iframe.parentNode) {
-              iframe.parentNode.removeChild(iframe);
-            }
-          } catch (e) {
-            // Ignore cleanup errors
-          }
-          // Revoke URL after print dialog has been shown
-          setTimeout(() => {
-            try {
-              URL.revokeObjectURL(url);
-            } catch (e) {
-              // Ignore URL revocation errors
-            }
-          }, 2000);
-        }, 500);
-      };
-
-      // Function to trigger print and cleanup
+      // Trigger print once the PDF viewer has loaded (Chrome/Edge need a short delay)
       const triggerPrint = () => {
         if (printTriggered) return;
         printTriggered = true;
-
         try {
-          // Wait a bit more to ensure iframe content is fully loaded
-          setTimeout(() => {
-            if (iframe && iframe.contentWindow) {
-              try {
-                iframe.contentWindow.focus();
-                iframe.contentWindow.print();
-                cleanup();
-              } catch (printError) {
-                console.error("Error calling print:", printError);
-                cleanup();
-              }
-            } else {
-              cleanup();
-            }
-          }, 200);
-        } catch (error) {
-          console.error("Error printing:", error);
-          cleanup();
-        }
-      };
-
-      // Wait for iframe to load the PDF
-      iframe.onload = () => {
-        // Give more time for PDF to fully render
-        setTimeout(triggerPrint, 300);
-      };
-
-      // Add error handler
-      iframe.onerror = () => {
-        console.error("Iframe load error");
-        cleanup();
-      };
-
-      // Append iframe to DOM first
-      document.body.appendChild(iframe);
-
-      // Set the PDF URL after iframe is in DOM
-      iframe.src = url;
-
-      // Fallback timeout in case onload doesn't fire
-      setTimeout(() => {
-        if (!printTriggered) {
-          try {
-            if (iframe && iframe.contentDocument) {
-              const readyState = iframe.contentDocument.readyState;
-              if (readyState === "complete" || readyState === "interactive") {
-                triggerPrint();
-              } else {
-                // If still loading, wait a bit more
-                setTimeout(() => {
-                  if (!printTriggered && iframe && iframe.contentDocument) {
-                    triggerPrint();
-                  }
-                }, 500);
-              }
-            } else {
-              // If iframe doesn't have contentDocument, try anyway
-              triggerPrint();
-            }
-          } catch (e) {
-            console.error("Error in fallback:", e);
-            cleanup();
+          if (!printWin.closed) {
+            printWin.focus();
+            printWin.print();
           }
+        } catch (printError) {
+          console.error("Error calling print:", printError);
+          showToast.error("Print failed. Use the PDF button to download and print manually.");
         }
-      }, 2000);
+        // Revoke blob URL after a delay so the new tab has finished using it
+        setTimeout(() => {
+          try {
+            URL.revokeObjectURL(url);
+          } catch (e) {
+            // Ignore
+          }
+        }, 3000);
+      };
+
+      // Try on load (may not fire for PDF in some browsers)
+      printWin.onload = () => {
+        setTimeout(triggerPrint, 400);
+      };
+
+      // Fallback: trigger print after delay in case onload doesn't fire (common with PDF in Chrome/Edge)
+      setTimeout(() => {
+        if (!printTriggered) triggerPrint();
+      }, 1200);
     } catch (error) {
       console.error("Error generating PDF:", error);
       showToast.error("Failed to generate PDF. Please try again.");

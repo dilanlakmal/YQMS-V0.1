@@ -133,12 +133,12 @@ const ReportCard = ({
   const canUserEdit = isAdminUser || isCreator || isWarehouseUser;
   const canUserDelete = isAdminUser || isCreator || isWarehouseUser;
 
-  // Hard rule: Completed reports cannot be edited or deleted by anyone, including admins
+  // Completed reports cannot be edited by anyone, but admins can delete them
   const isCompleted = report.status === 'completed';
 
-  // Buttons are hidden based on status restrictions, OR if report is completed
+  // Buttons are hidden based on status restrictions, OR if report is completed (except delete for admins)
   const shouldHideEditButton = !canUserEdit || isCompleted || (!isAdminUser && restrictEditStatuses && restrictEditStatuses.includes(report.status));
-  const shouldHideDeleteButton = !canUserDelete || isCompleted || (!isAdminUser && restrictDeleteStatuses && restrictDeleteStatuses.includes(report.status));
+  const shouldHideDeleteButton = !canUserDelete || (!isAdminUser && isCompleted) || (!isAdminUser && restrictDeleteStatuses && restrictDeleteStatuses.includes(report.status));
 
   // Timeline uploads/edits follow the same "canUserEdit" logic
   const isActionLocked = isEditLocked(); // Use more granular isEditLocked instead of just canUserEdit

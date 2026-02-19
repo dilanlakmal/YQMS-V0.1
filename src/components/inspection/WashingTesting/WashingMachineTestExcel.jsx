@@ -51,7 +51,6 @@ const fetchImageBuffer = async (url) => {
   }
 };
 
-/**
 // Resolve emp_id to display name from users list; fallback to id
 const getNameForView = (empId, storedName, users = []) => {
   if (storedName && String(storedName).trim()) return storedName;
@@ -386,6 +385,55 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "", users = 
 
     if (report.completionImages && report.completionImages.length > 0) {
       await addImagesToWorksheet("Step 3 Images", report.completionImages, "FFF1F8F1");
+    }
+
+    // --- Care Instructions ---
+    const careSymbolsObj = report.careSymbols
+      ? (typeof report.careSymbols === "string"
+          ? (() => { try { return JSON.parse(report.careSymbols); } catch (e) { return {}; } })()
+          : report.careSymbols)
+      : {};
+    const careEntries = report.careSymbolsImages && Object.keys(careSymbolsObj).length > 0
+      ? Object.entries(careSymbolsObj).filter(([key]) => report.careSymbolsImages[key] && String(report.careSymbolsImages[key]).startsWith("data:"))
+      : [];
+    if (careEntries.length > 0) {
+      worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
+      const careHeaderCell = worksheet.getCell(`A${currentRow}`);
+      careHeaderCell.value = `  Care Instructions (${careEntries.length})`;
+      careHeaderCell.style = {
+        font: { bold: true, size: 10, color: { argb: "FF4B5563" } },
+        fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8E0F0" } },
+        border: { bottom: { style: "thin", color: { argb: "FFD1D5DB" } } }
+      };
+      worksheet.getRow(currentRow).height = 18;
+      currentRow++;
+
+      const careImgRow = currentRow;
+      worksheet.getRow(careImgRow).height = 50;
+      let colOffset = 0.2;
+      for (let c = 0; c < careEntries.length; c++) {
+        const [key, iconName] = careEntries[c];
+        const dataUrl = report.careSymbolsImages[key];
+        if (!dataUrl || !dataUrl.startsWith("data:")) continue;
+        const base64Data = dataUrl.split(",")[1];
+        if (!base64Data) continue;
+        try {
+          const buffer = Uint8Array.from(atob(base64Data), (ch) => ch.charCodeAt(0)).buffer;
+          const imageId = workbook.addImage({
+            buffer: buffer,
+            extension: dataUrl.indexOf("image/png") !== -1 ? "png" : "jpeg",
+          });
+          worksheet.addImage(imageId, {
+            tl: { col: colOffset, row: careImgRow - 0.9 },
+            ext: { width: 44, height: 44 },
+            editAs: "oneCell",
+          });
+          colOffset += 1.2;
+        } catch (err) {
+          console.error("Error adding care symbol image:", err);
+        }
+      }
+      currentRow += 2;
     }
 
     // --- Footer ---

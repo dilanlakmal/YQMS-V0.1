@@ -641,11 +641,15 @@ export const updateReportWashing = async (req, res) => {
       }
     }
 
-    // Handle completion images if uploaded
-    if (req.files && req.files.completionImages && req.files.completionImages.length > 0) {
+    // Handle completion images if uploaded (normalize: multer may send single file or array)
+    const completionFiles = req.files?.completionImages
+      ? (Array.isArray(req.files.completionImages) ? req.files.completionImages : [req.files.completionImages])
+      : [];
+    if (completionFiles.length > 0) {
       const completionImagePaths = [];
 
-      for (const file of req.files.completionImages) {
+      for (const file of completionFiles) {
+        if (!file || !file.buffer) continue;
         try {
           // Generate unique filename
           const timestamp = Date.now();
@@ -654,7 +658,6 @@ export const updateReportWashing = async (req, res) => {
             .replace(/[\/\\]/g, "-")
             .replace(/\s+/g, "-")
             .replace(/[^a-zA-Z0-9._-]/g, "");
-          const extension = path.extname(file.originalname) || ".webp";
           const filename = `completion-${sanitizedYmStyle}-${timestamp}-${randomSuffix}.webp`;
 
           const finalDiskPath = path.join(washingMachineTestUploadPath, filename);
