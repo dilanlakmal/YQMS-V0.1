@@ -1,12 +1,12 @@
 import sql from "mssql";
 import {
-  sqlConfigYMDataStore,
+  // sqlConfigYMDataStore,
   sqlConfigYMCE,
   sqlConfigFCSystem,
 } from "../../Config/sqlConfig.js";
 
 // Create connection pools
-export const poolYMDataStore = new sql.ConnectionPool(sqlConfigYMDataStore);
+// export const poolYMDataStore = new sql.ConnectionPool(sqlConfigYMDataStore);
 export const poolYMCE = new sql.ConnectionPool(sqlConfigYMCE);
 export const poolFCSystem = new sql.ConnectionPool(sqlConfigFCSystem);
 
@@ -97,7 +97,7 @@ export async function ensurePoolConnected(pool, poolName, maxRetries = 3) {
 export async function initializeSQLPools() {
   console.log("Initializing SQL connection pools...");
   const connectionPromises = [
-    connectPool(poolYMDataStore, "YMDataStore"),
+    // connectPool(poolYMDataStore, "YMDataStore"),
     connectPool(poolYMCE, "YMCE_SYSTEM"),
     connectPool(poolFCSystem, "FCSystem"),
   ];
@@ -122,7 +122,7 @@ export async function initializeSQLPools() {
 export async function closeSQLPools() {
   try {
     await Promise.all([
-      poolYMDataStore.close(),
+      // poolYMDataStore.close(),
       poolYMCE.close(),
       poolFCSystem.close(),
     ]);

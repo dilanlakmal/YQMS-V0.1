@@ -2835,7 +2835,7 @@ export const syncDtOrders = async (req, res) => {
 export async function closeSQLPools() {
     try {
         await Promise.all([
-            poolYMDataStore.close(),
+            // poolYMDataStore.close(),
             poolYMCE.close(),
             poolFCSystem.close()
         ]);

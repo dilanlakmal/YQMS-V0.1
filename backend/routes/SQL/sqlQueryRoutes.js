@@ -1,14 +1,29 @@
 import express from 'express';
+// import {
+//   // getSunriseRS18Data,
+//   // getSunriseOutputData,
+//   // getSunriseQC1Sync,
+//   getInlineOrdersSync,
+//   getYMCESystemData,
+//   cutpanelOrdersSync,
+//   syncDtOrders,
+//   // syncCuttingInlineOrdersData
+// } from '../../controller/SQL/sqlQueryController.js';
+
 import {
   // getSunriseRS18Data,
   // getSunriseOutputData,
   // getSunriseQC1Sync,
+} from "../../controller/SQL/sqlQueryController.js";
+
+import {
   getInlineOrdersSync,
   getYMCESystemData,
-  cutpanelOrdersSync,
-  syncDtOrders,
-  // syncCuttingInlineOrdersData
-} from '../../controller/SQL/sqlQueryController.js';
+} from "../../controller/SQL/inlineOrdersController.js";
+import { cutpanelOrdersSync } from "../../controller/SQL/cuttingController.js";
+import { syncDtOrders } from "../../controller/SQL/dtOrdersController.js";
+
+
 
 const router = express.Router();
 

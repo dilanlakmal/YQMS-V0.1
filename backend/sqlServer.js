@@ -4,7 +4,8 @@ import { app } from "./Config/appConfig.js";
    SQL Query Import
 ------------------------------ */
 import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
-import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+// import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+import { closeSQLPools } from "./controller/SQL/sqlConnectionManager.js";
 /* ------------------------------
   SQL Query routs
 ------------------------------ */
