@@ -6,7 +6,7 @@ import {
   saveWashingSpecs,
   getUploadedSpecsOrders,
   fixWashingSpecsIssues,
-  fixTolIssues
+  fixTolIssues,
 } from "../../controller/Common/DTOrdersController.js";
 
 const router = express.Router();
