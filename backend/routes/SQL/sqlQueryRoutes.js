@@ -17,7 +17,11 @@ const router = express.Router();
 // router.get("/api/sunrise/sync-qc1", getSunriseQC1Sync);
 router.get("/api/sync-inline-orders", getInlineOrdersSync);
 router.get("/api/ymce-system-data", getYMCESystemData);
+
+// Cutting routes
 router.post("/api/sync-cutpanel-orders", cutpanelOrdersSync);
+
+// DT Orders routes
 router.get("/api/sync-dt-orders", syncDtOrders);
 // router.get("/api/sync-cutting-inline-orders", syncCuttingInlineOrdersData);
 

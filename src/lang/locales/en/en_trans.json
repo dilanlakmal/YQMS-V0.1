@@ -879,7 +879,8 @@
     "inspectionQty": "Inspection Qty",
     "cutPanelDetailsTitle": "Cut Panel Details",
     "fabricDefectsTitle": "Fabric Defects",
-    "defectDetails": "Defect Details"
+    "defectDetails": "Defect Details",
+    "modifyCuttingInspection": "Modify Report"
   },
 
   "cuttingReport": {

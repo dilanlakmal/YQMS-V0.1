@@ -569,7 +569,7 @@ const TabletGridItem = ({ item, onClick, fincheckActionCount }) => {
       <img
         src={item.image}
         alt={item.title}
-        className="w-10 h-10 object-contain mb-2"
+        className="w-12 h-12 object-contain mb-2"
       />
       <h3 className="text-xs font-bold text-center text-slate-700 dark:text-slate-100 line-clamp-2">
         {item.title}
