@@ -30,7 +30,8 @@
     "live_dashboard": "实时仪表板",
     "systemadmin": "System Administration",
     "yqms": "YQMS",
-    "b-grade_defects": "B-grade defects"
+    "b-grade_defects": "B-grade defects",
+    "fc": "FC System"
   },
 
   "nav": {

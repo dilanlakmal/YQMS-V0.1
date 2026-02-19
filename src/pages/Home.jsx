@@ -753,6 +753,13 @@ function Home() {
             title: t("home.accessories"),
             description: "Accessories Inspection",
           },
+          {
+            path: "/fc-system",
+            roles: ["FC"],
+            image: "assets/Home/FC.jpg",
+            title: t("home.fc"),
+            description: "FC System",
+          },
         ],
       },
       {

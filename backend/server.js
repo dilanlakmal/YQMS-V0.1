@@ -19,8 +19,8 @@ import normalNotification from "./routes/Notification/normalNotificationRoutes.j
 /* ------------------------------
    SQL Query Import
 ------------------------------ */
-import sqlQueryRoutes from "./routes/SQL/sqlQueryRoutes.js";
-import { closeSQLPools } from "./controller/SQL/sqlConnectionManager.js";
+// import sqlQueryRoutes from "./routes/SQL/sqlQueryRoutes.js";
+// import { closeSQLPools } from "./controller/SQL/sqlConnectionManager.js";
 
 /* ------------------------------
    Cutting
@@ -322,6 +322,30 @@ import ceTargetMasterRoutes from "./modules/CESystem/Routes/CETargetMasterRoutes
 ------------------------------ */
 import huminityRoutes from "./routes/huminity/huminityRoutes.js";
 
+/* ------------------------------
+   FC System Import
+------------------------------ */
+import FCSystemRoutes from "./routes/SQL/FCSystemRoutes.js";
+import { closeFCPool } from "./controller/SQL/fcConnectionManager.js";
+
+/* ------------------------------
+   FC System Routes
+------------------------------ */
+app.use(FCSystemRoutes);
+
+/* ------------------------------
+   FC System Graceful Shutdown
+------------------------------ */
+process.on("SIGINT", async () => {
+  try {
+    await closeFCPool();
+  } catch (err) {
+    console.error("Error closing FC pool:", err);
+  } finally {
+    process.exit(0);
+  }
+});
+
 /* -----------------------------
   User Routes
 ------------------------------ */
@@ -337,22 +361,22 @@ app.use(normalNotification);
 /* ------------------------------
    SQL Query routes start
 ------------------------------ */
-app.use(sqlQueryRoutes);
+// app.use(sqlQueryRoutes);
 
 /* ------------------------------
    Graceful Shutdown
 ------------------------------ */
 
-process.on("SIGINT", async () => {
-  try {
-    await closeSQLPools();
-    console.log("SQL connection pools closed.");
-  } catch (err) {
-    console.error("Error closing SQL connection pools:", err);
-  } finally {
-    process.exit(0);
-  }
-});
+// process.on("SIGINT", async () => {
+//   try {
+//     await closeSQLPools();
+//     console.log("SQL connection pools closed.");
+//   } catch (err) {
+//     console.error("Error closing SQL connection pools:", err);
+//   } finally {
+//     process.exit(0);
+//   }
+// });
 
 /* -----------------------------
 Commin file  Routes
