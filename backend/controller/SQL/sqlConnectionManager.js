@@ -5,6 +5,15 @@ import {
   sqlConfigFCSystem,
 } from "../../Config/sqlConfig.js";
 
+// Import sync functions from other controllers
+import { syncQC1SunriseData, syncQC1WorkerData } from "./sunriseController.js";
+import {
+  dropConflictingIndex,
+  syncInlineOrders,
+} from "./inlineOrdersController.js";
+import { syncCutPanelOrders } from "./cuttingController.js";
+import { syncDTOrdersData } from "./dtOrdersController.js";
+
 // Create connection pools
 // export const poolYMDataStore = new sql.ConnectionPool(sqlConfigYMDataStore);
 export const poolYMCE = new sql.ConnectionPool(sqlConfigYMCE);
@@ -94,7 +103,7 @@ export async function ensurePoolConnected(pool, poolName, maxRetries = 3) {
 }
 
 // Initialize all SQL pools
-export async function initializeSQLPools() {
+async function initializeSQLPools() {
   console.log("Initializing SQL connection pools...");
   const connectionPromises = [
     // connectPool(poolYMDataStore, "YMDataStore"),
@@ -132,3 +141,35 @@ export async function closeSQLPools() {
     throw err;
   }
 }
+
+// ---- SQL Initialization (runs automatically on import) ----
+async function initializeSQL() {
+  console.log("--- Initializing SQL Services ---");
+
+  await dropConflictingIndex();
+  await initializeSQLPools();
+
+  console.log("Running initial data synchronizations...");
+
+  const syncs = [
+    { name: "InlineOrders", fn: syncInlineOrders },
+    { name: "CutPanelOrders", fn: syncCutPanelOrders },
+    { name: "QC1Sunrise", fn: syncQC1SunriseData },
+    { name: "DTOrders", fn: syncDTOrdersData },
+    { name: "QC1Worker", fn: syncQC1WorkerData },
+  ];
+
+  for (const sync of syncs) {
+    try {
+      await sync.fn();
+    } catch (err) {
+      console.warn(`⚠️ Skipping ${sync.name} sync: ${err.message}`);
+    }
+  }
+
+  console.log("--- SQL Initialization Complete ---");
+}
+
+initializeSQL().catch((err) => {
+  console.error("A critical error occurred during SQL initialization:", err);
+});
