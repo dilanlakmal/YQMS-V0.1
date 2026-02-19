@@ -217,7 +217,7 @@ async function initializeServer() {
   await syncCutPanelOrders();
   // await syncQC1SunriseData();
   await syncDTOrdersData();
-  await syncQC1WorkerData();
+  // await syncQC1WorkerData();
   // await syncCuttingInlineOrders(); // Fetch all historical data on initial startup
 
   console.log("--- Server Initialization Complete ---");

@@ -503,8 +503,17 @@ const MobileGridItem = ({ item, onClick, fincheckActionCount }) => {
       )}
 
       {/* Version Badge */}
-      <div className={`absolute top-1 right-1 px-1 py-0.5 rounded-full text-[8px] font-bold`}>
-      </div>
+      {item.version && (
+        <div className={`absolute top-1 right-1 px-1.5 py-0.5 rounded-full text-[8px] font-bold ${
+          item.version === '0' 
+            ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' 
+            : item.version === '0.1' 
+            ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' 
+            : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+        }`}>
+          {/* v{item.version} */}
+        </div>
+      )}
 
       <div className="w-9 h-9 rounded-lg bg-gray-50 dark:bg-slate-700 flex items-center justify-center flex-shrink-0 overflow-hidden mt-1">
         <img
@@ -541,6 +550,19 @@ const TabletGridItem = ({ item, onClick, fincheckActionCount }) => {
       {item.path === "/fincheck-inspection" && fincheckActionCount > 0 && (
         <div className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 shadow-sm animate-pulse">
           {fincheckActionCount}
+        </div>
+      )}
+
+      {/* Version Badge */}
+      {item.version && (
+        <div className={`absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+          item.version === '0' 
+            ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' 
+            : item.version === '0.1' 
+            ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' 
+            : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+        }`}>
+          {/* v{item.version} */}
         </div>
       )}
 
@@ -602,7 +624,7 @@ const DesktopNavItem = ({ section, isActive, onClick }) => {
 };
 
 // --- Desktop Grid Item Component ---
-const DesktopGridItem = ({ item, onClick, fincheckActionCount }) => {
+const DesktopGridItem = ({ item, onClick, fincheckActionCount, className }) => {
   return (
     // 1. Outer Wrapper (Acts as the trigger for 'group' hover effects)
     <div
@@ -614,11 +636,24 @@ const DesktopGridItem = ({ item, onClick, fincheckActionCount }) => {
       <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 rounded-2xl opacity-0 group-hover:opacity-100 blur transition duration-1000 group-hover:duration-200" />
 
       {/* 3. Main Content Card (The visible white box) */}
-      <div className="relative flex flex-col items-center justify-center p-6 rounded-2xl bg-white dark:bg-slate-800 h-full border border-slate-100 dark:border-slate-700 shadow-sm transition-all duration-300 hover:-translate-y-1">
+      <div className={className || "relative flex flex-col items-center justify-center p-6 rounded-2xl bg-white dark:bg-slate-800 h-full border border-slate-100 dark:border-slate-700 shadow-sm transition-all duration-300 hover:-translate-y-1"}>
         {/* Notification Badge */}
         {item.path === "/fincheck-inspection" && fincheckActionCount > 0 && (
           <div className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full min-w-[24px] h-6 flex items-center justify-center px-2 shadow-lg animate-pulse z-10">
             {fincheckActionCount}
+          </div>
+        )}
+
+        {/* Version Badge */}
+        {item.version && (
+          <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+            item.version === '0' 
+              ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' 
+              : item.version === '0.1' 
+              ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' 
+              : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+          }`}>
+            {/* v{item.version} */}
           </div>
         )}
 
@@ -689,6 +724,7 @@ function Home() {
             image: "assets/Home/development.png",
             title: "Development",
             description: "---",
+            version: '0',
           },
         ],
       },
@@ -706,6 +742,7 @@ function Home() {
             image: "assets/Home/fabric-logo.png",
             title: t("home.fabric"),
             description: "Fabric Inspection",
+            version: '0',
           },
           {
             path: "/Accessories",
@@ -713,6 +750,7 @@ function Home() {
             image: "assets/Home/accessories-logo.png",
             title: t("home.accessories"),
             description: "Accessories Inspection",
+            version: '0',
           },
         ],
       },
@@ -730,6 +768,7 @@ function Home() {
             image: "assets/Home/cutting.webp",
             title: t("home.cutting"),
             description: "Cut Panel Inspection",
+            version: '0.1',
           },
           {
             path: "/cutting-inline",
@@ -737,6 +776,7 @@ function Home() {
             image: "assets/Home/cutting-inline.png",
             title: t("home.cutting-inline"),
             description: "Cutting Inline Inspection",
+            version: '0.1',
           },
           {
             path: "/scc",
@@ -744,6 +784,7 @@ function Home() {
             image: "assets/Home/SCCLogo.jpg",
             title: t("SCC"),
             description: "Spreading & Cutting",
+            version: '0.1',
           },
         ],
       },
@@ -761,6 +802,7 @@ function Home() {
             image: "assets/Home/qcinline.png",
             title: "QC Inline Roving",
             description: "QC Inline Roving Point",
+            version: '0.1',
           },
           {
             path: "/details",
@@ -768,6 +810,7 @@ function Home() {
             image: "assets/Home/qcc.png",
             title: t("home.qc1_inspection"),
             description: "QC1 Inspection Point",
+            version: '0.1',
           },
           {
             path: "/sub-con-qc1",
@@ -775,6 +818,7 @@ function Home() {
             image: "assets/Home/sub-con-qc1.png",
             title: t("home.qc1_subcon_inspection"),
             description: "QC1 Sub Con Inspection",
+            version: '0.1',
           },
           {
             path: "/qc-accuracy",
@@ -782,6 +826,7 @@ function Home() {
             image: "assets/Home/qc-accuracy.png",
             title: "QA Random Inspection",
             description: "QA Random Checks",
+            version: '0.1',
           },
           {
             path: "/qc-output",
@@ -789,6 +834,7 @@ function Home() {
             image: "assets/Home/qcOutput.png",
             title: "QC Output",
             description: "QC Output | Sunrise & Old Barcode System",
+            version: '0.1',
           },
         ],
       },
@@ -806,6 +852,7 @@ function Home() {
             image: "assets/Home/qcwashing.png",
             title: t("home.qcWashing"),
             description: "Washing Report",
+            version: '0.1',
           },
 
           {
@@ -814,6 +861,7 @@ function Home() {
             image: "assets/Home/select-specs.png",
             title: t("home.select_dt_specs"),
             description: "Select After Wash DT Specs",
+            version: '0.1',
           },
         ],
       },
@@ -850,19 +898,12 @@ function Home() {
             version: '0',
           },
           {
-            path: "/ironing",
-            pageId: "ironing",
-            image: "assets/Home/ironing.png",
-            title: t("home.ironing"),
-            description: "Scan orders for Ironing",
-            version: '0',
-          },
-          {
             path: "/afterIroning",
             roles: ["QC Ironing"],
             image: "assets/Home/after_ironing.png",
             title: t("home.afterIroning"),
             description: "After Ironing Report",
+             version: '0',
           },
           {
             path: "/qc2-inspection",
@@ -920,6 +961,7 @@ function Home() {
             image: "assets/Home/anf-washing.png",
             title: t("home.anf_washing"),
             description: "QC After Wash Measurements",
+           version: '0.1',
           },
           {
             path: "/afterIroning",
@@ -935,6 +977,7 @@ function Home() {
             image: "assets/Home/Humidity.jpg",
             title: "Humidity Report",
             description: "View Humidity Report",
+            version: '0.1',
           },
           {
             path: "/supplier-issues",
@@ -960,7 +1003,7 @@ function Home() {
             image: "assets/Home/Fincheck_Setting.png",
             title: t("home.qa_sections"),
             description: "Configuration",
-            version: "0"
+            version: "0.1"
           },
           {
             path: "/qa-measurements",
@@ -976,7 +1019,7 @@ function Home() {
             image: "assets/Home/Fincheck_Templates.png",
             title: t("home.qa_templates"),
             description: "...",
-            version: "0"
+            version: "0.1"
           },
           {
             path: "/fincheck-inspection",
@@ -1078,6 +1121,7 @@ function Home() {
             image: "assets/Home/user-management.png", // Add appropriate image
             title: "User Management",
             description: "Manage Users",
+            version: '0.1',
           },
           {
             path: "/role-management",
@@ -1085,6 +1129,7 @@ function Home() {
             image: "assets/Home/role-management.png", // Add appropriate image
             title: "Role Management",
             description: "Manage Roles & Permissions",
+            version: '0.1',
           },
           // Supporting Configuration Items
           {
@@ -1094,6 +1139,7 @@ function Home() {
             title: t("home.qc2_upload_data"),
             description: "QC2 Upload Data",
             isSupporting: true, // Add this flag
+            version: '0.1',
           },
           {
             path: "/qc2-washing-upload",
@@ -1102,6 +1148,7 @@ function Home() {
             title: t("home.qc2_washing_data"),
             description: "QC2 Washing Data",
             isSupporting: true,
+            version: '0.1',
           },
           {
             path: "/inline-emp",
@@ -1110,6 +1157,7 @@ function Home() {
             title: "Print QR",
             description: "Sewing Worker QR Code",
             isSupporting: true,
+            version: '0.1',
           },
         ],
       },
@@ -1411,6 +1459,13 @@ function Home() {
                     item={item}
                     onClick={() => handleNavigation(item)}
                     fincheckActionCount={fincheckActionCount}
+                    className={`relative flex flex-col items-center justify-start p-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm active:scale-[0.95] active:bg-gray-50 dark:active:bg-slate-700 transition-all border-2 aspect-square ${
+                      item.version === '0' 
+                        ? 'border-red-400 dark:border-red-500' 
+                        : item.version === '0.1' 
+                        ? 'border-green-400 dark:border-green-500' 
+                        : 'border-gray-100 dark:border-slate-700'
+                    }`}
                   />
                 ))}
               </div>
@@ -1668,6 +1723,13 @@ function Home() {
                             item={item}
                             onClick={() => handleNavigation(item)}
                             fincheckActionCount={fincheckActionCount}
+                            className={`group relative flex flex-col items-center justify-center p-4 rounded-xl shadow-md transition-all duration-300 bg-white dark:bg-slate-800 cursor-pointer hover:shadow-xl hover:-translate-y-1 border-2 ${
+                              item.version === '0' 
+                                ? 'border-red-400 dark:border-red-500' 
+                                : item.version === '0.1' 
+                                ? 'border-green-400 dark:border-green-500' 
+                                : 'border-gray-200 dark:border-slate-700'
+                            }`}
                           />
                         ))}
                     </div>
