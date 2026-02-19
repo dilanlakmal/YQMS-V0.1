@@ -1,6 +1,3 @@
-import dotenv from "dotenv";
-dotenv.config(); 
-
 import { app } from "./Config/appConfig.js";
 /* -----------------------------
    SQL Query Import
@@ -12,6 +9,7 @@ import { closeSQLPools } from "./controller/SQL/sqlConnectionManager.js";
   SQL Query routs
 ------------------------------ */
 app.use(sqlQuery);
+
 
 
 process.on("SIGINT", async () => {

@@ -1,6 +1,6 @@
 import sql from "mssql";
 import {
-  sqlConfigYMDataStore,
+  // sqlConfigYMDataStore,
   sqlConfigYMCE,
   sqlConfigFCSystem,
 } from "../../Config/sqlConfig.js";
@@ -15,16 +15,18 @@ import { syncCutPanelOrders } from "./cuttingController.js";
 import { syncDTOrdersData } from "./dtOrdersController.js";
 
 // Create connection pools
-export const poolYMDataStore = new sql.ConnectionPool(sqlConfigYMDataStore);
+// export const poolYMDataStore = new sql.ConnectionPool(sqlConfigYMDataStore);
 export const poolYMCE = new sql.ConnectionPool(sqlConfigYMCE);
 export const poolFCSystem = new sql.ConnectionPool(sqlConfigFCSystem);
 
 // SQL Connection Status Tracker
 export const sqlConnectionStatus = {
-  YMDataStore: false,
+  // YMDataStore: false,
   YMCE_SYSTEM: false,
   FCSystem: false,
 };
+
+let isInitializing = false;
 
 // Function to connect to a pool
 async function connectPool(pool, poolName) {
@@ -102,36 +104,11 @@ export async function ensurePoolConnected(pool, poolName, maxRetries = 3) {
   }
 }
 
-// Initialize all SQL pools
-async function initializeSQLPools() {
-  console.log("Initializing SQL connection pools...");
-  const connectionPromises = [
-    connectPool(poolYMDataStore, "YMDataStore"),
-    connectPool(poolYMCE, "YMCE_SYSTEM"),
-    connectPool(poolFCSystem, "FCSystem"),
-  ];
-
-  const results = await Promise.allSettled(connectionPromises);
-
-  results.forEach((result) => {
-    if (result.status === "rejected") {
-      console.warn(
-        `Initialization Warning: ${result.reason.message}. Dependent services will be unavailable.`,
-      );
-    }
-  });
-
-  console.log("Current SQL Connection Status:", sqlConnectionStatus);
-  console.log(
-    "SQL pool initialization complete. Server will continue regardless of failures.",
-  );
-}
-
 // Close all SQL pools
 export async function closeSQLPools() {
   try {
     await Promise.all([
-      poolYMDataStore.close(),
+      // poolYMDataStore.close(),
       poolYMCE.close(),
       poolFCSystem.close(),
     ]);
@@ -142,15 +119,35 @@ export async function closeSQLPools() {
   }
 }
 
-// ---- SQL Initialization (runs automatically on import) ----
+// ---- Single initialization function ----
 async function initializeSQL() {
+  if (isInitializing) return; // Stop if already running
+  isInitializing = true;
   console.log("--- Initializing SQL Services ---");
 
+  // 1. Drop conflicting MongoDB index
   await dropConflictingIndex();
-  await initializeSQLPools();
 
-  console.log("Running initial data synchronizations...");
+  // 2. Connect all SQL pools
+  console.log("Initializing SQL connection pools...");
+  const results = await Promise.allSettled([
+    // connectPool(poolYMDataStore, "YMDataStore"),
+    connectPool(poolYMCE, "YMCE_SYSTEM"),
+    connectPool(poolFCSystem, "FCSystem"),
+  ]);
 
+  results.forEach((result) => {
+    if (result.status === "rejected") {
+      console.warn(
+        `Initialization Warning: ${result.reason.message}. Dependent services will be unavailable.`,
+      );
+    }
+  });
+
+  console.log("Current SQL Connection Status:", sqlConnectionStatus);
+
+  // 3. Run initial data syncs
+  // console.log("Running initial data synchronizations...");
   const syncs = [
     { name: "InlineOrders", fn: syncInlineOrders },
     { name: "CutPanelOrders", fn: syncCutPanelOrders },
@@ -170,6 +167,7 @@ async function initializeSQL() {
   console.log("--- SQL Initialization Complete ---");
 }
 
+// Auto-run on import
 initializeSQL().catch((err) => {
   console.error("A critical error occurred during SQL initialization:", err);
 });

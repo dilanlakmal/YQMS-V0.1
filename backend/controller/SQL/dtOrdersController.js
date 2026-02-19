@@ -1,3 +1,5 @@
+//Batch Processing - Process as 500 batch
+
 import cron from "node-cron";
 import {
   poolFCSystem,
@@ -10,12 +12,15 @@ import { DtOrder } from "../MongoDB/dbConnectionController.js";
    DT Orders Data Migration
 ------------------------------ */
 
+// Batch size for MongoDB bulkWrite
+const BATCH_SIZE = 500;
+
 export async function syncDTOrdersData() {
   try {
     console.log("🔄 Starting DT Orders data migration...");
 
     try {
-      await Promise.all([ensurePoolConnected(poolFCSystem, "FCSystem")]);
+      await ensurePoolConnected(poolFCSystem, "FCSystem");
     } catch (connErr) {
       console.error(
         "❌ Failed to establish required connections:",
@@ -27,7 +32,7 @@ export async function syncDTOrdersData() {
 
     // 1. Fetch Order Headers
     const orderHeaderQuery = `
-      SELECT 
+      SELECT
         h.[SC_Heading], h.[Factory], h.[SalesTeamName], h.[Cust_Code], h.[ShortName],
         h.[EngName], h.[Order_No], h.[Ccy], h.[Style], h.[CustStyle], h.[NoOfCol],
         h.[Size_Seq10], h.[Size_Seq20], h.[Size_Seq30], h.[Size_Seq40], h.[Size_Seq50],
@@ -43,10 +48,13 @@ export async function syncDTOrdersData() {
       ORDER BY h.[Order_No]
     `;
     const orderHeaderResult = await request.query(orderHeaderQuery);
+    // console.log(
+    //   `📊 Fetched ${orderHeaderResult.recordset.length} order headers`,
+    // );
 
     // 2. Fetch Size Names
     const sizeNamesQuery = `
-    SELECT DISTINCT
+      SELECT DISTINCT
         [Order_No],
         NULLIF([Size_Seq10], '') AS Size_10_Name,
         NULLIF([Size_Seq20], '') AS Size_20_Name,
@@ -88,35 +96,37 @@ export async function syncDTOrdersData() {
         NULLIF([Size_Seq380], '') AS Size_380_Name,
         NULLIF([Size_Seq390], '') AS Size_390_Name,
         NULLIF([Size_Seq400], '') AS Size_400_Name
-    FROM 
-        [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
-    WHERE 
-        [Order_No] IS NOT NULL;
-        `;
+      FROM [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
+      WHERE [Order_No] IS NOT NULL
+    `;
     const sizeNamesResult = await request.query(sizeNamesQuery);
+    // console.log(
+    //   `📏 Fetched ${sizeNamesResult.recordset.length} size name records`,
+    // );
 
     // 3. Fetch Order Colors and Shipping WITH Ship_ID
     const orderColorsQuery = `
-      SELECT 
-          [Order_No], [ColorCode], [Color], [ChnColor], [Color_Seq], [ship_seq_no],
-          [Ship_ID], [Mode], [Country], [Origin], [CustPORef],
-          [Size_Seq10], [Size_Seq20], [Size_Seq30], [Size_Seq40], [Size_Seq50], [Size_Seq60],
-          [Size_Seq70], [Size_Seq80], [Size_Seq90], [Size_Seq100], [Size_Seq110], [Size_Seq120],
-          [Size_Seq130], [Size_Seq140], [Size_Seq150], [Size_Seq160], [Size_Seq170], [Size_Seq180],
-          [Size_Seq190], [Size_Seq200], [Size_Seq210], [Size_Seq220], [Size_Seq230], [Size_Seq240],
-          [Size_Seq250], [Size_Seq260], [Size_Seq270], [Size_Seq280], [Size_Seq290], [Size_Seq300],
-          [Size_Seq310], [Size_Seq320], [Size_Seq330], [Size_Seq340], [Size_Seq350], [Size_Seq360],
-          [Size_Seq370], [Size_Seq380], [Size_Seq390], [Size_Seq400] 
-      FROM 
-          [DTrade_CONN].[dbo].[vBuyerPOColQty_BySz]
-      ORDER BY 
-          [Order_No], [ColorCode], [ship_seq_no];
+      SELECT
+        [Order_No], [ColorCode], [Color], [ChnColor], [Color_Seq], [ship_seq_no],
+        [Ship_ID], [Mode], [Country], [Origin], [CustPORef],
+        [Size_Seq10], [Size_Seq20], [Size_Seq30], [Size_Seq40], [Size_Seq50], [Size_Seq60],
+        [Size_Seq70], [Size_Seq80], [Size_Seq90], [Size_Seq100], [Size_Seq110], [Size_Seq120],
+        [Size_Seq130], [Size_Seq140], [Size_Seq150], [Size_Seq160], [Size_Seq170], [Size_Seq180],
+        [Size_Seq190], [Size_Seq200], [Size_Seq210], [Size_Seq220], [Size_Seq230], [Size_Seq240],
+        [Size_Seq250], [Size_Seq260], [Size_Seq270], [Size_Seq280], [Size_Seq290], [Size_Seq300],
+        [Size_Seq310], [Size_Seq320], [Size_Seq330], [Size_Seq340], [Size_Seq350], [Size_Seq360],
+        [Size_Seq370], [Size_Seq380], [Size_Seq390], [Size_Seq400]
+      FROM [DTrade_CONN].[dbo].[vBuyerPOColQty_BySz]
+      ORDER BY [Order_No], [ColorCode], [ship_seq_no]
     `;
     const orderColorsResult = await request.query(orderColorsQuery);
+    // console.log(
+    //   `🎨 Fetched ${orderColorsResult.recordset.length} color records`,
+    // );
 
     // 4. Fetch Size Specifications
     const sizeSpecQuery = `
-      SELECT 
+      SELECT
         [JobNo], [SizeSpecId], [DetId], [Seq], [AtoZ], [Area],
         [ChineseArea], [EnglishRemark], [ChineseRemark], [AreaCode],
         [IsMiddleCalc], [Tolerance], [Tolerance2], [SpecMemo], [SizeSpecMeasUnit],
@@ -128,160 +138,113 @@ export async function syncDTOrdersData() {
       ORDER BY [JobNo], [Seq]
     `;
     const sizeSpecResult = await request.query(sizeSpecQuery);
+    // console.log(`📐 Fetched ${sizeSpecResult.recordset.length} spec records`);
 
     // 5. Fetch Cut Quantity data from FC_SYSTEM
     const cutQtyQuery = `
-      SELECT 
+      SELECT
         [BuyerStyle], [StyleNo], [ColorCode], [ChColor], [EngColor], [SIZE],
-        SUM(CAST([PlanQty] AS INT)) as TotalPlanQty, 
+        SUM(CAST([PlanQty] AS INT)) as TotalPlanQty,
         SUM(CAST([CutQty] AS INT)) as TotalCutQty
       FROM [FC_SYSTEM].[dbo].[ViewOrderPlanQty]
-      WHERE [StyleNo] IS NOT NULL 
-        AND [ColorCode] IS NOT NULL 
+      WHERE [StyleNo] IS NOT NULL
+        AND [ColorCode] IS NOT NULL
         AND [SIZE] IS NOT NULL
-        AND [PlanQty] IS NOT NULL 
+        AND [PlanQty] IS NOT NULL
         AND [CutQty] IS NOT NULL
       GROUP BY [BuyerStyle], [StyleNo], [ColorCode], [ChColor], [EngColor], [SIZE]
       ORDER BY [StyleNo], [ColorCode], [SIZE]
     `;
     const cutQtyResult = await request.query(cutQtyQuery);
+    // console.log(`✂️ Fetched ${cutQtyResult.recordset.length} cut qty records`);
 
-    // Create size mapping from database for each order
+    // ---- SIZE COLUMNS CONSTANT (reused everywhere) ----
+    const SIZE_COLUMNS = [
+      "10",
+      "20",
+      "30",
+      "40",
+      "50",
+      "60",
+      "70",
+      "80",
+      "90",
+      "100",
+      "110",
+      "120",
+      "130",
+      "140",
+      "150",
+      "160",
+      "170",
+      "180",
+      "190",
+      "200",
+      "210",
+      "220",
+      "230",
+      "240",
+      "250",
+      "260",
+      "270",
+      "280",
+      "290",
+      "300",
+      "310",
+      "320",
+      "330",
+      "340",
+      "350",
+      "360",
+      "370",
+      "380",
+      "390",
+      "400",
+    ];
+
+    // ---- Build size mapping ----
     const orderSizeMapping = new Map();
     sizeNamesResult.recordset.forEach((sizeRecord) => {
       const orderNo = sizeRecord.Order_No;
       const sizeMapping = {};
-
-      const sizeColumns = [
-        "10",
-        "20",
-        "30",
-        "40",
-        "50",
-        "60",
-        "70",
-        "80",
-        "90",
-        "100",
-        "110",
-        "120",
-        "130",
-        "140",
-        "150",
-        "160",
-        "170",
-        "180",
-        "190",
-        "200",
-        "210",
-        "220",
-        "230",
-        "240",
-        "250",
-        "260",
-        "270",
-        "280",
-        "290",
-        "300",
-        "310",
-        "320",
-        "330",
-        "340",
-        "350",
-        "360",
-        "370",
-        "380",
-        "390",
-        "400",
-      ];
-      sizeColumns.forEach((seq) => {
+      SIZE_COLUMNS.forEach((seq) => {
         const sizeNameColumn = `Size_${seq}_Name`;
-        if (sizeRecord[sizeNameColumn] && sizeRecord[sizeNameColumn] !== null) {
+        if (sizeRecord[sizeNameColumn] != null) {
           sizeMapping[seq] = sizeRecord[sizeNameColumn].toString();
         }
       });
       orderSizeMapping.set(orderNo, sizeMapping);
     });
+    // Free memory - no longer needed
+    sizeNamesResult.recordset.length = 0;
 
-    // Process Cut Quantity data and create mapping
+    // ---- Build cut quantity mapping ----
     const cutQtyMapping = new Map();
     cutQtyResult.recordset.forEach((record) => {
-      const styleNo = record.StyleNo;
-      const colorCode = record.ColorCode;
-      const size = record.SIZE;
-      const planQty = Number(record.TotalPlanQty) || 0;
-      const cutQty = Number(record.TotalCutQty) || 0;
-
-      const key = `${styleNo}_${colorCode}`;
-
+      const key = `${record.StyleNo}_${record.ColorCode}`;
       if (!cutQtyMapping.has(key)) {
         cutQtyMapping.set(key, {});
       }
-
-      const colorCutData = cutQtyMapping.get(key);
-      colorCutData[size] = {
-        PlanCutQty: planQty,
-        ActualCutQty: cutQty,
+      cutQtyMapping.get(key)[record.SIZE] = {
+        PlanCutQty: Number(record.TotalPlanQty) || 0,
+        ActualCutQty: Number(record.TotalCutQty) || 0,
       };
     });
+    const cutQtyRecordCount = cutQtyResult.recordset.length;
+    // Free memory
+    cutQtyResult.recordset.length = 0;
 
     // ---- Helper Functions ----
 
     function extractSizeDataAsObject(record, prefix = "Size_Seq", orderNo) {
       const sizeMapping = orderSizeMapping.get(orderNo) || {};
       const sizeObject = {};
-
-      const allSizeColumns = [
-        "10",
-        "20",
-        "30",
-        "40",
-        "50",
-        "60",
-        "70",
-        "80",
-        "90",
-        "100",
-        "110",
-        "120",
-        "130",
-        "140",
-        "150",
-        "160",
-        "170",
-        "180",
-        "190",
-        "200",
-        "210",
-        "220",
-        "230",
-        "240",
-        "250",
-        "260",
-        "270",
-        "280",
-        "290",
-        "300",
-        "310",
-        "320",
-        "330",
-        "340",
-        "350",
-        "360",
-        "370",
-        "380",
-        "390",
-        "400",
-      ];
-      allSizeColumns.forEach((seq) => {
-        const columnName = `${prefix}${seq}`;
-        const quantity = record[columnName];
-
-        if (quantity === null || quantity === undefined) {
+      SIZE_COLUMNS.forEach((seq) => {
+        const quantity = record[`${prefix}${seq}`];
+        if (quantity === null || quantity === undefined || quantity === 0) {
           return;
         }
         const sizeName = sizeMapping[seq] || `Size${seq}`;
-
         if (sizeName) {
           sizeObject[sizeName] = Number(quantity);
         }
@@ -292,120 +255,62 @@ export async function syncDTOrdersData() {
     function getOrderedSizeList(orderNo) {
       const sizeMapping = orderSizeMapping.get(orderNo) || {};
       const sizeList = [];
-
-      const sizeSeqs = [
-        "10",
-        "20",
-        "30",
-        "40",
-        "50",
-        "60",
-        "70",
-        "80",
-        "90",
-        "100",
-        "110",
-        "120",
-        "130",
-        "140",
-        "150",
-        "160",
-        "170",
-        "180",
-        "190",
-        "200",
-        "210",
-        "220",
-        "230",
-        "240",
-        "250",
-        "260",
-        "270",
-        "280",
-        "290",
-        "300",
-        "310",
-        "320",
-        "330",
-        "340",
-        "350",
-        "360",
-        "370",
-        "380",
-        "390",
-        "400",
-      ];
-
-      sizeSeqs.forEach((seq) => {
+      SIZE_COLUMNS.forEach((seq) => {
         const val = sizeMapping[seq];
-        if (val && val !== null && val !== "") {
+        if (val && val !== "") {
           sizeList.push(val);
         }
       });
-
       return sizeList;
     }
 
     function convertSizeObjectToArray(sizeObject, orderNo) {
       const sizeMapping = orderSizeMapping.get(orderNo) || {};
-
       const sizeToSeqMapping = {};
       Object.entries(sizeMapping).forEach(([seq, sizeName]) => {
         sizeToSeqMapping[sizeName] = parseInt(seq);
       });
-
       return Object.entries(sizeObject)
-        .sort(([sizeNameA], [sizeNameB]) => {
-          const seqA = sizeToSeqMapping[sizeNameA] || 999;
-          const seqB = sizeToSeqMapping[sizeNameB] || 999;
-          return seqA - seqB;
-        })
-        .map(([sizeName, qty]) => {
-          const obj = {};
-          obj[sizeName] = qty;
-          return obj;
-        });
+        .sort(
+          ([a], [b]) =>
+            (sizeToSeqMapping[a] || 999) - (sizeToSeqMapping[b] || 999),
+        )
+        .map(([sizeName, qty]) => ({ [sizeName]: qty }));
     }
 
     function parseToleranceValue(toleranceStr) {
       if (!toleranceStr) return { fraction: "", decimal: 0 };
-
       let str = toleranceStr.toString().trim();
       let decimal = 0;
-
       str = str.replace(/['"]/g, "").trim();
       str = str.replace(/[⁄∕／]/g, "/");
-
       let isNegative = false;
       if (str.startsWith("-")) {
         isNegative = true;
         str = str.substring(1);
       }
-
       try {
-        const mixedNumberPattern =
-          /^(\d+(?:\.\d+)?)\s*[-\s　]\s*(\d+)\s*\/\s*(\d+)$/;
-        const mixedMatch = str.match(mixedNumberPattern);
-
+        const mixedMatch = str.match(
+          /^(\d+(?:\.\d+)?)\s*[-\s　]\s*(\d+)\s*\/\s*(\d+)$/,
+        );
         if (mixedMatch) {
-          const wholePart = parseFloat(mixedMatch[1]) || 0;
-          const numerator = parseFloat(mixedMatch[2]) || 0;
-          const denominator = parseFloat(mixedMatch[3]) || 1;
-          decimal = wholePart + numerator / denominator;
+          decimal =
+            (parseFloat(mixedMatch[1]) || 0) +
+            (parseFloat(mixedMatch[2]) || 0) / (parseFloat(mixedMatch[3]) || 1);
         } else if (str.includes("/")) {
-          const fractionPattern = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/;
-          const fractionMatch = str.match(fractionPattern);
-
+          const fractionMatch = str.match(
+            /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/,
+          );
           if (fractionMatch) {
-            const numerator = parseFloat(fractionMatch[1]) || 0;
-            const denominator = parseFloat(fractionMatch[2]) || 1;
-            decimal = numerator / denominator;
+            decimal =
+              (parseFloat(fractionMatch[1]) || 0) /
+              (parseFloat(fractionMatch[2]) || 1);
           } else {
             const parts = str.split("/");
             if (parts.length === 2) {
-              const numerator = parseFloat(parts[0].trim()) || 0;
-              const denominator = parseFloat(parts[1].trim()) || 1;
-              decimal = numerator / denominator;
+              decimal =
+                (parseFloat(parts[0].trim()) || 0) /
+                (parseFloat(parts[1].trim()) || 1);
             } else {
               decimal = parseFloat(str) || 0;
             }
@@ -413,27 +318,13 @@ export async function syncDTOrdersData() {
         } else {
           decimal = parseFloat(str) || 0;
         }
-
-        if (isNegative) {
-          decimal = -decimal;
-        }
+        if (isNegative) decimal = -decimal;
       } catch (error) {
-        console.error(
-          `Error parsing tolerance value "${toleranceStr}":`,
-          error,
-        );
         const numbers = str.match(/\d+(?:\.\d+)?/g);
-        if (numbers && numbers.length >= 1) {
-          decimal = parseFloat(numbers[0]) || 0;
-        } else {
-          decimal = 0;
-        }
+        decimal =
+          numbers && numbers.length >= 1 ? parseFloat(numbers[0]) || 0 : 0;
       }
-
-      if (isNaN(decimal)) {
-        decimal = 0;
-      }
-
+      if (isNaN(decimal)) decimal = 0;
       return {
         fraction: toleranceStr.toString(),
         decimal: Math.round(decimal * 10000) / 10000,
@@ -443,98 +334,73 @@ export async function syncDTOrdersData() {
     function extractSpecsDataAsArray(record, orderNo) {
       const sizeMapping = orderSizeMapping.get(orderNo) || {};
       const specsArray = [];
-
       for (let i = 1; i <= 40; i++) {
         const sizeColumn = `Size${i}`;
-        if (record[sizeColumn] && record[sizeColumn] !== null) {
+        if (record[sizeColumn] != null) {
           const value = record[sizeColumn].toString().trim();
+          if (!value) continue;
           const seqNumber = (i * 10).toString();
           const sizeName = sizeMapping[seqNumber] || `Size${i}`;
-
           let decimal = 0;
           try {
             let cleanValue = value.replace(/[⁄∕／]/g, "/");
-
-            const mixedNumberPattern =
-              /^(\d+(?:\.\d+)?)\s*[-\s　]\s*(\d+)\s*\/\s*(\d+)$/;
-            const mixedMatch = cleanValue.match(mixedNumberPattern);
-
+            const mixedMatch = cleanValue.match(
+              /^(\d+(?:\.\d+)?)\s*[-\s　]\s*(\d+)\s*\/\s*(\d+)$/,
+            );
             if (mixedMatch) {
-              const wholePart = parseFloat(mixedMatch[1]) || 0;
-              const numerator = parseFloat(mixedMatch[2]) || 0;
-              const denominator = parseFloat(mixedMatch[3]) || 1;
-              decimal = wholePart + numerator / denominator;
+              decimal =
+                (parseFloat(mixedMatch[1]) || 0) +
+                (parseFloat(mixedMatch[2]) || 0) /
+                  (parseFloat(mixedMatch[3]) || 1);
             } else if (cleanValue.includes("/")) {
-              const fractionPattern =
-                /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/;
-              const fractionMatch = cleanValue.match(fractionPattern);
-
+              const fractionMatch = cleanValue.match(
+                /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/,
+              );
               if (fractionMatch) {
-                const numerator = parseFloat(fractionMatch[1]) || 0;
-                const denominator = parseFloat(fractionMatch[2]) || 1;
-                decimal = numerator / denominator;
+                decimal =
+                  (parseFloat(fractionMatch[1]) || 0) /
+                  (parseFloat(fractionMatch[2]) || 1);
               } else {
                 const parts = cleanValue.split("/");
-                if (parts.length === 2) {
-                  const numerator = parseFloat(parts[0].trim()) || 0;
-                  const denominator = parseFloat(parts[1].trim()) || 1;
-                  decimal = numerator / denominator;
-                } else {
-                  decimal = parseFloat(cleanValue) || 0;
-                }
+                decimal =
+                  parts.length === 2
+                    ? (parseFloat(parts[0].trim()) || 0) /
+                      (parseFloat(parts[1].trim()) || 1)
+                    : parseFloat(cleanValue) || 0;
               }
             } else {
               decimal = parseFloat(cleanValue) || 0;
             }
           } catch (error) {
-            console.error(`Error parsing spec value "${value}":`, error);
             const numbers = value.match(/\d+(?:\.\d+)?/g);
-            if (numbers && numbers.length >= 1) {
-              decimal = parseFloat(numbers[0]) || 0;
-            } else {
-              decimal = 0;
-            }
+            decimal =
+              numbers && numbers.length >= 1 ? parseFloat(numbers[0]) || 0 : 0;
           }
-
-          if (isNaN(decimal)) {
-            decimal = 0;
-          }
-
-          const specObject = {};
-          specObject[sizeName] = {
-            fraction: value,
-            decimal: Math.round(decimal * 10000) / 10000,
-          };
-          specsArray.push(specObject);
+          if (isNaN(decimal)) decimal = 0;
+          specsArray.push({
+            [sizeName]: {
+              fraction: value,
+              decimal: Math.round(decimal * 10000) / 10000,
+            },
+          });
         }
       }
       return specsArray;
     }
 
     function isEmptyOrContainsNumbers(value) {
-      if (!value || value === null || value === undefined || value === "") {
-        return true;
-      }
-
+      if (!value || value === "") return true;
       const str = value.toString().trim();
-      if (str === "") {
-        return true;
-      }
-
-      return /^\d+$/.test(str);
+      return str === "" || /^\d+$/.test(str);
     }
 
     function convertEmptyToNull(value) {
-      if (!value || value === null || value === undefined || value === "") {
-        return null;
-      }
-
+      if (!value || value === "") return null;
       const str = value.toString().trim();
       return str === "" ? null : str;
     }
 
     // ---- Process Data ----
-
     const orderMap = new Map();
 
     // 1. Process Order Headers
@@ -542,9 +408,6 @@ export async function syncDTOrdersData() {
       const orderNo = header.Order_No;
       if (!orderMap.has(orderNo)) {
         const sizeData = extractSizeDataAsObject(header, "Size_Seq", orderNo);
-
-        const orderedSizeList = getOrderedSizeList(orderNo);
-
         orderMap.set(orderNo, {
           SC_Heading: convertEmptyToNull(header.SC_Heading),
           Factory: convertEmptyToNull(header.Factory),
@@ -558,215 +421,230 @@ export async function syncDTOrdersData() {
           CustStyle: convertEmptyToNull(header.CustStyle),
           TotalQty: Number(header.OrderQuantity) || 0,
           NoOfSize: Object.keys(sizeData).length,
-          SizeList: orderedSizeList,
+          SizeList: getOrderedSizeList(orderNo),
           OrderColors: [],
           OrderColorShip: [],
           SizeSpec: [],
         });
       }
     });
+    // Free memory
+    orderHeaderResult.recordset.length = 0;
+    // console.log(`📦 Processed ${orderMap.size} unique orders`);
 
     // 2. Process Order Colors and Shipping
-    const colorSummaryMap = new Map();
-    const shipMap = new Map();
+    // *** FIX: Group by orderNo FIRST to avoid O(n*m) nested loop later ***
+    const colorsByOrder = new Map(); // orderNo -> Map(colorKey -> colorSummary)
+    const shipsByOrder = new Map(); // orderNo -> Map(shipKey -> shipData)
+
     orderColorsResult.recordset.forEach((record) => {
       const orderNo = record.Order_No;
       const colorCode = record.ColorCode;
       const shipSeqNo = record.ship_seq_no;
       const shipId = record.Ship_ID;
 
-      if (orderMap.has(orderNo)) {
-        const order = orderMap.get(orderNo);
+      if (!orderMap.has(orderNo)) return;
 
-        order.Mode = convertEmptyToNull(record.Mode);
-        order.Country = convertEmptyToNull(record.Country);
-        order.Origin = convertEmptyToNull(record.Origin);
-        order.CustPORef = convertEmptyToNull(record.CustPORef);
+      const order = orderMap.get(orderNo);
+      order.Mode = convertEmptyToNull(record.Mode);
+      order.Country = convertEmptyToNull(record.Country);
+      order.Origin = convertEmptyToNull(record.Origin);
+      order.CustPORef = convertEmptyToNull(record.CustPORef);
 
-        // Sum quantities for OrderColors
-        const colorKey = `${orderNo}_${colorCode}`;
-        if (!colorSummaryMap.has(colorKey)) {
-          colorSummaryMap.set(colorKey, {
-            ColorCode: record.ColorCode,
-            Color: record.Color,
-            ChnColor: record.ChnColor,
-            ColorKey: Number(record.Color_Seq) || 0,
-            sizeTotals: {},
-          });
-        }
+      // --- Color Summary (grouped by order) ---
+      if (!colorsByOrder.has(orderNo)) {
+        colorsByOrder.set(orderNo, new Map());
+      }
+      const orderColors = colorsByOrder.get(orderNo);
 
-        const colorSummary = colorSummaryMap.get(colorKey);
-        const sizes = extractSizeDataAsObject(record, "Size_Seq", orderNo);
-
-        Object.entries(sizes).forEach(([sizeName, qty]) => {
-          if (!colorSummary.sizeTotals[sizeName]) {
-            colorSummary.sizeTotals[sizeName] = 0;
-          }
-          colorSummary.sizeTotals[sizeName] += qty;
+      if (!orderColors.has(colorCode)) {
+        orderColors.set(colorCode, {
+          ColorCode: record.ColorCode,
+          Color: record.Color,
+          ChnColor: record.ChnColor,
+          ColorKey: Number(record.Color_Seq) || 0,
+          sizeTotals: {},
         });
+      }
 
-        // Process OrderColorShip WITH Ship_ID
-        const shipKey = `${orderNo}_${colorCode}`;
-        if (!shipMap.has(shipKey)) {
-          shipMap.set(shipKey, {
-            ColorCode: record.ColorCode,
-            Color: record.Color,
-            ChnColor: record.ChnColor,
-            ColorKey: Number(record.Color_Seq) || 0,
-            ShipSeqNo: [],
-          });
-        }
+      const colorSummary = orderColors.get(colorCode);
+      const sizes = extractSizeDataAsObject(record, "Size_Seq", orderNo);
+      Object.entries(sizes).forEach(([sizeName, qty]) => {
+        colorSummary.sizeTotals[sizeName] =
+          (colorSummary.sizeTotals[sizeName] || 0) + qty;
+      });
 
-        const shipRecord = shipMap.get(shipKey);
-        const existingSeq = shipRecord.ShipSeqNo.find(
-          (seq) => seq.seqNo === shipSeqNo,
-        );
-        if (!existingSeq && shipSeqNo) {
-          const sizesArray = convertSizeObjectToArray(sizes, orderNo);
+      // --- Ship Data (grouped by order) ---
+      if (!shipsByOrder.has(orderNo)) {
+        shipsByOrder.set(orderNo, new Map());
+      }
+      const orderShips = shipsByOrder.get(orderNo);
 
-          shipRecord.ShipSeqNo.push({
-            seqNo: Number(shipSeqNo),
-            Ship_ID: convertEmptyToNull(shipId),
-            sizes: sizesArray,
-          });
-        }
+      if (!orderShips.has(colorCode)) {
+        orderShips.set(colorCode, {
+          ColorCode: record.ColorCode,
+          Color: record.Color,
+          ChnColor: record.ChnColor,
+          ColorKey: Number(record.Color_Seq) || 0,
+          ShipSeqNo: [],
+        });
+      }
+
+      const shipRecord = orderShips.get(colorCode);
+      const existingSeq = shipRecord.ShipSeqNo.find(
+        (seq) => seq.seqNo === shipSeqNo,
+      );
+      if (!existingSeq && shipSeqNo) {
+        shipRecord.ShipSeqNo.push({
+          seqNo: Number(shipSeqNo),
+          Ship_ID: convertEmptyToNull(shipId),
+          sizes: convertSizeObjectToArray(sizes, orderNo),
+        });
       }
     });
+    // Free memory
+    orderColorsResult.recordset.length = 0;
 
-    // Convert color summaries to the desired format
-    const colorMap = new Map();
-    for (const [colorKey, colorSummary] of colorSummaryMap) {
-      const orderNo = colorKey.split("_")[0];
-      const orderQtyArray = convertSizeObjectToArray(
-        colorSummary.sizeTotals,
-        orderNo,
-      );
-
-      colorMap.set(colorKey, {
-        ColorCode: colorSummary.ColorCode,
-        Color: colorSummary.Color,
-        ChnColor: colorSummary.ChnColor,
-        ColorKey: colorSummary.ColorKey,
-        OrderQty: orderQtyArray,
-        CutQty: {},
-      });
-    }
-
-    // Add cut quantity data to colors
+    // *** FIX: Now attach colors and ships to orders - O(n) instead of O(n*m) ***
     let cutQtyMatchCount = 0;
-    let totalColorProcessed = 0;
+    let colorsWithCutQty = 0;
 
     for (const [orderNo, order] of orderMap) {
-      for (const [colorKey, colorData] of colorMap) {
-        if (colorKey.startsWith(orderNo + "_")) {
-          totalColorProcessed++;
-          const colorCode = colorData.ColorCode;
+      // Attach OrderColors
+      const orderColors = colorsByOrder.get(orderNo);
+      if (orderColors) {
+        for (const [colorCode, colorSummary] of orderColors) {
+          const orderQtyArray = convertSizeObjectToArray(
+            colorSummary.sizeTotals,
+            orderNo,
+          );
 
+          const colorData = {
+            ColorCode: colorSummary.ColorCode,
+            Color: colorSummary.Color,
+            ChnColor: colorSummary.ChnColor,
+            ColorKey: colorSummary.ColorKey,
+            OrderQty: orderQtyArray,
+            CutQty: {},
+          };
+
+          // Add cut quantity
           const cutKey = `${orderNo}_${colorCode}`;
-
           if (cutQtyMapping.has(cutKey)) {
             const cutData = cutQtyMapping.get(cutKey);
-
-            colorData.CutQty = {};
-
             Object.entries(cutData).forEach(([size, quantities]) => {
               colorData.CutQty[size] = {
                 ActualCutQty: quantities.ActualCutQty,
                 PlanCutQty: quantities.PlanCutQty,
               };
             });
-
             cutQtyMatchCount++;
+            colorsWithCutQty++;
           }
-        }
-      }
-    }
 
-    // Verify CutQty data
-    let colorsWithCutQty = 0;
-    for (const [colorKey, colorData] of colorMap) {
-      if (Object.keys(colorData.CutQty).length > 0) {
-        colorsWithCutQty++;
-      }
-    }
-
-    // Add colors and shipping to orders
-    for (const [orderNo, order] of orderMap) {
-      for (const [colorKey, colorData] of colorMap) {
-        if (colorKey.startsWith(orderNo + "_")) {
           order.OrderColors.push(colorData);
         }
       }
 
-      for (const [shipKey, shipData] of shipMap) {
-        if (shipKey.startsWith(orderNo + "_")) {
+      // Attach OrderColorShip
+      const orderShips = shipsByOrder.get(orderNo);
+      if (orderShips) {
+        for (const [, shipData] of orderShips) {
           order.OrderColorShip.push(shipData);
         }
       }
     }
+    // Free memory
+    colorsByOrder.clear();
+    shipsByOrder.clear();
+    cutQtyMapping.clear();
 
     // 3. Process Size Specifications
     sizeSpecResult.recordset.forEach((spec) => {
       const jobNo = spec.JobNo;
+      if (!orderMap.has(jobNo)) return;
 
-      if (orderMap.has(jobNo)) {
-        const order = orderMap.get(jobNo);
+      const order = orderMap.get(jobNo);
+      try {
+        const toleranceMinus = parseToleranceValue(spec.Tolerance);
+        const tolerancePlus = parseToleranceValue(spec.Tolerance2);
+        const specs = extractSpecsDataAsArray(spec, jobNo);
 
-        try {
-          const toleranceMinus = parseToleranceValue(spec.Tolerance);
-          const tolerancePlus = parseToleranceValue(spec.Tolerance2);
-          const specs = extractSpecsDataAsArray(spec, jobNo);
-
-          const chineseArea = convertEmptyToNull(spec.ChineseArea);
-          const chineseRemark = convertEmptyToNull(spec.ChineseRemark);
-          let chineseName = null;
-
-          if (isEmptyOrContainsNumbers(spec.ChineseArea)) {
-            chineseName = chineseRemark;
-          } else if (isEmptyOrContainsNumbers(spec.ChineseRemark)) {
-            chineseName = chineseArea;
-          } else {
-            chineseName = chineseArea;
-          }
-
-          const sizeSpecData = {
-            Seq: Number(spec.Seq) || 0,
-            AtoZ: convertEmptyToNull(spec.AtoZ),
-            Area: convertEmptyToNull(spec.Area),
-            ChineseArea: chineseArea,
-            EnglishRemark: convertEmptyToNull(spec.EnglishRemark),
-            ChineseRemark: chineseRemark,
-            ChineseName: chineseName,
-            AreaCode: convertEmptyToNull(spec.AreaCode),
-            IsMiddleCalc: spec.IsMiddleCalc || null,
-            ToleranceMinus: {
-              fraction: toleranceMinus.fraction || "",
-              decimal: toleranceMinus.decimal,
-            },
-            TolerancePlus: {
-              fraction: tolerancePlus.fraction || "",
-              decimal: tolerancePlus.decimal,
-            },
-            SpecMemo: convertEmptyToNull(spec.SpecMemo),
-            SizeSpecMeasUnit: convertEmptyToNull(spec.SizeSpecMeasUnit),
-            Specs: specs || [],
-          };
-
-          order.SizeSpec.push(sizeSpecData);
-        } catch (error) {
-          console.error(
-            `Error processing spec for job ${jobNo}, seq ${spec.Seq}:`,
-            error.message,
-          );
+        const chineseArea = convertEmptyToNull(spec.ChineseArea);
+        const chineseRemark = convertEmptyToNull(spec.ChineseRemark);
+        let chineseName = null;
+        if (isEmptyOrContainsNumbers(spec.ChineseArea)) {
+          chineseName = chineseRemark;
+        } else if (isEmptyOrContainsNumbers(spec.ChineseRemark)) {
+          chineseName = chineseArea;
+        } else {
+          chineseName = chineseArea;
         }
+
+        order.SizeSpec.push({
+          Seq: Number(spec.Seq) || 0,
+          AtoZ: convertEmptyToNull(spec.AtoZ),
+          Area: convertEmptyToNull(spec.Area),
+          ChineseArea: chineseArea,
+          EnglishRemark: convertEmptyToNull(spec.EnglishRemark),
+          ChineseRemark: chineseRemark,
+          ChineseName: chineseName,
+          AreaCode: convertEmptyToNull(spec.AreaCode),
+          IsMiddleCalc: spec.IsMiddleCalc || null,
+          ToleranceMinus: {
+            fraction: toleranceMinus.fraction || "",
+            decimal: toleranceMinus.decimal,
+          },
+          TolerancePlus: {
+            fraction: tolerancePlus.fraction || "",
+            decimal: tolerancePlus.decimal,
+          },
+          SpecMemo: convertEmptyToNull(spec.SpecMemo),
+          SizeSpecMeasUnit: convertEmptyToNull(spec.SizeSpecMeasUnit),
+          Specs: specs || [],
+        });
+      } catch (error) {
+        console.error(
+          `Error processing spec for job ${jobNo}, seq ${spec.Seq}:`,
+          error.message,
+        );
       }
     });
+    // Free memory
+    sizeSpecResult.recordset.length = 0;
 
-    // 4. Save to MongoDB
-    console.log("💾 Saving to MongoDB...");
-    const finalDocs = Array.from(orderMap.values());
+    // 4. Save to MongoDB IN BATCHES
+    console.log("💾 Saving to MongoDB in batches...");
 
-    const cleanedDocs = finalDocs.map((doc) => {
+    // Get modified orders first
+    const modifiedOrders = await DtOrder.find({ isModify: true })
+      .select("Order_No")
+      .lean();
+    const modifiedOrderNos = new Set(
+      modifiedOrders.map((order) => order.Order_No),
+    );
+    // console.log(`📋 Found ${modifiedOrderNos.size} orders with isModify: true`);
+
+    let totalProcessed = 0;
+    let totalMatched = 0;
+    let totalModified = 0;
+    let totalUpserted = 0;
+    let totalSkipped = 0;
+    let totalOrders = 0;
+
+    // *** FIX: Process directly from orderMap in batches - no intermediate arrays ***
+    let batch = [];
+
+    for (const [orderNo, doc] of orderMap) {
+      totalOrders++;
+
+      // Skip modified orders
+      if (modifiedOrderNos.has(orderNo)) {
+        totalSkipped++;
+        continue;
+      }
+
+      // Filter SizeSpec
       if (doc.SizeSpec) {
         doc.SizeSpec = doc.SizeSpec.filter((spec) => {
           return (
@@ -778,107 +656,82 @@ export async function syncDTOrdersData() {
         });
       }
 
-      const {
-        isModify,
-        modifiedAt,
-        modifiedBy,
-        modificationHistory,
-        ...cleanDoc
-      } = doc;
-      return cleanDoc;
-    });
+      // Remove isModify related fields
+      delete doc.isModify;
+      delete doc.modifiedAt;
+      delete doc.modifiedBy;
+      delete doc.modificationHistory;
 
-    const uniqueDocs = cleanedDocs.reduce((acc, doc) => {
-      const existingIndex = acc.findIndex(
-        (existing) => existing.Order_No === doc.Order_No,
-      );
-      if (existingIndex === -1) {
-        acc.push(doc);
-      }
-      return acc;
-    }, []);
+      batch.push({
+        updateOne: {
+          filter: { Order_No: orderNo },
+          update: { $set: doc },
+          upsert: true,
+        },
+      });
 
-    // Get list of orders with isModify: true first
-    const modifiedOrders = await DtOrder.find({ isModify: true }).select(
-      "Order_No",
-    );
-    const modifiedOrderNos = new Set(
-      modifiedOrders.map((order) => order.Order_No),
-    );
-
-    console.log(`📋 Found ${modifiedOrderNos.size} orders with isModify: true`);
-
-    const ordersToUpdate = uniqueDocs.filter(
-      (doc) => !modifiedOrderNos.has(doc.Order_No),
-    );
-
-    console.log(
-      `📊 Orders to update: ${ordersToUpdate.length} out of ${uniqueDocs.length}`,
-    );
-    console.log(
-      `📊 Orders to skip (manually modified): ${modifiedOrderNos.size}`,
-    );
-
-    const bulkOps = ordersToUpdate.map((doc) => ({
-      updateOne: {
-        filter: { Order_No: doc.Order_No },
-        update: { $set: doc },
-        upsert: true,
-      },
-    }));
-
-    if (bulkOps.length > 0) {
-      try {
-        const result = await DtOrder.bulkWrite(bulkOps, { ordered: false });
-
-        return {
-          success: true,
-          totalOrders: uniqueDocs.length,
-          processed: ordersToUpdate.length,
-          matched: result.matchedCount,
-          modified: result.modifiedCount,
-          upserted: result.upsertedCount,
-          skipped: modifiedOrderNos.size,
-          cutQtyRecords: cutQtyResult.recordset.length,
-          cutQtyMatchCount: cutQtyMatchCount,
-          colorsWithCutQty: colorsWithCutQty,
-        };
-      } catch (bulkError) {
-        console.error("❌ Bulk operation failed:", bulkError);
-
-        if (bulkError.writeErrors) {
-          bulkError.writeErrors.forEach((error, index) => {
-            console.log(`   Error ${index + 1}: ${error.errmsg}`);
-          });
+      // Write batch when it reaches BATCH_SIZE
+      if (batch.length >= BATCH_SIZE) {
+        try {
+          const result = await DtOrder.bulkWrite(batch, { ordered: false });
+          totalProcessed += batch.length;
+          totalMatched += result.matchedCount;
+          totalModified += result.modifiedCount;
+          totalUpserted += result.upsertedCount;
+          // console.log(
+          //   `   ✅ Batch saved: ${totalProcessed} orders processed so far...`,
+          // );
+        } catch (batchError) {
+          console.error(`   ❌ Batch error:`, batchError.message);
+          if (batchError.result) {
+            totalMatched += batchError.result.matchedCount || 0;
+            totalModified += batchError.result.modifiedCount || 0;
+            totalUpserted += batchError.result.upsertedCount || 0;
+          }
+          totalProcessed += batch.length;
         }
-
-        if (bulkError.result) {
-          return {
-            success: false,
-            partialSuccess: true,
-            totalOrders: uniqueDocs.length,
-            processed: ordersToUpdate.length,
-            matched: bulkError.result.matchedCount,
-            modified: bulkError.result.modifiedCount,
-            upserted: bulkError.result.upsertedCount,
-            skipped: modifiedOrderNos.size,
-            errors: bulkError.writeErrors?.length || 0,
-            cutQtyRecords: cutQtyResult.recordset.length,
-            cutQtyMatchCount: cutQtyMatchCount,
-            colorsWithCutQty: colorsWithCutQty,
-          };
-        }
-
-        throw bulkError;
+        batch = []; // Clear batch
       }
-    } else {
-      return {
-        success: true,
-        message: "No records to update - all are manually modified",
-        totalOrders: uniqueDocs.length,
-        skipped: modifiedOrderNos.size,
-      };
     }
+
+    // Write remaining batch
+    if (batch.length > 0) {
+      try {
+        const result = await DtOrder.bulkWrite(batch, { ordered: false });
+        totalProcessed += batch.length;
+        totalMatched += result.matchedCount;
+        totalModified += result.modifiedCount;
+        totalUpserted += result.upsertedCount;
+      } catch (batchError) {
+        console.error(`   ❌ Final batch error:`, batchError.message);
+        if (batchError.result) {
+          totalMatched += batchError.result.matchedCount || 0;
+          totalModified += batchError.result.modifiedCount || 0;
+          totalUpserted += batchError.result.upsertedCount || 0;
+        }
+        totalProcessed += batch.length;
+      }
+      batch = [];
+    }
+
+    // Clear orderMap
+    orderMap.clear();
+
+    const resultSummary = {
+      success: true,
+      totalOrders,
+      processed: totalProcessed,
+      matched: totalMatched,
+      modified: totalModified,
+      upserted: totalUpserted,
+      skipped: totalSkipped,
+      cutQtyRecords: cutQtyRecordCount,
+      cutQtyMatchCount,
+      colorsWithCutQty,
+    };
+
+    console.log("✅ DT Orders sync complete:", resultSummary);
+    return resultSummary;
   } catch (error) {
     console.error("❌ DT Orders sync failed:", error);
     throw error;
@@ -915,7 +768,7 @@ cron.schedule("0 */3 * * *", async () => {
     });
 });
 
-//Batch Processing way to fix Memory issue, didn't test
+//Old code - single loading all orders at once, it cause to memory issue
 
 // import cron from "node-cron";
 // import {
@@ -929,19 +782,16 @@ cron.schedule("0 */3 * * *", async () => {
 //    DT Orders Data Migration
 // ------------------------------ */
 
-// // Batch size for MongoDB bulkWrite
-// const BATCH_SIZE = 500;
-
 // export async function syncDTOrdersData() {
 //   try {
 //     console.log("🔄 Starting DT Orders data migration...");
 
 //     try {
-//       await ensurePoolConnected(poolFCSystem, "FCSystem");
+//       await Promise.all([ensurePoolConnected(poolFCSystem, "FCSystem")]);
 //     } catch (connErr) {
 //       console.error(
 //         "❌ Failed to establish required connections:",
-//         connErr.message
+//         connErr.message,
 //       );
 //       throw connErr;
 //     }
@@ -965,11 +815,10 @@ cron.schedule("0 */3 * * *", async () => {
 //       ORDER BY h.[Order_No]
 //     `;
 //     const orderHeaderResult = await request.query(orderHeaderQuery);
-//     console.log(`📊 Fetched ${orderHeaderResult.recordset.length} order headers`);
 
 //     // 2. Fetch Size Names
 //     const sizeNamesQuery = `
-//       SELECT DISTINCT
+//     SELECT DISTINCT
 //         [Order_No],
 //         NULLIF([Size_Seq10], '') AS Size_10_Name,
 //         NULLIF([Size_Seq20], '') AS Size_20_Name,
@@ -1011,29 +860,31 @@ cron.schedule("0 */3 * * *", async () => {
 //         NULLIF([Size_Seq380], '') AS Size_380_Name,
 //         NULLIF([Size_Seq390], '') AS Size_390_Name,
 //         NULLIF([Size_Seq400], '') AS Size_400_Name
-//       FROM [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
-//       WHERE [Order_No] IS NOT NULL
-//     `;
+//     FROM
+//         [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
+//     WHERE
+//         [Order_No] IS NOT NULL;
+//         `;
 //     const sizeNamesResult = await request.query(sizeNamesQuery);
-//     console.log(`📏 Fetched ${sizeNamesResult.recordset.length} size name records`);
 
 //     // 3. Fetch Order Colors and Shipping WITH Ship_ID
 //     const orderColorsQuery = `
 //       SELECT
-//         [Order_No], [ColorCode], [Color], [ChnColor], [Color_Seq], [ship_seq_no],
-//         [Ship_ID], [Mode], [Country], [Origin], [CustPORef],
-//         [Size_Seq10], [Size_Seq20], [Size_Seq30], [Size_Seq40], [Size_Seq50], [Size_Seq60],
-//         [Size_Seq70], [Size_Seq80], [Size_Seq90], [Size_Seq100], [Size_Seq110], [Size_Seq120],
-//         [Size_Seq130], [Size_Seq140], [Size_Seq150], [Size_Seq160], [Size_Seq170], [Size_Seq180],
-//         [Size_Seq190], [Size_Seq200], [Size_Seq210], [Size_Seq220], [Size_Seq230], [Size_Seq240],
-//         [Size_Seq250], [Size_Seq260], [Size_Seq270], [Size_Seq280], [Size_Seq290], [Size_Seq300],
-//         [Size_Seq310], [Size_Seq320], [Size_Seq330], [Size_Seq340], [Size_Seq350], [Size_Seq360],
-//         [Size_Seq370], [Size_Seq380], [Size_Seq390], [Size_Seq400]
-//       FROM [DTrade_CONN].[dbo].[vBuyerPOColQty_BySz]
-//       ORDER BY [Order_No], [ColorCode], [ship_seq_no]
+//           [Order_No], [ColorCode], [Color], [ChnColor], [Color_Seq], [ship_seq_no],
+//           [Ship_ID], [Mode], [Country], [Origin], [CustPORef],
+//           [Size_Seq10], [Size_Seq20], [Size_Seq30], [Size_Seq40], [Size_Seq50], [Size_Seq60],
+//           [Size_Seq70], [Size_Seq80], [Size_Seq90], [Size_Seq100], [Size_Seq110], [Size_Seq120],
+//           [Size_Seq130], [Size_Seq140], [Size_Seq150], [Size_Seq160], [Size_Seq170], [Size_Seq180],
+//           [Size_Seq190], [Size_Seq200], [Size_Seq210], [Size_Seq220], [Size_Seq230], [Size_Seq240],
+//           [Size_Seq250], [Size_Seq260], [Size_Seq270], [Size_Seq280], [Size_Seq290], [Size_Seq300],
+//           [Size_Seq310], [Size_Seq320], [Size_Seq330], [Size_Seq340], [Size_Seq350], [Size_Seq360],
+//           [Size_Seq370], [Size_Seq380], [Size_Seq390], [Size_Seq400]
+//       FROM
+//           [DTrade_CONN].[dbo].[vBuyerPOColQty_BySz]
+//       ORDER BY
+//           [Order_No], [ColorCode], [ship_seq_no];
 //     `;
 //     const orderColorsResult = await request.query(orderColorsQuery);
-//     console.log(`🎨 Fetched ${orderColorsResult.recordset.length} color records`);
 
 //     // 4. Fetch Size Specifications
 //     const sizeSpecQuery = `
@@ -1049,7 +900,6 @@ cron.schedule("0 */3 * * *", async () => {
 //       ORDER BY [JobNo], [Seq]
 //     `;
 //     const sizeSpecResult = await request.query(sizeSpecQuery);
-//     console.log(`📐 Fetched ${sizeSpecResult.recordset.length} spec records`);
 
 //     // 5. Fetch Cut Quantity data from FC_SYSTEM
 //     const cutQtyQuery = `
@@ -1067,59 +917,143 @@ cron.schedule("0 */3 * * *", async () => {
 //       ORDER BY [StyleNo], [ColorCode], [SIZE]
 //     `;
 //     const cutQtyResult = await request.query(cutQtyQuery);
-//     console.log(`✂️ Fetched ${cutQtyResult.recordset.length} cut qty records`);
 
-//     // ---- SIZE COLUMNS CONSTANT (reused everywhere) ----
-//     const SIZE_COLUMNS = [
-//       "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
-//       "110", "120", "130", "140", "150", "160", "170", "180", "190", "200",
-//       "210", "220", "230", "240", "250", "260", "270", "280", "290", "300",
-//       "310", "320", "330", "340", "350", "360", "370", "380", "390", "400",
-//     ];
-
-//     // ---- Build size mapping ----
+//     // Create size mapping from database for each order
 //     const orderSizeMapping = new Map();
 //     sizeNamesResult.recordset.forEach((sizeRecord) => {
 //       const orderNo = sizeRecord.Order_No;
 //       const sizeMapping = {};
-//       SIZE_COLUMNS.forEach((seq) => {
+
+//       const sizeColumns = [
+//         "10",
+//         "20",
+//         "30",
+//         "40",
+//         "50",
+//         "60",
+//         "70",
+//         "80",
+//         "90",
+//         "100",
+//         "110",
+//         "120",
+//         "130",
+//         "140",
+//         "150",
+//         "160",
+//         "170",
+//         "180",
+//         "190",
+//         "200",
+//         "210",
+//         "220",
+//         "230",
+//         "240",
+//         "250",
+//         "260",
+//         "270",
+//         "280",
+//         "290",
+//         "300",
+//         "310",
+//         "320",
+//         "330",
+//         "340",
+//         "350",
+//         "360",
+//         "370",
+//         "380",
+//         "390",
+//         "400",
+//       ];
+//       sizeColumns.forEach((seq) => {
 //         const sizeNameColumn = `Size_${seq}_Name`;
-//         if (sizeRecord[sizeNameColumn] != null) {
+//         if (sizeRecord[sizeNameColumn] && sizeRecord[sizeNameColumn] !== null) {
 //           sizeMapping[seq] = sizeRecord[sizeNameColumn].toString();
 //         }
 //       });
 //       orderSizeMapping.set(orderNo, sizeMapping);
 //     });
-//     // Free memory - no longer needed
-//     sizeNamesResult.recordset.length = 0;
 
-//     // ---- Build cut quantity mapping ----
+//     // Process Cut Quantity data and create mapping
 //     const cutQtyMapping = new Map();
 //     cutQtyResult.recordset.forEach((record) => {
-//       const key = `${record.StyleNo}_${record.ColorCode}`;
+//       const styleNo = record.StyleNo;
+//       const colorCode = record.ColorCode;
+//       const size = record.SIZE;
+//       const planQty = Number(record.TotalPlanQty) || 0;
+//       const cutQty = Number(record.TotalCutQty) || 0;
+
+//       const key = `${styleNo}_${colorCode}`;
+
 //       if (!cutQtyMapping.has(key)) {
 //         cutQtyMapping.set(key, {});
 //       }
-//       cutQtyMapping.get(key)[record.SIZE] = {
-//         PlanCutQty: Number(record.TotalPlanQty) || 0,
-//         ActualCutQty: Number(record.TotalCutQty) || 0,
+
+//       const colorCutData = cutQtyMapping.get(key);
+//       colorCutData[size] = {
+//         PlanCutQty: planQty,
+//         ActualCutQty: cutQty,
 //       };
 //     });
-//     const cutQtyRecordCount = cutQtyResult.recordset.length;
-//     // Free memory
-//     cutQtyResult.recordset.length = 0;
 
 //     // ---- Helper Functions ----
 
 //     function extractSizeDataAsObject(record, prefix = "Size_Seq", orderNo) {
 //       const sizeMapping = orderSizeMapping.get(orderNo) || {};
 //       const sizeObject = {};
-//       SIZE_COLUMNS.forEach((seq) => {
-//         const quantity = record[`${prefix}${seq}`];
-//         if (quantity === null || quantity === undefined || quantity === 0) {
+
+//       const allSizeColumns = [
+//         "10",
+//         "20",
+//         "30",
+//         "40",
+//         "50",
+//         "60",
+//         "70",
+//         "80",
+//         "90",
+//         "100",
+//         "110",
+//         "120",
+//         "130",
+//         "140",
+//         "150",
+//         "160",
+//         "170",
+//         "180",
+//         "190",
+//         "200",
+//         "210",
+//         "220",
+//         "230",
+//         "240",
+//         "250",
+//         "260",
+//         "270",
+//         "280",
+//         "290",
+//         "300",
+//         "310",
+//         "320",
+//         "330",
+//         "340",
+//         "350",
+//         "360",
+//         "370",
+//         "380",
+//         "390",
+//         "400",
+//       ];
+//       allSizeColumns.forEach((seq) => {
+//         const columnName = `${prefix}${seq}`;
+//         const quantity = record[columnName];
+
+//         if (quantity === null || quantity === undefined) {
 //           return;
 //         }
 //         const sizeName = sizeMapping[seq] || `Size${seq}`;
+
 //         if (sizeName) {
 //           sizeObject[sizeName] = Number(quantity);
 //         }
@@ -1130,49 +1064,120 @@ cron.schedule("0 */3 * * *", async () => {
 //     function getOrderedSizeList(orderNo) {
 //       const sizeMapping = orderSizeMapping.get(orderNo) || {};
 //       const sizeList = [];
-//       SIZE_COLUMNS.forEach((seq) => {
+
+//       const sizeSeqs = [
+//         "10",
+//         "20",
+//         "30",
+//         "40",
+//         "50",
+//         "60",
+//         "70",
+//         "80",
+//         "90",
+//         "100",
+//         "110",
+//         "120",
+//         "130",
+//         "140",
+//         "150",
+//         "160",
+//         "170",
+//         "180",
+//         "190",
+//         "200",
+//         "210",
+//         "220",
+//         "230",
+//         "240",
+//         "250",
+//         "260",
+//         "270",
+//         "280",
+//         "290",
+//         "300",
+//         "310",
+//         "320",
+//         "330",
+//         "340",
+//         "350",
+//         "360",
+//         "370",
+//         "380",
+//         "390",
+//         "400",
+//       ];
+
+//       sizeSeqs.forEach((seq) => {
 //         const val = sizeMapping[seq];
-//         if (val && val !== "") {
+//         if (val && val !== null && val !== "") {
 //           sizeList.push(val);
 //         }
 //       });
+
 //       return sizeList;
 //     }
 
 //     function convertSizeObjectToArray(sizeObject, orderNo) {
 //       const sizeMapping = orderSizeMapping.get(orderNo) || {};
+
 //       const sizeToSeqMapping = {};
 //       Object.entries(sizeMapping).forEach(([seq, sizeName]) => {
 //         sizeToSeqMapping[sizeName] = parseInt(seq);
 //       });
+
 //       return Object.entries(sizeObject)
-//         .sort(([a], [b]) => (sizeToSeqMapping[a] || 999) - (sizeToSeqMapping[b] || 999))
-//         .map(([sizeName, qty]) => ({ [sizeName]: qty }));
+//         .sort(([sizeNameA], [sizeNameB]) => {
+//           const seqA = sizeToSeqMapping[sizeNameA] || 999;
+//           const seqB = sizeToSeqMapping[sizeNameB] || 999;
+//           return seqA - seqB;
+//         })
+//         .map(([sizeName, qty]) => {
+//           const obj = {};
+//           obj[sizeName] = qty;
+//           return obj;
+//         });
 //     }
 
 //     function parseToleranceValue(toleranceStr) {
 //       if (!toleranceStr) return { fraction: "", decimal: 0 };
+
 //       let str = toleranceStr.toString().trim();
 //       let decimal = 0;
+
 //       str = str.replace(/['"]/g, "").trim();
 //       str = str.replace(/[⁄∕／]/g, "/");
+
 //       let isNegative = false;
 //       if (str.startsWith("-")) {
 //         isNegative = true;
 //         str = str.substring(1);
 //       }
+
 //       try {
-//         const mixedMatch = str.match(/^(\d+(?:\.\d+)?)\s*[-\s　]\s*(\d+)\s*\/\s*(\d+)$/);
+//         const mixedNumberPattern =
+//           /^(\d+(?:\.\d+)?)\s*[-\s　]\s*(\d+)\s*\/\s*(\d+)$/;
+//         const mixedMatch = str.match(mixedNumberPattern);
+
 //         if (mixedMatch) {
-//           decimal = (parseFloat(mixedMatch[1]) || 0) + (parseFloat(mixedMatch[2]) || 0) / (parseFloat(mixedMatch[3]) || 1);
+//           const wholePart = parseFloat(mixedMatch[1]) || 0;
+//           const numerator = parseFloat(mixedMatch[2]) || 0;
+//           const denominator = parseFloat(mixedMatch[3]) || 1;
+//           decimal = wholePart + numerator / denominator;
 //         } else if (str.includes("/")) {
-//           const fractionMatch = str.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+//           const fractionPattern = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/;
+//           const fractionMatch = str.match(fractionPattern);
+
 //           if (fractionMatch) {
-//             decimal = (parseFloat(fractionMatch[1]) || 0) / (parseFloat(fractionMatch[2]) || 1);
+//             const numerator = parseFloat(fractionMatch[1]) || 0;
+//             const denominator = parseFloat(fractionMatch[2]) || 1;
+//             decimal = numerator / denominator;
 //           } else {
 //             const parts = str.split("/");
 //             if (parts.length === 2) {
-//               decimal = (parseFloat(parts[0].trim()) || 0) / (parseFloat(parts[1].trim()) || 1);
+//               const numerator = parseFloat(parts[0].trim()) || 0;
+//               const denominator = parseFloat(parts[1].trim()) || 1;
+//               decimal = numerator / denominator;
 //             } else {
 //               decimal = parseFloat(str) || 0;
 //             }
@@ -1180,66 +1185,128 @@ cron.schedule("0 */3 * * *", async () => {
 //         } else {
 //           decimal = parseFloat(str) || 0;
 //         }
-//         if (isNegative) decimal = -decimal;
+
+//         if (isNegative) {
+//           decimal = -decimal;
+//         }
 //       } catch (error) {
+//         console.error(
+//           `Error parsing tolerance value "${toleranceStr}":`,
+//           error,
+//         );
 //         const numbers = str.match(/\d+(?:\.\d+)?/g);
-//         decimal = numbers && numbers.length >= 1 ? parseFloat(numbers[0]) || 0 : 0;
+//         if (numbers && numbers.length >= 1) {
+//           decimal = parseFloat(numbers[0]) || 0;
+//         } else {
+//           decimal = 0;
+//         }
 //       }
-//       if (isNaN(decimal)) decimal = 0;
-//       return { fraction: toleranceStr.toString(), decimal: Math.round(decimal * 10000) / 10000 };
+
+//       if (isNaN(decimal)) {
+//         decimal = 0;
+//       }
+
+//       return {
+//         fraction: toleranceStr.toString(),
+//         decimal: Math.round(decimal * 10000) / 10000,
+//       };
 //     }
 
 //     function extractSpecsDataAsArray(record, orderNo) {
 //       const sizeMapping = orderSizeMapping.get(orderNo) || {};
 //       const specsArray = [];
+
 //       for (let i = 1; i <= 40; i++) {
 //         const sizeColumn = `Size${i}`;
-//         if (record[sizeColumn] != null) {
+//         if (record[sizeColumn] && record[sizeColumn] !== null) {
 //           const value = record[sizeColumn].toString().trim();
-//           if (!value) continue;
 //           const seqNumber = (i * 10).toString();
 //           const sizeName = sizeMapping[seqNumber] || `Size${i}`;
+
 //           let decimal = 0;
 //           try {
 //             let cleanValue = value.replace(/[⁄∕／]/g, "/");
-//             const mixedMatch = cleanValue.match(/^(\d+(?:\.\d+)?)\s*[-\s　]\s*(\d+)\s*\/\s*(\d+)$/);
+
+//             const mixedNumberPattern =
+//               /^(\d+(?:\.\d+)?)\s*[-\s　]\s*(\d+)\s*\/\s*(\d+)$/;
+//             const mixedMatch = cleanValue.match(mixedNumberPattern);
+
 //             if (mixedMatch) {
-//               decimal = (parseFloat(mixedMatch[1]) || 0) + (parseFloat(mixedMatch[2]) || 0) / (parseFloat(mixedMatch[3]) || 1);
+//               const wholePart = parseFloat(mixedMatch[1]) || 0;
+//               const numerator = parseFloat(mixedMatch[2]) || 0;
+//               const denominator = parseFloat(mixedMatch[3]) || 1;
+//               decimal = wholePart + numerator / denominator;
 //             } else if (cleanValue.includes("/")) {
-//               const fractionMatch = cleanValue.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+//               const fractionPattern =
+//                 /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/;
+//               const fractionMatch = cleanValue.match(fractionPattern);
+
 //               if (fractionMatch) {
-//                 decimal = (parseFloat(fractionMatch[1]) || 0) / (parseFloat(fractionMatch[2]) || 1);
+//                 const numerator = parseFloat(fractionMatch[1]) || 0;
+//                 const denominator = parseFloat(fractionMatch[2]) || 1;
+//                 decimal = numerator / denominator;
 //               } else {
 //                 const parts = cleanValue.split("/");
-//                 decimal = parts.length === 2 ? (parseFloat(parts[0].trim()) || 0) / (parseFloat(parts[1].trim()) || 1) : parseFloat(cleanValue) || 0;
+//                 if (parts.length === 2) {
+//                   const numerator = parseFloat(parts[0].trim()) || 0;
+//                   const denominator = parseFloat(parts[1].trim()) || 1;
+//                   decimal = numerator / denominator;
+//                 } else {
+//                   decimal = parseFloat(cleanValue) || 0;
+//                 }
 //               }
 //             } else {
 //               decimal = parseFloat(cleanValue) || 0;
 //             }
 //           } catch (error) {
+//             console.error(`Error parsing spec value "${value}":`, error);
 //             const numbers = value.match(/\d+(?:\.\d+)?/g);
-//             decimal = numbers && numbers.length >= 1 ? parseFloat(numbers[0]) || 0 : 0;
+//             if (numbers && numbers.length >= 1) {
+//               decimal = parseFloat(numbers[0]) || 0;
+//             } else {
+//               decimal = 0;
+//             }
 //           }
-//           if (isNaN(decimal)) decimal = 0;
-//           specsArray.push({ [sizeName]: { fraction: value, decimal: Math.round(decimal * 10000) / 10000 } });
+
+//           if (isNaN(decimal)) {
+//             decimal = 0;
+//           }
+
+//           const specObject = {};
+//           specObject[sizeName] = {
+//             fraction: value,
+//             decimal: Math.round(decimal * 10000) / 10000,
+//           };
+//           specsArray.push(specObject);
 //         }
 //       }
 //       return specsArray;
 //     }
 
 //     function isEmptyOrContainsNumbers(value) {
-//       if (!value || value === "") return true;
+//       if (!value || value === null || value === undefined || value === "") {
+//         return true;
+//       }
+
 //       const str = value.toString().trim();
-//       return str === "" || /^\d+$/.test(str);
+//       if (str === "") {
+//         return true;
+//       }
+
+//       return /^\d+$/.test(str);
 //     }
 
 //     function convertEmptyToNull(value) {
-//       if (!value || value === "") return null;
+//       if (!value || value === null || value === undefined || value === "") {
+//         return null;
+//       }
+
 //       const str = value.toString().trim();
 //       return str === "" ? null : str;
 //     }
 
 //     // ---- Process Data ----
+
 //     const orderMap = new Map();
 
 //     // 1. Process Order Headers
@@ -1247,6 +1314,9 @@ cron.schedule("0 */3 * * *", async () => {
 //       const orderNo = header.Order_No;
 //       if (!orderMap.has(orderNo)) {
 //         const sizeData = extractSizeDataAsObject(header, "Size_Seq", orderNo);
+
+//         const orderedSizeList = getOrderedSizeList(orderNo);
+
 //         orderMap.set(orderNo, {
 //           SC_Heading: convertEmptyToNull(header.SC_Heading),
 //           Factory: convertEmptyToNull(header.Factory),
@@ -1260,211 +1330,215 @@ cron.schedule("0 */3 * * *", async () => {
 //           CustStyle: convertEmptyToNull(header.CustStyle),
 //           TotalQty: Number(header.OrderQuantity) || 0,
 //           NoOfSize: Object.keys(sizeData).length,
-//           SizeList: getOrderedSizeList(orderNo),
+//           SizeList: orderedSizeList,
 //           OrderColors: [],
 //           OrderColorShip: [],
 //           SizeSpec: [],
 //         });
 //       }
 //     });
-//     // Free memory
-//     orderHeaderResult.recordset.length = 0;
-//     console.log(`📦 Processed ${orderMap.size} unique orders`);
 
 //     // 2. Process Order Colors and Shipping
-//     // *** FIX: Group by orderNo FIRST to avoid O(n*m) nested loop later ***
-//     const colorsByOrder = new Map();   // orderNo -> Map(colorKey -> colorSummary)
-//     const shipsByOrder = new Map();    // orderNo -> Map(shipKey -> shipData)
-
+//     const colorSummaryMap = new Map();
+//     const shipMap = new Map();
 //     orderColorsResult.recordset.forEach((record) => {
 //       const orderNo = record.Order_No;
 //       const colorCode = record.ColorCode;
 //       const shipSeqNo = record.ship_seq_no;
 //       const shipId = record.Ship_ID;
 
-//       if (!orderMap.has(orderNo)) return;
+//       if (orderMap.has(orderNo)) {
+//         const order = orderMap.get(orderNo);
 
-//       const order = orderMap.get(orderNo);
-//       order.Mode = convertEmptyToNull(record.Mode);
-//       order.Country = convertEmptyToNull(record.Country);
-//       order.Origin = convertEmptyToNull(record.Origin);
-//       order.CustPORef = convertEmptyToNull(record.CustPORef);
+//         order.Mode = convertEmptyToNull(record.Mode);
+//         order.Country = convertEmptyToNull(record.Country);
+//         order.Origin = convertEmptyToNull(record.Origin);
+//         order.CustPORef = convertEmptyToNull(record.CustPORef);
 
-//       // --- Color Summary (grouped by order) ---
-//       if (!colorsByOrder.has(orderNo)) {
-//         colorsByOrder.set(orderNo, new Map());
-//       }
-//       const orderColors = colorsByOrder.get(orderNo);
+//         // Sum quantities for OrderColors
+//         const colorKey = `${orderNo}_${colorCode}`;
+//         if (!colorSummaryMap.has(colorKey)) {
+//           colorSummaryMap.set(colorKey, {
+//             ColorCode: record.ColorCode,
+//             Color: record.Color,
+//             ChnColor: record.ChnColor,
+//             ColorKey: Number(record.Color_Seq) || 0,
+//             sizeTotals: {},
+//           });
+//         }
 
-//       if (!orderColors.has(colorCode)) {
-//         orderColors.set(colorCode, {
-//           ColorCode: record.ColorCode,
-//           Color: record.Color,
-//           ChnColor: record.ChnColor,
-//           ColorKey: Number(record.Color_Seq) || 0,
-//           sizeTotals: {},
+//         const colorSummary = colorSummaryMap.get(colorKey);
+//         const sizes = extractSizeDataAsObject(record, "Size_Seq", orderNo);
+
+//         Object.entries(sizes).forEach(([sizeName, qty]) => {
+//           if (!colorSummary.sizeTotals[sizeName]) {
+//             colorSummary.sizeTotals[sizeName] = 0;
+//           }
+//           colorSummary.sizeTotals[sizeName] += qty;
 //         });
-//       }
 
-//       const colorSummary = orderColors.get(colorCode);
-//       const sizes = extractSizeDataAsObject(record, "Size_Seq", orderNo);
-//       Object.entries(sizes).forEach(([sizeName, qty]) => {
-//         colorSummary.sizeTotals[sizeName] = (colorSummary.sizeTotals[sizeName] || 0) + qty;
-//       });
+//         // Process OrderColorShip WITH Ship_ID
+//         const shipKey = `${orderNo}_${colorCode}`;
+//         if (!shipMap.has(shipKey)) {
+//           shipMap.set(shipKey, {
+//             ColorCode: record.ColorCode,
+//             Color: record.Color,
+//             ChnColor: record.ChnColor,
+//             ColorKey: Number(record.Color_Seq) || 0,
+//             ShipSeqNo: [],
+//           });
+//         }
 
-//       // --- Ship Data (grouped by order) ---
-//       if (!shipsByOrder.has(orderNo)) {
-//         shipsByOrder.set(orderNo, new Map());
-//       }
-//       const orderShips = shipsByOrder.get(orderNo);
+//         const shipRecord = shipMap.get(shipKey);
+//         const existingSeq = shipRecord.ShipSeqNo.find(
+//           (seq) => seq.seqNo === shipSeqNo,
+//         );
+//         if (!existingSeq && shipSeqNo) {
+//           const sizesArray = convertSizeObjectToArray(sizes, orderNo);
 
-//       if (!orderShips.has(colorCode)) {
-//         orderShips.set(colorCode, {
-//           ColorCode: record.ColorCode,
-//           Color: record.Color,
-//           ChnColor: record.ChnColor,
-//           ColorKey: Number(record.Color_Seq) || 0,
-//           ShipSeqNo: [],
-//         });
-//       }
-
-//       const shipRecord = orderShips.get(colorCode);
-//       const existingSeq = shipRecord.ShipSeqNo.find((seq) => seq.seqNo === shipSeqNo);
-//       if (!existingSeq && shipSeqNo) {
-//         shipRecord.ShipSeqNo.push({
-//           seqNo: Number(shipSeqNo),
-//           Ship_ID: convertEmptyToNull(shipId),
-//           sizes: convertSizeObjectToArray(sizes, orderNo),
-//         });
+//           shipRecord.ShipSeqNo.push({
+//             seqNo: Number(shipSeqNo),
+//             Ship_ID: convertEmptyToNull(shipId),
+//             sizes: sizesArray,
+//           });
+//         }
 //       }
 //     });
-//     // Free memory
-//     orderColorsResult.recordset.length = 0;
 
-//     // *** FIX: Now attach colors and ships to orders - O(n) instead of O(n*m) ***
+//     // Convert color summaries to the desired format
+//     const colorMap = new Map();
+//     for (const [colorKey, colorSummary] of colorSummaryMap) {
+//       const orderNo = colorKey.split("_")[0];
+//       const orderQtyArray = convertSizeObjectToArray(
+//         colorSummary.sizeTotals,
+//         orderNo,
+//       );
+
+//       colorMap.set(colorKey, {
+//         ColorCode: colorSummary.ColorCode,
+//         Color: colorSummary.Color,
+//         ChnColor: colorSummary.ChnColor,
+//         ColorKey: colorSummary.ColorKey,
+//         OrderQty: orderQtyArray,
+//         CutQty: {},
+//       });
+//     }
+
+//     // Add cut quantity data to colors
 //     let cutQtyMatchCount = 0;
-//     let colorsWithCutQty = 0;
+//     let totalColorProcessed = 0;
 
 //     for (const [orderNo, order] of orderMap) {
-//       // Attach OrderColors
-//       const orderColors = colorsByOrder.get(orderNo);
-//       if (orderColors) {
-//         for (const [colorCode, colorSummary] of orderColors) {
-//           const orderQtyArray = convertSizeObjectToArray(colorSummary.sizeTotals, orderNo);
+//       for (const [colorKey, colorData] of colorMap) {
+//         if (colorKey.startsWith(orderNo + "_")) {
+//           totalColorProcessed++;
+//           const colorCode = colorData.ColorCode;
 
-//           const colorData = {
-//             ColorCode: colorSummary.ColorCode,
-//             Color: colorSummary.Color,
-//             ChnColor: colorSummary.ChnColor,
-//             ColorKey: colorSummary.ColorKey,
-//             OrderQty: orderQtyArray,
-//             CutQty: {},
-//           };
-
-//           // Add cut quantity
 //           const cutKey = `${orderNo}_${colorCode}`;
+
 //           if (cutQtyMapping.has(cutKey)) {
 //             const cutData = cutQtyMapping.get(cutKey);
+
+//             colorData.CutQty = {};
+
 //             Object.entries(cutData).forEach(([size, quantities]) => {
 //               colorData.CutQty[size] = {
 //                 ActualCutQty: quantities.ActualCutQty,
 //                 PlanCutQty: quantities.PlanCutQty,
 //               };
 //             });
-//             cutQtyMatchCount++;
-//             colorsWithCutQty++;
-//           }
 
+//             cutQtyMatchCount++;
+//           }
+//         }
+//       }
+//     }
+
+//     // Verify CutQty data
+//     let colorsWithCutQty = 0;
+//     for (const [colorKey, colorData] of colorMap) {
+//       if (Object.keys(colorData.CutQty).length > 0) {
+//         colorsWithCutQty++;
+//       }
+//     }
+
+//     // Add colors and shipping to orders
+//     for (const [orderNo, order] of orderMap) {
+//       for (const [colorKey, colorData] of colorMap) {
+//         if (colorKey.startsWith(orderNo + "_")) {
 //           order.OrderColors.push(colorData);
 //         }
 //       }
 
-//       // Attach OrderColorShip
-//       const orderShips = shipsByOrder.get(orderNo);
-//       if (orderShips) {
-//         for (const [, shipData] of orderShips) {
+//       for (const [shipKey, shipData] of shipMap) {
+//         if (shipKey.startsWith(orderNo + "_")) {
 //           order.OrderColorShip.push(shipData);
 //         }
 //       }
 //     }
-//     // Free memory
-//     colorsByOrder.clear();
-//     shipsByOrder.clear();
-//     cutQtyMapping.clear();
 
 //     // 3. Process Size Specifications
 //     sizeSpecResult.recordset.forEach((spec) => {
 //       const jobNo = spec.JobNo;
-//       if (!orderMap.has(jobNo)) return;
 
-//       const order = orderMap.get(jobNo);
-//       try {
-//         const toleranceMinus = parseToleranceValue(spec.Tolerance);
-//         const tolerancePlus = parseToleranceValue(spec.Tolerance2);
-//         const specs = extractSpecsDataAsArray(spec, jobNo);
+//       if (orderMap.has(jobNo)) {
+//         const order = orderMap.get(jobNo);
 
-//         const chineseArea = convertEmptyToNull(spec.ChineseArea);
-//         const chineseRemark = convertEmptyToNull(spec.ChineseRemark);
-//         let chineseName = null;
-//         if (isEmptyOrContainsNumbers(spec.ChineseArea)) {
-//           chineseName = chineseRemark;
-//         } else if (isEmptyOrContainsNumbers(spec.ChineseRemark)) {
-//           chineseName = chineseArea;
-//         } else {
-//           chineseName = chineseArea;
+//         try {
+//           const toleranceMinus = parseToleranceValue(spec.Tolerance);
+//           const tolerancePlus = parseToleranceValue(spec.Tolerance2);
+//           const specs = extractSpecsDataAsArray(spec, jobNo);
+
+//           const chineseArea = convertEmptyToNull(spec.ChineseArea);
+//           const chineseRemark = convertEmptyToNull(spec.ChineseRemark);
+//           let chineseName = null;
+
+//           if (isEmptyOrContainsNumbers(spec.ChineseArea)) {
+//             chineseName = chineseRemark;
+//           } else if (isEmptyOrContainsNumbers(spec.ChineseRemark)) {
+//             chineseName = chineseArea;
+//           } else {
+//             chineseName = chineseArea;
+//           }
+
+//           const sizeSpecData = {
+//             Seq: Number(spec.Seq) || 0,
+//             AtoZ: convertEmptyToNull(spec.AtoZ),
+//             Area: convertEmptyToNull(spec.Area),
+//             ChineseArea: chineseArea,
+//             EnglishRemark: convertEmptyToNull(spec.EnglishRemark),
+//             ChineseRemark: chineseRemark,
+//             ChineseName: chineseName,
+//             AreaCode: convertEmptyToNull(spec.AreaCode),
+//             IsMiddleCalc: spec.IsMiddleCalc || null,
+//             ToleranceMinus: {
+//               fraction: toleranceMinus.fraction || "",
+//               decimal: toleranceMinus.decimal,
+//             },
+//             TolerancePlus: {
+//               fraction: tolerancePlus.fraction || "",
+//               decimal: tolerancePlus.decimal,
+//             },
+//             SpecMemo: convertEmptyToNull(spec.SpecMemo),
+//             SizeSpecMeasUnit: convertEmptyToNull(spec.SizeSpecMeasUnit),
+//             Specs: specs || [],
+//           };
+
+//           order.SizeSpec.push(sizeSpecData);
+//         } catch (error) {
+//           console.error(
+//             `Error processing spec for job ${jobNo}, seq ${spec.Seq}:`,
+//             error.message,
+//           );
 //         }
-
-//         order.SizeSpec.push({
-//           Seq: Number(spec.Seq) || 0,
-//           AtoZ: convertEmptyToNull(spec.AtoZ),
-//           Area: convertEmptyToNull(spec.Area),
-//           ChineseArea: chineseArea,
-//           EnglishRemark: convertEmptyToNull(spec.EnglishRemark),
-//           ChineseRemark: chineseRemark,
-//           ChineseName: chineseName,
-//           AreaCode: convertEmptyToNull(spec.AreaCode),
-//           IsMiddleCalc: spec.IsMiddleCalc || null,
-//           ToleranceMinus: { fraction: toleranceMinus.fraction || "", decimal: toleranceMinus.decimal },
-//           TolerancePlus: { fraction: tolerancePlus.fraction || "", decimal: tolerancePlus.decimal },
-//           SpecMemo: convertEmptyToNull(spec.SpecMemo),
-//           SizeSpecMeasUnit: convertEmptyToNull(spec.SizeSpecMeasUnit),
-//           Specs: specs || [],
-//         });
-//       } catch (error) {
-//         console.error(`Error processing spec for job ${jobNo}, seq ${spec.Seq}:`, error.message);
 //       }
 //     });
-//     // Free memory
-//     sizeSpecResult.recordset.length = 0;
 
-//     // 4. Save to MongoDB IN BATCHES
-//     console.log("💾 Saving to MongoDB in batches...");
+//     // 4. Save to MongoDB
+//     console.log("💾 Saving to MongoDB...");
+//     const finalDocs = Array.from(orderMap.values());
 
-//     // Get modified orders first
-//     const modifiedOrders = await DtOrder.find({ isModify: true }).select("Order_No").lean();
-//     const modifiedOrderNos = new Set(modifiedOrders.map((order) => order.Order_No));
-//     console.log(`📋 Found ${modifiedOrderNos.size} orders with isModify: true`);
-
-//     let totalProcessed = 0;
-//     let totalMatched = 0;
-//     let totalModified = 0;
-//     let totalUpserted = 0;
-//     let totalSkipped = 0;
-//     let totalOrders = 0;
-
-//     // *** FIX: Process directly from orderMap in batches - no intermediate arrays ***
-//     let batch = [];
-
-//     for (const [orderNo, doc] of orderMap) {
-//       totalOrders++;
-
-//       // Skip modified orders
-//       if (modifiedOrderNos.has(orderNo)) {
-//         totalSkipped++;
-//         continue;
-//       }
-
-//       // Filter SizeSpec
+//     const cleanedDocs = finalDocs.map((doc) => {
 //       if (doc.SizeSpec) {
 //         doc.SizeSpec = doc.SizeSpec.filter((spec) => {
 //           return (
@@ -1476,80 +1550,107 @@ cron.schedule("0 */3 * * *", async () => {
 //         });
 //       }
 
-//       // Remove isModify related fields
-//       delete doc.isModify;
-//       delete doc.modifiedAt;
-//       delete doc.modifiedBy;
-//       delete doc.modificationHistory;
+//       const {
+//         isModify,
+//         modifiedAt,
+//         modifiedBy,
+//         modificationHistory,
+//         ...cleanDoc
+//       } = doc;
+//       return cleanDoc;
+//     });
 
-//       batch.push({
-//         updateOne: {
-//           filter: { Order_No: orderNo },
-//           update: { $set: doc },
-//           upsert: true,
-//         },
-//       });
-
-//       // Write batch when it reaches BATCH_SIZE
-//       if (batch.length >= BATCH_SIZE) {
-//         try {
-//           const result = await DtOrder.bulkWrite(batch, { ordered: false });
-//           totalProcessed += batch.length;
-//           totalMatched += result.matchedCount;
-//           totalModified += result.modifiedCount;
-//           totalUpserted += result.upsertedCount;
-//           console.log(`   ✅ Batch saved: ${totalProcessed} orders processed so far...`);
-//         } catch (batchError) {
-//           console.error(`   ❌ Batch error:`, batchError.message);
-//           if (batchError.result) {
-//             totalMatched += batchError.result.matchedCount || 0;
-//             totalModified += batchError.result.modifiedCount || 0;
-//             totalUpserted += batchError.result.upsertedCount || 0;
-//           }
-//           totalProcessed += batch.length;
-//         }
-//         batch = []; // Clear batch
+//     const uniqueDocs = cleanedDocs.reduce((acc, doc) => {
+//       const existingIndex = acc.findIndex(
+//         (existing) => existing.Order_No === doc.Order_No,
+//       );
+//       if (existingIndex === -1) {
+//         acc.push(doc);
 //       }
-//     }
+//       return acc;
+//     }, []);
 
-//     // Write remaining batch
-//     if (batch.length > 0) {
+//     // Get list of orders with isModify: true first
+//     const modifiedOrders = await DtOrder.find({ isModify: true }).select(
+//       "Order_No",
+//     );
+//     const modifiedOrderNos = new Set(
+//       modifiedOrders.map((order) => order.Order_No),
+//     );
+
+//     console.log(`📋 Found ${modifiedOrderNos.size} orders with isModify: true`);
+
+//     const ordersToUpdate = uniqueDocs.filter(
+//       (doc) => !modifiedOrderNos.has(doc.Order_No),
+//     );
+
+//     console.log(
+//       `📊 Orders to update: ${ordersToUpdate.length} out of ${uniqueDocs.length}`,
+//     );
+//     console.log(
+//       `📊 Orders to skip (manually modified): ${modifiedOrderNos.size}`,
+//     );
+
+//     const bulkOps = ordersToUpdate.map((doc) => ({
+//       updateOne: {
+//         filter: { Order_No: doc.Order_No },
+//         update: { $set: doc },
+//         upsert: true,
+//       },
+//     }));
+
+//     if (bulkOps.length > 0) {
 //       try {
-//         const result = await DtOrder.bulkWrite(batch, { ordered: false });
-//         totalProcessed += batch.length;
-//         totalMatched += result.matchedCount;
-//         totalModified += result.modifiedCount;
-//         totalUpserted += result.upsertedCount;
-//       } catch (batchError) {
-//         console.error(`   ❌ Final batch error:`, batchError.message);
-//         if (batchError.result) {
-//           totalMatched += batchError.result.matchedCount || 0;
-//           totalModified += batchError.result.modifiedCount || 0;
-//           totalUpserted += batchError.result.upsertedCount || 0;
+//         const result = await DtOrder.bulkWrite(bulkOps, { ordered: false });
+
+//         return {
+//           success: true,
+//           totalOrders: uniqueDocs.length,
+//           processed: ordersToUpdate.length,
+//           matched: result.matchedCount,
+//           modified: result.modifiedCount,
+//           upserted: result.upsertedCount,
+//           skipped: modifiedOrderNos.size,
+//           cutQtyRecords: cutQtyResult.recordset.length,
+//           cutQtyMatchCount: cutQtyMatchCount,
+//           colorsWithCutQty: colorsWithCutQty,
+//         };
+//       } catch (bulkError) {
+//         console.error("❌ Bulk operation failed:", bulkError);
+
+//         if (bulkError.writeErrors) {
+//           bulkError.writeErrors.forEach((error, index) => {
+//             console.log(`   Error ${index + 1}: ${error.errmsg}`);
+//           });
 //         }
-//         totalProcessed += batch.length;
+
+//         if (bulkError.result) {
+//           return {
+//             success: false,
+//             partialSuccess: true,
+//             totalOrders: uniqueDocs.length,
+//             processed: ordersToUpdate.length,
+//             matched: bulkError.result.matchedCount,
+//             modified: bulkError.result.modifiedCount,
+//             upserted: bulkError.result.upsertedCount,
+//             skipped: modifiedOrderNos.size,
+//             errors: bulkError.writeErrors?.length || 0,
+//             cutQtyRecords: cutQtyResult.recordset.length,
+//             cutQtyMatchCount: cutQtyMatchCount,
+//             colorsWithCutQty: colorsWithCutQty,
+//           };
+//         }
+
+//         throw bulkError;
 //       }
-//       batch = [];
+//     } else {
+//       return {
+//         success: true,
+//         message: "No records to update - all are manually modified",
+//         totalOrders: uniqueDocs.length,
+//         skipped: modifiedOrderNos.size,
+//       };
 //     }
-
-//     // Clear orderMap
-//     orderMap.clear();
-
-//     const resultSummary = {
-//       success: true,
-//       totalOrders,
-//       processed: totalProcessed,
-//       matched: totalMatched,
-//       modified: totalModified,
-//       upserted: totalUpserted,
-//       skipped: totalSkipped,
-//       cutQtyRecords: cutQtyRecordCount,
-//       cutQtyMatchCount,
-//       colorsWithCutQty,
-//     };
-
-//     console.log("✅ DT Orders sync complete:", resultSummary);
-//     return resultSummary;
 //   } catch (error) {
 //     console.error("❌ DT Orders sync failed:", error);
 //     throw error;
