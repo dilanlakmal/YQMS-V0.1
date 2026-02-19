@@ -1,5 +1,7 @@
-import { app } from "./Config/appConfig.js";
+import dotenv from "dotenv";
+dotenv.config(); 
 
+import { app } from "./Config/appConfig.js";
 /* -----------------------------
    SQL Query Import
 ------------------------------ */

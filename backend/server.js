@@ -329,6 +329,7 @@ import Feedback from "./routes/Feedback/FeedbackRoutes.js";
 ------------------------------ */
 // import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
 // import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+// import { closeSQLPools } from "./controller/SQL/sqlConnectionManager.js";
 /* ------------------------------
   SQL Query routs
 ------------------------------ */

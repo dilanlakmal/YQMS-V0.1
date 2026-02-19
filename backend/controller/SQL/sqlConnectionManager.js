@@ -1,12 +1,12 @@
 import sql from "mssql";
 import {
-  // sqlConfigYMDataStore,
+  sqlConfigYMDataStore,
   sqlConfigYMCE,
   sqlConfigFCSystem,
 } from "../../Config/sqlConfig.js";
 
 // Import sync functions from other controllers
-import { syncQC1SunriseData, syncQC1WorkerData } from "./sunriseController.js";
+// import { syncQC1SunriseData, syncQC1WorkerData } from "./sunriseController.js";
 import {
   dropConflictingIndex,
   syncInlineOrders,
@@ -15,7 +15,7 @@ import { syncCutPanelOrders } from "./cuttingController.js";
 import { syncDTOrdersData } from "./dtOrdersController.js";
 
 // Create connection pools
-// export const poolYMDataStore = new sql.ConnectionPool(sqlConfigYMDataStore);
+export const poolYMDataStore = new sql.ConnectionPool(sqlConfigYMDataStore);
 export const poolYMCE = new sql.ConnectionPool(sqlConfigYMCE);
 export const poolFCSystem = new sql.ConnectionPool(sqlConfigFCSystem);
 
@@ -106,7 +106,7 @@ export async function ensurePoolConnected(pool, poolName, maxRetries = 3) {
 async function initializeSQLPools() {
   console.log("Initializing SQL connection pools...");
   const connectionPromises = [
-    // connectPool(poolYMDataStore, "YMDataStore"),
+    connectPool(poolYMDataStore, "YMDataStore"),
     connectPool(poolYMCE, "YMCE_SYSTEM"),
     connectPool(poolFCSystem, "FCSystem"),
   ];
@@ -131,7 +131,7 @@ async function initializeSQLPools() {
 export async function closeSQLPools() {
   try {
     await Promise.all([
-      // poolYMDataStore.close(),
+      poolYMDataStore.close(),
       poolYMCE.close(),
       poolFCSystem.close(),
     ]);
@@ -154,9 +154,9 @@ async function initializeSQL() {
   const syncs = [
     { name: "InlineOrders", fn: syncInlineOrders },
     { name: "CutPanelOrders", fn: syncCutPanelOrders },
-    { name: "QC1Sunrise", fn: syncQC1SunriseData },
+    // { name: "QC1Sunrise", fn: syncQC1SunriseData },
     { name: "DTOrders", fn: syncDTOrdersData },
-    { name: "QC1Worker", fn: syncQC1WorkerData },
+    // { name: "QC1Worker", fn: syncQC1WorkerData },
   ];
 
   for (const sync of syncs) {
