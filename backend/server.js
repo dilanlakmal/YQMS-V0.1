@@ -19,19 +19,8 @@ import normalNotification from "./routes/Notification/normalNotificationRoutes.j
 /* ------------------------------
    SQL Query Import
 ------------------------------ */
-// import sqlQueryRoutes from "./routes/SQL/sqlQueryRoutes.js";
-// import {
-//   initializeSQLPools,
-//   closeSQLPools,
-// } from "./controller/SQL/sqlConnectionManager.js";
-// import { dropConflictingIndex } from "./controller/SQL/inlineOrdersController.js";
-// import {
-//   syncQC1SunriseData,
-//   syncQC1WorkerData,
-// } from "./controller/SQL/sunriseController.js";
-// import { syncInlineOrders } from "./controller/SQL/inlineOrdersController.js";
-// import { syncCutPanelOrders } from "./controller/SQL/cuttingController.js";
-// import { syncDTOrdersData } from "./controller/SQL/dtOrdersController.js";
+import sqlQueryRoutes from "./routes/SQL/sqlQueryRoutes.js";
+import { closeSQLPools } from "./controller/SQL/sqlConnectionManager.js";
 
 /* ------------------------------
    Cutting
@@ -348,58 +337,22 @@ app.use(normalNotification);
 /* ------------------------------
    SQL Query routes start
 ------------------------------ */
-// app.use(sqlQueryRoutes);
-
-/* ------------------------------
-   SQL Initialization
------------------------------- */
-
-// async function initializeSQL() {
-//   console.log("--- Initializing SQL Services ---");
-
-//   await dropConflictingIndex();
-//   await initializeSQLPools();
-
-//   console.log("Running initial data synchronizations...");
-
-//   // Each sync runs independently - failure in one won't block others
-//   const syncs = [
-//     { name: "InlineOrders", fn: syncInlineOrders },
-//     { name: "CutPanelOrders", fn: syncCutPanelOrders },
-//     { name: "QC1Sunrise", fn: syncQC1SunriseData },
-//     { name: "DTOrders", fn: syncDTOrdersData },
-//     { name: "QC1Worker", fn: syncQC1WorkerData },
-//   ];
-
-//   for (const sync of syncs) {
-//     try {
-//       await sync.fn();
-//     } catch (err) {
-//       console.warn(`⚠️ Skipping ${sync.name} sync: ${err.message}`);
-//     }
-//   }
-
-//   console.log("--- SQL Initialization Complete ---");
-// }
-
-// initializeSQL().catch((err) => {
-//   console.error("A critical error occurred during SQL initialization:", err);
-// });
+app.use(sqlQueryRoutes);
 
 /* ------------------------------
    Graceful Shutdown
 ------------------------------ */
 
-// process.on("SIGINT", async () => {
-//   try {
-//     await closeSQLPools();
-//     console.log("SQL connection pools closed.");
-//   } catch (err) {
-//     console.error("Error closing SQL connection pools:", err);
-//   } finally {
-//     process.exit(0);
-//   }
-// });
+process.on("SIGINT", async () => {
+  try {
+    await closeSQLPools();
+    console.log("SQL connection pools closed.");
+  } catch (err) {
+    console.error("Error closing SQL connection pools:", err);
+  } finally {
+    process.exit(0);
+  }
+});
 
 /* -----------------------------
 Commin file  Routes
