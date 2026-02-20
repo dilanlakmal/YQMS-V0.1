@@ -1,10 +1,10 @@
 import { 
   DtOrder,
-   BuyerSpecTemplate,
- } from "../MongoDB/dbConnectionController.js";
+  BuyerSpecTemplate,
+} from "../MongoDB/dbConnectionController.js";
 import { getBuyerFromMoNumber } from "../../helpers/helperFunctions.js";
 
-const processSpecs = (specArray, allSizes) => {
+const processSpecs = (specArray, allSizes, includeShrinkage = false) => {
   if (!specArray || specArray.length === 0) {
     return {};
   }
@@ -28,7 +28,7 @@ const processSpecs = (specArray, allSizes) => {
       });
     }
 
-    groupedSpecs[groupKey].push({
+    const specItem = {
       point: spec.MeasurementPointEngName,
       values: allSizes.map(size => {
         const value = valuesMap.get(size);
@@ -36,7 +36,14 @@ const processSpecs = (specArray, allSizes) => {
       }),
       tolerancePlus: spec.TolPlus ? spec.TolPlus.decimal : 0,
       toleranceMinus: spec.TolMinus ? spec.TolMinus.decimal : 0,
-    });
+    };
+
+    // Add shrinkage only if requested (for beforeWash)
+    if (includeShrinkage) {
+      specItem.shrinkage = spec.Shrinkage ? spec.Shrinkage.decimal : null;
+    }
+
+    groupedSpecs[groupKey].push(specItem);
   });
 
   return groupedSpecs;
@@ -79,13 +86,11 @@ export const getMatchingStyleNos = async (req, res) => {
 export const getMeasurementDataByStyle = async (req, res) => {
   try {
     const { styleNo } = req.params;
-
     if (!styleNo) {
       return res.status(400).json({ message: "Style No is required." });
     }
 
     const order = await DtOrder.findOne({ Order_No: styleNo }).lean();
-
     if (!order) {
       return res.status(404).json({ message: `No order found for Style No: ${styleNo}` });
     }
@@ -115,14 +120,14 @@ export const getMeasurementDataByStyle = async (req, res) => {
 
     // Get sizes only from SizeSpec (maintain order)
     const allSizes = getSizesFromSizeSpec(order.SizeSpec);
-
     if (allSizes.length === 0) {
       return res.status(404).json({ message: `No size specifications found for Style No: ${styleNo}` });
     }
 
     // Process both before and after wash specs
-    const beforeWashData = processSpecs(order.BeforeWashSpecs, allSizes);
-    const afterWashData = processSpecs(order.AfterWashSpecs, allSizes);
+    // Include shrinkage for beforeWash, exclude for afterWash
+    const beforeWashData = processSpecs(order.BeforeWashSpecs, allSizes, true);
+    const afterWashData = processSpecs(order.AfterWashSpecs, allSizes, false);
 
     const responseData = {
       styleNo: order.Order_No,
@@ -137,7 +142,6 @@ export const getMeasurementDataByStyle = async (req, res) => {
     };
 
     res.status(200).json(responseData);
-
   } catch (error) {
     console.error("Error fetching measurement data:", error);
     res.status(500).json({
@@ -147,8 +151,6 @@ export const getMeasurementDataByStyle = async (req, res) => {
   }
 };
 
-
-
 export const getMeasurementDataByStyleV2 = async (req, res) => {
   try {
     const { styleNo } = req.params;
@@ -157,6 +159,7 @@ export const getMeasurementDataByStyleV2 = async (req, res) => {
     if (!styleNo) {
       return res.status(400).json({ message: "Style No is required." });
     }
+
     if (!washType || !['beforeWash', 'afterWash'].includes(washType)) {
       return res.status(400).json({ message: "Valid washType (beforeWash or afterWash) is required." });
     }
@@ -238,15 +241,18 @@ export const getMeasurementDataByStyleV2 = async (req, res) => {
     }
 
     let measurementData = {};
+
     if (washType === 'beforeWash') {
+      // Include shrinkage for beforeWash
       measurementData = {
-        beforeWash: processSpecs(order.BeforeWashSpecs, allSizes)
+        beforeWash: processSpecs(order.BeforeWashSpecs, allSizes, true)
       };
     } else if (washType === 'afterWash') {
       // Check if AfterWashSpecs exists and has data
       if (order.AfterWashSpecs && order.AfterWashSpecs.length > 0) {
+        // No shrinkage for afterWash
         measurementData = {
-          afterWash: processSpecs(order.AfterWashSpecs, allSizes)
+          afterWash: processSpecs(order.AfterWashSpecs, allSizes, false)
         };
       } else {
         // Fallback to SizeSpec if no AfterWashSpecs
@@ -275,7 +281,6 @@ export const getMeasurementDataByStyleV2 = async (req, res) => {
   }
 };
 
-
 // New function to process SizeSpec data
 const processSizeSpecs = (sizeSpecArray, allSizes) => {
   if (!sizeSpecArray || sizeSpecArray.length === 0) {
@@ -283,7 +288,6 @@ const processSizeSpecs = (sizeSpecArray, allSizes) => {
   }
 
   const groupedSpecs = {};
-
   sizeSpecArray.forEach((sizeSpec) => {
     // For SizeSpec, we'll group everything under "main" since there's no kValue
     const groupKey = "main";
@@ -318,17 +322,14 @@ const processSizeSpecs = (sizeSpecArray, allSizes) => {
   return groupedSpecs;
 };
 
-
 export const getTemplateByBuyer = async (req, res) => {
   try {
     const { buyerName } = req.params;
-
     if (!buyerName) {
       return res.status(400).json({ message: "Buyer name is required." });
     }
 
-    const template = await  BuyerSpecTemplate.findOne({ buyer: buyerName }).lean();
-
+    const template = await BuyerSpecTemplate.findOne({ buyer: buyerName }).lean();
     if (!template) {
       // It's not an error if a template doesn't exist, just return an empty array.
       return res.status(200).json({ measurementPoints: [] });
@@ -347,14 +348,12 @@ export const getTemplateByBuyer = async (req, res) => {
 export const getTemplateByStyleNo = async (req, res) => {
   try {
     const { styleNo } = req.params;
-
     if (!styleNo) {
       return res.status(400).json({ message: "Style No is required." });
     }
 
     // Find the template where 'moNo' matches the provided 'styleNo'
     const template = await BuyerSpecTemplate.findOne({ moNo: styleNo }).lean();
-
     if (!template) {
       // If no template is found for the style, it's not an error. Return an empty list.
       return res.status(200).json({ measurementPoints: [] });
@@ -365,7 +364,6 @@ export const getTemplateByStyleNo = async (req, res) => {
     const points = template.specData?.[0]?.specDetails?.map(p => p.specName) || [];
 
     res.status(200).json({ measurementPoints: points });
-
   } catch (error) {
     console.error("Error fetching buyer template by style:", error);
     res.status(500).json({ message: "An internal server error occurred while fetching the buyer template." });

@@ -730,7 +730,7 @@ export async function syncDTOrdersData() {
       colorsWithCutQty,
     };
 
-    console.log("✅ DT Orders sync complete:", resultSummary);
+    // console.log("✅ DT Orders sync complete:", resultSummary);
     return resultSummary;
   } catch (error) {
     console.error("❌ DT Orders sync failed:", error);

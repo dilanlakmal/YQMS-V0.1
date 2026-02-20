@@ -40,19 +40,14 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
       .replace(/"/g, '"'); // Right double quote
   }
 
-  // 3. FIXED: More intelligent handling of spaced-out words
-  // Only fix obvious cases where single characters are spaced out
-  // This pattern looks for sequences like "a b c d" where each character is separated by exactly one space
   sanitized = sanitized.replace(
     /\b([a-zA-Z0-9])\s+([a-zA-Z0-9])\s+([a-zA-Z0-9])\s+([a-zA-Z0-9])\b/g,
     (match) => {
-      // Only remove spaces if it looks like artificially spaced characters
-      // Check if it's a sequence of single characters with spaces
       const parts = match.split(/\s+/);
       if (parts.every(part => part.length === 1)) {
         return match.replace(/\s/g, "");
       }
-      return match; // Leave it as is if it doesn't match the pattern
+      return match; 
     }
   );
 
@@ -158,21 +153,40 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
   }, [activeTab, showAll, anfPoints, measurementGroups]);
 
   const getTableData = (groupKey) => {
-    const groupData = measurementGroups[groupKey] || [];    
-    const headers = ["Measurement Point", "Tol+", "Tol-", ...sizes];
 
-    const body = groupData.map(m => ([
-      sanitizeMeasurementPoint(m.point), // Apply sanitization here
+  const groupData = measurementGroups[groupKey] || [];    
+
+  // Add Shrinkage column only for beforeWash
+
+  const isShrinkageVisible = filterCriteria.washType === 'beforeWash';
+  const headers = isShrinkageVisible 
+    ? ["Measurement Point", "Tol+", "Tol-", "Shrinkage", ...sizes]
+    : ["Measurement Point", "Tol+", "Tol-", ...sizes];
+
+  const body = groupData.map(m => {
+
+    const baseRow = [
+      sanitizeMeasurementPoint(m.point),
       `+${decimalToFraction(m.tolerancePlus)}`,
       `-${decimalToFraction(m.toleranceMinus)}`,
-      ...sizes.map((size, index) => {
-        const value = m.values?.[index];
-        return decimalToFraction(value);
-      })
-    ]));
+    ];
 
-    return { headers, body };
-  };
+    // Add shrinkage value if visible
+    if (isShrinkageVisible) {
+      baseRow.push(decimalToFraction(m.shrinkage));
+    }
+
+    // Add size values
+    baseRow.push(...sizes.map((size, index) => {
+      const value = m.values?.[index];
+      return decimalToFraction(value);
+    }));
+    return baseRow;
+  });
+
+  return { headers, body };
+
+};
 
 const handleExportPDF = async () => {
   setIsExporting(true);
@@ -180,22 +194,25 @@ const handleExportPDF = async () => {
     const doc = new jsPDF('landscape');
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
+    // Check if shrinkage should be visible
+    const isShrinkageVisible = filterCriteria.washType === 'beforeWash';
 
     // Process each K group on separate pages
     tabs.forEach((tabKey, tabIndex) => {
       const groupData = measurementGroups[tabKey] || [];
-      
+
       if (groupData.length > 0) {
         // Add new page for each group (except first)
         if (tabIndex > 0) {
           doc.addPage('landscape');
         }
-
         let currentPageY = 5;
         let isFirstPageOfGroup = true;
 
         // Function to add header to page
-        const addHeader = (y, kValue) => {
+
+       const addHeader = (y, kValue) => {
+
           // Main title
           const washTypeDisplay = filterCriteria.washType === 'beforeWash' ? 'Before Wash' : 'After Wash';
           doc.setFillColor(240, 240, 240);
@@ -215,59 +232,65 @@ const handleExportPDF = async () => {
           // Customer info
           doc.setFontSize(7);
           doc.setFont('helvetica', 'normal');
-          
+
           doc.text(`Customer: ${filterCriteria.customer || ''}`, 8, y);
           doc.text(`CustStyle: ${filterCriteria.custStyle || ''}`, 8, y + 6);
-          
+
           doc.text(`Our Ref: ${filterCriteria.styleNo || ''}`, pageWidth / 2 - 25, y);
           doc.text(`Order Qty: ${filterCriteria.totalQty || ''}`, pageWidth / 2 - 25, y + 6);
-          
+
           doc.text(`Actual Qty:`, pageWidth - 50, y);
           doc.text(`Date:`, pageWidth - 50, y + 6);
-          
+
           return y + 8;
         };
-    
+
         // Function to add table headers
         const addTableHeaders = (y) => {
           const rowHeight = 8;
           const fontSize = 6;
-          
-          // Column structure
+
+          // Column structure - adjust for shrinkage column
           const measurementPointWidth = 80;
           const tolPlusWidth = 8;
           const tolMinusWidth = 8;
-          const remainingWidth = pageWidth - 10 - measurementPointWidth - tolPlusWidth - tolMinusWidth;
+
+          const shrinkageWidth = isShrinkageVisible ? 12 : 0;
+
+          const remainingWidth = pageWidth - 10 - measurementPointWidth - tolPlusWidth - tolMinusWidth - shrinkageWidth;
+
           const sizeGroupWidth = remainingWidth / sizes.length;
           const sizeColumnWidth = sizeGroupWidth / 4;
-          
+
           let tableY = y;
-          
+
           // First header row - Merged headers
           doc.setFillColor(220, 220, 220);
           doc.rect(5, tableY, pageWidth - 10, rowHeight, 'F');
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(fontSize);
-          
+
           let colX = 5;
-          
+
           // Measurement Point header
           doc.rect(colX, tableY, measurementPointWidth, rowHeight, 'S');
           doc.text('Measurement Point', colX + measurementPointWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
           colX += measurementPointWidth;
-          
-          // Tolerance header
-          doc.rect(colX, tableY, tolPlusWidth + tolMinusWidth, rowHeight, 'S');
-          doc.text('Tolerance', colX + (tolPlusWidth + tolMinusWidth)/2, tableY + rowHeight/2 + 1, { align: 'center' });
-          colX += tolPlusWidth + tolMinusWidth;
-          
+
+          // Tolerance header (spans Tol+ and Tol-)
+          const toleranceSpan = isShrinkageVisible ? tolPlusWidth + tolMinusWidth + shrinkageWidth : tolPlusWidth + tolMinusWidth;
+          doc.rect(colX, tableY, toleranceSpan, rowHeight, 'S');
+          const toleranceHeaderText = isShrinkageVisible ? 'Tolerance & Shrinkage' : 'Tolerance';
+          doc.text(toleranceHeaderText, colX + toleranceSpan/2, tableY + rowHeight/2 + 1, { align: 'center' });
+          colX += toleranceSpan;
+
           // Size headers
           sizes.forEach(size => {
             doc.rect(colX, tableY, sizeGroupWidth, rowHeight, 'S');
             doc.text(size, colX + sizeGroupWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
             colX += sizeGroupWidth;
           });
-          
+
           tableY += rowHeight;
 
           // Second header row - Sub column headers
@@ -275,91 +298,89 @@ const handleExportPDF = async () => {
           doc.rect(5, tableY, pageWidth - 10, rowHeight, 'F');
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(fontSize - 0.5);
-          
+
           colX = 5;
-          
+
           // Empty cell under Measurement Point
           doc.rect(colX, tableY, measurementPointWidth, rowHeight, 'S');
           colX += measurementPointWidth;
-          
+
           // Tolerance sub-headers
           doc.rect(colX, tableY, tolPlusWidth, rowHeight, 'S');
           doc.text('+', colX + tolPlusWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
           colX += tolPlusWidth;
-          
+
           doc.rect(colX, tableY, tolMinusWidth, rowHeight, 'S');
           doc.text('-', colX + tolMinusWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
           colX += tolMinusWidth;
-          
+
+          // Empty cell under Shrinkage (only for beforeWash)
+          if (isShrinkageVisible) {
+            doc.rect(colX, tableY, shrinkageWidth, rowHeight, 'S');
+            doc.text('Shrinkage', colX + shrinkageWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+            colX += shrinkageWidth;
+
+          }
+
           // Size sub-headers
           sizes.forEach(size => {
             // First column - Spec
             doc.rect(colX, tableY, sizeColumnWidth, rowHeight, 'S');
             doc.text('Spec', colX + sizeColumnWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
             colX += sizeColumnWidth;
-            
+
             // Three empty columns
             for (let i = 0; i < 3; i++) {
               doc.rect(colX, tableY, sizeColumnWidth, rowHeight, 'S');
               colX += sizeColumnWidth;
             }
           });
-          
+
           return tableY + rowHeight;
         };
 
         // Function to add footer
         const addFooter = () => {
+
           const footerY = pageHeight - 22;
-          
+
           doc.setFillColor(240, 240, 240);
           doc.rect(5, footerY, pageWidth - 10, 16, 'F');
-          
           doc.setDrawColor(0, 0, 0);
           doc.setLineWidth(0.2);
           doc.rect(5, footerY, pageWidth - 10, 16);
-          
           doc.setFontSize(6);
           doc.setFont('helvetica', 'normal');
-          
+
           // Left section
           const leftWidth = 60;
           doc.line(5 + leftWidth, footerY, 5 + leftWidth, footerY + 16);
-          
           doc.setFont('helvetica', 'bold');
           doc.text('Inspect Quantity', 7, footerY + 4);
           doc.setFont('helvetica', 'normal');
-          
           doc.rect(7, footerY + 5, 2, 2);
           doc.text('Accept', 10, footerY + 7);
-          
           doc.rect(7, footerY + 10, 2, 2);
           doc.text('Reject', 10, footerY + 12);
-          
           doc.rect(30, footerY + 10, 2, 2);
           doc.text('Wait for Approval', 33, footerY + 12);
-          
           // Center section
           const centerWidth = pageWidth - 10 - leftWidth - 70;
           doc.line(5 + leftWidth + centerWidth, footerY, 5 + leftWidth + centerWidth, footerY + 16);
-          
           doc.setFont('helvetica', 'bold');
           doc.text('Remark:', 5 + leftWidth + 2, footerY + 4);
           doc.setFont('helvetica', 'normal');
-          
           doc.text('Inspector:', 5 + leftWidth + 2, footerY + 10);
           doc.text('Inspector\'s Signature:', 5 + leftWidth + 2, footerY + 14);
           doc.text(`Color:`, 5 + leftWidth + 70, footerY + 10);
           doc.text(`K-Value: ${tabKey || ''}`, 5 + leftWidth + 70, footerY + 14);
-          
+
           // Right section
           doc.setFont('helvetica', 'bold');
           doc.text('QC Signature', 5 + leftWidth + centerWidth + 2, footerY + 4);
           doc.setFont('helvetica', 'normal');
-          
           doc.text('Factory Signature', 5 + leftWidth + centerWidth + 2, footerY + 10);
           doc.text('Supervisor Approval', 5 + leftWidth + centerWidth + 2, footerY + 14);
-          
           doc.line(5, footerY + 8, pageWidth - 5, footerY + 8);
         };
 
@@ -367,7 +388,6 @@ const handleExportPDF = async () => {
         const calculateRowHeight = (text, width, fontSize) => {
           doc.setFontSize(fontSize);
           doc.setFont('helvetica', 'bold');
-          
           // Sanitize the text before calculating height
           const sanitizedText = sanitizeMeasurementPoint(text, true);
           
@@ -376,97 +396,103 @@ const handleExportPDF = async () => {
           const lineHeight = fontSize * 1.05;
           const minRowHeight = 6;
           const textHeight = lines.length * lineHeight + 1;
-          
           return Math.max(minRowHeight, textHeight);
         };
 
         // Add header to first page
         currentPageY = addHeader(currentPageY, tabKey);
-        
         // Add table headers
         let tableY = addTableHeaders(currentPageY);
-        
-        // Column dimensions
+        // Column dimensions - adjust for shrinkage
         const measurementPointWidth = 80;
         const tolPlusWidth = 8;
         const tolMinusWidth = 8;
-        const remainingWidth = pageWidth - 10 - measurementPointWidth - tolPlusWidth - tolMinusWidth;
+        const shrinkageWidth = isShrinkageVisible ? 12 : 0;
+        const remainingWidth = pageWidth - 10 - measurementPointWidth - tolPlusWidth - tolMinusWidth - shrinkageWidth;
         const sizeGroupWidth = remainingWidth / sizes.length;
         const sizeColumnWidth = sizeGroupWidth / 4;
-        
         // Data row settings
         const measurementPointFontSize = 6;
         const toleranceFontSize = 6;
+        const shrinkageFontSize = 6;
         const specFontSize = 6;
-        
         // Process data rows
         groupData.forEach((item, index) => {
           // Calculate required row height based on sanitized measurement point text
           const requiredRowHeight = calculateRowHeight(item.point, measurementPointWidth, measurementPointFontSize);
-          
           // Check if we need a new page (reserve space for footer)
           if (tableY + requiredRowHeight > pageHeight - 25) {
             // Add footer to current page
             addFooter();
-            
             // Add new page
             doc.addPage('landscape');
             currentPageY = 5;
             isFirstPageOfGroup = false;
-            
             // Add header to new page
             currentPageY = addHeader(currentPageY, tabKey);
-            
             // Add table headers to new page
             tableY = addTableHeaders(currentPageY);
           }
-          
           // Draw data row with dynamic height
           if (index % 2 === 0) {
             doc.setFillColor(248, 248, 248);
             doc.rect(5, tableY, pageWidth - 10, requiredRowHeight, 'F');
           }
-          
           let colX = 5;
-          
           // Measurement Point - WITH IMPROVED TEXT WRAPPING AND SANITIZATION
           doc.rect(colX, tableY, measurementPointWidth, requiredRowHeight, 'S');
           doc.setFontSize(measurementPointFontSize);
           doc.setFont('helvetica', 'bold');
-          
           // Sanitize the measurement text before processing
           const sanitizedMeasurementText = sanitizeMeasurementPoint(item.point, true);
-          
           // Split text with proper width consideration
           const lines = doc.splitTextToSize(sanitizedMeasurementText, measurementPointWidth - 6);
           const lineHeight = measurementPointFontSize * 1.05;
+
           
+
           // Calculate starting Y position to center text vertically
           const totalTextHeight = lines.length * lineHeight;
           const paddingTop = Math.max(0, (requiredRowHeight - totalTextHeight) / 2);
           const startY = tableY + paddingTop + lineHeight * 0.8;
+
           
+
           // Draw each line of text
           lines.forEach((line, lineIndex) => {
             const yPos = startY + (lineIndex * lineHeight);
             doc.text(line.trim(), colX + 3, yPos);
           });
+
           
+
           colX += measurementPointWidth;
+
           
+
           // Tolerance Plus - centered vertically
           doc.rect(colX, tableY, tolPlusWidth, requiredRowHeight, 'S');
           doc.setFontSize(toleranceFontSize);
           doc.setFont('helvetica', 'normal');
           doc.text(decimalToFraction(item.tolerancePlus), colX + tolPlusWidth/2, tableY + requiredRowHeight/2 + 2, { align: 'center' });
           colX += tolPlusWidth;
-          
+
           // Tolerance Minus - centered vertically
           doc.rect(colX, tableY, tolMinusWidth, requiredRowHeight, 'S');
           doc.setFontSize(toleranceFontSize);
           doc.text(decimalToFraction(item.toleranceMinus), colX + tolMinusWidth/2, tableY + requiredRowHeight/2 + 2, { align: 'center' });
           colX += tolMinusWidth;
-          
+          // Shrinkage - centered vertically (only for beforeWash)
+          if (isShrinkageVisible) {
+            doc.rect(colX, tableY, shrinkageWidth, requiredRowHeight, 'S');
+            doc.setFontSize(shrinkageFontSize);
+            doc.setFont('helvetica', 'normal');
+            const shrinkageValue = item.shrinkage !== null && item.shrinkage !== undefined ? decimalToFraction(item.shrinkage) : '-';
+            doc.text(shrinkageValue, colX + shrinkageWidth/2, tableY + requiredRowHeight/2 + 2, { align: 'center' });
+            colX += shrinkageWidth;
+
+          }
+
           // Size values - centered vertically
           sizes.forEach((size, valueIndex) => {
             const value = item.values?.[valueIndex];
@@ -474,21 +500,20 @@ const handleExportPDF = async () => {
             doc.rect(colX, tableY, sizeColumnWidth, requiredRowHeight, 'S');
             doc.setFontSize(specFontSize);
             doc.setFont('helvetica', 'bold');
-            
+
             const textToDisplay = (value !== undefined && value !== null && value !== '') ? decimalToFraction(value) : '-';
             doc.text(textToDisplay, colX + sizeColumnWidth/2, tableY + requiredRowHeight/2 + 2, { align: 'center' });
             colX += sizeColumnWidth;
-            
+
             // Three empty columns
             for (let j = 0; j < 3; j++) {
               doc.rect(colX, tableY, sizeColumnWidth, requiredRowHeight, 'S');
               colX += sizeColumnWidth;
             }
           });
-          
+
           tableY += requiredRowHeight;
         });
-        
         // Add footer to the last page of this group
         addFooter();
       }
@@ -509,10 +534,10 @@ const handleExportExcel = async () => {
   setIsExporting(true);
   try {
     const wb = XLSX.utils.book_new();
-    
+
     // Filter only K tabs (K1, K2, K3, etc.)
     const kTabs = tabs.filter(tab => tab.toUpperCase().startsWith('K'));
-    
+
     if (kTabs.length === 0) {
       alert('No K measurement groups found to export.');
       setIsExporting(false);
@@ -523,7 +548,24 @@ const handleExportExcel = async () => {
     kTabs.forEach((tabKey, index) => {
       const { headers, body } = getTableData(tabKey);
       if (body.length > 0) {
-        // Create enhanced header section with more professional layout
+        const isShrinkageVisible = filterCriteria.washType === 'beforeWash';
+
+        const mainHeaderRow = ['Measurement Point'];
+        if (isShrinkageVisible) {
+          mainHeaderRow.push('Tolerance & Shrinkage', '', '');
+        } else {
+          mainHeaderRow.push('Tolerance', '');
+        }
+        mainHeaderRow.push(...sizes);
+
+        const subHeaderRow = [''];
+        if (isShrinkageVisible) {
+          subHeaderRow.push('Tol+', 'Tol-', 'Shrinkage');
+        } else {
+          subHeaderRow.push('Tol+', 'Tol-');
+        }
+        subHeaderRow.push(...sizes.map(() => ''));
+
         const sheetData = [
           // Row 0: Company Header with logo space
           ['🏭 YORKMARS (CAMBODIA) GARMENT MFG CO., LTD', '', '', '', '', '', '', '📊 MEASUREMENT SPECIFICATION'],
@@ -554,38 +596,36 @@ const handleExportExcel = async () => {
           // Row 9: Measurement Data Header
           ['📊 MEASUREMENT DATA TABLE', '', '', '', '', '', '', ''],
           // Row 10: Sub header with instructions
-          ['📌 Point Name', '📈 Tolerance (+)', '📉 Tolerance (-)', ...sizes.map(size => `📏 Size ${size}`), ''],
+          mainHeaderRow,
           // Row 11: Table headers (actual data headers)
-          headers,
+          subHeaderRow,
           // Row 12+: Table data (sanitized measurement points are already applied in getTableData)
           ...body
         ];
-
         const ws = XLSX.utils.aoa_to_sheet(sheetData);
-        
-        // Enhanced column widths for better readability
         const colWidths = [
           { width: 40 }, // Measurement Point - extra wide for long names
           { width: 18 }, // Tol+ - wider for better visibility
           { width: 18 }, // Tol- - wider for better visibility
+          ...(isShrinkageVisible ? [{ width: 15 }] : []), // Shrinkage column (only for beforeWash)
           ...sizes.map(() => ({ width: 20 })) // Size columns - much wider for comfort
         ];
         ws['!cols'] = colWidths;
 
         // Apply enhanced styles (keeping the existing styling code)
         const range = XLSX.utils.decode_range(ws['!ref']);
-        
+      
         for (let R = range.s.r; R <= range.e.r; ++R) {
           for (let C = range.s.c; C <= range.e.c; ++C) {
             const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
             if (!ws[cellAddress]) continue;
-            
+
             if (!ws[cellAddress].s) ws[cellAddress].s = {};
-            
+
             // Company Header (Row 0) - Premium blue gradient effect
             if (R === 0) {
               ws[cellAddress].s = {
-                font: { 
+              font: { 
                   bold: true, 
                   sz: 18, 
                   color: { rgb: "FFFFFF" },
@@ -605,7 +645,9 @@ const handleExportExcel = async () => {
                 }
               };
             }
+
             
+
             // Document Title (Row 1) - Lighter blue
             else if (R === 1) {
               ws[cellAddress].s = {
@@ -629,7 +671,6 @@ const handleExportExcel = async () => {
                 }
               };
             }
-            
             // Decorative separators (Rows 2, 8)
             else if (R === 2 || R === 8) {
               ws[cellAddress].s = {
@@ -650,7 +691,7 @@ const handleExportExcel = async () => {
                 }
               };
             }
-            
+
             // Document Info Header (Row 3)
             else if (R === 3) {
               ws[cellAddress].s = {
@@ -673,13 +714,13 @@ const handleExportExcel = async () => {
                 }
               };
             }
-            
+
             // Document Info Rows (4-7) - Enhanced with alternating colors
             else if (R >= 4 && R <= 7) {
               const isLabel = C === 0 || C === 3 || C === 5;
               const rowColor = R % 2 === 0 ? "F8FBFF" : "EDF4FF";
               const labelColor = R % 2 === 0 ? "E1EFFF" : "D6E8FF";
-              
+
               ws[cellAddress].s = {
                 font: { 
                   bold: isLabel, 
@@ -701,7 +742,7 @@ const handleExportExcel = async () => {
                 }
               };
             }
-            
+
             // Measurement Data Header (Row 9)
             else if (R === 9) {
               ws[cellAddress].s = {
@@ -724,38 +765,13 @@ const handleExportExcel = async () => {
                 }
               };
             }
-            
-                        // Sub Headers (Row 10) - Instructional row
+            // Main Headers (Row 10) - Professional header styling
             else if (R === 10) {
-              ws[cellAddress].s = {
-                font: { 
-                  bold: true, 
-                  sz: 12, 
-                  color: { rgb: "FFFFFF" },
-                  name: "Calibri",
-                  italic: true
-                },
-                fill: { fgColor: { rgb: "A9D18E" } },
-                alignment: { 
-                  horizontal: "center", 
-                  vertical: "center"
-                },
-                border: {
-                  top: { style: "medium", color: { rgb: "70AD47" } },
-                  bottom: { style: "medium", color: { rgb: "70AD47" } },
-                  left: { style: "thin", color: { rgb: "FFFFFF" } },
-                  right: { style: "thin", color: { rgb: "FFFFFF" } }
-                }
-              };
-            }
-            
-            // Table Headers (Row 11) - Professional header styling
-            else if (R === 11) {
               let headerColor = "2E75B6"; // Default blue
-              if (C === 1) headerColor = "70AD47"; // Green for Tol+
-              if (C === 2) headerColor = "C5504B"; // Red for Tol-
-              if (C > 2) headerColor = "7030A0"; // Purple for sizes
-              
+              if (C === 0) headerColor = "2E75B6"; // Measurement Point
+              if (C === 1) headerColor = "2E75B6"; // Tolerance
+              if (C > (isShrinkageVisible ? 3 : 2)) headerColor = "7030A0"; // Purple for sizes
+
               ws[cellAddress].s = {
                 font: { 
                   bold: true, 
@@ -777,14 +793,36 @@ const handleExportExcel = async () => {
                 }
               };
             }
-            
+            // Sub Headers (Row 11) - Instructional row
+            else if (R === 11) {
+              ws[cellAddress].s = {
+                font: { 
+                  bold: true, 
+                  sz: 12, 
+                  color: { rgb: "FFFFFF" },
+                  name: "Calibri",
+                  italic: true
+                },
+                fill: { fgColor: { rgb: "A9D18E" } },
+                alignment: { 
+                  horizontal: "center", 
+                  vertical: "center"
+                },
+                border: {
+                  top: { style: "medium", color: { rgb: "70AD47" } },
+                  bottom: { style: "medium", color: { rgb: "70AD47" } },
+                  left: { style: "thin", color: { rgb: "FFFFFF" } },
+                  right: { style: "thin", color: { rgb: "FFFFFF" } }
+                }
+              };
+            }
+
             // Data Rows (Row 12+) - Enhanced with professional styling
             else if (R >= 12) {
               const dataRowIndex = R - 12;
               const isEvenRow = dataRowIndex % 2 === 0;
-              
               let fillColor, textColor = "2C3E50", borderColor = "D5DBDB";
-              
+
               if (C === 0) {
                 // Measurement Point column - Professional blue theme
                 fillColor = isEvenRow ? "F8F9FA" : "EBF3FD";
@@ -800,13 +838,18 @@ const handleExportExcel = async () => {
                 fillColor = isEvenRow ? "FDF2F2" : "FADBD8";
                 textColor = "721C24";
                 borderColor = "F1C0C7";
+              } else if (isShrinkageVisible && C === 3) {
+                // Shrinkage column - Info blue theme
+                fillColor = isEvenRow ? "E7F3FF" : "D6E9FF";
+                textColor = "003366";
+                borderColor = "B4D7F1";
               } else {
                 // Size columns - Professional purple theme
                 fillColor = isEvenRow ? "F8F4FF" : "F0E6FF";
                 textColor = "4A148C";
                 borderColor = "D1C4E9";
               }
-              
+
               ws[cellAddress].s = {
                 font: { 
                   sz: 11, 
@@ -827,18 +870,18 @@ const handleExportExcel = async () => {
                   right: { style: "thin", color: { rgb: borderColor } }
                 }
               };
-              
               // Add special formatting for measurement values
-              if (C > 2 && ws[cellAddress].v) {
-                // Add number formatting for measurement values
-                ws[cellAddress].z = '0.00';
+              if ((isShrinkageVisible && C > 3) || (!isShrinkageVisible && C > 2)) {
+                if (ws[cellAddress].v) {
+                  // Add number formatting for measurement values
+                  ws[cellAddress].z = '0.00';
+                }
               }
             }
           }
         }
-
         // Enhanced merges for professional layout
-        const maxCol = Math.max(headers.length - 1, 7);
+        const maxCol = Math.max(mainHeaderRow.length - 1, 7);
         ws['!merges'] = [
           // Company header spans
           { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
@@ -855,7 +898,20 @@ const handleExportExcel = async () => {
           // Data header
           { s: { r: 9, c: 0 }, e: { r: 9, c: maxCol } }
         ];
-
+        // Add merges for table headers
+        // Measurement Point
+        ws['!merges'].push({ s: { r: 10, c: 0 }, e: { r: 11, c: 0 } });
+        // Tolerance
+        if (isShrinkageVisible) {
+          ws['!merges'].push({ s: { r: 10, c: 1 }, e: { r: 10, c: 3 } });
+        } else {
+          ws['!merges'].push({ s: { r: 10, c: 1 }, e: { r: 10, c: 2 } });
+        }
+        // Sizes
+        sizes.forEach((size, i) => {
+          const col = 1 + (isShrinkageVisible ? 3 : 2) + i;
+          ws['!merges'].push({ s: { r: 10, c: col }, e: { r: 11, c: col } });
+        });
         // Enhanced row heights for professional appearance
         ws['!rows'] = [
           { hpt: 35 }, // Company header - taller
@@ -877,7 +933,7 @@ const handleExportExcel = async () => {
         ws['!printHeader'] = [
           ['YORKMARS (CAMBODIA) GARMENT MFG CO., LTD - MEASUREMENT SPECIFICATIONS']
         ];
-        
+
         ws['!margins'] = {
           left: 0.7,
           right: 0.7,
@@ -903,7 +959,7 @@ const handleExportExcel = async () => {
     const dateStr = now.toISOString().split('T')[0];
     const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-');
     const fileName = `${filterCriteria.styleNo}_Professional_Measurements_${dateStr}_${timeStr}.xlsx`;
-    
+
     // Write file with enhanced options
     XLSX.writeFile(wb, fileName, { 
       bookType: 'xlsx',
@@ -911,7 +967,7 @@ const handleExportExcel = async () => {
       sheetStubs: false,
       compression: true
     });
-    
+
   } catch (error) {
     console.error('Excel Export failed:', error);
     alert('Failed to export Excel file. Please try again.');
@@ -960,7 +1016,7 @@ const handleExportExcel = async () => {
               </label>
             </div>
           )}
-          
+
           {/* Enhanced Export Buttons */}
           <div className="flex gap-3">
             <button 
@@ -1040,41 +1096,49 @@ const handleExportExcel = async () => {
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-            <tr>
-              <th rowSpan="2" className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200 bg-gray-100">
-                <div className="flex items-center gap-2 group">
-                  <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                  Measurement Point
+          <tr>
+            <th rowSpan="2" className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200 bg-gray-100">
+              <div className="flex items-center gap-2 group">
+                <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Measurement Point
+              </div>
+            </th>
+            <th colSpan={filterCriteria.washType === 'beforeWash' ? "3" : "2"} className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200">
+              <div className="flex items-center justify-center gap-2">
+                <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd"/>
+                </svg>
+                Tolerance {filterCriteria.washType === 'beforeWash' && '& Shrinkage'}
+              </div>
+
+            </th>
+            {sizes.map((size) => (
+              <th key={size} rowSpan="2" className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200 last:border-r-0">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
+                  {size}
                 </div>
               </th>
-              <th colSpan="2" className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200">
-                <div className="flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd"/>
-                  </svg>
-                  Tolerance
-                </div>
+            ))}
+          </tr>
+
+          <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-green-600 uppercase tracking-wider border-r border-gray-200 bg-green-50">
+              Tol+
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-red-600 uppercase tracking-wider border-r border-gray-200 bg-red-50">
+              Tol-
+            </th>
+            {filterCriteria.washType === 'beforeWash' && (
+              <th className="px-6 py-3 text-left text-xs font-medium text-blue-600 uppercase tracking-wider border-r border-gray-200 bg-blue-50">
+                Shrinkage
               </th>
-              {sizes.map((size) => (
-                <th key={size} rowSpan="2" className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200 last:border-r-0">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
-                    {size}
-                  </div>
-                </th>
-              ))}
-            </tr>
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-green-600 uppercase tracking-wider border-r border-gray-200 bg-green-50">
-                Tol+
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-red-600 uppercase tracking-wider border-r border-gray-200 bg-red-50">
-                Tol-
-              </th>
-            </tr>
-          </thead>
+            )}
+          </tr>
+
+        </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {currentMeasurements.map((item, index) => (
               <tr key={index} className={`${
@@ -1087,7 +1151,6 @@ const handleExportExcel = async () => {
                       checked={!showAll}
                       disabled
                       className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-0 cursor-default" />
-                    {/* Apply sanitization to the displayed measurement point */}
                     {sanitizeMeasurementPoint(item.point)}
                   </div>
                 </td>
@@ -1101,6 +1164,13 @@ const handleExportExcel = async () => {
                     -{decimalToFraction(item.toleranceMinus)}
                   </span>
                 </td>
+                {filterCriteria.washType === 'beforeWash' && (
+                  <td className="px-6 py-4 whitespace-nowrap text-sm border-r border-gray-200">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {item.shrinkage !== null && item.shrinkage !== undefined ? decimalToFraction(item.shrinkage) : '-'}
+                    </span>
+                  </td>
+                )}
                 {sizes.map((size, vIndex) => {
                   const value = item.values?.[vIndex];
                   return (
@@ -1124,9 +1194,9 @@ const handleExportExcel = async () => {
             ))}
             {currentMeasurements.length === 0 && (
               <tr>
-                <td colSpan={3 + sizes.length} className="text-center py-12">
+                <td colSpan={3 + sizes.length + (filterCriteria.washType === 'beforeWash' ? 1 : 0)} className="text-center py-12">
                   <div className="flex flex-col items-center">
-                    <svg className="w-12 h-12 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                     <svg className="w-12 h-12 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     <p className="text-gray-500 text-sm">No measurements available for this group</p>
@@ -1155,5 +1225,3 @@ const handleExportExcel = async () => {
 };
 
 export default MeasurementSheet;
-
-              
