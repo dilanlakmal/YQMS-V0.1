@@ -519,6 +519,8 @@ const YPivotQAInspectionReportType = ({
   shippingStages = [],
   loadedReportData = null,
 }) => {
+  // --- Track Lock Status ---
+  const [isSelectionLocked, setIsSelectionLocked] = useState(false);
   const [reportTemplates, setReportTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(
     savedState?.selectedTemplate || null,
@@ -980,14 +982,24 @@ const YPivotQAInspectionReportType = ({
         orderData={orderData}
         orderType={orderType}
         onProductTypeUpdate={handleProductTypeUpdate}
+        onLockStatusChange={setIsSelectionLocked}
       />
 
       {/* Report Type Selection */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div
+        className={`bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden transition-all duration-300 ${
+          isSelectionLocked ? "opacity-50 pointer-events-none grayscale" : ""
+        }`}
+      >
         <div className="bg-gradient-to-r from-purple-500 to-pink-600 px-4 py-3">
           <h3 className="text-white font-bold text-sm flex items-center gap-2">
             <FileText className="w-4 h-4" />
             Report Type
+            {isSelectionLocked && (
+              <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded ml-2">
+                LOCKED
+              </span>
+            )}
           </h3>
         </div>
         <div className="p-4">

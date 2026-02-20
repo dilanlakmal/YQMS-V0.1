@@ -340,7 +340,8 @@ const YPivotQAInspectionBuyerDetermination = ({
   selectedOrders = [],
   orderData = null,
   orderType = "single",
-  onProductTypeUpdate, // <--- FIX 1: New Prop to bubble up ID
+  onProductTypeUpdate,
+  onLockStatusChange,
 }) => {
   // Product Type State
   const [productTypeInfo, setProductTypeInfo] = useState(null);
@@ -351,6 +352,9 @@ const YPivotQAInspectionBuyerDetermination = ({
   const [loadingProductType, setLoadingProductType] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [savingProductType, setSavingProductType] = useState(false);
+
+  // NEW STATE: Track if Yorksys data exists for the order
+  const [hasYorksysData, setHasYorksysData] = useState(true);
 
   const buyerInfo = useMemo(() => {
     if (!selectedOrders || selectedOrders.length === 0) return null;
@@ -368,6 +372,7 @@ const YPivotQAInspectionBuyerDetermination = ({
   const fetchProductTypeInfo = useCallback(async () => {
     if (!selectedOrders || selectedOrders.length === 0) {
       setProductTypeInfo(null);
+      setHasYorksysData(true);
       return;
     }
 
@@ -380,11 +385,16 @@ const YPivotQAInspectionBuyerDetermination = ({
 
       if (res.data.success) {
         setProductTypeInfo(res.data.data);
+
+        // Let's check `orderData.yorksysOrder` from props!
+        const yorksysExists = !!orderData?.yorksysOrder;
+        setHasYorksysData(yorksysExists);
+
         if (res.data.data.hasProductType) {
           setSelectedProductType(res.data.data.productType);
           setSelectedProductTypeImage(res.data.data.imageURL);
 
-          // <--- FIX 2: Propagate ID up when auto-loaded
+          // Propagate ID up when auto-loaded
           if (onProductTypeUpdate && res.data.data.productTypeId) {
             onProductTypeUpdate(res.data.data.productTypeId);
           }
@@ -400,7 +410,7 @@ const YPivotQAInspectionBuyerDetermination = ({
     } finally {
       setLoadingProductType(false);
     }
-  }, [selectedOrders, onProductTypeUpdate]);
+  }, [selectedOrders, onProductTypeUpdate, orderData]);
 
   // Fetch Product Type Options
   const fetchProductTypeOptions = useCallback(async () => {
@@ -477,6 +487,19 @@ const YPivotQAInspectionBuyerDetermination = ({
   useEffect(() => {
     fetchProductTypeOptions();
   }, [fetchProductTypeOptions]);
+
+  // --- Monitor Lock Condition and Notify Parent ---
+  useEffect(() => {
+    if (onLockStatusChange) {
+      // Logic mirrors "Case 2": Not Loading AND No Product Type AND No Yorksys Data
+      const shouldLock =
+        !loadingProductType &&
+        !productTypeInfo?.hasProductType &&
+        !hasYorksysData;
+
+      onLockStatusChange(shouldLock);
+    }
+  }, [loadingProductType, productTypeInfo, hasYorksysData, onLockStatusChange]);
 
   if (!selectedOrders || selectedOrders.length === 0 || !buyerInfo) {
     return null;
@@ -567,7 +590,7 @@ const YPivotQAInspectionBuyerDetermination = ({
             )}
           </div>
 
-          {/* If Product Type Exists */}
+          {/* CASE 1: Existing Product Type Found -> Show It */}
           {hasExistingProductType && !loadingProductType && (
             <div className="flex items-center gap-4">
               <ProductTypeImage
@@ -591,9 +614,26 @@ const YPivotQAInspectionBuyerDetermination = ({
               </div>
             </div>
           )}
+          {/* CASE 2: No Product Type & NO Yorksys Data -> Show Lock Message */}
+          {showProductTypeSelector &&
+            !loadingProductType &&
+            !hasYorksysData && (
+              <div className="p-4 bg-gray-100 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-center">
+                <AlertCircle className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm font-bold text-gray-600 dark:text-gray-300">
+                  Product Type Selection Locked
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Please ask your colleague to upload Yorksys Order File for{" "}
+                  <span className="font-mono font-bold text-indigo-500">
+                    {orderDisplay}
+                  </span>
+                </p>
+              </div>
+            )}
 
-          {/* If No Product Type - Show Selector */}
-          {showProductTypeSelector && !loadingProductType && (
+          {/* CASE 3: No Product Type & HAS Yorksys Data -> Show Selector */}
+          {showProductTypeSelector && !loadingProductType && hasYorksysData && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
                 <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
