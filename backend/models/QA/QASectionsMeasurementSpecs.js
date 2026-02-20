@@ -9,11 +9,16 @@ const SpecItemSchema = new mongoose.Schema(
     MeasurementPointChiName: { type: String },
     TolMinus: {
       fraction: { type: String },
-      decimal: { type: Number }
+      decimal: { type: Number },
     },
     TolPlus: {
       fraction: { type: String },
-      decimal: { type: Number }
+      decimal: { type: Number },
+    },
+    // NEW FIELD: Shrinkage
+    Shrinkage: {
+      fraction: { type: String, default: "0" },
+      decimal: { type: Number, default: 0 },
     },
     Specs: [
       {
@@ -21,11 +26,11 @@ const SpecItemSchema = new mongoose.Schema(
         size: { type: String },
         fraction: { type: String },
         decimal: { type: Number },
-        _id: false
-      }
-    ]
+        _id: false,
+      },
+    ],
   },
-  { _id: true }
+  { _id: true },
 );
 
 const QASectionsMeasurementSpecsSchema = new mongoose.Schema(
@@ -38,7 +43,7 @@ const QASectionsMeasurementSpecsSchema = new mongoose.Schema(
     isSaveAllBeforeWashSpecs: {
       type: String,
       default: "No",
-      enum: ["Yes", "No"]
+      enum: ["Yes", "No"],
     },
 
     // User selected subset
@@ -46,14 +51,14 @@ const QASectionsMeasurementSpecsSchema = new mongoose.Schema(
 
     // Placeholders for future logic
     AllAfterWashSpecs: { type: Array, default: [] },
-    selectedAfterWashSpecs: { type: Array, default: [] }
+    selectedAfterWashSpecs: { type: Array, default: [] },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export default (connection) =>
   connection.model(
     "QASectionsMeasurementSpecs",
     QASectionsMeasurementSpecsSchema,
-    "qa_sections_measurement_specs"
+    "qa_sections_measurement_specs",
   );

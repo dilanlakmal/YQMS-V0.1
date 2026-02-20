@@ -19,7 +19,7 @@ const WashingSpecsDataPreview = ({ moNo, allSpecData }) => {
       // 2. Letters alphabetically (KA comes after K9, KA comes before KAA)
       return a.sheetName.localeCompare(b.sheetName, undefined, {
         numeric: true,
-        sensitivity: "base"
+        sensitivity: "base",
       });
     });
   }, [allSpecData]);
@@ -134,6 +134,13 @@ const WashingSpecsDataPreview = ({ moNo, allSpecData }) => {
                 >
                   Tol (+)
                 </th>
+                {/* NEW: Shrinkage Header */}
+                <th
+                  rowSpan="2"
+                  className="px-2 py-3 text-center text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600 w-16 bg-yellow-50 dark:bg-yellow-900/20"
+                >
+                  Solid K
+                </th>
                 {currentSpec.headers.map((header) => (
                   <th
                     key={header.size}
@@ -176,6 +183,10 @@ const WashingSpecsDataPreview = ({ moNo, allSpecData }) => {
                   </td>
                   <td className="px-2 py-3 text-center text-xs font-bold text-green-600 dark:text-green-400 border-r border-gray-200 dark:border-gray-700 bg-green-50/30 dark:bg-green-900/10">
                     {row["Tol Plus"].raw}
+                  </td>
+                  {/* NEW: Shrinkage Data Cell */}
+                  <td className="px-2 py-3 text-center text-xs font-bold text-blue-600 dark:text-blue-400 border-r border-gray-200 dark:border-gray-700 bg-yellow-50/30 dark:bg-yellow-900/10">
+                    {row["Shrinkage"]?.raw || "-"}
                   </td>
                   {currentSpec.headers.map((header) => (
                     <React.Fragment key={`${header.size}-${index}`}>

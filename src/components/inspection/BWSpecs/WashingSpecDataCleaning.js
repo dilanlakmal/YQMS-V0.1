@@ -106,7 +106,7 @@ const detectAndFixColumns = (data) => {
 export const cleanWashingSpecData = (data, sheetName) => {
   if (!data || data.length < 4) {
     throw new Error(
-      `Sheet "${sheetName}" has insufficient data or is in the wrong format.`
+      `Sheet "${sheetName}" has insufficient data or is in the wrong format.`,
     );
   }
 
@@ -114,6 +114,9 @@ export const cleanWashingSpecData = (data, sheetName) => {
 
   const { engColIndex, chiColIndex, tolMinusIndex, tolPlusIndex } =
     detectAndFixColumns(relevantData);
+
+  // NEW: Hardcode Shrinkage index as the 5th column (Index 4)
+  const shrinkageIndex = 4;
 
   const headerRow1 = relevantData[0];
   const headerRow2 = relevantData[1];
@@ -126,8 +129,17 @@ export const cleanWashingSpecData = (data, sheetName) => {
     }
   });
 
-  for (let i = 4; i < headerRow1.length; i++) {
-    if (i === shuritsuColumnIndex) continue;
+  for (let i = 0; i < headerRow1.length; i++) {
+    //if (i === shuritsuColumnIndex) continue;
+    // Skip Eng, Chi, Tols, and the new Shrinkage column
+    if (
+      i === engColIndex ||
+      i === chiColIndex ||
+      i === tolMinusIndex ||
+      i === tolPlusIndex ||
+      i === shrinkageIndex
+    )
+      continue;
 
     const size = headerRow1[i];
     if (size !== null && size !== undefined && String(size).trim() !== "") {
@@ -139,8 +151,8 @@ export const cleanWashingSpecData = (data, sheetName) => {
           size: String(size).trim(),
           columns: [
             { name: "After Washing", original: String(spec1).trim() },
-            { name: "Before Washing", original: String(spec2).trim() }
-          ]
+            { name: "Before Washing", original: String(spec2).trim() },
+          ],
         });
         columnIndexMap[String(size).trim()] = [i, i + 1];
         i++;
@@ -160,14 +172,16 @@ export const cleanWashingSpecData = (data, sheetName) => {
       "Measurement Point - Chi": row[chiColIndex] || "",
       "Tol Minus": fractionToDecimal(row[tolMinusIndex]),
       "Tol Plus": fractionToDecimal(row[tolPlusIndex]),
-      specs: {}
+      // NEW: Extract Shrinkage Value
+      Shrinkage: fractionToDecimal(row[shrinkageIndex]),
+      specs: {},
     };
 
     headers.forEach((header) => {
       const [col1Index, col2Index] = columnIndexMap[header.size];
       rowData.specs[header.size] = {
         "After Washing": fractionToDecimal(row[col1Index]),
-        "Before Washing": fractionToDecimal(row[col2Index])
+        "Before Washing": fractionToDecimal(row[col2Index]),
       };
     });
 
@@ -177,6 +191,6 @@ export const cleanWashingSpecData = (data, sheetName) => {
   return {
     sheetName,
     headers,
-    rows: cleanedRows
+    rows: cleanedRows,
   };
 };

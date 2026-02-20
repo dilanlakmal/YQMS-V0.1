@@ -15,7 +15,7 @@ export const getMoNoSearch = async (req, res) => {
 
     const results = await collection
       .find({
-        Order_No: { $regex: regexPattern }
+        Order_No: { $regex: regexPattern },
       })
       .project({ Order_No: 1, _id: 0 }) // Only return Order_No field
       .limit(100) // Limit results to prevent overwhelming the UI
@@ -36,7 +36,7 @@ export const getOrderDetails = async (req, res) => {
   try {
     const collection = ymProdConnection.db.collection("dt_orders");
     const order = await collection.findOne({
-      Order_No: req.params.mono
+      Order_No: req.params.mono,
     });
 
     if (!order) return res.status(404).json({ error: "Order not found" });
@@ -52,7 +52,7 @@ export const getOrderDetails = async (req, res) => {
           colorCode: colorObj.ColorCode,
           chnColor: colorObj.ChnColor,
           colorKey: colorObj.ColorKey,
-          sizes: new Map()
+          sizes: new Map(),
         });
       }
 
@@ -64,7 +64,7 @@ export const getOrderDetails = async (req, res) => {
         if (quantity > 0) {
           colorMap.get(colorKey).sizes.set(cleanSize, {
             orderQty: quantity,
-            planCutQty: colorObj.CutQty?.[sizeName]?.PlanCutQty || 0
+            planCutQty: colorObj.CutQty?.[sizeName]?.PlanCutQty || 0,
           });
         }
       });
@@ -80,7 +80,7 @@ export const getOrderDetails = async (req, res) => {
         original: c.originalColor,
         code: c.colorCode,
         chn: c.chnColor,
-        key: c.colorKey
+        key: c.colorKey,
       })),
       colorSizeMap: Array.from(colorMap.values()).reduce((acc, curr) => {
         acc[curr.originalColor.toLowerCase()] = {
@@ -88,11 +88,11 @@ export const getOrderDetails = async (req, res) => {
           details: Array.from(curr.sizes.entries()).map(([size, data]) => ({
             size,
             orderQty: data.orderQty,
-            planCutQty: data.planCutQty
-          }))
+            planCutQty: data.planCutQty,
+          })),
         };
         return acc;
-      }, {})
+      }, {}),
     };
 
     res.json(response);
@@ -110,13 +110,13 @@ export const getOrderSizes = async (req, res) => {
     if (!order) return res.status(404).json({ error: "Order not found" });
 
     const colorObj = order.OrderColors.find(
-      (c) => c.Color.toLowerCase() === req.params.color.toLowerCase().trim()
+      (c) => c.Color.toLowerCase() === req.params.color.toLowerCase().trim(),
     );
 
     if (!colorObj) return res.json([]);
 
     const sizesWithDetails = colorObj.OrderQty.filter(
-      (entry) => entry[Object.keys(entry)[0]] > 0
+      (entry) => entry[Object.keys(entry)[0]] > 0,
     )
       .map((entry) => {
         const sizeName = Object.keys(entry)[0];
@@ -124,7 +124,7 @@ export const getOrderSizes = async (req, res) => {
         return {
           size: cleanSize,
           orderQty: entry[sizeName],
-          planCutQty: colorObj.CutQty?.[sizeName]?.PlanCutQty || 0
+          planCutQty: colorObj.CutQty?.[sizeName]?.PlanCutQty || 0,
         };
       })
       .filter((v, i, a) => a.findIndex((t) => t.size === v.size) === i);
@@ -151,7 +151,7 @@ export const saveWashingSpecs = async (req, res) => {
 
     if (!orderDocument) {
       return res.status(404).json({
-        message: `Order with MO No '${moNo}' not found in dt_orders.`
+        message: `Order with MO No '${moNo}' not found in dt_orders.`,
       });
     }
 
@@ -173,7 +173,7 @@ export const saveWashingSpecs = async (req, res) => {
               size: header.size,
               // Save BOTH fraction and decimal for the spec value
               fraction: specData.raw,
-              decimal: specData.decimal
+              decimal: specData.decimal,
             });
           }
         });
@@ -186,13 +186,18 @@ export const saveWashingSpecs = async (req, res) => {
           // Save the full object for TolMinus and TolPlus
           TolMinus: {
             fraction: row["Tol Minus"].raw,
-            decimal: row["Tol Minus"].decimal
+            decimal: row["Tol Minus"].decimal,
           },
           TolPlus: {
             fraction: row["Tol Plus"].raw,
-            decimal: row["Tol Plus"].decimal
+            decimal: row["Tol Plus"].decimal,
           },
-          Specs: specsArray
+          // UPDATED: Hardcode Shrinkage to 0 for After Wash
+          Shrinkage: {
+            fraction: "0",
+            decimal: 0,
+          },
+          Specs: specsArray,
         });
       });
     }
@@ -210,7 +215,7 @@ export const saveWashingSpecs = async (req, res) => {
                 size: header.size,
                 // Save BOTH fraction and decimal for the spec value
                 fraction: specData.raw,
-                decimal: specData.decimal
+                decimal: specData.decimal,
               });
             }
           });
@@ -223,13 +228,18 @@ export const saveWashingSpecs = async (req, res) => {
             // Save the full object for TolMinus and TolPlus
             TolMinus: {
               fraction: row["Tol Minus"].raw,
-              decimal: row["Tol Minus"].decimal
+              decimal: row["Tol Minus"].decimal,
             },
             TolPlus: {
               fraction: row["Tol Plus"].raw,
-              decimal: row["Tol Plus"].decimal
+              decimal: row["Tol Plus"].decimal,
             },
-            Specs: specsArray
+            // NEW: Add Shrinkage Field
+            Shrinkage: {
+              fraction: row["Shrinkage"] ? row["Shrinkage"].raw : "",
+              decimal: row["Shrinkage"] ? row["Shrinkage"].decimal : 0,
+            },
+            Specs: specsArray,
           });
         });
       }
@@ -241,9 +251,9 @@ export const saveWashingSpecs = async (req, res) => {
       {
         $set: {
           AfterWashSpecs: afterWashSpecs,
-          BeforeWashSpecs: beforeWashSpecs
-        }
-      }
+          BeforeWashSpecs: beforeWashSpecs,
+        },
+      },
     );
 
     if (updateResult.modifiedCount === 0 && updateResult.matchedCount > 0) {
@@ -253,12 +263,12 @@ export const saveWashingSpecs = async (req, res) => {
     }
 
     res.status(200).json({
-      message: `Successfully updated washing specs for MO No '${moNo}'.`
+      message: `Successfully updated washing specs for MO No '${moNo}'.`,
     });
   } catch (error) {
     console.error("Error saving washing specs:", error);
     res.status(500).json({
-      message: "An internal server error occurred while saving the data."
+      message: "An internal server error occurred while saving the data.",
     });
   }
 };
@@ -275,8 +285,8 @@ export const getUploadedSpecsOrders = async (req, res) => {
     const query = {
       $or: [
         { BeforeWashSpecs: { $exists: true, $not: { $size: 0 } } },
-        { AfterWashSpecs: { $exists: true, $not: { $size: 0 } } }
-      ]
+        { AfterWashSpecs: { $exists: true, $not: { $size: 0 } } },
+      ],
     };
 
     // Optional: Filter by specific MO No if provided
@@ -297,7 +307,7 @@ export const getUploadedSpecsOrders = async (req, res) => {
         TotalQty: 1,
         OrderColors: 1,
         BeforeWashSpecs: 1,
-        AfterWashSpecs: 1
+        AfterWashSpecs: 1,
       })
       .toArray();
 
@@ -392,7 +402,7 @@ export const getUploadedSpecsOrders = async (req, res) => {
         bwIssues: bwIssues,
         bwNoField: bwNoField,
         awIssues: awIssues,
-        awNoField: awNoField
+        awNoField: awNoField,
       };
     });
 
@@ -402,8 +412,8 @@ export const getUploadedSpecsOrders = async (req, res) => {
         totalRecords,
         totalPages: Math.ceil(totalRecords / limit),
         currentPage: parseInt(page),
-        limit: parseInt(limit)
-      }
+        limit: parseInt(limit),
+      },
     });
   } catch (error) {
     console.error("Error fetching uploaded specs orders:", error);
@@ -473,8 +483,8 @@ export const fixWashingSpecsIssues = async (req, res) => {
     const cursor = collection.find({
       $or: [
         { BeforeWashSpecs: { $exists: true, $not: { $size: 0 } } },
-        { AfterWashSpecs: { $exists: true, $not: { $size: 0 } } }
-      ]
+        { AfterWashSpecs: { $exists: true, $not: { $size: 0 } } },
+      ],
     });
 
     let totalBwFixed = 0;
@@ -561,9 +571,9 @@ export const fixWashingSpecsIssues = async (req, res) => {
           {
             $set: {
               BeforeWashSpecs: doc.BeforeWashSpecs,
-              AfterWashSpecs: doc.AfterWashSpecs
-            }
-          }
+              AfterWashSpecs: doc.AfterWashSpecs,
+            },
+          },
         );
         modifiedDocCount++;
       }
@@ -576,8 +586,8 @@ export const fixWashingSpecsIssues = async (req, res) => {
         totalBwIssuesFixed: totalBwFixed,
         totalAwIssuesFixed: totalAwFixed,
         totalDecimalsInserted: totalDecimalsInserted,
-        documentsUpdated: modifiedDocCount
-      }
+        documentsUpdated: modifiedDocCount,
+      },
     });
   } catch (error) {
     console.error("Error fixing washing specs:", error);
@@ -596,8 +606,8 @@ export const fixTolIssues = async (req, res) => {
     const cursor = collection.find({
       $or: [
         { BeforeWashSpecs: { $exists: true, $not: { $size: 0 } } },
-        { AfterWashSpecs: { $exists: true, $not: { $size: 0 } } }
-      ]
+        { AfterWashSpecs: { $exists: true, $not: { $size: 0 } } },
+      ],
     });
 
     let totalBwTolFixed = 0;
@@ -680,9 +690,9 @@ export const fixTolIssues = async (req, res) => {
           {
             $set: {
               BeforeWashSpecs: doc.BeforeWashSpecs,
-              AfterWashSpecs: doc.AfterWashSpecs
-            }
-          }
+              AfterWashSpecs: doc.AfterWashSpecs,
+            },
+          },
         );
         modifiedDocCount++;
       }
@@ -695,8 +705,8 @@ export const fixTolIssues = async (req, res) => {
         totalBwTolFixed,
         totalAwTolFixed,
         totalDecimalsInserted,
-        documentsUpdated: modifiedDocCount
-      }
+        documentsUpdated: modifiedDocCount,
+      },
     });
   } catch (error) {
     console.error("Error fixing TOL specs:", error);

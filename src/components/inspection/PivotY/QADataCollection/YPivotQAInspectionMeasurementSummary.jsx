@@ -557,6 +557,7 @@ export const MeasurementSummaryTable = ({
   selectedSpecsList,
   sizeList = [],
   compact = false,
+  stage = "Before",
 }) => {
   const tableData = buildTableData(measurements, sizeList);
 
@@ -636,6 +637,20 @@ export const MeasurementSummaryTable = ({
                 TOL (+)
               </span>
             </th>
+
+            {/* --- NEW: Shrinkage Header (Only for Before Wash) --- */}
+            {stage === "Before" && (
+              <th
+                rowSpan={2}
+                className={`border border-gray-300 dark:border-gray-600 ${
+                  compact ? "p-1" : "p-1.5"
+                } text-center bg-yellow-50 dark:bg-yellow-900/20 w-[60px]`}
+              >
+                <span className="text-amber-600 dark:text-amber-400 font-bold">
+                  Shrinkage
+                </span>
+              </th>
+            )}
 
             {/* 3. Size Headers */}
             {tableData.map(
@@ -789,6 +804,19 @@ export const MeasurementSummaryTable = ({
                     {displayTolPlus}
                   </span>
                 </td>
+
+                {/* --- NEW: Shrinkage Cell (Only for Before Wash) --- */}
+                {stage === "Before" && (
+                  <td
+                    className={`border border-gray-300 dark:border-gray-600 ${
+                      compact ? "p-1" : "p-1.5"
+                    } text-center bg-yellow-50/50 dark:bg-yellow-900/10`}
+                  >
+                    <span className="text-amber-600 dark:text-amber-400 font-bold text-[10px]">
+                      {spec.Shrinkage?.fraction || "-"}
+                    </span>
+                  </td>
+                )}
 
                 {/* 4. Size Data Loop */}
                 {tableData.map((sizeData, sIdx) => {

@@ -307,6 +307,9 @@ export const getQASectionsMeasurementSpecs = async (req, res) => {
       id: new mongoose.Types.ObjectId().toString(),
       TolMinus: sanitizeToleranceValue(spec.TolMinus),
       TolPlus: sanitizeToleranceValue(spec.TolPlus),
+      Shrinkage: spec.Shrinkage
+        ? sanitizeToleranceValue(spec.Shrinkage)
+        : { fraction: "0", decimal: 0 },
     }));
 
     return res.status(200).json({
@@ -337,12 +340,14 @@ export const saveQASectionsMeasurementSpecs = async (req, res) => {
       ...spec,
       TolMinus: sanitizeToleranceValue(spec.TolMinus),
       TolPlus: sanitizeToleranceValue(spec.TolPlus),
+      Shrinkage: sanitizeToleranceValue(spec.Shrinkage),
     }));
 
     const cleanedSelectedSpecs = selectedSpecs.map((spec) => ({
       ...spec,
       TolMinus: sanitizeToleranceValue(spec.TolMinus),
       TolPlus: sanitizeToleranceValue(spec.TolPlus),
+      Shrinkage: sanitizeToleranceValue(spec.Shrinkage),
     }));
 
     // Use direct update with explicit $set for arrays
@@ -452,6 +457,7 @@ export const getQASectionsMeasurementSpecsAW = async (req, res) => {
         MeasurementPointChiName: item.ChineseName || "",
         TolMinus: cleanTolMinus,
         TolPlus: cleanTolPlus,
+        Shrinkage: { fraction: "0", decimal: 0 },
         Specs: transformedSpecsValues,
       };
     });
@@ -490,6 +496,7 @@ export const saveQASectionsMeasurementSpecsAW = async (req, res) => {
         ...spec,
         TolMinus: sanitizeToleranceValue(spec.TolMinus),
         TolPlus: sanitizeToleranceValue(spec.TolPlus),
+        Shrinkage: { fraction: "0", decimal: 0 },
         Specs: cleanSpecsValues,
       };
     });
@@ -504,6 +511,7 @@ export const saveQASectionsMeasurementSpecsAW = async (req, res) => {
         ...spec,
         TolMinus: sanitizeToleranceValue(spec.TolMinus),
         TolPlus: sanitizeToleranceValue(spec.TolPlus),
+        Shrinkage: { fraction: "0", decimal: 0 },
         Specs: cleanSpecsValues,
       };
     });
@@ -792,5 +800,111 @@ export const previewToleranceIssues = async (req, res) => {
       success: false,
       error: error.message,
     });
+  }
+};
+
+/**
+ * APPLIES BEFORE WASH SELECTION TO AFTER WASH
+ * 1. Generates fresh AllAfterWashSpecs from Master Data (dt_orders.SizeSpec).
+ * 2. Selects items in AW that match the MeasurementPointEngName from the BW selection.
+ * 3. Saves both arrays to the database.
+ */
+export const applyBWSelectionToAW = async (req, res) => {
+  const { moNo, selectedPointNames } = req.body;
+
+  if (!moNo) {
+    return res.status(400).json({ message: "MO Number is required." });
+  }
+
+  if (!selectedPointNames || !Array.isArray(selectedPointNames)) {
+    return res
+      .status(400)
+      .json({ message: "Selected Point Names array is required." });
+  }
+
+  try {
+    const cleanMoNo = moNo.trim();
+
+    // 1. Fetch Master Data for AW (SizeSpec)
+    const dtOrderData = await DtOrder.findOne(
+      { Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") } },
+      { SizeSpec: 1, Order_No: 1, _id: 0 },
+    ).lean();
+
+    if (!dtOrderData || !dtOrderData.SizeSpec) {
+      return res.status(404).json({
+        message:
+          "No 'Size Spec' (After Wash) data found in Master Data to apply.",
+      });
+    }
+
+    // 2. Transform Master Data into Clean AW Specs
+    // (Logic mirrors getQASectionsMeasurementSpecsAW)
+    const allAfterWashSpecs = dtOrderData.SizeSpec.map((item, index) => {
+      const transformedSpecsValues = [];
+
+      if (item.Specs && Array.isArray(item.Specs)) {
+        item.Specs.forEach((sizeObj, sIdx) => {
+          const sizeKey = Object.keys(sizeObj)[0];
+          if (sizeKey) {
+            const rawVal = sizeObj[sizeKey];
+            const cleanVal = sanitizeSpecValue(rawVal); // Uses existing helper
+
+            transformedSpecsValues.push({
+              index: sIdx + 1,
+              size: sizeKey,
+              fraction: cleanVal.fraction,
+              decimal: cleanVal.decimal,
+            });
+          }
+        });
+      }
+
+      const cleanTolMinus = sanitizeToleranceValue(item.ToleranceMinus); // Uses existing helper
+      const cleanTolPlus = sanitizeToleranceValue(item.TolerancePlus); // Uses existing helper
+
+      return {
+        id: new mongoose.Types.ObjectId().toString(),
+        no: index + 1,
+        kValue: "NA", // Hardcoded for AW
+        MeasurementPointEngName: item.EnglishRemark || item.Area || "Unknown",
+        MeasurementPointChiName: item.ChineseName || "",
+        TolMinus: cleanTolMinus,
+        TolPlus: cleanTolPlus,
+        Shrinkage: { fraction: "0", decimal: 0 }, // Hardcoded for AW
+        Specs: transformedSpecsValues,
+      };
+    });
+
+    // 3. Filter: Select items that match the names from Before Wash
+    const selectedAfterWashSpecs = allAfterWashSpecs.filter((awSpec) =>
+      selectedPointNames.includes(awSpec.MeasurementPointEngName),
+    );
+
+    // 4. Save to DB
+    const result = await QASectionsMeasurementSpecs.findOneAndUpdate(
+      { Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") } },
+      {
+        $set: {
+          Order_No: cleanMoNo,
+          AllAfterWashSpecs: allAfterWashSpecs,
+          selectedAfterWashSpecs: selectedAfterWashSpecs,
+        },
+        $currentDate: { updatedAt: true },
+      },
+      {
+        new: true,
+        upsert: true,
+        runValidators: true,
+      },
+    );
+
+    res.status(200).json({
+      message: `Successfully applied selection to After Wash. (${selectedAfterWashSpecs.length} points matched)`,
+      data: result,
+    });
+  } catch (error) {
+    console.error("Error applying BW selection to AW:", error);
+    res.status(500).json({ error: error.message });
   }
 };
