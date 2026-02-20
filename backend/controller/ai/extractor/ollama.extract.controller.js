@@ -181,4 +181,54 @@ const LLMImageExtractor = async (imagePath, schema = null, systemPrompt = null) 
   }
 }
 
-export { LLMTextExtractor, LLMImageExtractor };
+/**
+ * Extracts raw text from an image (OCR-like) using VLM.
+ */
+const LLMOCR = async (imageBase64) => {
+  const primaryModel = process.env.OLLAMA_VLM_PRIMARY ?? "devstral-small-2:latest";
+  const fallbacks = (process.env.OLLAMA_VLM_FALLBACKS ?? "llama3.2-vision:latest,moondream:latest").split(",");
+
+  const prompt = "Please transcribe all the text found in this image. Maintain the layout if possible. Return only the extracted text.";
+
+  let optimizedImage = imageBase64;
+  try {
+    const buffer = Buffer.from(imageBase64, 'base64');
+    const resizedBuffer = await sharp(buffer)
+      .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+    optimizedImage = resizedBuffer.toString('base64');
+  } catch (optError) {
+    if (global.logger) global.logger.warn("Image optimization failed in OCR, using original:", optError.message);
+  }
+
+  try {
+    const response = await ollamaChatWithRetry({
+      model: primaryModel,
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+          images: [optimizedImage]
+        }
+      ],
+      keep_alive: "30m",
+      options: {
+        temperature: 0,
+        num_thread: 8,
+      }
+    }, fallbacks, 300000, 'vision');
+
+    return response.message.content;
+  } catch (err) {
+    if (err.code === 'ECONNREFUSED' || (err.cause && err.cause.code === 'ECONNREFUSED')) {
+      const errorMsg = `Ollama service unreachable. Please ensure Ollama is running at ${ollamaClient.config.host}`;
+      if (global.logger) global.logger.error("OCR Connection Error:", errorMsg);
+      throw new Error(errorMsg);
+    }
+    if (global.logger) global.logger.error("All OCR models failed", err);
+    throw err;
+  }
+}
+
+export { LLMTextExtractor, LLMImageExtractor, LLMOCR };

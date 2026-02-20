@@ -1,13 +1,14 @@
 import { useState } from "react";
 import GprtTranslationTemplate from "./templates/gprt/GprtTranslationTemplate";
-import { AlertCircle, Download, Maximize2, Minimize2, Globe, Loader2 } from "lucide-react";
+import { AlertCircle, Download, Maximize2, Minimize2, Globe, Loader2, BookCheck } from "lucide-react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import { glossary, default as instructionService } from "@/services/instructionService";
 
 const TranslationReview = ({ team, mode = "final", instruction, setinstruction, onNext, sourceLang, targetLangs = [] }) => {
-    const allLangs = [sourceLang, ...targetLangs];
+    const allLangs = [sourceLang, ...targetLangs].filter(lang => lang && lang.value);
 
-    const initialLang = targetLangs[0]?.value || sourceLang?.value || "english";
+    const initialLang = targetLangs[0]?.value || sourceLang?.value || "en";
     const [currentViewLang, setCurrentViewLang] = useState(initialLang);
     const [isExpanded, setIsExpanded] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
@@ -62,6 +63,21 @@ const TranslationReview = ({ team, mode = "final", instruction, setinstruction, 
         }
     };
 
+    const handleExportToGlossary = async () => {
+        if (!instruction?._id) return;
+
+        setIsExporting(true);
+        try {
+            await glossary.exportFromInstruction(instruction._id, currentViewLang);
+            alert(`Verified ${currentViewLang.toUpperCase()} terms have been exported to your library.`);
+        } catch (error) {
+            console.error("Glossary Export Error:", error);
+            alert("Failed to export terms to library.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     const containerClasses = isExpanded
         ? "fixed inset-0 z-50 bg-slate-50 flex flex-col"
         : "h-full w-full bg-slate-50 rounded-xl border border-slate-200 overflow-hidden relative flex flex-col";
@@ -83,8 +99,21 @@ const TranslationReview = ({ team, mode = "final", instruction, setinstruction, 
                 <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
                     {allLangs.map((lang) => (
                         <button
-                            key={lang.value}
-                            onClick={() => setCurrentViewLang(lang.value)}
+                            key={lang?.value}
+                            onClick={async () => {
+                                const newLang = lang.value;
+                                setCurrentViewLang(newLang);
+                                const idToUse = instruction?._id || instruction?.instructionId;
+                                if (idToUse) {
+                                    try {
+                                        const response = await instructionService.document.getInstractionTranslatedById(idToUse, newLang);
+                                        const translatedData = response.data || response;
+                                        setinstruction(translatedData);
+                                    } catch (err) {
+                                        console.error("Failed to fetch translated instruction:", err);
+                                    }
+                                }
+                            }}
                             className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${currentViewLang === lang.value
                                 ? "bg-white text-blue-600 shadow-sm scale-105"
                                 : "text-slate-500 hover:text-slate-700 hover:bg-white/50"}`}
@@ -105,52 +134,64 @@ const TranslationReview = ({ team, mode = "final", instruction, setinstruction, 
                 </div>
             </div>
 
-            {team === "GPRT0007C" ? (
-                <div className="flex-1 overflow-hidden bg-white relative flex flex-col">
-                    <div className="flex-1 overflow-x-hidden overflow-y-auto bg-slate-100 p-0">
-                        <GprtTranslationTemplate
-                            editable={false}
-                            step="complete"
-                            currentLanguage={currentViewLang}
-                            instruction={instruction}
-                            setinstruction={setinstruction}
-                        />
+            {
+                team === "GPRT0007C" ? (
+                    <div className="flex-1 overflow-hidden bg-slate-200 relative flex flex-col">
+                        <div className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8">
+                            <GprtTranslationTemplate
+                                editable={false}
+                                step="complete"
+                                currentLanguage={currentViewLang}
+                                instruction={instruction}
+                                setinstruction={setinstruction}
+                            />
+                        </div>
                     </div>
-                </div>
-            ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8">
-                    <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-                        <AlertCircle size={32} />
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8">
+                        <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                            <AlertCircle size={32} />
+                        </div>
+                        <p>Select a supported team to view the final result.</p>
                     </div>
-                    <p>Select a supported team to view the final result.</p>
-                </div>
-            )}
+                )
+            }
 
-            {team === "GPRT0007C" && (
-                <div className="p-5 bg-white border-t border-slate-200 flex justify-between items-center shrink-0 gap-4">
-                    <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${isExporting ? 'bg-blue-500 animate-spin' : 'bg-emerald-500 animate-pulse'}`}></div>
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                            {isExporting ? "Generating PDF..." : `${currentViewLang} version • Ready for Export`}
-                        </span>
+            {
+                team === "GPRT0007C" && (
+                    <div className="p-5 bg-white border-t border-slate-200 flex justify-between items-center shrink-0 gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${isExporting ? 'bg-blue-500 animate-spin' : 'bg-emerald-500 animate-pulse'}`}></div>
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                                {isExporting ? "Generating PDF..." : `${currentViewLang} version • Ready for Export`}
+                            </span>
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleExportToGlossary}
+                                disabled={isExporting || currentViewLang === sourceLang?.value}
+                                className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-slate-200 text-slate-700 rounded-xl hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-bold group"
+                            >
+                                <BookCheck size={18} className="group-hover:scale-110 transition-transform" />
+                                To Library
+                            </button>
+                            <button
+                                onClick={handleExportPdf}
+                                disabled={isExporting}
+                                className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-all text-sm font-bold shadow-lg shadow-blue-200 group"
+                            >
+                                {isExporting ? (
+                                    <Loader2 size={18} className="animate-spin" />
+                                ) : (
+                                    <Download size={18} className="group-hover:translate-y-0.5 transition-transform" />
+                                )}
+                                {isExporting ? "Exporting..." : `Download ${currentViewLang.toUpperCase()} PDF`}
+                            </button>
+                        </div>
                     </div>
-                    <div className="flex gap-3">
-                        <button
-                            onClick={handleExportPdf}
-                            disabled={isExporting}
-                            className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-all text-sm font-bold shadow-lg shadow-blue-200 group"
-                        >
-                            {isExporting ? (
-                                <Loader2 size={18} className="animate-spin" />
-                            ) : (
-                                <Download size={18} className="group-hover:translate-y-0.5 transition-transform" />
-                            )}
-                            {isExporting ? "Exporting..." : `Download ${currentViewLang.toUpperCase()} PDF`}
-                        </button>
-                    </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

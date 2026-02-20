@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Circle,
@@ -10,37 +10,46 @@ import {
 } from "lucide-react";
 
 import Guide from "../components/ai/instruction-translation/Guide";
-import TeamSelection from "../components/ai/instruction-translation/TeamSelection";
-import DocumentUpload from "../components/ai/instruction-translation/DocumentUpload";
-import LanguageConfig from "../components/ai/instruction-translation/LanguageConfig";
-import TranslationReview from "../components/ai/instruction-translation/TranslationReview";
+import StepContent from "../components/ai/instruction-translation/StepContent";
 import Sidebar from "../components/ai/instruction-translation/Sidebar";
 import Header from "../components/ai/instruction-translation/Header";
 import TranslationOverlay from "../components/ai/instruction-translation/TranslationOverlay";
+
 import { customer, progress, document } from "@/services/instructionService";
 import { useAuth } from "@/components/authentication/AuthContext";
-
 import { useTranslate } from "@/hooks/useTranslate";
+import { useInstructionFlow } from "@/hooks/useInstructionFlow";
 
 const InstructionTranslation = () => {
-    const [steps, setSteps] = useState(null);
+    // Custom Hook for Step Management
+    const {
+        steps,
+        currentStep,
+        setCurrentStep,
+        loadSteps,
+        goToNext,
+        goToPrev,
+        updateAllStepsTeam
+    } = useInstructionFlow();
+
+    // Local State
     const [teams, setTeams] = useState(null);
     const [showDoc, setShowDoc] = useState(false);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-    const [currentStep, setCurrentStep] = useState(1);
+
+    // Form/Data State
     const [selectedTeam, setSelectedTeam] = useState(null);
     const [files, setFiles] = useState([]);
     const [preview, setPreview] = useState("");
     const [instruction, setinstruction] = useState({});
-    const [glossaryFile, setGlossaryFile] = useState(null);
-    // eslint-disable-next-line no-unused-vars
-    const [glossaryCount, setGlossaryCount] = useState(0);
     const [isTranslating, setIsTranslating] = useState(false);
-    const { user } = useAuth();
-    const { translate, translateBatch } = useTranslate();
 
+    // Language State
     const [sourceLang, setSourceLang] = useState(null);
     const [targetLangs, setTargetLangs] = useState([]);
+
+    const { user } = useAuth();
+    const { translateBatch } = useTranslate();
 
     const iconMapping = {
         "Users": Users,
@@ -49,9 +58,16 @@ const InstructionTranslation = () => {
         "Award": Award
     };
 
+    // Use a ref to prevent double-initialization in StrictMode/re-renders
+    const hasFetched = useRef(false);
+
+    // Initial Data Fetch
     useEffect(() => {
         const fetchData = async () => {
+            if (!user || hasFetched.current) return;
+
             try {
+                hasFetched.current = true;
                 let userLanguage = user?.language || localStorage.getItem("preferredLanguage") || "en";
                 if (userLanguage === "kh") userLanguage = "km";
                 if (userLanguage === "ch") userLanguage = "zh-Hans";
@@ -59,19 +75,16 @@ const InstructionTranslation = () => {
                 const data = await progress.getProgress(userLanguage);
                 const customerData = await customer.getCustomer();
                 setTeams(customerData);
-                // Map the API response to the format expected by the UI
+
+                // Map API response to UI format
                 let formattedSteps = data.map(step => ({
                     ...step,
-                    // Use 'order' as the ID for internal UI logic (1, 2, 3...)
                     id: step.order,
-                    // Keep the original ID just in case
                     originalId: step.id,
-                    // Map the string icon name to the actual component
                     icon: iconMapping[step.icon] || Circle
                 })).sort((a, b) => a.order - b.order);
 
-                // Translate static text using the new static route
-                // Logic: Backend might have returned English if translation missing, so we force a check via our static route
+                // Translate static text
                 if (translateBatch) {
                     formattedSteps = await translateBatch(formattedSteps, 'title');
                     formattedSteps = await translateBatch(formattedSteps, 'instruct_title');
@@ -79,13 +92,15 @@ const InstructionTranslation = () => {
                     formattedSteps = await translateBatch(formattedSteps, 'description');
                 }
 
-                setSteps(formattedSteps);
-                const activeStep = data.find(step => step.status === "active");
-                if (activeStep) {
-                    setCurrentStep(activeStep.order);
+                loadSteps(formattedSteps);
+
+                // Restore Team
+                const teamStep = data.find(s => s.order === 1);
+                if (teamStep?.team) {
+                    setSelectedTeam(teamStep.team);
                 }
 
-                // Restore active document and instruction data
+                // Restore Active Document
                 const docsResponse = await document.getDocsByUser();
                 const userDocs = docsResponse?.documents || [];
                 const activeDoc = userDocs.find(d => d.active);
@@ -95,77 +110,112 @@ const InstructionTranslation = () => {
                 }
 
                 if (activeDoc) {
-                    // Fetch extraction data
                     try {
-                        const response = await document.getInstruction(activeDoc._id);
-                        const instructionData = response.data || response;
-                        setinstruction(instructionData);
-                        // If the instruction data has customer info, restore selectedTeam
-                        if (instructionData?.customer?.customer_info?.name) {
-                            setSelectedTeam(instructionData.customer.customer_info.name);
-                        } else if (instructionData?.customer) {
-                            // Fallback for different response structures
-                            setSelectedTeam(instructionData.customer);
+                        // Check if we already have this instruction loaded to avoid redundant fetch
+                        if (instruction?.documentId !== activeDoc._id) {
+                            const response = await document.getInstruction(activeDoc._id);
+                            const instructionData = response.data || response;
+                            setinstruction(instructionData);
+
+                            // Only restore from instruction if we haven't already restored from progress
+                            if (!teamStep || !teamStep.team) {
+                                if (instructionData?.customer?.customer_info?.name) {
+                                    setSelectedTeam(instructionData.customer.customer_info.name);
+                                } else if (typeof instructionData?.customer === 'string') {
+                                    setSelectedTeam(instructionData.customer);
+                                }
+                            }
+                            setPreview("Preview");
                         }
-                        setPreview("Preview");
                     } catch (err) {
-                        logger.error("Failed to restore instruction data:", err);
+                        console.error("Failed to restore instruction data:", err);
                     }
                 }
             } catch (error) {
-                logger.error("Failed to fetch page data:", error);
+                console.error("Failed to fetch page data:", error);
+                hasFetched.current = false; // Allow retry on failure
             }
         };
 
-        if (user) {
-            fetchData();
-        }
-    }, [user, translateBatch]);
+        fetchData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, loadSteps]);
 
-    const activeSteps = steps;
 
-    const handleNext = async () => {
-        if (currentStep === 3) {
-            // Trigger translation animation
-            setIsTranslating(true);
-            try {
-                const targetValues = targetLangs.map(l => l.value);
-                targetValues.push(sourceLang.value);
-                logger.log("targetValues", targetValues);
-                // Ensure documentId exists before calling API
-                if (!instruction?.instructionId) {
-                    logger.error("Missing instructionId for translation");
-                    setIsTranslating(false);
-                    return;
-                }
-                await document.translate(instruction.instructionId, targetValues);
-                // After translation is done on server, fetch the updated instruction data
-                const updatedResponse = await document.getInstruction(instruction.documentId);
-                setinstruction(updatedResponse.data || updatedResponse);
-                setTimeout(async () => {
-                    setIsTranslating(false);
-                    setCurrentStep(prev => prev + 1);
-                    // Update progress to Step 4
-                    await progress.updateStatus(steps[3].originalId);
-                }, 3500);
-            } catch (error) {
-                logger.error("Translation failed:", error);
-                setIsTranslating(false);
-                // Optionally add a toast/alert here
-            }
-        } else if (currentStep < activeSteps.length) {
-            const nextStepOrder = currentStep + 1;
-            const nextStepIndex = nextStepOrder - 1;
-            setCurrentStep(nextStepOrder);
+    // Handlers
+    const handleTeamSelection = async (team) => {
+        setSelectedTeam(team.code);
 
-            if (steps[nextStepIndex]) {
-                await progress.updateStatus(steps[nextStepIndex].originalId);
-            }
+        try {
+            await updateAllStepsTeam(team.code);
+            goToNext();
+        } catch (error) {
+            console.error("Failed to save team selection:", error);
         }
     };
 
-    const handlePrev = () => {
-        if (currentStep > 1) setCurrentStep(prev => prev - 1);
+    const handleNextClick = async () => {
+        if (currentStep === 3) {
+            // Step 3 -> 4: Translation Trigger
+            try {
+                // Save languages
+                if (steps[2]) {
+                    await progress.updateProgress(steps[2].originalId, {
+                        source_language: sourceLang?.value,
+                        target_languages: targetLangs.map(l => l.value)
+                    });
+                }
+
+                console.log("Triggering translation with:", {
+                    source: sourceLang,
+                    targets: targetLangs,
+                    instructionId: instruction?.instructionId,
+                    _id: instruction?._id
+                });
+
+                // Start Translation Logic
+                setIsTranslating(true);
+                const targetValues = targetLangs.map(l => l.value);
+                targetValues.push(sourceLang.value);
+
+                const idToUse = instruction?.instructionId || instruction?._id || instruction?.id;
+
+                if (!idToUse) {
+                    console.error("Missing instructionId for translation", instruction);
+                    alert("Error: Missing Instruction ID. Please reload the document.");
+                    setIsTranslating(false);
+                    return;
+                }
+
+                await document.translate(idToUse, targetValues);
+
+                // Refresh Data
+                try {
+                    const docIdToFetch = instruction.documentId || instruction.document_id || files.find(f => f.active)?._id;
+                    if (docIdToFetch) {
+                        const updatedResponse = await document.getInstruction(docIdToFetch);
+                        setinstruction(updatedResponse.data || updatedResponse);
+                        console.log("Instruction data refreshed with translations.");
+                    } else {
+                        console.warn("Could not determine document ID for refresh.");
+                    }
+                } catch (refreshError) {
+                    console.error("Failed to refresh instruction data:", refreshError);
+                }
+
+                setTimeout(async () => {
+                    setIsTranslating(false);
+                    goToNext(); // Advances to Step 4
+                }, 1000);
+
+            } catch (error) {
+                console.error("Translation flow failed:", error);
+                setIsTranslating(false);
+            }
+        } else {
+            // Standard Navigation
+            goToNext();
+        }
     };
 
     if (!steps) {
@@ -182,7 +232,7 @@ const InstructionTranslation = () => {
             <Sidebar
                 isCollapsed={isSidebarCollapsed}
                 setIsCollapsed={setIsSidebarCollapsed}
-                steps={activeSteps}
+                steps={steps}
                 currentStep={currentStep}
                 showDoc={showDoc}
                 setShowDoc={setShowDoc}
@@ -193,9 +243,9 @@ const InstructionTranslation = () => {
 
                 <Header
                     currentStep={currentStep}
-                    steps={activeSteps}
-                    onPrev={handlePrev}
-                    onNext={handleNext}
+                    steps={steps}
+                    onPrev={goToPrev}
+                    onNext={handleNextClick}
                 />
 
                 <div className="flex-1 overflow-hidden relative">
@@ -222,78 +272,25 @@ const InstructionTranslation = () => {
                                 className="h-full w-full overflow-y-auto p-4 md:p-6 lg:p-8"
                             >
                                 <div className="max-w-[1600px] w-full mx-auto bg-white rounded-2xl shadow-sm border border-slate-100 min-h-[500px] p-6 md:p-8 lg:p-10">
-                                    {currentStep === 1 && (
-                                        <div className="space-y-6">
-                                            <div className="text-center">
-                                                <h2 className="text-2xl font-bold text-slate-900">{steps[currentStep - 1].instruct_title}</h2>
-                                                <p className="text-slate-500 mt-2">{steps[currentStep].instruct_description}</p>
-                                            </div>
-                                            <div className="mt-8">
-                                                <TeamSelection
-                                                    teams={teams}
-                                                    setSelectedTeam={setSelectedTeam}
-                                                    currentStep={currentStep}
-                                                    setCurrentStep={setCurrentStep}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {currentStep === 2 && (
-                                        <div className="h-full flex flex-col">
-                                            <div className="mb-6">
-                                                <h2 className="text-2xl font-bold text-slate-900">{steps[currentStep - 1].instruct_title}</h2>
-                                                <p className="text-slate-500">{steps[currentStep].instruct_description}</p>
-                                            </div>
-                                            <DocumentUpload
-                                                instruction={instruction}
-                                                setinstruction={setinstruction}
-                                                team={selectedTeam}
-                                                files={files}
-                                                setFiles={setFiles}
-                                                preview={preview}
-                                                setPreview={setPreview}
-                                                currentStep={currentStep}
-                                                setCurrentStep={setCurrentStep}
-                                            />
-                                        </div>
-                                    )}
-
-                                    {currentStep === 3 && (
-                                        <div className="space-y-6">
-                                            <div className="mb-6">
-                                                <h2 className="text-2xl font-bold text-slate-900">{steps[currentStep - 1].instruct_title}</h2>
-                                                <p className="text-slate-500">{steps[currentStep].instruct_description}</p>
-                                            </div>
-                                            <LanguageConfig
-                                                glossaryFile={glossaryFile}
-                                                setGlossaryFile={setGlossaryFile}
-                                                instruction={instruction}
-                                                onNext={handleNext}
-                                                sourceLang={sourceLang}
-                                                setSourceLang={setSourceLang}
-                                                targetLangs={targetLangs}
-                                                setTargetLangs={setTargetLangs}
-                                            />
-                                        </div>
-                                    )}
-
-                                    {currentStep === 4 && (
-                                        <div className="h-full">
-                                            <div className="mb-6">
-                                                <h2 className="text-2xl font-bold text-slate-900">{steps[currentStep - 1].instruct_title}</h2>
-                                                <p className="text-slate-500">{steps[currentStep - 1].instruct_description}</p>
-                                            </div>
-                                            <TranslationReview
-                                                team={selectedTeam}
-                                                mode="final"
-                                                instruction={instruction}
-                                                setinstruction={setinstruction}
-                                                sourceLang={sourceLang}
-                                                targetLangs={targetLangs}
-                                            />
-                                        </div>
-                                    )}
+                                    <StepContent
+                                        currentStep={currentStep}
+                                        stepData={steps[currentStep - 1]}
+                                        teams={teams}
+                                        selectedTeam={selectedTeam}
+                                        onTeamSelect={handleTeamSelection}
+                                        instruction={instruction}
+                                        setinstruction={setinstruction}
+                                        files={files}
+                                        setFiles={setFiles}
+                                        preview={preview}
+                                        setPreview={setPreview}
+                                        setCurrentStep={setCurrentStep}
+                                        onNext={handleNextClick}
+                                        sourceLang={sourceLang}
+                                        setSourceLang={setSourceLang}
+                                        targetLangs={targetLangs}
+                                        setTargetLangs={setTargetLangs}
+                                    />
                                 </div>
                             </motion.div>
                         )}

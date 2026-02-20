@@ -20,18 +20,31 @@ const GprtFirstPage = ({
     /**
      * Helper to get display text from the multilingual object (original + translations)
      */
-    const getDisplayText = (val) => {
+    const getDisplayText = useCallback((val) => {
+        // console.log("getDisplayText", { workingLang, val });
         if (!val) return "";
         if (typeof val === "string") return val;
 
-        // Fallback sequence: selected -> detected -> english -> first available value
-        return val[workingLang] ||
-            val[instruction?.detectedLanguage] ||
+        // Normalized matching for robustness
+        const target = workingLang.toLowerCase();
+        const keys = Object.keys(val);
+        const match = keys.find(k => k.toLowerCase() === target);
+
+        if (match) return val[match];
+
+        // Specific handling for Chinese variants if specific match failed
+        if (target.startsWith('zh')) {
+            const zhMatch = keys.find(k => k.toLowerCase().startsWith('zh'));
+            if (zhMatch) return val[zhMatch];
+        }
+
+        // Fallback sequence: detected -> english -> first available value
+        return val[instruction?.detectedLanguage] ||
             val.english ||
             val["null"] ||
             Object.values(val)[0] ||
             "";
-    };
+    }, [workingLang, instruction?.detectedLanguage]);
 
     /**
      * Unified handler for updating instruction fields
@@ -269,7 +282,6 @@ const GprtFirstPage = ({
                     <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
                         <AlertCircle className="w-5 h-5" />
                     </div>
-                    <h2 className="text-lg font-black uppercase tracking-widest text-slate-800">Production Instructions</h2>
                     <div className="h-px bg-slate-200 flex-grow" />
                     {(step === "Preview" || step === "edit") && (
                         <button
@@ -318,10 +330,7 @@ const GprtFirstPage = ({
             {/* NEW: Measurement Table Section */}
             <div className="mb-16">
                 <div className="flex items-center gap-4 mb-6">
-                    <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center">
-                        <Ruler className="w-5 h-5" />
-                    </div>
-                    <div className="h-px bg-slate-200 flex-grow" />
+
                 </div>
 
                 <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-sm">

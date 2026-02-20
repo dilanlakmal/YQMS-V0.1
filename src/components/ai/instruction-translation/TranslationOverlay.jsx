@@ -105,11 +105,7 @@ const TranslationOverlay = ({ isTranslating, sourceLang, targetLangs }) => {
             </div>
 
             {/* Context hints floating around */}
-            <div className="mt-16 flex gap-8">
-                <div className="glass-morphism px-4 py-2 rounded-lg flex items-center gap-2 animate-bounce" style={{ animationDelay: '0s' }}>
-                    <Sparkles size={14} className="text-blue-500" />
-                    <span className="text-xs font-semibold text-slate-700">Glossary Applied</span>
-                </div>
+            <div className="mt-16">
                 <div className="glass-morphism px-4 py-2 rounded-lg flex items-center gap-2 animate-bounce" style={{ animationDelay: '0.2s' }}>
                     <BrainCircuit size={14} className="text-indigo-500" />
                     <span className="text-xs font-semibold text-slate-700">Context Aware</span>

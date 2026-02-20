@@ -3,6 +3,51 @@
 ------------------------------ */
 
 import { app, server, PORT } from "./Config/appConfig.js";
+import { exec } from "node:child_process";
+
+
+exec("ssh yaidev", (error, stdout, stderr) => {
+  if (error) {
+    logger.error(error.message);
+    return;
+  }
+  if (stderr) {
+    logger.error(stderr);
+    return;
+  }
+  logger.info(stdout);
+});
+// --- Global Request Lifecycle Logger ---
+export const requestLogger = (req, res, next) => {
+  const start = Date.now();
+  const { method, originalUrl } = req;
+  const timestamp = new Date().toISOString();
+
+  // Log the incoming request with a distinct cyan color
+  logger.info(`\x1b[36m>>> [${timestamp}] ${req.ip} - ${method} ${originalUrl}\x1b[0m`);
+
+  // Log body preview if not empty (truncated for performance and readability)
+  if (req.body && Object.keys(req.body).length > 0) {
+    const bodyPreview = JSON.stringify(req.body);
+    logger.info(`    Body: ${bodyPreview.length > 500 ? bodyPreview.substring(0, 500) + "..." : bodyPreview}`);
+  }
+
+  // Capture the moment the response finishes to calculate duration and status
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const status = res.statusCode;
+    // Color coding: Green for success, Yellow for redirects, Red for errors
+    const color = status >= 400 ? '\x1b[31m' : (status >= 300 ? '\x1b[33m' : '\x1b[32m');
+    logger.log(`${color}<<< [${new Date().toISOString()}] ${method} ${originalUrl} ${status} (${duration}ms)\x1b[0m\n`);
+  });
+
+  next();
+};
+
+// Apply logger immediately at the start of the middleware chain
+app.use(requestLogger);
+// -----------------------------------------
+
 
 /* -----------------------------
   User Imports
@@ -304,6 +349,7 @@ import InstructionRoutes from "./routes/instruction/index.route.js"
 import GlossaryRoutes from "./routes/translation/glossary.routes.js";
 app.use("/api/instruction/translation", InstructionRoutes);
 app.use("/api/glossary", GlossaryRoutes);
+
 
 import { connectDB } from "./Config/database.js";
 await connectDB();
@@ -657,30 +703,19 @@ app.use((req, res, next) => {
 // process.on("SIGINT", async () => {
 //   try {
 //     await closeSQLPools();
-//     console.log("SQL connection pools closed.");
+//     logger.log("SQL connection pools closed.");
 //   } catch (err) {
-//     console.error("Error closing SQL connection pools:", err);
+//     logger.error("Error closing SQL connection pools:", err);
 //   } finally {
 //     process.exit(0);
 //   }
 // });
-export const requestLogger = (req, res, next) => {
-  const { method, originalUrl, params, query, body } = req;
-  const timestamp = new Date().toISOString();
 
-  console.log(`[${timestamp}] ${method} ${originalUrl}`);
-  console.log("Params:", params);
-  console.log("Query:", query);
-  console.log("Body:", body);
-
-  next(); // important to call next() so the request continues
-};
-app.use(requestLogger)
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`HTTPS Server is running on https://localhost:${PORT}`);
+  logger.log(`HTTPS Server is running on https://localhost:${PORT}`);
 });

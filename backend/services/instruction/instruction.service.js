@@ -127,11 +127,21 @@ class InstructionService {
         const imageBuffer = await downloadBlob(containerName, blobName);
         const imageBase64 = imageBuffer.toString('base64');
 
-        const schema = await instruction.getDynamicSchema();
-        const result = await LLMImageExtractor(imageBase64, schema);
-        if (!result) throw new Error("No data returned from AI extractor");
+        let result;
+        try {
+            const schema = await instruction.getDynamicSchema();
+            result = await LLMImageExtractor(imageBase64, schema);
+        } catch (error) {
+            global.logger.error("AI Extraction failed:", error.message);
+        }
 
-        const updatedInstruction = await instruction.updateInstruction(result);
+        let updatedInstruction = instruction;
+        if (result) {
+            updatedInstruction = await instruction.updateInstruction(result);
+        } else {
+            global.logger.warn("No data returned from AI extractor, using empty template");
+        }
+
         await Document.findByIdAndUpdate(docId, { $set: { status: "fieldExtracted" } });
 
         return {
@@ -302,10 +312,12 @@ class InstructionService {
      * Gets full hydrated instruction data (original + all translations).
      */
     async getInstructionById(instructionId) {
-        const instruction = await Instruction.findById(instructionId);
-        if (!instruction) throw { status: 404, message: "Instruction not found" };
+        const inst = await Instruction.findById(instructionId);
+        if (!inst) throw { status: 404, message: "Instruction not found" };
 
-        const result = await instruction.getFormattedData?.() || instruction.toObject();
+        const instruction = await Instruction.getInstruction(inst.document_id);
+        const result = instruction.toObject();
+
         return {
             instructionId: instruction._id,
             documentId: instruction.document_id,

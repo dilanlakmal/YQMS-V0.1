@@ -1,97 +1,108 @@
-import { Document } from "./backend/models/instruction/index.js";
+import "dotenv/config";
 import { connectDB, disconnectDB } from "./backend/Config/database.js";
-import { downloadBlob, uploadBlob } from "./backend/storage/azure.blob.storage.js";
-import { LLMImageExtractor } from "./backend/controller/ai/extractor/ollama.extract.controller.js";
-import PDFExtractor from "./backend/controller/AI/extractor/PDFExtractor.js";
-import fs from "fs";
-import path from "path";
-import  "./backend/Utils/logger.js";
-import { Instruction } from "./backend/models/instruction/index.js";
-import "./backend/Utils/logger.js"
-import "./backend/Utils/logger.js"
+import Instruction from "./backend/models/instruction/Instruction.model.js";
+// import Document from "./backend/models/instruction/document.model.js";
+import Glossary from "./backend/models/translation/glossary.model.js";
+import "./backend/Utils/logger.js";
+import OllamaProvider from "./backend/modules/ai/orchestrator/providers/ollama-provider.js";
+import { exec } from "node:child_process";
+/**
+ * Simple test script for Instruction models
+ * 
+ * 
+ */
 await connectDB();
 
-const instruction = await Instruction.findOne({ _id: "697af9646fcd8587c4bac2d7" });
 
-const ids = await instruction.getAllContentIds();
+await Glossary.createGlossary("廠號", "", "លេខរោងចក្រ", "km");
 
-logger.info(JSON.stringify(ids, null, 2));
-// const imagePath = "./converted_test-01.png";
-
-// logger.time("extracting");
-// const result = await LLMImageExtractor(imagePath, formated);
-// logger.info(JSON.stringify(result, null, 2));
-// logger.timeEnd("extracting");
+const glossaries = await Glossary.getGlossaryItems("zh-Hant", "km");
+const glossaryContent = glossaries.map(g => `${g.source}\t${g.target}`).join("\n");
+logger.info(glossaryContent);
 
 await disconnectDB();
-// // Main function
-// const run = async () => {
-//     try {
-//         await connectDB();
+// exec("ssh yaidev");
+// const testContent = `GPRT00077C 注意大點
+// 客款號 : W02-490014
+// 廠號 : GPRT00077C
+// PO# 709331
+// 數量 : 3,200 pcs
+// 大點 : Retail单 要PO#+RETEK 组合唛
+// 1. GPRT00077C W02-490014 前幅印花(PP办评语看附页明细)
+// 2. 圈起的数量加裁+10%
+// 3. 中查明细表如图`;
 
-//         // 1. Fetch Document
-//         const docId = "697ac4c69b66b7c5147d10aa";
-//         const doc = await Document.findOne({ _id: docId });
+// async function testModels() {
+//   try {
+//     console.log("🚀 Starting models test...");
+//     await connectDB();
 
-//         if (!doc) {
-//             logger.error("Document not found");
-//             process.exit(1);
-//         }
+//     // 1. Create a dummy document
+//     console.log("Creating dummy document...");
+//     const dummyDoc = await Document.create({
+//       type: "instruction",
+//       file_name: "test-instruction.pdf",
+//       status: "uploaded"
+//     });
+//     console.log(`✅ Document created: ${dummyDoc._id}`);
 
-//         logger.log("Found document:", doc.file_name);
-//         logger.log("Source URL:", doc.source);
+//     // 2. Test getInitialInstruction (which uses Prompt and Annotation internally)
+//     console.log("Testing getInitialInstruction...");
+//     const instruction = await Instruction.getInitialInstruction(dummyDoc._id);
+//     console.log(`✅ Instruction initialized: ${instruction._id}`);
 
-//         // 2. Parse URL for container and blob name
-//         // URL format: https://<account>.blob.core.windows.net/<container>/<blob>
-//         const urlObj = new URL(doc.source);
-//         const pathParts = urlObj.pathname.split('/').filter(p => p.length > 0);
+//     // 3. Test constructORC
+//     console.log("Testing constructORC (generating JSON schema)...");
+//     const populatedInstruction = await Instruction.getInstruction(dummyDoc._id);
+//     logger.info(JSON.stringify(populatedInstruction, null, 2));
 
-//         // pathParts[0] is container (likely user_id), pathParts[1] is blob name
-//         const containerName = pathParts[0];
-//         const blobName = pathParts.slice(1).join('/'); // In case blob name has slashes
+//     const orcSchema = await populatedInstruction.constructORC();
+//     console.log("✅ ORC Schema generated successfully:");
+//     console.log(JSON.stringify(orcSchema, null, 2));
 
-//         logger.log(`Container: ${containerName}`);
-//         logger.log(`Blob Name: ${blobName}`);
+//     // 4. Test Extraction
+//     console.log("🚀 Starting Extraction with Ollama...");
+//     const aiProvider = new OllamaProvider({
+//       baseUrl: process.env.OLLAMA_BASE_URL
+//     });
 
-//         // 3. Download PDF
-//         logger.log("Downloading PDF from Azure...");
-//         const pdfBuffer = await downloadBlob(containerName, blobName);
-//         logger.log(`Downloaded ${pdfBuffer.length} bytes.`);
+//     // Use the primary text model from env or fallback
+//     const model = process.env.OLLAMA_TEXT_PRIMARY || "llama3.1:latest";
+//     console.log(`Using model: ${model}`);
 
-//         // 4. Save to temp file
-//         const tempPdfPath = path.resolve("./temp_test.pdf");
-//         fs.writeFileSync(tempPdfPath, pdfBuffer);
-//         logger.log(`Saved temp PDF to ${tempPdfPath}`);
+//     const extractedResult = await aiProvider.extract(testContent, orcSchema, { model });
 
-//         // 5. Convert to Image
-//         logger.log("Converting to image...");
-//         const extractor = new PDFExtractor(tempPdfPath);
-//         const outputName = "converted_test";
-//         // convert(outputDir, outputName)
-//         const imagePath = await extractor.convert(process.cwd(), outputName);
-//         logger.log(`Image generated at: ${imagePath}`);
-
-//         // 6. Upload Image back to Azure
-//         if (fs.existsSync(imagePath)) {
-//             const imageBuffer = fs.readFileSync(imagePath);
-//             const imageBlobName = `converted-${docId}.png`;
-//             logger.log(`Uploading image as ${imageBlobName}...`);
-
-//             const uploadedUrl = await uploadBlob(containerName, imageBlobName, imageBuffer);
-//             logger.log(`Image uploaded successfully! URL: ${uploadedUrl}`);
-//         } else {
-//             logger.error("Image file not found!");
-//         }
-
-//         // Cleanup
-//         // fs.unlinkSync(tempPdfPath);
-//         // if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
-
-//     } catch (error) {
-//         logger.error("Error:", error);
-//     } finally {
-//         await disconnectDB();
+//     if (extractedResult) {
+//       console.log("✅ Extraction successful!");
+//       console.log(JSON.stringify(extractedResult, null, 2));
+//       await populatedInstruction.updateInstruction(extractedResult);
+//       const updatedInstruction = await Instruction.getInstruction(dummyDoc._id);
+//       logger.info("updated instruction: " + JSON.stringify(updatedInstruction, null, 2));
+//       const detectedLanguage = await updatedInstruction.getDetectedLanguage();
+//       logger.info(`Detected language: ${detectedLanguage}`);
+//       // Test getAllContents
+//       logger.info("Testing getAllContents...");
+//       const allContents = await updatedInstruction.getAllContents();
+//       logger.info(`✅ Retrieved ${allContents.length} unique content documents.`);
+//       allContents.forEach((c, idx) => {
+//         logger.info(`  [${idx + 1}] ID: ${c._id}, Text: "${c.original}"`);
+//       });
+//     } else {
+//       logger.error("❌ Extraction failed (returned null).");
 //     }
-// };
 
-// run();
+//     // 5. Cleanup
+//     // console.log("Cleaning up test data...");
+//     // await Document.findByIdAndDelete(dummyDoc._id);
+//     // await Instruction.findByIdAndDelete(instruction._id);
+
+//     console.log("🎉 All tests completed!");
+//   } catch (error) {
+//     console.error("❌ Test failed:", error);
+//   } finally {
+//     await disconnectDB();
+//     process.exit(0);
+//   }
+// }
+
+// await testModels();

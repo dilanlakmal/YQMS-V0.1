@@ -29,7 +29,7 @@ const AzureTranslatorService = {
      * @param {string[]} targetLanguages - List of target language codes (e.g., ['fr', 'de']).
      * @returns {Promise<string>} - The Job ID.
      */
-    submitTranslationJob: async (customerId, files, targetLanguages, suorceLanguage) => {
+    submitTranslationJob: async (customerId, files, targetLanguages, sourceLanguage) => {
         logger.info("Starting translation job submission", { customerId, fileCount: files.length, targetLanguages });
 
         try {
@@ -47,7 +47,7 @@ const AzureTranslatorService = {
 
                 // Generate SAS for source (Read access for specific blob)
                 const sourceUrl = await getBlobSasUrl(sourceContainer, blobName);
-                const source = constructSource(sourceUrl, suorceLanguage);
+                const source = constructSource(sourceUrl, sourceLanguage);
 
                 // Generate SAS for target (Write access for container + specific output blob)
                 const targets = await Promise.all(targetLanguages.map(async (lang) => {
@@ -59,10 +59,10 @@ const AzureTranslatorService = {
                     const targetUrl = await getContainerSasUrl(targetContainer, targetBlobName);
                     logger.info(`[Step 2] Target SAS URL generated for lang: ${lang}`);
 
-                    const blobGlossaryName = `${customerId}/${suorceLanguage}-${lang}.tsv`;
+                    const blobGlossaryName = `${customerId}/${sourceLanguage}-${lang}.tsv`;
                     logger.info(`[Step 3] Glossary blob name generated: ${blobGlossaryName}`);
 
-                    const glossaryItems = await Glossary.getGlossaryItems(suorceLanguage, lang);
+                    const glossaryItems = await Glossary.getGlossaryItems(sourceLanguage, lang);
                     logger.info(`[Step 5] Retrieved ${glossaryItems.length} glossary items`);
 
                     let glossary = null;

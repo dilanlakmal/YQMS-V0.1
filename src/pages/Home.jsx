@@ -790,6 +790,7 @@ import {
   Home as HomeIcon
 } from "lucide-react";
 import { FaRobot, FaGlobe, FaClipboard } from "react-icons/fa";
+import { useTranslate } from "@/hooks/useTranslate";
 
 // --- Theme Hook for Dark Mode ---
 const useTheme = () => {
@@ -967,9 +968,8 @@ const SettingsModal = ({
 
   return (
     <div
-      className={`fixed inset-0 z-[100] ${
-        isMobile ? "" : "flex items-center justify-center"
-      }`}
+      className={`fixed inset-0 z-[100] ${isMobile ? "" : "flex items-center justify-center"
+        }`}
     >
       {/* Backdrop */}
       <div
@@ -979,11 +979,10 @@ const SettingsModal = ({
 
       {/* Modal Content */}
       <div
-        className={`relative bg-white dark:bg-slate-900 ${
-          isMobile
+        className={`relative bg-white dark:bg-slate-900 ${isMobile
             ? "h-full w-full"
             : "rounded-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl"
-        }`}
+          }`}
       >
         {/* Header */}
         <div className="sticky top-0 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 px-4 py-4 flex items-center justify-between z-10">
@@ -1063,11 +1062,10 @@ const SettingsModal = ({
               <button
                 onClick={subscribeToPush}
                 disabled={loading}
-                className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all ${
-                  loading
+                className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all ${loading
                     ? "bg-gray-300 dark:bg-slate-700 cursor-not-allowed text-gray-500"
                     : "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg active:scale-[0.98]"
-                }`}
+                  }`}
               >
                 {loading ? (
                   <>
@@ -1189,18 +1187,16 @@ const MobileBottomNav = ({
             key={section.id}
             ref={activeSection === section.id ? activeButtonRef : null}
             onClick={() => onSectionChange(section.id)}
-            className={`flex-shrink-0 min-w-[72px] flex flex-col items-center py-2 px-2 transition-all duration-200 ${
-              activeSection === section.id
+            className={`flex-shrink-0 min-w-[72px] flex flex-col items-center py-2 px-2 transition-all duration-200 ${activeSection === section.id
                 ? "text-blue-600 dark:text-blue-400"
                 : "text-slate-400 dark:text-slate-500"
-            }`}
+              }`}
           >
             <div
-              className={`p-1.5 rounded-lg transition-colors ${
-                activeSection === section.id
+              className={`p-1.5 rounded-lg transition-colors ${activeSection === section.id
                   ? "bg-blue-100 dark:bg-blue-900/30"
                   : ""
-              }`}
+                }`}
             >
               {React.cloneElement(section.icon, {
                 className: "w-5 h-5",
@@ -1304,6 +1300,26 @@ function Home() {
     return localStorage.getItem("home-active-section") || null;
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const { translate, userLang } = useTranslate();
+  const [translatedInstruction, setTranslatedInstruction] = useState({
+    title: "Instruction Translation",
+    description: "Translate your final report"
+  });
+
+  useEffect(() => {
+    const fetchTranslations = async () => {
+      const tTitle = await translate("Instruction Translation");
+      const tDesc = await translate("Translate your final report");
+      setTranslatedInstruction({
+        title: tTitle,
+        description: tDesc
+      });
+    };
+    if (userLang && userLang !== 'en') {
+      fetchTranslations();
+    }
+  }, [userLang, translate]);
 
   const sectionRefs = useRef({});
 
@@ -1721,8 +1737,8 @@ function Home() {
             version: "0"
           },
           {
-            title: "Instruction Translation",
-            description: "Translate your final report",
+            title: translatedInstruction.title,
+            description: translatedInstruction.description,
             path: "/ai/instruction-translation",
             image: "assets/Home/icon-instruction.png",
           }

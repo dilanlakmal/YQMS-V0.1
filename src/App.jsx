@@ -148,14 +148,14 @@ function AppContent() {
   const location = useLocation();
 
   useEffect(() => {
-  if (location.pathname !== "/chatbot") {
-    setIsChatOpen(false);
-  }
-  else if (location.pathname === "/chatbot") {
-    setIsChatOpen(true);
-  }
-}, [location.pathname]);
-  
+    if (location.pathname !== "/chatbot") {
+      setIsChatOpen(false);
+    }
+    else if (location.pathname === "/chatbot") {
+      setIsChatOpen(true);
+    }
+  }, [location.pathname]);
+
   useEffect(() => {
     let interval;
     if (isPlaying) {
@@ -506,10 +506,9 @@ function AppContent() {
               <Route path="/qa-sections" element={<YPivotQASections />} />
               <Route
                 path="/chatbot"
-                element={<YQMSAIChatBox isOpen={isChatOpen} setIsOpen={setIsChatOpen} />} 
+                element={<YQMSAIChatBox isOpen={isChatOpen} setIsOpen={setIsChatOpen} />}
               />
-              <Route path="/ai/production-instruction-translation" element={<ProductionInstructionServices/>} />
-              <Route path="/ai/instruction-translation" element={<InstructionTranslation/>} />
+              <Route path="/ai/instruction-translation" element={<InstructionTranslation />} />
               <Route
                 path="/qa-measurements"
                 element={<YPivotQAMeasurements />}
@@ -544,7 +543,7 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <ThemeProvider>
           <FormDataProvider>

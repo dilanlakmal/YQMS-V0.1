@@ -40,6 +40,16 @@ const instructionService = {
         updateStatus: async (progressId, status = "active") => {
             const userId = await getUserId();
             return api.patch(`${BASE_PATH}/progress/update/${userId}/${progressId}/status`, { status });
+        },
+
+        /**
+         * Generic update for progress items.
+         * @param {string} progressId 
+         * @param {Object} data - { status, team, source_language, target_languages }
+         */
+        updateProgress: async (progressId, data) => {
+            const userId = await getUserId();
+            return api.patch(`${BASE_PATH}/progress/${userId}/${progressId}`, data);
         }
     },
 
@@ -171,6 +181,13 @@ const instructionService = {
             return api.post(`${BASE_PATH}/document/translate/static`, { text, toLanguage });
         },
 
+        getInstructionById: async (instructionId) => {
+            return api.get(`${BASE_PATH}/document/instruction/${instructionId}`);
+        },
+
+        getInstractionTranslatedById: async (instructionId, toLanguage) => {
+            return api.get(`${BASE_PATH}/document/instruction/${instructionId}/translated/${toLanguage}`);
+        },
         /**
          * Update instruction data.
          * @param {string} docId 
@@ -180,10 +197,45 @@ const instructionService = {
             const userId = await getUserId();
             return api.patch(`${BASE_PATH}/document/instruction/${docId}`, { userId, data });
         }
+    },
+
+    glossary: {
+        /**
+         * Get glossary entries with optional filters.
+         * @param {Object} filters - { sourceLang, targetLang, category, search }
+         */
+        getEntries: async (filters = {}) => {
+            return api.get("/glossary", { params: filters });
+        },
+
+        /**
+         * Add or update a glossary entry.
+         * @param {Object} data - { originalText, sourceLanguageCode, targetLanguageCode, translatedText, category, description }
+         */
+        addEntry: async (data) => {
+            return api.post("/glossary", data);
+        },
+
+        /**
+         * Delete a glossary entry by ID.
+         * @param {string} id 
+         */
+        deleteEntry: async (id) => {
+            return api.delete(`/glossary/${id}`);
+        },
+
+        /**
+         * Export all translations from an instruction to the glossary.
+         * @param {string} instructionId 
+         * @param {string} targetLanguageCode 
+         */
+        exportFromInstruction: async (instructionId, targetLanguageCode) => {
+            return api.post("/glossary/export", { instructionId, targetLanguageCode });
+        }
     }
 };
 
 // Export individual namespaces for backward compatibility if needed, 
 // or export the default service object.
-export const { progress, customer, document } = instructionService;
+export const { progress, customer, document, glossary } = instructionService;
 export default instructionService;

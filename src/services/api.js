@@ -6,7 +6,7 @@ import axios from "axios";
  */
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL + "/api",
-    timeout: 10000,
+    timeout: 300000,
     headers: {
         "Content-Type": "application/json",
     },
@@ -22,7 +22,7 @@ api.interceptors.request.use(
         }
 
         // Debug logging
-        logger.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, config);
+        console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, config);
 
         return config;
     },
@@ -35,7 +35,7 @@ api.interceptors.response.use(
     (error) => {
         // Handle 401 Unauthorized globally if needed (e.g., redirect to login)
         if (error.response?.status === 401) {
-            logger.warn("Unauthorized access - redirecting to login...");
+            console.warn("Unauthorized access - redirecting to login...");
             // Logic to clear token or redirect could go here
         }
         return Promise.reject(error);

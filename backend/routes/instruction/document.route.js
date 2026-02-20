@@ -18,15 +18,19 @@ router.delete("/storage/:container", documentController.storage.deleteBlobsByCon
 
 // Extract routes
 router.post("/extract/:docId", documentController.extract.extractFields);
+router.post("/extract-text", documentController.extract.extractTextFromImage);
 router.patch("/instruction/:docId", documentController.translate.updateInstruction);
 
 // Resource-specific routes with parameters
 router.post("/:userId/convert/:docId", documentController.extract.convertPdfToImage);
 router.get("/:userId/instruction/:docId", documentController.extract.getInstruction);
+router.get("/image/:docId/:pageNumber", documentController.extract.getPageImageBase64);
 
 // New Instruction Endpoints
 router.get("/instruction/:instructionId/html", documentController.translate.getHTMLFile);
 router.get("/instruction/:instructionId/translated/:languageCode", documentController.translate.getInstructionTranslated);
+router.get("/instruction/:instructionId/format-output", documentController.translate.getFormatOutput);
+router.patch("/status/:docId", documentController.updateStatus);
 router.patch("/:userId/active/:docId", documentController.setActiveDocument);
 
 // Generic User routes last

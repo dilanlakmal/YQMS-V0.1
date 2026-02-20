@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { document as docService } from '@/services/instructionService';
 import { useAuth } from '@/components/authentication/AuthContext';
 
@@ -8,7 +8,7 @@ import { useAuth } from '@/components/authentication/AuthContext';
  */
 export const useTranslate = () => {
     const { user } = useAuth();
-    const [cache, setCache] = useState({});
+    const cacheRef = useRef({}); // Using Ref avoid re-memoization loops
     const [userLang, setUserLang] = useState('en');
 
     useEffect(() => {
@@ -28,7 +28,7 @@ export const useTranslate = () => {
 
         // 1. Check local session cache
         const cacheKey = `${text}_${userLang}`;
-        if (cache[cacheKey]) return cache[cacheKey];
+        if (cacheRef.current[cacheKey]) return cacheRef.current[cacheKey];
 
         try {
             // 2. Call backend static translation
@@ -36,13 +36,13 @@ export const useTranslate = () => {
             const translated = response.translated || text;
 
             // 3. Update cache
-            setCache(prev => ({ ...prev, [cacheKey]: translated }));
+            cacheRef.current[cacheKey] = translated;
             return translated;
         } catch (error) {
             console.error('Static translation failed:', error);
             return text; // Fallback to original
         }
-    }, [userLang, cache]);
+    }, [userLang]);
 
     /**
      * Helper to translate an object/array of texts.
