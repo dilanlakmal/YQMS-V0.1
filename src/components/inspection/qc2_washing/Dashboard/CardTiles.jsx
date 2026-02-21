@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Target, Waves, Layers, ClipboardList, ArrowRight, CheckCircle2, ShieldAlert, Award, Activity, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Target, Waves, Layers, ClipboardList, ArrowRight, CheckCircle2, ShieldAlert, Award, Activity, TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
 
 const KpiCard = ({ title, value, icon: Icon, color, subtitle, isStatus = false, trend, percentage }) => {
   const colors = {
@@ -188,6 +188,7 @@ const CardTiles = ({ reports = [] }) => {
     let totalWashQty = 0;
     let passReports = 0;
     let failReports = 0;
+    let totalDefects = 0;
 
     reports.forEach((report) => {
       // 1. Unique Planned Qty logic
@@ -198,6 +199,8 @@ const CardTiles = ({ reports = [] }) => {
       // 2. Resolved Wash Qty logic
       const resolvedQty = report.actualWashQty ?? report.editedActualWashQty ?? report.washQty ?? 0;
       totalWashQty += resolvedQty;
+      
+      totalDefects += (report.totalDefectCount || 0);
 
       // 3. Count Pass/Fail Reports
       if (report.overallFinalResult === "Pass") passReports++;
@@ -221,7 +224,8 @@ const CardTiles = ({ reports = [] }) => {
       passReports,
       failReports,
       passRatePercent,
-      failRatePercent // ADD THIS NEW FIELD
+      failRatePercent, // ADD THIS NEW FIELD
+      totalDefects
     };
   }, [reports]);
 
@@ -254,7 +258,7 @@ const CardTiles = ({ reports = [] }) => {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-6">
         {/* 1. Production Target */}
         <KpiCard 
           title="Order QTY" 
@@ -285,6 +289,14 @@ const CardTiles = ({ reports = [] }) => {
           value={stats.numberOfWashings.toLocaleString()} 
           icon={ClipboardList} 
           color="purple" 
+        />
+
+        {/* 5. Total Defects */}
+        <KpiCard 
+          title="Total Defects" 
+          value={stats.totalDefects.toLocaleString()} 
+          icon={AlertTriangle} 
+          color="rose" 
         />
 
         {/* 5. Enhanced Quality Summary */}
