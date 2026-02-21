@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const SpecItemSchema = new mongoose.Schema(
   {
-    id: { type: String }, // Unique ID for UI tracking
+    id: { type: String },
     no: { type: Number },
     kValue: { type: String },
     MeasurementPointEngName: { type: String },
@@ -15,7 +15,6 @@ const SpecItemSchema = new mongoose.Schema(
       fraction: { type: String },
       decimal: { type: Number },
     },
-    // NEW FIELD: Shrinkage
     Shrinkage: {
       fraction: { type: String, default: "0" },
       decimal: { type: Number, default: 0 },
@@ -37,21 +36,18 @@ const QASectionsMeasurementSpecsSchema = new mongoose.Schema(
   {
     Order_No: { type: String, required: true, unique: true },
 
-    // Full copy from dt_orders
+    // Before Wash
     AllBeforeWashSpecs: [SpecItemSchema],
-
     isSaveAllBeforeWashSpecs: {
       type: String,
       default: "No",
       enum: ["Yes", "No"],
     },
-
-    // User selected subset
     selectedBeforeWashSpecs: [SpecItemSchema],
 
-    // Placeholders for future logic
-    AllAfterWashSpecs: { type: Array, default: [] },
-    selectedAfterWashSpecs: { type: Array, default: [] },
+    // ✅ FIXED: Use SpecItemSchema instead of generic Array
+    AllAfterWashSpecs: [SpecItemSchema],
+    selectedAfterWashSpecs: [SpecItemSchema],
   },
   { timestamps: true },
 );

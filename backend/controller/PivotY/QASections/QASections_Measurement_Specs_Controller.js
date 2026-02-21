@@ -8,11 +8,11 @@ import mongoose from "mongoose";
 // HELPER: SANITIZERS & DECIMAL CALCULATORS
 // =========================================================================
 
-/**
- * Cleans a TOLERANCE measurement string and calculates its decimal value.
- * Handles: "- 1/4" → "-1/4", "-0.5", etc.
- * ⚠️ USE ONLY FOR TOLERANCE VALUES (TolMinus, TolPlus)
- */
+// /**
+//  * Cleans a TOLERANCE measurement string and calculates its decimal value.
+//  * Handles: "- 1/4" → "-1/4", "-0.5", etc.
+//  * ⚠️ USE ONLY FOR TOLERANCE VALUES (TolMinus, TolPlus)
+//  */
 const sanitizeToleranceValue = (inputValue) => {
   // 1. Extract the string
   let str = "";
@@ -62,12 +62,12 @@ const sanitizeToleranceValue = (inputValue) => {
   };
 };
 
-/**
- * Cleans a SPEC measurement string and calculates its decimal value.
- * Handles mixed fractions: "14 1/2", "1 3/4", simple fractions: "1/2", decimals: "14.5"
- * ⚠️ PRESERVES SPACES in mixed fractions (e.g., "14 1/2")
- * ⚠️ USE ONLY FOR SPEC VALUES (Specs array items)
- */
+// /**
+//  * Cleans a SPEC measurement string and calculates its decimal value.
+//  * Handles mixed fractions: "14 1/2", "1 3/4", simple fractions: "1/2", decimals: "14.5"
+//  * ⚠️ PRESERVES SPACES in mixed fractions (e.g., "14 1/2")
+//  * ⚠️ USE ONLY FOR SPEC VALUES (Specs array items)
+//  */
 const sanitizeSpecValue = (inputValue) => {
   // 1. Extract the string
   let str = "";
@@ -137,15 +137,15 @@ const sanitizeSpecValue = (inputValue) => {
   };
 };
 
-/**
- * FIX TOLERANCE HELPER - Fixes bad tolerance formats
- * Handles:
- * - "- 1/4" → "-1/4" (remove space after minus for simple fractions)
- * - "-1⁄8" → "-1/8" (fix Unicode fraction slash)
- * - Calculates decimal if null/undefined
- *
- * Does NOT touch mixed fractions like "-1 1/4" (correct format)
- */
+// /**
+//  * FIX TOLERANCE HELPER - Fixes bad tolerance formats
+//  * Handles:
+//  * - "- 1/4" → "-1/4" (remove space after minus for simple fractions)
+//  * - "-1⁄8" → "-1/8" (fix Unicode fraction slash)
+//  * - Calculates decimal if null/undefined
+//  *
+//  * Does NOT touch mixed fractions like "-1 1/4" (correct format)
+//  */
 const fixToleranceFraction = (tolObj) => {
   if (!tolObj) {
     return { wasFixed: false, result: { fraction: "", decimal: 0 } };
@@ -308,7 +308,7 @@ export const getQASectionsMeasurementSpecs = async (req, res) => {
       TolMinus: sanitizeToleranceValue(spec.TolMinus),
       TolPlus: sanitizeToleranceValue(spec.TolPlus),
       Shrinkage: spec.Shrinkage
-        ? sanitizeToleranceValue(spec.Shrinkage)
+        ? sanitizeSpecValue(spec.Shrinkage) // ✅ CHANGED FROM sanitizeToleranceValue
         : { fraction: "0", decimal: 0 },
     }));
 
@@ -340,14 +340,14 @@ export const saveQASectionsMeasurementSpecs = async (req, res) => {
       ...spec,
       TolMinus: sanitizeToleranceValue(spec.TolMinus),
       TolPlus: sanitizeToleranceValue(spec.TolPlus),
-      Shrinkage: sanitizeToleranceValue(spec.Shrinkage),
+      Shrinkage: sanitizeSpecValue(spec.Shrinkage), // ✅ CHANGED
     }));
 
     const cleanedSelectedSpecs = selectedSpecs.map((spec) => ({
       ...spec,
       TolMinus: sanitizeToleranceValue(spec.TolMinus),
       TolPlus: sanitizeToleranceValue(spec.TolPlus),
-      Shrinkage: sanitizeToleranceValue(spec.Shrinkage),
+      Shrinkage: sanitizeSpecValue(spec.Shrinkage), // ✅ CHANGED
     }));
 
     // Use direct update with explicit $set for arrays
