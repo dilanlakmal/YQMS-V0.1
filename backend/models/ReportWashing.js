@@ -37,6 +37,14 @@ const reportWashingSchema = new mongoose.Schema(
     completedAt: { type: Date, default: null }, // Full timestamp when completed
     completionImages: { type: [String], default: [] }, // Images added during completion
     completionNotes: { type: String, default: "" }, // Notes added during completion
+    // Rejected by warehouse (e.g. color mismatch, wrong quantity)
+    rejectedAt: { type: Date, default: null },
+    rejectedNotes: { type: String, default: "" },
+    // Warehouse color-edit notification for submitter (who edited, when, what was removed)
+    colorEditedByWarehouseAt: { type: Date, default: null },
+    colorEditedByWarehouseBy: { type: String, default: "" },
+    colorEditedByWarehouseName: { type: String, default: "" },
+    colorUncheckedByWarehouse: { type: [String], default: [] }, // Colors warehouse removed (submitter sent more, warehouse kept fewer)
   },
   {
     strict: false,

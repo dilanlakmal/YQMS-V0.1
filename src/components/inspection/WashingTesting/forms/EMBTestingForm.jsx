@@ -1,7 +1,11 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Upload, Camera, X, Send, RotateCw, Calendar, CheckCircle2, XCircle } from "lucide-react";
-import { DatePicker as AntDatePicker } from "antd";
+import { DatePicker as AntDatePicker, TimePicker, Select } from "antd";
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+import { EMB_PRINT_WASH_TEST_DEFAULTS } from "../constants/reportTypes.js";
+
+dayjs.extend(customParseFormat);
 
 /**
  * EMB/Printing Testing Form Component
@@ -25,6 +29,8 @@ const EMBTestingForm = ({
     triggerFileInput,
     triggerCameraInput,
     handleRemoveImage,
+    fileInputRef,
+    cameraInputRef,
     // Search & Data Props
     searchOrderNo,
     orderNoSuggestions,
@@ -36,7 +42,71 @@ const EMBTestingForm = ({
     styleDescription,
     custStyle,
     fabrication,
+    fabricContent = [],
+    availableColors = [],
+    // Users & assignment (for Checked By dropdown)
+    users: parentUsers = [],
+    isLoadingUsers = false,
+    assignHistory,
 }) => {
+    const [showFabricDropdown, setShowFabricDropdown] = useState(false);
+    const users = parentUsers || [];
+
+    // Use order colors for Fabric Color dropdown (e.g. "900 CASUAL BLACK") instead of fabric compositions
+    const colorOptions = Array.isArray(availableColors) ? availableColors.map((c) => (typeof c === 'string' ? c : (c?.label ?? c?.value ?? '')).trim()).filter(Boolean) : [];
+    const selectedFabricColors = Array.isArray(formData.fabricColor)
+        ? formData.fabricColor
+        : (formData.fabricColor ? String(formData.fabricColor).split(',').map((s) => s.trim()).filter(Boolean) : []);
+
+    // Close fabric dropdown when clicking outside
+    useEffect(() => {
+        if (!showFabricDropdown) return;
+        const handleClickOutside = (e) => {
+            if (!e.target.closest(".fabric-dropdown-container")) setShowFabricDropdown(false);
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [showFabricDropdown]);
+
+    // Filter users based on assignHistory (same pattern as HTTestingForm / GarmentWashForm)
+    const getFilteredOptions = (field) => {
+        if (!assignHistory || assignHistory.length === 0) return [];
+        const sortedHistory = [...assignHistory].sort(
+            (a, b) => new Date(a.updatedAt) - new Date(b.updatedAt),
+        );
+        const userRolesMap = new Map();
+        const extractId = (val) => {
+            if (!val) return null;
+            const match = String(val).match(/\((.*?)\)/);
+            return match ? match[1] : val;
+        };
+        sortedHistory.forEach((item) => {
+            const checkedId = extractId(item.checkedBy);
+            const approvedId = extractId(item.approvedBy);
+            if (checkedId) {
+                const current = userRolesMap.get(checkedId) || { checkedBy: false, approvedBy: false };
+                current.checkedBy = true;
+                userRolesMap.set(checkedId, current);
+            }
+            if (approvedId) {
+                const current = userRolesMap.get(approvedId) || { checkedBy: false, approvedBy: false };
+                current.approvedBy = true;
+                userRolesMap.set(approvedId, current);
+            }
+        });
+        const allowedEmpIds = new Set();
+        userRolesMap.forEach((roles, empId) => {
+            if (roles[field]) allowedEmpIds.add(empId);
+        });
+        if (allowedEmpIds.size === 0) return [];
+        const filteredUsers = users.filter((u) => allowedEmpIds.has(u.emp_id));
+        return filteredUsers.map((u) => ({
+            value: u.emp_id,
+            label: `(${u.emp_id}) ${u.name}`,
+        }));
+    };
+    const checkedByOptions = getFilteredOptions("checkedBy");
+
     // Sync fetched data to form
     React.useEffect(() => {
         if (season && season !== '' && (!formData.season || formData.season === '')) handleInputChange('season', season);
@@ -44,6 +114,18 @@ const EMBTestingForm = ({
         if (custStyle && custStyle !== '' && (!formData.custStyle || formData.custStyle === '')) handleInputChange('custStyle', custStyle);
         if (fabrication && fabrication !== '' && (!formData.fabrication || formData.fabrication === '')) handleInputChange('fabrication', fabrication);
     }, [season, styleDescription, custStyle, fabrication]);
+
+    // Normalize checkedBy when options change (match HTTestingForm / GarmentWashForm behavior)
+    React.useEffect(() => {
+        if (users.length === 0 || !formData.checkedBy) return;
+        if (checkedByOptions.some((o) => o.value === formData.checkedBy)) return;
+        const byName = users.find((u) => u.name === formData.checkedBy || formData.checkedBy === `(${u.emp_id}) ${u.name}`);
+        if (byName && checkedByOptions.some((o) => o.value === byName.emp_id)) {
+            handleInputChange("checkedBy", byName.emp_id);
+        } else {
+            handleInputChange("checkedBy", "");
+        }
+    }, [users.length, checkedByOptions, formData.checkedBy]);
 
     return (
         <div className="space-y-8">
@@ -116,6 +198,11 @@ const EMBTestingForm = ({
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Cust.Style
+                                {
+                                    custStyle.length > 0 && (
+                                        <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto-filled)</span>
+                                    )
+                                }
                             </label>
                             <input
                                 type="text"
@@ -124,22 +211,117 @@ const EMBTestingForm = ({
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                                 required
                                 placeholder="e.g., SCL6042CC"
+                                disabled={custStyle.length > 0}
                             />
                         </div>
 
-                        {/* Fabric Color */}
-                        <div>
+                        {/* Fabric Color - multi-select from order colors (e.g. 900 CASUAL BLACK) or type manually */}
+                        <div className="relative fabric-dropdown-container">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Fabric Color
+                                {colorOptions.length > 0 && (
+                                    <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto-filled)</span>
+                                )}
                             </label>
-                            <input
-                                type="text"
-                                value={formData.fabricColor || ''}
-                                onChange={(e) => handleInputChange("fabricColor", e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                required
-                                placeholder="e.g., PORT ROYALE"
-                            />
+                            {colorOptions.length > 0 ? (
+                                isCompleting ? (
+                                    <div
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300 text-gray-700"
+                                        title={selectedFabricColors.length > 0 ? selectedFabricColors.join(", ") : ""}
+                                    >
+                                        <span className="truncate block">
+                                            {selectedFabricColors.length > 0
+                                                ? `${selectedFabricColors.length} color(s) selected`
+                                                : "No colors selected"}
+                                        </span>
+                                    </div>
+                                ) : (
+                                <>
+                                    <div className="relative">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowFabricDropdown(!showFabricDropdown)}
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between"
+                                        >
+                                            <span className="truncate">
+                                                {selectedFabricColors.length === 0
+                                                    ? "Select color(s)"
+                                                    : selectedFabricColors.length === colorOptions.length
+                                                        ? "All colors selected"
+                                                        : `${selectedFabricColors.length} color(s) selected`}
+                                            </span>
+                                            <svg
+                                                className={`w-4 h-4 transition-transform flex-shrink-0 ${showFabricDropdown ? "rotate-180" : ""}`}
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+
+                                        {showFabricDropdown && (
+                                            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                                <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleInputChange("fabricColor", [...colorOptions])}
+                                                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                                                    >
+                                                        Select All
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleInputChange("fabricColor", [])}
+                                                        className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                                                    >
+                                                        Clear All
+                                                    </button>
+                                                </div>
+                                                <div className="p-2">
+                                                    <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                        Colors
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        {colorOptions.map((label, index) => (
+                                                            <label
+                                                                key={index}
+                                                                className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedFabricColors.includes(label)}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.checked) {
+                                                                            handleInputChange("fabricColor", [...selectedFabricColors, label]);
+                                                                        } else {
+                                                                            handleInputChange("fabricColor", selectedFabricColors.filter((c) => c !== label));
+                                                                        }
+                                                                    }}
+                                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                                                                />
+                                                                <span className="ml-2 text-sm text-gray-900 dark:text-white">{label}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {selectedFabricColors.length === 0 && (
+                                        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Select at least one color</p>
+                                    )}
+                                </>
+                                )
+                            ) : (
+                                <input
+                                    type="text"
+                                    value={typeof formData.fabricColor === 'string' ? formData.fabricColor : (Array.isArray(formData.fabricColor) ? formData.fabricColor.join(', ') : '')}
+                                    onChange={(e) => handleInputChange("fabricColor", e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    placeholder="e.g., PORT ROYALE"
+                                />
+                            )}
                         </div>
 
                         {/* EMB/Print Color */}
@@ -152,7 +334,6 @@ const EMBTestingForm = ({
                                 value={formData.embColor || ''}
                                 onChange={(e) => handleInputChange("embColor", e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                required
                                 placeholder="e.g., PORT ROYALE"
                             />
                         </div>
@@ -167,13 +348,12 @@ const EMBTestingForm = ({
                                 value={formData.embName || ''}
                                 onChange={(e) => handleInputChange("embName", e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                required
                                 placeholder="e.g., LOGO"
                             />
                         </div>
 
                         {/* Style Description */}
-                        <div>
+                        {/* <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Style Description
                             </label>
@@ -182,10 +362,10 @@ const EMBTestingForm = ({
                                 value={formData.styleDescription || ''}
                                 onChange={(e) => handleInputChange("styleDescription", e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                required
                                 placeholder="e.g., LADIES' T-SHIRT"
                             />
-                        </div>
+                        </div> */}
+                        
                     </div>
                 </div>
 
@@ -194,9 +374,9 @@ const EMBTestingForm = ({
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
                         Report Information
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                         {/* Report Date */}
-                        <div>
+                        {/* <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Report Date
                             </label>
@@ -213,17 +393,17 @@ const EMBTestingForm = ({
                                 />
                                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none z-10" />
                             </div>
-                        </div>
+                        </div> */}
 
-                        {/* Rec. Date */}
+                        {/* Received Date */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Rec. Date
+                                Received Date
                             </label>
                             <div className="relative group ant-datepicker-container">
                                 <AntDatePicker
-                                    value={formData.recDate ? dayjs(formData.recDate) : null}
-                                    onChange={(date, dateString) => handleInputChange("recDate", dateString ? dayjs(date).format('YYYY-MM-DD') : '')}
+                                    value={(formData.receivedDate ?? formData.recDate) ? dayjs(formData.receivedDate ?? formData.recDate) : null}
+                                    onChange={(date, dateString) => handleInputChange("receivedDate", dateString ? dayjs(date).format('YYYY-MM-DD') : '')}
                                     format="MM/DD/YYYY"
                                     placeholder="mm/dd/yyyy"
                                     className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white h-[42px]"
@@ -235,17 +415,24 @@ const EMBTestingForm = ({
                             </div>
                         </div>
 
-                        {/* Time */}
+                        {/* Time - 12-hour picker (Ant Design) */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Time <span className="text-gray-400 text-xs">(Optional)</span>
                             </label>
-                            <input
-                                type="text"
-                                value={formData.time || ''}
-                                onChange={(e) => handleInputChange("time", e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                placeholder="e.g., 9:42AM"
+                            <TimePicker
+                                value={formData.time ? (() => {
+                                    const t = dayjs(formData.time, ['h:mm A', 'HH:mm', 'h:mm a']);
+                                    return t.isValid() ? t : null;
+                                })() : null}
+                                onChange={(date, dateString) => handleInputChange("time", dateString || '')}
+                                format="h:mm A"
+                                use12Hours
+                                placeholder="e.g., 9:42 AM"
+                                className="w-full h-[42px] [&_.ant-picker]:h-[42px] [&_.ant-picker-input]:h-[42px] border border-gray-300 dark:border-gray-600 rounded-md focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent [&_.ant-picker]:border-0 [&_.ant-picker]:dark:bg-gray-700 [&_.ant-picker-input>input]:text-left dark:[&_.ant-picker-input>input]:text-white"
+                                allowClear
+                                inputReadOnly
+                                minuteStep={1}
                             />
                         </div>
 
@@ -281,9 +468,7 @@ const EMBTestingForm = ({
 
                 {/* Section 3: Placement & Fabrication */}
                 <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
-                        Placement & Fabrication Details
-                    </h3>
+                  
                     <div className="grid grid-cols-1 gap-4">
                         {/* EMB/Print Placement */}
                         <div>
@@ -402,7 +587,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorChange1 || ''}
+                                            value={formData.colorChange1 || EMB_PRINT_WASH_TEST_DEFAULTS.colorChange1}
                                             onChange={(e) => handleInputChange("colorChange1", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="5"
@@ -411,7 +596,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorChange5 || ''}
+                                            value={formData.colorChange5 || EMB_PRINT_WASH_TEST_DEFAULTS.colorChange5}
                                             onChange={(e) => handleInputChange("colorChange5", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="4-5."
@@ -420,7 +605,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorChange10 || ''}
+                                            value={formData.colorChange10 || EMB_PRINT_WASH_TEST_DEFAULTS.colorChange10}
                                             onChange={(e) => handleInputChange("colorChange10", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="4-5."
@@ -429,7 +614,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorChange15 || ''}
+                                            value={formData.colorChange15 || EMB_PRINT_WASH_TEST_DEFAULTS.colorChange15}
                                             onChange={(e) => handleInputChange("colorChange15", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="4-5."
@@ -445,7 +630,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorStaining1 || ''}
+                                            value={formData.colorStaining1 || EMB_PRINT_WASH_TEST_DEFAULTS.colorStaining1}
                                             onChange={(e) => handleInputChange("colorStaining1", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="5"
@@ -454,7 +639,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorStaining5 || ''}
+                                            value={formData.colorStaining5 || EMB_PRINT_WASH_TEST_DEFAULTS.colorStaining5}
                                             onChange={(e) => handleInputChange("colorStaining5", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="4-5."
@@ -463,7 +648,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorStaining10 || ''}
+                                            value={formData.colorStaining10 || EMB_PRINT_WASH_TEST_DEFAULTS.colorStaining10}
                                             onChange={(e) => handleInputChange("colorStaining10", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="4-5."
@@ -472,7 +657,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorStaining15 || ''}
+                                            value={formData.colorStaining15 || EMB_PRINT_WASH_TEST_DEFAULTS.colorStaining15}
                                             onChange={(e) => handleInputChange("colorStaining15", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="4-5."
@@ -488,7 +673,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.appearance1 || ''}
+                                            value={formData.appearance1 || EMB_PRINT_WASH_TEST_DEFAULTS.appearance1}
                                             onChange={(e) => handleInputChange("appearance1", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="Accepted"
@@ -497,7 +682,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.appearance5 || ''}
+                                            value={formData.appearance5 || EMB_PRINT_WASH_TEST_DEFAULTS.appearance5}
                                             onChange={(e) => handleInputChange("appearance5", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="Accepted"
@@ -506,7 +691,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.appearance10 || ''}
+                                            value={formData.appearance10 || EMB_PRINT_WASH_TEST_DEFAULTS.appearance10}
                                             onChange={(e) => handleInputChange("appearance10", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="Accepted"
@@ -515,7 +700,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.appearance15 || ''}
+                                            value={formData.appearance15 || EMB_PRINT_WASH_TEST_DEFAULTS.appearance15}
                                             onChange={(e) => handleInputChange("appearance15", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="Accepted"
@@ -531,7 +716,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.cracking1 || ''}
+                                            value={formData.cracking1 || EMB_PRINT_WASH_TEST_DEFAULTS.cracking1}
                                             onChange={(e) => handleInputChange("cracking1", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="N/A"
@@ -540,7 +725,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.cracking5 || ''}
+                                            value={formData.cracking5 || EMB_PRINT_WASH_TEST_DEFAULTS.cracking5}
                                             onChange={(e) => handleInputChange("cracking5", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="N/A"
@@ -549,7 +734,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.cracking10 || ''}
+                                            value={formData.cracking10 || EMB_PRINT_WASH_TEST_DEFAULTS.cracking10}
                                             onChange={(e) => handleInputChange("cracking10", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="N/A"
@@ -558,7 +743,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.cracking15 || ''}
+                                            value={formData.cracking15 || EMB_PRINT_WASH_TEST_DEFAULTS.cracking15}
                                             onChange={(e) => handleInputChange("cracking15", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="N/A"
@@ -574,7 +759,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.fading1 || ''}
+                                            value={formData.fading1 || EMB_PRINT_WASH_TEST_DEFAULTS.fading1}
                                             onChange={(e) => handleInputChange("fading1", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="Accepted"
@@ -583,7 +768,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.fading5 || ''}
+                                            value={formData.fading5 || EMB_PRINT_WASH_TEST_DEFAULTS.fading5}
                                             onChange={(e) => handleInputChange("fading5", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="Accepted"
@@ -592,7 +777,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.fading10 || ''}
+                                            value={formData.fading10 || EMB_PRINT_WASH_TEST_DEFAULTS.fading10}
                                             onChange={(e) => handleInputChange("fading10", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="Accepted"
@@ -601,7 +786,7 @@ const EMBTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.fading15 || ''}
+                                            value={formData.fading15 || EMB_PRINT_WASH_TEST_DEFAULTS.fading15}
                                             onChange={(e) => handleInputChange("fading15", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="Accepted"
@@ -693,38 +878,34 @@ const EMBTestingForm = ({
                                 {formData.images?.length || 0}/5 images
                             </span>
                         </div>
-                        <div className="mt-1 space-y-4">
-                            {/* Image Preview Area */}
+                        <div className="mt-1">
+                            {/* Image Preview Area - compact flex thumbnails */}
                             {formData.images && formData.images.length > 0 ? (
-                                <div className="space-y-4">
+                                <div className="flex flex-wrap gap-2">
                                     {formData.images.map((imageFile, index) => {
                                         const imageUrl = URL.createObjectURL(imageFile);
                                         return (
                                             <div
                                                 key={index}
-                                                className="relative border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50/50 dark:bg-gray-800/50 p-3"
+                                                className="relative w-20 h-20 sm:w-24 sm:h-24 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50 flex-shrink-0 group"
                                             >
-                                                <div className="relative w-full flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-md overflow-hidden">
-                                                    <img
-                                                        src={imageUrl}
-                                                        alt={`Preview ${index + 1}`}
-                                                        className="max-w-xs max-h-64 object-contain rounded-md"
-                                                    />
-                                                    <div className="absolute top-2 right-2 flex gap-2 z-10">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                URL.revokeObjectURL(imageUrl);
-                                                                handleRemoveImage(index);
-                                                            }}
-                                                            className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
-                                                            aria-label="Remove image"
-                                                            title="Remove"
-                                                        >
-                                                            <X size={18} />
-                                                        </button>
-                                                    </div>
-                                                </div>
+                                                <img
+                                                    src={imageUrl}
+                                                    alt={`Preview ${index + 1}`}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        URL.revokeObjectURL(imageUrl);
+                                                        handleRemoveImage(index);
+                                                    }}
+                                                    className="absolute top-0.5 right-0.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                                                    aria-label="Remove image"
+                                                    title="Remove"
+                                                >
+                                                    <X size={14} />
+                                                </button>
                                             </div>
                                         );
                                     })}
@@ -841,18 +1022,21 @@ const EMBTestingForm = ({
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Checked by
                             </label>
-                            <div className="relative group">
-                                <input
-                                    type="text"
-                                    value={formData.checkedBy || ''}
-                                    onChange={(e) => handleInputChange("checkedBy", e.target.value)}
-                                    className="w-full pl-3 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 outline-none transition-all text-gray-800 dark:text-white placeholder:font-normal placeholder:text-gray-400"
-                                    placeholder="e.g., LONG"
-                                />
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 transition-opacity">
-                                    <CheckCircle2 className="w-4 h-4 text-blue-500" />
-                                </div>
-                            </div>
+                            <Select
+                                showSearch
+                                value={formData.checkedBy || undefined}
+                                placeholder="Select User"
+                                optionFilterProp="label"
+                                onChange={(value) => handleInputChange("checkedBy", value)}
+                                filterOption={(input, option) =>
+                                    (option?.label ?? "")
+                                        .toLowerCase()
+                                        .includes(input.toLowerCase())
+                                }
+                                options={checkedByOptions}
+                                className="w-full h-[42px]"
+                                loading={isLoadingUsers}
+                            />
                         </div>
 
                         {/* Date */}
@@ -875,6 +1059,22 @@ const EMBTestingForm = ({
                             </div>
                         </div>
                     </div>
+                </div>
+
+                {/* Submit Button */}
+                <div className="flex justify-end pt-4">
+                    <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {isSubmitting ? (
+                            <RotateCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Send className="w-4 h-4" />
+                        )}
+                        {isSubmitting ? "Submitting..." : isCompleting ? "Complete EMB/Print" : "Submit EMB/Print Test Report"}
+                    </button>
                 </div>
             </form>
         </div>

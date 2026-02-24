@@ -1,6 +1,7 @@
 import React from "react";
 import { useAuth } from "../../authentication/AuthContext";
-import { ChevronDown, ChevronUp, Printer, FileText, FileSpreadsheet, Pencil, Trash2, QrCode, CheckCircle } from "lucide-react";
+import { ChevronDown, ChevronUp, Printer, FileText, FileSpreadsheet, Pencil, Trash2, QrCode, CheckCircle, XCircle, Bell, BellRing } from "lucide-react";
+import { useAssignControlStore, computeUserRoles, useModalStore } from "../../../stores/washing";
 import ReportTimeline from "./ReportTimeline";
 
 const DEFAULT_SCALE = 'scale-125';
@@ -87,21 +88,33 @@ const ReportCard = ({
   onExportExcel,
   onEdit,
   onDelete,
-  onShowQRCode,
+  onReject,
+  openRejectModal,
+  onAcceptReceived,
   printingReportId,
   savedImageRotations,
   openImageViewer,
   onEditInitialImages,
   onEditReceivedImages,
   onEditCompletionImages,
-  restrictDeleteStatuses = [], // List of statuses that prevent deletion
-  restrictEditStatuses = [], // List of statuses that prevent editing
-  enableRoleLocking = false, // If true, applies reporter/receiver status locking
-  isAdminUser = false,
-  isWarehouseUser = false,
-  users = [],
+  restrictDeleteStatuses = [],
+  restrictEditStatuses = [],
+  enableRoleLocking = false,
+  /** When true, show notification icon on this record (e.g. user submitted / record finished). You control this in the parent. */
+  hasNotification = false,
+  /** When true, user has opened notification (mark read) – dot is hidden, ring icon kept. */
+  notificationRead = false,
+  /** When true, always show the notification button so user can open status modal (default true in Reports list). */
+  showNotificationButton = true,
+  /** Optional tooltip for the notification icon */
+  notificationTitle = "Notification",
+  /** Optional callback when notification icon is clicked */
+  onNotificationClick,
 }) => {
   const { user } = useAuth();
+  const { users, causeAssignHistory } = useAssignControlStore();
+  const { isAdminUser, isWarehouseUser } = computeUserRoles(user, causeAssignHistory);
+  const { showReportDateQR, setShowReportDateQR } = useModalStore();
   const reportId = report._id || report.id;
 
   // Check if edit should be locked based on user role and status
@@ -129,16 +142,24 @@ const ReportCard = ({
   const isCreator = (report.userSubmit && String(user?.emp_id) === String(report.userSubmit)) ||
     (report.reporter_emp_id && String(user?.emp_id) === String(report.reporter_emp_id));
 
-  // canUserEdit/Delete should allow admins regardless of anything
+  // canUserEdit: admin, creator, or warehouse can edit. canUserDelete: only admin or creator; warehouse must never delete.
   const canUserEdit = isAdminUser || isCreator || isWarehouseUser;
-  const canUserDelete = isAdminUser || isCreator || isWarehouseUser;
+  const canUserDelete = (isAdminUser || isCreator) && !isWarehouseUser;
 
   // Completed reports cannot be edited by anyone, but admins can delete them
   const isCompleted = report.status === 'completed';
+  // Rejected reports: hide Edit for everyone; hide Delete for non-admins only (admin can delete rejected records)
+  const isRejected = report.status === 'rejected';
 
-  // Buttons are hidden based on status restrictions, OR if report is completed (except delete for admins)
-  const shouldHideEditButton = !canUserEdit || isCompleted || (!isAdminUser && restrictEditStatuses && restrictEditStatuses.includes(report.status));
-  const shouldHideDeleteButton = !canUserDelete || (!isAdminUser && isCompleted) || (!isAdminUser && restrictDeleteStatuses && restrictDeleteStatuses.includes(report.status));
+  // Buttons: Edit always hidden when completed/rejected; Delete hidden for non-admin when completed/rejected, admin can delete rejected
+  const shouldHideEditButton = !canUserEdit || isCompleted || isRejected || (!isAdminUser && restrictEditStatuses && restrictEditStatuses.includes(report.status));
+  const shouldHideDeleteButton = !canUserDelete || (!isAdminUser && isCompleted) || (!isAdminUser && isRejected) || (!isAdminUser && restrictDeleteStatuses && restrictDeleteStatuses.includes(report.status));
+
+  // Reject: only for warehouse (or admin) when report is still pending – e.g. submitter sent 2 colors but warehouse sees 1
+  const canReject = (isWarehouseUser || isAdminUser) && (report.status === "pending" || report.status === "" || !report.status);
+  const shouldShowRejectButton = canReject && openRejectModal;
+  // Accept Received: same eligibility as Reject – quick accept without opening modal (no images/notes)
+  const shouldShowAcceptReceivedButton = canReject && onAcceptReceived;
 
   // Timeline uploads/edits follow the same "canUserEdit" logic
   const isActionLocked = isEditLocked(); // Use more granular isEditLocked instead of just canUserEdit
@@ -170,10 +191,42 @@ const ReportCard = ({
                   ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                   : report.status === "received"
                     ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-                    : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+                    : report.status === "rejected"
+                      ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                      : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
                   }`}>
                   {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
                 </span>
+              )}
+              {/* Has new: BellRing + amber + dot. No new: Bell, muted & smaller – clearly different */}
+              {showNotificationButton && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onNotificationClick?.(report);
+                  }}
+                  className={`relative flex-shrink-0 rounded transition-all duration-200 ${
+                    hasNotification
+                      ? "p-1 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300"
+                      : "p-1 text-gray-300 dark:text-gray-600 hover:text-gray-400 dark:hover:text-gray-500 opacity-70 hover:opacity-100"
+                  }`}
+                  title={hasNotification ? notificationTitle : "View report status"}
+                >
+                  {hasNotification ? (
+                    <BellRing size={18} strokeWidth={2.25} />
+                  ) : (
+                    <Bell size={16} strokeWidth={1.5} />
+                  )}
+                  {/* Dot only when has notification and not yet read (click once = mark read, remove point, keep ring) */}
+                  {hasNotification && !notificationRead && (
+                    <span
+                      className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500 dark:bg-amber-400 ring-2 ring-white dark:ring-gray-800"
+                      aria-hidden
+                    />
+                  )}
+                </button>
               )}
             </div>
             <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -230,6 +283,23 @@ const ReportCard = ({
                 <span className="hidden sm:inline">Edit</span>
               </button>
             )}
+
+           
+            {shouldShowRejectButton && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openRejectModal(report);
+                }}
+                className="px-2 md:px-3 py-1.5 text-xs md:text-sm bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-md hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors flex items-center gap-1"
+                title="Reject report (e.g. color mismatch)"
+              >
+                <XCircle size={14} />
+                <span className="hidden sm:inline">Reject</span>
+              </button>
+            )}
             {onDelete && !shouldHideDeleteButton && (
               <button
                 onClick={() => onDelete(reportId)}
@@ -241,6 +311,7 @@ const ReportCard = ({
                 <span className="sm:hidden">Del</span>
               </button>
             )}
+            
           </div>
           {/* QR Code Button */}
           {report.status === "completed" ? (
@@ -250,13 +321,20 @@ const ReportCard = ({
             >
               <CheckCircle size={16} />
             </div>
+          ) : report.status === "rejected" ? (
+            <div
+              className="px-2 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-md flex items-center justify-center cursor-default flex-shrink-0"
+              title="Report Rejected"
+            >
+              <XCircle size={16} />
+            </div>
           ) : (
             <button
               type="button"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                onShowQRCode(reportId);
+                setShowReportDateQR(showReportDateQR === reportId ? null : reportId);
               }}
               className="px-2 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors flex items-center justify-center flex-shrink-0"
               title="Show QR Code"
@@ -264,6 +342,21 @@ const ReportCard = ({
               <QrCode size={16} />
             </button>
           )}
+           {shouldShowAcceptReceivedButton && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onAcceptReceived(report);
+                }}
+                className="px-2 md:px-3 py-1.5 text-xs md:text-sm bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-md hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors flex items-center gap-1"
+                title="Accept as received (no images or notes)"
+              >
+                <CheckCircle size={14} />
+                <span className="hidden sm:inline">Accept Received</span>
+              </button>
+            )}
         </div>
       </div>
 
@@ -298,6 +391,30 @@ const ReportCard = ({
                 : "None"}
             </span>
           </div>
+          {report.status === "rejected" && (
+            <div className="sm:col-span-2 lg:col-span-4 mt-1 pt-2 border-t border-gray-200 dark:border-gray-600">
+              <span className="text-gray-500 dark:text-gray-400">Rejected by </span>
+              <span className="text-gray-900 dark:text-white">
+                {getNameForView(report.receiver_emp_id, report.receiver_name, users) || report.receiver_emp_id || "—"}
+              </span>
+              {report.rejectedAt && (
+                <>
+                  <span className="text-gray-500 dark:text-gray-400 ml-2">on </span>
+                  <span className="text-gray-900 dark:text-white">
+                    {new Date(report.rejectedAt).toLocaleDateString("en-GB", { dateStyle: "medium" })}
+                  </span>
+                </>
+              )}
+              {report.rejectedNotes && report.rejectedNotes.trim() && (
+                <>
+                  <span className="text-gray-500 dark:text-gray-400 ml-2">— </span>
+                  <span className="text-gray-700 dark:text-gray-300 italic truncate max-w-[200px] inline-block align-bottom" title={report.rejectedNotes}>
+                    {report.rejectedNotes}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -424,6 +541,39 @@ const ReportCard = ({
                       return name ? (name !== report.approvedBy ? `${name} (${report.approvedBy})` : name) : (report.approvedBy || "N/A");
                     })()}
                   </p>
+                </div>
+              </>
+            )}
+
+            {/* Rejection details (for admins/anyone viewing a rejected report) */}
+            {report.status === "rejected" && (
+              <>
+                <div className="sm:col-span-2 lg:col-span-3 mt-2 pt-3 border-t border-gray-200 dark:border-gray-600">
+                  <p className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wider mb-2">
+                    Rejection details
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-3 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-800/50">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Rejected by</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {getNameForView(report.receiver_emp_id, report.receiver_name, users) || report.receiver_emp_id || "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Rejected at</p>
+                      <p className="text-sm text-gray-900 dark:text-white">
+                        {report.rejectedAt
+                          ? new Date(report.rejectedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", hour12: true })
+                          : "—"}
+                      </p>
+                    </div>
+                    <div className="sm:col-span-2 lg:col-span-1">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Reason</p>
+                      <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap break-words">
+                        {report.rejectedNotes && report.rejectedNotes.trim() ? report.rejectedNotes : "—"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </>
             )}
@@ -554,14 +704,14 @@ const ReportCard = ({
             </div>
           )}
 
-          {/* Timeline View */}
+          {/* Timeline View - no edit/add image when locked or rejected (rejected = record is read-only) */}
           <ReportTimeline
             report={report}
             savedImageRotations={savedImageRotations}
             openImageViewer={openImageViewer}
-            onEditInitialImages={isActionLocked ? null : onEditInitialImages}
-            onEditReceivedImages={isActionLocked ? null : onEditReceivedImages}
-            onEditCompletionImages={isActionLocked ? null : onEditCompletionImages}
+            onEditInitialImages={isActionLocked || isRejected ? null : onEditInitialImages}
+            onEditReceivedImages={isActionLocked || isRejected ? null : onEditReceivedImages}
+            onEditCompletionImages={isActionLocked || isRejected ? null : onEditCompletionImages}
             isAdminUser={isAdminUser}
           />
         </>

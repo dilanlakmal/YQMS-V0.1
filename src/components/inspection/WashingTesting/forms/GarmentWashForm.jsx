@@ -228,6 +228,8 @@ const GarmentWashForm = ({
   const careLabelFileInputRef = useRef(null);
   const careLabelCameraInputRef = useRef(null);
   const prevAvailableColorsRef = useRef([]);
+  const prevUsedColorsLengthRef = useRef(0);
+  const initialRecordColorsRef = useRef([]); // when completing: record's colors at load (fixed list so user can uncheck/check; submit stores only checked)
   const prevSizeRef = useRef(formData.sampleSize);
   const [keypadOpen, setKeypadOpen] = useState(false);
   const [showSizeDropdown, setShowSizeDropdown] = useState(false);
@@ -239,29 +241,17 @@ const GarmentWashForm = ({
   const [tempValue, setTempValue] = useState("");
   const [showSizeComparisonModal, setShowSizeComparisonModal] = useState(false);
 
-  // Filter colors that have already been reported
-  // Filter colors that have already been reported, but ALWAYS include currently selected colors
-  const filteredColors = Array.from(
-    new Set([
-      ...(availableColors || []),
-      ...(Array.isArray(formData.color)
-        ? formData.color
-        : formData.color
-          ? [formData.color]
-          : []),
-    ]),
-  ).filter((color) => {
-    const colorStr = String(color).trim().toUpperCase();
-    const isAlreadySelected = Array.isArray(formData.color)
-      ? formData.color.some((c) => String(c).trim().toUpperCase() === colorStr)
-      : String(formData.color).trim().toUpperCase() === colorStr;
+  const recordColors = Array.isArray(formData.color)
+    ? formData.color
+    : formData.color
+      ? [formData.color]
+      : [];
 
-    const isUsed = usedColors?.some(
-      (uc) => String(uc).trim().toUpperCase() === colorStr,
-    );
-
-    return isAlreadySelected || !isUsed;
-  });
+  // Completing: dropdown shows the record's original colors (fixed list); user can uncheck some; submit stores only checked.
+  // New report: show ALL style colors, default all checked; user can uncheck.
+  const filteredColors = isCompleting
+    ? (initialRecordColorsRef.current.length > 0 ? initialRecordColorsRef.current : recordColors)
+    : Array.from(new Set([...(availableColors || []), ...recordColors]));
 
   // Added for Enhanced Header and specific page functionality
   const [showAll, setShowAll] = useState(false);
@@ -303,6 +293,16 @@ const GarmentWashForm = ({
     setTimeout(() => setIsExporting(false), 1000);
     console.log("Export Excel not implemented");
   };
+
+  // When completing: capture the record's colors once so dropdown list stays fixed; user can uncheck some, submit stores only checked.
+  useEffect(() => {
+    if (isCompleting && recordColors.length > 0 && initialRecordColorsRef.current.length === 0) {
+      initialRecordColorsRef.current = [...recordColors];
+    }
+    if (!isCompleting) {
+      initialRecordColorsRef.current = [];
+    }
+  }, [isCompleting, formData.color]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -880,17 +880,22 @@ const GarmentWashForm = ({
     }
   }, [custStyle, formData.custStyle]);
 
-  // Auto-populate Colors when available (Only on new data)
+  // Auto-populate Colors when availableColors changes (new order selected).
+  // - New report: pre-select ALL available colors (user can uncheck ones they don't want).
+  // - Completing a report: do not overwrite — keep the record's stored color(s).
   useEffect(() => {
+    if (isCompleting) return; // never overwrite when completing a received report
+
     const isNewColors =
       JSON.stringify(availableColors) !==
       JSON.stringify(prevAvailableColorsRef.current);
 
     if (isNewColors && availableColors && availableColors.length > 0) {
+      // Pre-select all available colors for the style by default
       handleInputChange("color", [...availableColors]);
       prevAvailableColorsRef.current = availableColors;
     }
-  }, [availableColors, handleInputChange]);
+  }, [availableColors, isCompleting, handleInputChange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-update table rows color when header color changes
   useEffect(() => {
@@ -1444,7 +1449,7 @@ const GarmentWashForm = ({
             />
           </div>
 
-          {/* COLOR Dropdown - Matching HomeWashForm UI */}
+          {/* COLOR Dropdown - Matching HomeWashForm UI; read-only when completing */}
           <div
             className="relative color-dropdown-container"
             ref={colorDropdownRef}
@@ -1456,17 +1461,26 @@ const GarmentWashForm = ({
               </span>
             </label>
             <div className="relative">
+              {isCompleting ? (
+                <div
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300 text-gray-700"
+                  title={Array.isArray(formData.color) && formData.color?.length > 0 ? formData.color.join(", ") : ""}
+                >
+                  <span className="truncate block">
+                    {formData.color?.length > 0
+                      ? `${formData.color.length} color(s) selected`
+                      : "No colors selected"}
+                  </span>
+                </div>
+              ) : (
+                <>
               <button
                 type="button"
                 onClick={() =>
                   setShowColorDropdown &&
                   setShowColorDropdown(!showColorDropdown)
                 }
-                disabled={
-                  isSearchingOrderNo ||
-                  !formData.moNo ||
-                  (filteredColors.length === 0 && usedColors?.length === 0)
-                }
+
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="truncate">
@@ -1480,11 +1494,11 @@ const GarmentWashForm = ({
                           filteredColors.length === availableColors.length
                           ? "All colors selected"
                           : Array.isArray(formData.color) &&
-                              formData.color.length === filteredColors.length
+                            formData.color.length === filteredColors.length
                             ? "All available colors selected"
                             : `${formData.color.length} color(s) selected`
                         : filteredColors.length === 0 &&
-                            availableColors?.length > 0
+                          availableColors?.length > 0
                           ? "All colors already reported"
                           : filteredColors.length === 0
                             ? "No colors available"
@@ -1583,66 +1597,68 @@ const GarmentWashForm = ({
                           (c) => String(c).trim().toUpperCase() === ucStr,
                         );
                       }).length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-                          <div className="text-[10px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider px-1">
-                            Already Reported:
-                          </div>
-                          <div className="flex flex-wrap gap-1 mt-1 px-1">
-                            {usedColors
-                              .filter((uc) => {
-                                const ucStr = String(uc).trim().toUpperCase();
-                                return !formData.color?.some(
-                                  (c) =>
-                                    String(c).trim().toUpperCase() === ucStr,
-                                );
-                              })
-                              .map((uc, i) => (
-                                <div
-                                  key={i}
-                                  className="flex items-center gap-1"
-                                >
-                                  <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px] rounded border border-gray-200 dark:border-gray-600 line-through">
-                                    {uc}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const currentColors = Array.isArray(
-                                        formData.color,
-                                      )
-                                        ? [...formData.color]
-                                        : formData.color
-                                          ? [formData.color]
-                                          : [];
-                                      const ucStr = String(uc)
-                                        .trim()
-                                        .toUpperCase();
-                                      if (
-                                        !currentColors.some(
-                                          (c) =>
-                                            String(c).trim().toUpperCase() ===
-                                            ucStr,
-                                        )
-                                      ) {
-                                        handleInputChange("color", [
-                                          ...currentColors,
-                                          uc,
-                                        ]);
-                                      }
-                                    }}
-                                    className="p-1 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-500 rounded-full transition-colors"
-                                    title="Re-select this color"
+                          <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                            <div className="text-[10px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider px-1">
+                              Already Reported:
+                            </div>
+                            <div className="flex flex-wrap gap-1 mt-1 px-1">
+                              {usedColors
+                                .filter((uc) => {
+                                  const ucStr = String(uc).trim().toUpperCase();
+                                  return !formData.color?.some(
+                                    (c) =>
+                                      String(c).trim().toUpperCase() === ucStr,
+                                  );
+                                })
+                                .map((uc, i) => (
+                                  <div
+                                    key={i}
+                                    className="flex items-center gap-1"
                                   >
-                                    <RotateCw className="w-2.5 h-2.5" />
-                                  </button>
-                                </div>
-                              ))}
+                                    <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px] rounded border border-gray-200 dark:border-gray-600 line-through">
+                                      {uc}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const currentColors = Array.isArray(
+                                          formData.color,
+                                        )
+                                          ? [...formData.color]
+                                          : formData.color
+                                            ? [formData.color]
+                                            : [];
+                                        const ucStr = String(uc)
+                                          .trim()
+                                          .toUpperCase();
+                                        if (
+                                          !currentColors.some(
+                                            (c) =>
+                                              String(c).trim().toUpperCase() ===
+                                              ucStr,
+                                          )
+                                        ) {
+                                          handleInputChange("color", [
+                                            ...currentColors,
+                                            uc,
+                                          ]);
+                                        }
+                                      }}
+                                      className="p-1 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-500 rounded-full transition-colors"
+                                      title="Re-select this color"
+                                    >
+                                      <RotateCw className="w-2.5 h-2.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
                     </div>
                   </div>
                 )}
+                </>
+              )}
             </div>
           </div>
 
@@ -2185,13 +2201,12 @@ const GarmentWashForm = ({
                         handleInputChange("washType", "Before Wash")
                       }
                       disabled={isWashTypeLocked}
-                      className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${
-                        formData.washType === "Before Wash"
+                      className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${formData.washType === "Before Wash"
                           ? isWashTypeLocked
                             ? "bg-gray-400 text-white"
                             : "bg-blue-600 text-white shadow-sm"
                           : "text-gray-400 hover:text-blue-500 hover:bg-white"
-                      } ${isWashTypeLocked ? "cursor-not-allowed" : ""}`}
+                        } ${isWashTypeLocked ? "cursor-not-allowed" : ""}`}
                     >
                       Before
                     </button>
@@ -2202,13 +2217,12 @@ const GarmentWashForm = ({
                         handleInputChange("washType", "After Wash")
                       }
                       disabled={isWashTypeLocked}
-                      className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${
-                        formData.washType === "After Wash"
+                      className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${formData.washType === "After Wash"
                           ? isWashTypeLocked
                             ? "bg-gray-400 text-white"
                             : "bg-blue-600 text-white shadow-sm"
                           : "text-gray-400 hover:text-blue-500 hover:bg-white"
-                      } ${isWashTypeLocked ? "cursor-not-allowed" : ""}`}
+                        } ${isWashTypeLocked ? "cursor-not-allowed" : ""}`}
                     >
                       After
                     </button>
@@ -2293,12 +2307,11 @@ const GarmentWashForm = ({
                                         setIsShrinkageSaved(false);
                                       }}
                                       className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold transition-all mb-0.5 last:mb-0 flex items-center justify-between group
-                                                                        ${
-                                                                          formData.sampleSize ===
-                                                                          s
-                                                                            ? "bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400"
-                                                                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-300"
-                                                                        }`}
+                                                                        ${formData.sampleSize ===
+                                          s
+                                          ? "bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400"
+                                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-300"
+                                        }`}
                                     >
                                       <span className="flex items-center gap-2">
                                         {s}
@@ -2663,12 +2676,11 @@ const GarmentWashForm = ({
                           <div className="flex flex-col items-center gap-1">
                             <div
                               className={`py-1.5 px-3 rounded-lg inline-flex items-center gap-1.5 border transition-all duration-500 shadow-sm
-                                                        ${
-                                                          row.passFail ===
-                                                          "FAIL"
-                                                            ? "bg-red-50 border-red-100 text-red-600 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 animate-pulse-soft"
-                                                            : "bg-green-50 border-green-100 text-green-600 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
-                                                        }`}
+                                                        ${row.passFail ===
+                                  "FAIL"
+                                  ? "bg-red-50 border-red-100 text-red-600 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 animate-pulse-soft"
+                                  : "bg-green-50 border-green-100 text-green-600 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
+                                }`}
                             >
                               <span className="text-sm font-black tabular-nums">
                                 {row.shrinkage}
@@ -2770,11 +2782,10 @@ const GarmentWashForm = ({
                       <td className="p-3 text-center">
                         <div
                           className={`transition-all duration-300 mx-auto
-                                                    ${
-                                                      row.passFail === "PASS"
-                                                        ? "text-green-500 scale-125 drop-shadow-sm"
-                                                        : "text-gray-200"
-                                                    }`}
+                                                    ${row.passFail === "PASS"
+                              ? "text-green-500 scale-125 drop-shadow-sm"
+                              : "text-gray-200"
+                            }`}
                         >
                           <Check size={28} strokeWidth={5} />
                         </div>
@@ -2782,11 +2793,10 @@ const GarmentWashForm = ({
                       <td className="p-3 text-center">
                         <div
                           className={`transition-all duration-300 mx-auto
-                                                    ${
-                                                      row.passFail === "FAIL"
-                                                        ? "text-red-500 scale-125 drop-shadow-sm"
-                                                        : "text-gray-200"
-                                                    }`}
+                                                    ${row.passFail === "FAIL"
+                              ? "text-red-500 scale-125 drop-shadow-sm"
+                              : "text-gray-200"
+                            }`}
                         >
                           <X size={28} strokeWidth={5} />
                         </div>
@@ -2977,26 +2987,33 @@ const GarmentWashForm = ({
               onChange={handleCameraInputChange}
             />
 
-            {/* Previews */}
-            <div className="mt-4 flex flex-wrap gap-4">
-              {(formData.images || []).map((file, idx) => (
-                <div
-                  key={idx}
-                  className="relative w-32 h-32 border rounded-md overflow-hidden group"
-                >
-                  <img
-                    src={URL.createObjectURL(file)}
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveImage(idx)}
-                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+            {/* Previews - compact flex thumbnails */}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {(formData.images || []).map((file, idx) => {
+                const imageUrl = URL.createObjectURL(file);
+                return (
+                  <div
+                    key={idx}
+                    className="relative w-20 h-20 sm:w-24 sm:h-24 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50 flex-shrink-0 group"
                   >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
+                    <img
+                      src={imageUrl}
+                      alt={`Preview ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        URL.revokeObjectURL(imageUrl);
+                        handleRemoveImage(idx);
+                      }}
+                      className="absolute top-0.5 right-0.5 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -3112,11 +3129,10 @@ const GarmentWashForm = ({
                             {comparisonData.sizes.map((size) => (
                               <th
                                 key={size}
-                                className={`p-4 text-center font-black border-b-2 border-gray-300 dark:border-gray-600 min-w-[120px] ${
-                                  size === formData.sampleSize
+                                className={`p-4 text-center font-black border-b-2 border-gray-300 dark:border-gray-600 min-w-[120px] ${size === formData.sampleSize
                                     ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
                                     : "text-gray-700 dark:text-gray-300"
-                                }`}
+                                  }`}
                               >
                                 <div className="flex items-center justify-center gap-2">
                                   <span className="w-2 h-2 rounded-full bg-blue-500"></span>
@@ -3144,11 +3160,10 @@ const GarmentWashForm = ({
                               {comparisonData.sizes.map((size) => (
                                 <td
                                   key={size}
-                                  className={`p-4 text-center border-l border-gray-100 dark:border-gray-700 ${
-                                    size === formData.sampleSize
+                                  className={`p-4 text-center border-l border-gray-100 dark:border-gray-700 ${size === formData.sampleSize
                                       ? "bg-blue-50/50 dark:bg-blue-900/20 font-black text-blue-700 dark:text-blue-300"
                                       : "text-gray-600 dark:text-gray-400"
-                                  }`}
+                                    }`}
                                 >
                                   {row.sizes[size] || "-"}
                                 </td>

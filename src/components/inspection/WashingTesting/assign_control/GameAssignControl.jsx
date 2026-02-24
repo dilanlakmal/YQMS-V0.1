@@ -62,7 +62,7 @@ const BUCKET_COLORS = {
     userWarehouse: { primary: '#FFA726', secondary: '#FB8C00', name: 'Warehouse' }
 };
 
-const GameAssignControl = ({ socket, user }) => {
+const GameAssignControl = ({ user }) => {
     const [users, setUsers] = useState([]);
     const [assignments, setAssignments] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null);
@@ -107,28 +107,9 @@ const GameAssignControl = ({ socket, user }) => {
         }
     }, []);
 
-
-
-    // Memoized socket event handlers to prevent recreation on every render
-    const handleAssignmentCreated = useCallback((assignment) => {
-        setAssignments(prev => [assignment, ...prev]);
-    }, []);
-
-    const handleAssignmentUpdated = useCallback((assignment) => {
-        setAssignments(prev =>
-            prev.map(a => a._id === assignment._id ? assignment : a)
-        );
-    }, []);
-
-    const handleAssignmentDeleted = useCallback(({ id }) => {
-        setAssignments(prev => prev.filter(a => a._id !== id));
-    }, []);
-
-
-
-
-
-
+    // Stable ref so submitAssignment can call fetchAssignments without it being
+    // declared yet (avoids temporal dead zone / circular useCallback deps).
+    const fetchAssignmentsRef = useRef(null);
 
     // Memoize getUserName helper to prevent recreation
     const getUserName = useCallback((userId) => {
@@ -184,6 +165,10 @@ const GameAssignControl = ({ socket, user }) => {
                 }
                 showToast.success('✓ New assignment created!');
             }
+
+            // Re-fetch to keep local list in sync (replaces socket listener)
+            // Uses a ref to avoid TDZ issue (fetchAssignments is declared later in the file)
+            if (fetchAssignmentsRef.current) await fetchAssignmentsRef.current();
 
         } catch (error) {
             console.error('[Frontend] Error submitting assignment:', error);
@@ -281,20 +266,13 @@ const GameAssignControl = ({ socket, user }) => {
                 : response.data.assignments || [];
 
             setAssignments(data);
-
-            // Default to the latest assignment if available
-            /*
-            if (data.length > 0) {
-                // Ensure we call handleLoadAssignment to populate state fully
-                // Need to defer this slightly or ensure render order? No, plain set is fine.
-                // But handleLoadAssignment depends on users potentially? No, it just sets IDs.
-                handleLoadAssignment(data[0]);
-            }
-            */
         } catch (error) {
             console.error('Error fetching assignments:', error);
         }
-    }, [handleLoadAssignment]);
+    }, []);
+
+    // Keep the ref up-to-date so submitAssignment always calls the latest version
+    fetchAssignmentsRef.current = fetchAssignments;
 
     const updateCurrentAssignment = useCallback((assignment) => {
         setCurrentAssignment({
@@ -482,6 +460,9 @@ const GameAssignControl = ({ socket, user }) => {
             if (activeAssignmentId === id) {
                 resetForm();
             }
+
+            // Re-fetch to keep local list in sync (replaces socket listener)
+            if (fetchAssignmentsRef.current) await fetchAssignmentsRef.current();
         } catch (error) {
             console.error('Error deleting assignment:', error);
             showToast.error('Failed to delete assignment');
@@ -489,21 +470,6 @@ const GameAssignControl = ({ socket, user }) => {
             setDeleteConfirmation({ isOpen: false, id: null });
         }
     }, [deleteConfirmation.id, activeAssignmentId, resetForm]);
-
-    useEffect(() => {
-        if (!socket) return;
-        socket.emit('join:assignments');
-
-        socket.on('assignment:created', handleAssignmentCreated);
-        socket.on('assignment:updated', handleAssignmentUpdated);
-        socket.on('assignment:deleted', handleAssignmentDeleted);
-
-        return () => {
-            socket.off('assignment:created', handleAssignmentCreated);
-            socket.off('assignment:updated', handleAssignmentUpdated);
-            socket.off('assignment:deleted', handleAssignmentDeleted);
-        };
-    }, [socket, handleAssignmentCreated, handleAssignmentUpdated, handleAssignmentDeleted]);
 
     useEffect(() => {
         fetchUsers();

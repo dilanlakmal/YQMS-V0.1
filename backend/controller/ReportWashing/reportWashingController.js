@@ -261,7 +261,7 @@ export const saveReportWashing = async (req, res) => {
 // Get all Report Washing data
 export const getReportWashing = async (req, res) => {
   try {
-    const { ymStyle, factory, startDate, endDate, limit = 10, page = 1, reportType } = req.query;
+    const { ymStyle, factory, startDate, endDate, limit = 10, page = 1, reportType, status } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     let query = {};
@@ -276,6 +276,10 @@ export const getReportWashing = async (req, res) => {
 
     if (req.query.color) {
       query.color = { $regex: req.query.color, $options: "i" };
+    }
+
+    if (status) {
+      query.status = status;
     }
 
 
@@ -404,8 +408,28 @@ export const updateReportWashing = async (req, res) => {
       }
     }
 
+    // Detect color change and whether editor is warehouse (for submitter notification)
+    const prevColor = Array.isArray(existingReport.color) ? existingReport.color : [];
+    const newColor = Array.isArray(updateData.color) ? updateData.color : [];
+    const colorChanged = prevColor.length !== newColor.length ||
+      prevColor.some((c, i) => newColor[i] !== c) ||
+      newColor.some((c, i) => prevColor[i] !== c);
+    const editedByWarehouse = req.body.editedByWarehouse === true || req.body.editedByWarehouse === "true";
 
-
+    if (editedByWarehouse && colorChanged) {
+      updateData.colorEditedByWarehouseAt = new Date();
+      updateData.colorEditedByWarehouseBy = req.body.editorUserId || req.body.editorEmpId || "";
+      updateData.colorEditedByWarehouseName = req.body.editorUserName || req.body.editorName || "";
+      // Colors that were in original but warehouse removed (submitter sees this in Report notification modal on the report card)
+      updateData.colorUncheckedByWarehouse = prevColor.filter((c) => !newColor.includes(c));
+    }
+    // When a non-warehouse user updates the report (e.g. submitter or admin), clear the warehouse color-edit notification
+    if (!editedByWarehouse && colorChanged) {
+      updateData.colorEditedByWarehouseAt = null;
+      updateData.colorEditedByWarehouseBy = "";
+      updateData.colorEditedByWarehouseName = "";
+      updateData.colorUncheckedByWarehouse = [];
+    }
 
     // Helper to safely parse JSON fields (duplicate of logic in save, consider hoisting if refactoring)
     const safeParseJSON = (data, fallback = []) => {
@@ -795,6 +819,11 @@ export const updateReportWashing = async (req, res) => {
     // Clean up other obsolete fields if they leak in
     delete updateData.userSubmit;
     delete updateData.userSubmitName;
+    delete updateData.editedByWarehouse;
+    delete updateData.editorUserId;
+    delete updateData.editorUserName;
+    delete updateData.editorEmpId;
+    delete updateData.editorName;
 
     // Find and update the report using the correct model
     const updatedReport = await ReportModel.findByIdAndUpdate(
@@ -882,7 +911,7 @@ export const deleteReportWashing = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Report Washing and associated files deleted successfully",
+      message: "Report Washing and associated files deleted successfully",  
       data: deletedReport
     });
   } catch (error) {
@@ -1072,7 +1101,74 @@ export const scanReceived = async (req, res) => {
   }
 };
 
+// Reject report (warehouse: e.g. color mismatch, wrong quantity) – only when status is pending
+export const rejectReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { receiver_emp_id, rejectedNotes } = req.body;
 
+    if (!receiver_emp_id) {
+      return res.status(400).json({
+        success: false,
+        message: "receiver_emp_id is required"
+      });
+    }
+
+    const { model: ReportModel, doc: existingReport } = await findReportById(id);
+
+    if (!ReportModel || !existingReport) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found"
+      });
+    }
+
+    const currentStatus = existingReport.status || "";
+    if (currentStatus && currentStatus !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: `Report cannot be rejected (current status: ${currentStatus}). Only pending reports can be rejected.`
+      });
+    }
+
+    const now = new Date();
+    const updateData = {
+      status: "rejected",
+      receiver_emp_id,
+      receiver_status: "rejected",
+      rejectedAt: now,
+      rejectedNotes: rejectedNotes || ""
+    };
+
+    const updatedReport = await ReportModel.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedReport) {
+      return res.status(404).json({
+        success: false,
+        message: "Failed to update report"
+      });
+    }
+
+    io.emit("washing-report-updated", updatedReport);
+
+    res.status(200).json({
+      success: true,
+      message: "Report rejected successfully",
+      data: updatedReport
+    });
+  } catch (error) {
+    console.error("Error rejecting report:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reject report",
+      error: error.message
+    });
+  }
+};
 
 // Get unique colors for autocomplete
 export const getUniqueColors = async (req, res) => {

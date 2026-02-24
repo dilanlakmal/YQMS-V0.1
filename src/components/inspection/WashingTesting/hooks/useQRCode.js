@@ -1,20 +1,76 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { API_BASE_URL } from "../../../../../config.js";
 import showToast from "../../../../utils/toast.js";
+import { useModalStore } from "../../../../stores/washing/index.js";
 
 /**
- * Custom hook for QR code operations (scanning, generation)
+ * Custom hook for QR code operations (scanning, generation).
+ * QR visibility state lives in useModalStore; only the scanner DOM instance
+ * stays local (non-serializable).
  */
 export const useQRCode = (getQRCodeBaseURL) => {
-  const [showReportDateQR, setShowReportDateQR] = useState(null);
-  const [showReportDateScanner, setShowReportDateScanner] = useState(null);
+  const {
+    setShowReportDateQR,
+    setShowReportDateScanner,
+    setScanningReportId,
+  } = useModalStore();
   const [html5QrCodeInstance, setHtml5QrCodeInstance] = useState(null);
-  const [scanningReportId, setScanningReportId] = useState(null);
   const statusCheckIntervalRef = useRef(null);
 
-  // Generate QR code as data URL for PDF using QRCodeCanvas
+  // Generate QR code as data URL **without logo** (for download/print)
+  const generateQRCodeDataURLNoLogo = useCallback(async (value, size = 1024) => {
+    return new Promise((resolve) => {
+      try {
+        const container = document.createElement("div");
+        container.style.position = "absolute";
+        container.style.left = "-9999px";
+        container.style.width = `${size}px`;
+        container.style.height = `${size}px`;
+        container.style.background = "white";
+        document.body.appendChild(container);
+
+        import("react-dom/client")
+          .then(({ createRoot }) => {
+            const root = createRoot(container);
+            root.render(
+              React.createElement(QRCodeCanvas, {
+                value,
+                size,
+                level: "H",
+                includeMargin: true,
+              })
+            );
+            setTimeout(() => {
+              const canvas = container.querySelector("canvas");
+              if (canvas) {
+                const dataURL = canvas.toDataURL("image/png");
+                root.unmount();
+                document.body.removeChild(container);
+                resolve(dataURL);
+              } else {
+                root.unmount();
+                document.body.removeChild(container);
+                resolve(null);
+              }
+            }, 300);
+          })
+          .catch((error) => {
+            console.error("Error generating QR code (no logo):", error);
+            if (document.body.contains(container)) {
+              document.body.removeChild(container);
+            }
+            resolve(null);
+          });
+      } catch (error) {
+        console.error("Error generating QR code:", error);
+        resolve(null);
+      }
+    });
+  }, []);
+
+  // Generate QR code as data URL for PDF using QRCodeCanvas (with logo)
   const generateQRCodeDataURL = useCallback(async (value, size = 100) => {
     // Increase resolution for the data URL to ensure it's sharp in PDF/Print
     const highResSize = 1024;
@@ -82,89 +138,31 @@ export const useQRCode = (getQRCodeBaseURL) => {
     });
   }, []);
 
-  // Download QR code as image
-  const downloadQRCode = useCallback((reportId) => {
-    // Try to find the canvas directly first (more reliable for logo inclusion)
-    let canvas = document.querySelector(`#qr-canvas-${reportId}`);
-
-    // Fallback to searching inside the container if it's not found by ID
-    if (!canvas) {
-      canvas = document.querySelector(`#qr-code-${reportId} canvas`);
-    }
-
-    if (canvas) {
-      // Direct download from canvas (easiest and most reliable way to get the logo)
-      try {
-        const downloadUrl = canvas.toDataURL("image/png");
-        const link = document.createElement("a");
-        link.href = downloadUrl;
-        link.download = `QR-Code-Report-${reportId}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        showToast.success("QR code downloaded successfully!");
-        return;
-      } catch (e) {
-        console.error("Canvas download failed, falling back to SVG method", e);
-      }
-    }
-
-    // Fallback: If no canvas is found (e.g., if we were still using SVG), try SVG conversion
-    const svg = document.querySelector(`#qr-code-${reportId} svg`);
-    if (!svg) {
-      showToast.error("QR code not found. Please try again.");
-      return;
-    }
-
-    try {
-      const svgData = new XMLSerializer().serializeToString(svg);
-      const tempCanvas = document.createElement("canvas");
-      const ctx = tempCanvas.getContext("2d");
-      const img = new Image();
-
-      const size = 512;
-      tempCanvas.width = size;
-      tempCanvas.height = size;
-
-      const svgBlob = new Blob([svgData], {
-        type: "image/svg+xml;charset=utf-8",
-      });
-      const svgUrl = URL.createObjectURL(svgBlob);
-
-      img.onload = () => {
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-        ctx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
-        URL.revokeObjectURL(svgUrl);
-
-        tempCanvas.toBlob((blob) => {
-          if (!blob) {
-            showToast.error("Failed to generate QR code image.");
-            return;
-          }
-          const downloadUrl = URL.createObjectURL(blob);
+  // Download QR code as image (no logo — plain QR for download)
+  const downloadQRCode = useCallback(
+    (reportId) => {
+      const value = `${getQRCodeBaseURL()}/Launch-washing-machine-test?scan=${reportId}`;
+      generateQRCodeDataURLNoLogo(value, 1024).then((dataURL) => {
+        if (!dataURL) {
+          showToast.error("Failed to generate QR code. Please try again.");
+          return;
+        }
+        try {
           const link = document.createElement("a");
-          link.href = downloadUrl;
+          link.href = dataURL;
           link.download = `QR-Code-Report-${reportId}.png`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
-          URL.revokeObjectURL(downloadUrl);
           showToast.success("QR code downloaded successfully!");
-        }, "image/png");
-      };
-
-      img.onerror = () => {
-        showToast.error("Failed to load QR code image.");
-        URL.revokeObjectURL(svgUrl);
-      };
-
-      img.src = svgUrl;
-    } catch (error) {
-      console.error("Error downloading QR code:", error);
-      showToast.error("Failed to download QR code. Please try again.");
-    }
-  }, []);
+        } catch (e) {
+          console.error("Download failed:", e);
+          showToast.error("Failed to download QR code. Please try again.");
+        }
+      });
+    },
+    [getQRCodeBaseURL, generateQRCodeDataURLNoLogo]
+  );
 
   // Stop QR Code Scanner
   const stopScanner = useCallback(async () => {
@@ -368,39 +366,25 @@ export const useQRCode = (getQRCodeBaseURL) => {
     return targetReportId;
   }, []);
 
-  // Cleanup scanner on unmount or when scanner is closed
-  useEffect(() => {
-    if (!showReportDateScanner && html5QrCodeInstance) {
-      stopScanner();
-    }
-    return () => {
-      stopScanner();
-    };
-  }, [showReportDateScanner, html5QrCodeInstance, stopScanner]);
+  // Print QR code as a Stamp/Label - Refined Horizontal Layout (5cm x 4cm) (no logo)
+  const printQRCode = useCallback(
+    (reportId) => {
+      const value = `${getQRCodeBaseURL()}/Launch-washing-machine-test?scan=${reportId}`;
+      generateQRCodeDataURLNoLogo(value, 1024).then((qrDataURL) => {
+        if (!qrDataURL) {
+          showToast.error("Failed to generate QR code for printing.");
+          return;
+        }
+        const printWindow = window.open("", "_blank", "width=600,height=600");
 
-  // Print QR code as a Stamp/Label - Refined Horizontal Layout (5cm x 4cm)
-  const printQRCode = useCallback((reportId) => {
-    let canvas = document.querySelector(`#qr-canvas-${reportId}`);
-    if (!canvas) {
-      canvas = document.querySelector(`#qr-code-${reportId} canvas`);
-    }
+        if (!printWindow) {
+          showToast.error(
+            "Pop-up blocked! Please allow pop-ups to print the stamp."
+          );
+          return;
+        }
 
-    if (!canvas) {
-      showToast.error("QR code not found for printing.");
-      return;
-    }
-
-    const qrDataURL = canvas.toDataURL("image/png");
-    const printWindow = window.open("", "_blank", "width=600,height=600");
-
-    if (!printWindow) {
-      showToast.error(
-        "Pop-up blocked! Please allow pop-ups to print the stamp."
-      );
-      return;
-    }
-
-    printWindow.document.write(`
+        printWindow.document.write(`
       <html>
         <head>
           <title>QR Stamp - ${reportId}</title>
@@ -505,16 +489,13 @@ export const useQRCode = (getQRCodeBaseURL) => {
         </body>
       </html>
     `);
-    printWindow.document.close();
-  }, []);
+        printWindow.document.close();
+      });
+    },
+    [getQRCodeBaseURL, generateQRCodeDataURLNoLogo]
+  );
 
   return {
-    showReportDateQR,
-    setShowReportDateQR,
-    showReportDateScanner,
-    setShowReportDateScanner,
-    scanningReportId,
-    setScanningReportId,
     generateQRCodeDataURL: generateQRCodeDataURL,
     downloadQRCode: downloadQRCode,
     printQRCode: printQRCode,

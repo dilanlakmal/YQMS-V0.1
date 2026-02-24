@@ -1,5 +1,6 @@
-import React, { useRef } from "react";
-import { X, Camera, Upload, RotateCw, CheckCircle } from "lucide-react";
+import React from "react";
+import ImageUploadModal from "./ImageUploadModal";
+import { useModalStore } from "../../../../stores/washing/index.js";
 
 const CompletionModal = ({
   isOpen,
@@ -11,167 +12,34 @@ const CompletionModal = ({
   completionImageInputRef,
   handleCompletionImageUpload,
   handleCompletionSubmit,
-  isSavingCompletion,
   completionImageRotations,
   setCompletionImageRotations,
 }) => {
-  const uploadInputRef = useRef(null);
-
-  if (!isOpen) return null;
-
+  const { isSavingCompletion } = useModalStore();
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-            Complete Report
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Please upload images and add notes to complete this report.
-          </p>
-
-          {/* Completion Images */}
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Completion Images
-              </label>
-              <span className={`text-xs font-medium ${completionImages.length >= 5 ? 'text-red-500' : 'text-gray-500'}`}>
-                {completionImages.length}/5 images
-              </span>
-            </div>
-            <div className="space-y-4">
-              {completionImages.length > 0 && (
-                <div className="flex flex-row gap-2 overflow-x-auto">
-                  {completionImages.map((imageFile, index) => {
-                    const imageUrl = URL.createObjectURL(imageFile);
-                    const rotation = completionImageRotations[index] || 0;
-                    return (
-                      <div key={index} className="relative w-32 h-32 flex-shrink-0 rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-700">
-                        <div className="w-full h-full flex items-center justify-center">
-                          <img
-                            src={imageUrl}
-                            alt={`Completion ${index + 1}`}
-                            className="max-w-full max-h-full object-contain transition-transform duration-300"
-                            style={{ transform: `rotate(${rotation}deg)` }}
-                          />
-                        </div>
-                        {/* Control Buttons */}
-                        <div className="absolute top-1 right-1 flex flex-col gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              URL.revokeObjectURL(imageUrl);
-                              setCompletionImages((prev) => prev.filter((_, i) => i !== index));
-                              setCompletionImageRotations((prev) => {
-                                const newRotations = { ...prev };
-                                delete newRotations[index];
-                                return newRotations;
-                              });
-                            }}
-                            className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg transition-colors"
-                            title="Remove"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => completionImageInputRef.current?.click()}
-                  disabled={completionImages.length >= 5}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Camera size={18} className="mr-2" />
-                  Capture
-                </button>
-                <button
-                  type="button"
-                  onClick={() => uploadInputRef.current?.click()}
-                  disabled={completionImages.length >= 5}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Upload size={18} className="mr-2" />
-                  Upload
-                </button>
-              </div>
-              <input
-                ref={completionImageInputRef}
-                type="file"
-                className="hidden"
-                accept="image/*;capture=camera"
-                capture="environment"
-                onChange={(e) => {
-                  handleCompletionImageUpload(e.target.files);
-                  if (completionImageInputRef.current) {
-                    completionImageInputRef.current.value = "";
-                  }
-                }}
-              />
-              <input
-                ref={uploadInputRef}
-                type="file"
-                className="hidden"
-                accept="image/*"
-                multiple
-                onChange={(e) => {
-                  handleCompletionImageUpload(e.target.files);
-                  if (uploadInputRef.current) {
-                    uploadInputRef.current.value = "";
-                  }
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Completion Notes */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Notes
-            </label>
-            <textarea
-              value={completionNotes}
-              onChange={(e) => setCompletionNotes(e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              placeholder="Enter completion notes..."
-            />
-          </div>
-
-          {/* Modal Actions */}
-          <div className="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
-            >
-              <X className="w-4 h-4" />
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleCompletionSubmit}
-              disabled={isSavingCompletion}
-              className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isSavingCompletion ? (
-                <RotateCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <CheckCircle className="w-4 h-4" />
-              )}
-              {isSavingCompletion ? "Completing..." : "Complete Report"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <ImageUploadModal
+      isOpen={isOpen}
+      onClose={onClose}
+      images={completionImages}
+      setImages={setCompletionImages}
+      notes={completionNotes}
+      setNotes={setCompletionNotes}
+      captureInputRef={completionImageInputRef}
+      onUpload={handleCompletionImageUpload}
+      onSubmit={handleCompletionSubmit}
+      isSaving={isSavingCompletion}
+      imageRotations={completionImageRotations}
+      setImageRotations={setCompletionImageRotations}
+      title="Complete Report"
+      description="Please upload images and add notes to complete this report."
+      imageLabel="Completion Images"
+      notesPlaceholder="Enter completion notes..."
+      submitLabel="Complete Report"
+      savingLabel="Completing..."
+      submitColor="green"
+      submitIcon="check"
+    />
   );
 };
 
 export default CompletionModal;
-

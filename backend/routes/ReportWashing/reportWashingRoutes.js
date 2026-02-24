@@ -8,7 +8,8 @@ import {
   getUniqueStyles,
   getUniqueColors,
   getUsedColors,
-  scanReceived
+  scanReceived,
+  rejectReport
 } from "../../controller/ReportWashing/reportWashingController.js";
 import { uploadWashingMachineTestImage } from "../../helpers/helperFunctions.js";
 
@@ -42,6 +43,7 @@ router.delete("/api/report-washing/:id", deleteReportWashing);
 
 // QR Code Scan route
 router.patch("/api/report-washing/:id/scan-received", scanReceived);
+router.patch("/api/report-washing/:id/reject", rejectReport);
 
 // Autocomplete routes
 router.get("/api/report-washing/autocomplete/styles", getUniqueStyles);

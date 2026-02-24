@@ -15,6 +15,7 @@ import showToast from '../../../../utils/toast';
  * @param {function} fetchReports - Refresh reports
  * @param {function} setShowEditModal - Modal state setter
  * @param {function} resetEditState - Reset edit state function
+ * @param {object} [warehouseEditContext] - When warehouse user edits (e.g. reject color), pass so backend sets colorEditedByWarehouse* and notifies submitter
  */
 export const handleEditFormSubmit = async (
     e,
@@ -22,7 +23,8 @@ export const handleEditFormSubmit = async (
     editFormData,
     fetchReports,
     setShowEditModal,
-    resetEditState
+    resetEditState,
+    warehouseEditContext
 ) => {
     e.preventDefault();
 
@@ -37,6 +39,15 @@ export const handleEditFormSubmit = async (
 
     try {
         const formDataToSubmit = new FormData();
+
+        // Warehouse edit context: so backend can set colorEditedByWarehouseAt and create notification for submitter
+        if (warehouseEditContext && warehouseEditContext.editedByWarehouse === true) {
+            formDataToSubmit.append("editedByWarehouse", "true");
+            if (warehouseEditContext.editorUserId != null) formDataToSubmit.append("editorUserId", String(warehouseEditContext.editorUserId));
+            if (warehouseEditContext.editorEmpId != null) formDataToSubmit.append("editorEmpId", String(warehouseEditContext.editorEmpId));
+            if (warehouseEditContext.editorUserName != null) formDataToSubmit.append("editorUserName", String(warehouseEditContext.editorUserName));
+            if (warehouseEditContext.editorName != null) formDataToSubmit.append("editorName", String(warehouseEditContext.editorName));
+        }
 
         // Add form fields
         formDataToSubmit.append("reportType", editFormData.reportType || "Home Wash Test");

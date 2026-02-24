@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Upload, Camera, X, Send, RotateCw, Plus, Trash2, Calendar } from "lucide-react";
-import { DatePicker as AntDatePicker, Select } from "antd";
+import { DatePicker as AntDatePicker, TimePicker, Select } from "antd";
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+
+dayjs.extend(customParseFormat);
 
 /**
  * Pulling Test Form Component
@@ -45,7 +48,27 @@ const PullingTestForm = ({
     isLoadingUsers = false,
     assignHistory,
     causeAssignData,
+    // Order data for Fabric Color multi-select
+    fabricContent = [],
 }) => {
+    const [showFabricDropdown, setShowFabricDropdown] = useState(false);
+
+    // When fabricContent is used, treat fabricColor as array of selected labels; otherwise string (same as HT/EMB)
+    const fabricOptions = Array.isArray(fabricContent) ? fabricContent.map((f) => `${f.percentageValue ?? ''}% ${f.fabricName ?? ''}`.trim() || `${f.fabricName ?? '—'} (${f.percentageValue ?? '—'}%)`) : [];
+    const selectedFabricColors = Array.isArray(formData.fabricColor)
+        ? formData.fabricColor
+        : (formData.fabricColor ? String(formData.fabricColor).split(',').map((s) => s.trim()).filter(Boolean) : []);
+
+    // Close fabric dropdown when clicking outside
+    useEffect(() => {
+        if (!showFabricDropdown) return;
+        const handleClickOutside = (e) => {
+            if (!e.target.closest(".fabric-dropdown-container")) setShowFabricDropdown(false);
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [showFabricDropdown]);
+
     // Filter colors that have already been reported
     // Filter colors that have already been reported, but ALWAYS include currently selected colors
     const filteredColors = Array.from(new Set([
@@ -160,6 +183,13 @@ const PullingTestForm = ({
             }
         }
     }, [users.length, preparedByOptions, checkedByOptions, formData.preparedBy, formData.checkedBy]);
+
+    // Default DATE to current date when empty
+    useEffect(() => {
+        if (!formData.testDate || formData.testDate === '') {
+            handleInputChange('testDate', dayjs().format('YYYY-MM-DD'));
+        }
+    }, []);
 
     // Initialize test rows from formData or with one empty row
     const [testRows, setTestRows] = useState(
@@ -306,6 +336,19 @@ const PullingTestForm = ({
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 COLOR <span className="text-red-500">*</span>
                             </label>
+                            {isCompleting ? (
+                                <div
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300 text-gray-700"
+                                    title={Array.isArray(formData.color) && formData.color?.length > 0 ? formData.color.join(", ") : ""}
+                                >
+                                    <span className="truncate block">
+                                        {formData.color?.length > 0
+                                            ? `${formData.color.length} color(s) selected`
+                                            : "No colors selected"}
+                                    </span>
+                                </div>
+                            ) : (
+                            <>
                             <button
                                 type="button"
                                 onClick={() => setShowColorDropdown(!showColorDropdown)}
@@ -441,6 +484,104 @@ const PullingTestForm = ({
                                     </div>
                                 </div>
                             )}
+                            </>
+                            )}
+                        </div>
+
+                        {/* Fabric Color - multi-select from order fabricContent (same as HT/EMB) or type manually */}
+                        <div className="relative fabric-dropdown-container">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Fabric Color
+                                {fabricOptions.length > 0 && (
+                                    <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto-filled)</span>
+                                )}
+                            </label>
+                            {fabricOptions.length > 0 ? (
+                                <>
+                                    <div className="relative">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowFabricDropdown(!showFabricDropdown)}
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between"
+                                        >
+                                            <span className="truncate">
+                                                {selectedFabricColors.length === 0
+                                                    ? "Select fabric(s)"
+                                                    : selectedFabricColors.length === fabricOptions.length
+                                                        ? "All fabrics selected"
+                                                        : `${selectedFabricColors.length} fabric(s) selected`}
+                                            </span>
+                                            <svg
+                                                className={`w-4 h-4 transition-transform flex-shrink-0 ${showFabricDropdown ? "rotate-180" : ""}`}
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+
+                                        {showFabricDropdown && (
+                                            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                                <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleInputChange("fabricColor", [...fabricOptions])}
+                                                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                                                    >
+                                                        Select All
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleInputChange("fabricColor", [])}
+                                                        className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                                                    >
+                                                        Clear All
+                                                    </button>
+                                                </div>
+                                                <div className="p-2">
+                                                    <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                        Available Fabrics:
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        {fabricOptions.map((label, index) => (
+                                                            <label
+                                                                key={index}
+                                                                className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedFabricColors.includes(label)}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.checked) {
+                                                                            handleInputChange("fabricColor", [...selectedFabricColors, label]);
+                                                                        } else {
+                                                                            handleInputChange("fabricColor", selectedFabricColors.filter((c) => c !== label));
+                                                                        }
+                                                                    }}
+                                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                                                                />
+                                                                <span className="ml-2 text-sm text-gray-900 dark:text-white">{label}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {selectedFabricColors.length === 0 && (
+                                        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Select at least one fabric</p>
+                                    )}
+                                </>
+                            ) : (
+                                <input
+                                    type="text"
+                                    value={typeof formData.fabricColor === 'string' ? formData.fabricColor : (Array.isArray(formData.fabricColor) ? formData.fabricColor.join(', ') : '')}
+                                    onChange={(e) => handleInputChange("fabricColor", e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    placeholder="e.g., PORT ROYALE"
+                                />
+                            )}
                         </div>
 
                         {/* BUYER */}
@@ -478,17 +619,24 @@ const PullingTestForm = ({
                             </div>
                         </div>
 
-                        {/* TIME */}
+                        {/* TIME - 12-hour picker (Ant Design) */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 TIME <span className="text-gray-400 text-xs">(Optional)</span>
                             </label>
-                            <input
-                                type="text"
-                                value={formData.testTime || ''}
-                                onChange={(e) => handleInputChange("testTime", e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                            <TimePicker
+                                value={formData.testTime ? (() => {
+                                    const t = dayjs(formData.testTime, ['h:mm A', 'HH:mm', 'h:mm a']);
+                                    return t.isValid() ? t : null;
+                                })() : null}
+                                onChange={(date, dateString) => handleInputChange("testTime", dateString || '')}
+                                format="h:mm A"
+                                use12Hours
                                 placeholder="e.g., 10:30 AM"
+                                className="w-full [&_.ant-picker-input>input]:text-left"
+                                allowClear
+                                inputReadOnly
+                                minuteStep={1}
                             />
                         </div>
                     </div>
@@ -676,38 +824,34 @@ const PullingTestForm = ({
                                 {formData.images?.length || 0}/5 images
                             </span>
                         </div>
-                        <div className="mt-1 space-y-4">
-                            {/* Image Preview Area */}
+                        <div className="mt-1">
+                            {/* Image Preview Area - compact flex thumbnails */}
                             {formData.images && formData.images.length > 0 ? (
-                                <div className="space-y-4">
+                                <div className="flex flex-wrap gap-2">
                                     {formData.images.map((imageFile, index) => {
                                         const imageUrl = URL.createObjectURL(imageFile);
                                         return (
                                             <div
                                                 key={index}
-                                                className="relative border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50/50 dark:bg-gray-800/50 p-3"
+                                                className="relative w-20 h-20 sm:w-24 sm:h-24 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50 flex-shrink-0 group"
                                             >
-                                                <div className="relative w-full flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-md overflow-hidden">
-                                                    <img
-                                                        src={imageUrl}
-                                                        alt={`Preview ${index + 1}`}
-                                                        className="max-w-xs max-h-64 object-contain rounded-md"
-                                                    />
-                                                    <div className="absolute top-2 right-2 flex gap-2 z-10">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                URL.revokeObjectURL(imageUrl);
-                                                                handleRemoveImage(index);
-                                                            }}
-                                                            className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
-                                                            aria-label="Remove image"
-                                                            title="Remove"
-                                                        >
-                                                            <X size={18} />
-                                                        </button>
-                                                    </div>
-                                                </div>
+                                                <img
+                                                    src={imageUrl}
+                                                    alt={`Preview ${index + 1}`}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        URL.revokeObjectURL(imageUrl);
+                                                        handleRemoveImage(index);
+                                                    }}
+                                                    className="absolute top-0.5 right-0.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                                                    aria-label="Remove image"
+                                                    title="Remove"
+                                                >
+                                                    <X size={14} />
+                                                </button>
                                             </div>
                                         );
                                     })}

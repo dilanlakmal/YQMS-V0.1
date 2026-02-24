@@ -1,7 +1,11 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Upload, Camera, X, Send, RotateCw, Calendar, CheckCircle2, XCircle } from "lucide-react";
-import { DatePicker as AntDatePicker } from "antd";
+import { DatePicker as AntDatePicker, TimePicker, Select } from "antd";
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+import { PRINT_WASH_TEST_DEFAULTS } from "../constants/reportTypes.js";
+
+dayjs.extend(customParseFormat);
 
 
 const HTTestingForm = ({
@@ -29,9 +33,72 @@ const HTTestingForm = ({
     styleDescription,
     custStyle,
     fabrication,
+    fabricContent = [],
+    availableColors = [],
+    // Users & assignment (for Checked By dropdown)
+    users: parentUsers = [],
+    isLoadingUsers = false,
+    assignHistory,
 }) => {
-    // Sync fetched data to form
-    // Sync fetched data to form
+    const [showFabricDropdown, setShowFabricDropdown] = useState(false);
+    const users = parentUsers || [];
+
+    // Filter users based on assignHistory (same pattern as GarmentWashForm)
+    const getFilteredOptions = (field) => {
+        if (!assignHistory || assignHistory.length === 0) return [];
+        const sortedHistory = [...assignHistory].sort(
+            (a, b) => new Date(a.updatedAt) - new Date(b.updatedAt),
+        );
+        const userRolesMap = new Map();
+        const extractId = (val) => {
+            if (!val) return null;
+            const match = String(val).match(/\((.*?)\)/);
+            return match ? match[1] : val;
+        };
+        sortedHistory.forEach((item) => {
+            const checkedId = extractId(item.checkedBy);
+            const approvedId = extractId(item.approvedBy);
+            if (checkedId) {
+                const current = userRolesMap.get(checkedId) || { checkedBy: false, approvedBy: false };
+                current.checkedBy = true;
+                userRolesMap.set(checkedId, current);
+            }
+            if (approvedId) {
+                const current = userRolesMap.get(approvedId) || { checkedBy: false, approvedBy: false };
+                current.approvedBy = true;
+                userRolesMap.set(approvedId, current);
+            }
+        });
+        const allowedEmpIds = new Set();
+        userRolesMap.forEach((roles, empId) => {
+            if (roles[field]) allowedEmpIds.add(empId);
+        });
+        if (allowedEmpIds.size === 0) return [];
+        const filteredUsers = users.filter((u) => allowedEmpIds.has(u.emp_id));
+        return filteredUsers.map((u) => ({
+            value: u.emp_id,
+            label: `(${u.emp_id}) ${u.name}`,
+        }));
+    };
+    const checkedByOptions = getFilteredOptions("checkedBy");
+
+    // Close fabric dropdown when clicking outside
+    useEffect(() => {
+        if (!showFabricDropdown) return;
+        const handleClickOutside = (e) => {
+            if (!e.target.closest(".fabric-dropdown-container")) setShowFabricDropdown(false);
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [showFabricDropdown]);
+
+    // When fabricContent is used, treat fabricColor as array of selected labels; otherwise string
+    const fabricOptions = Array.isArray(fabricContent) ? fabricContent.map((f) => `${f.percentageValue ?? ''}% ${f.fabricName ?? ''}`.trim() || `${f.fabricName ?? '—'} (${f.percentageValue ?? '—'}%)`) : [];
+    const selectedFabricColors = Array.isArray(formData.fabricColor)
+        ? formData.fabricColor
+        : (formData.fabricColor ? String(formData.fabricColor).split(',').map((s) => s.trim()).filter(Boolean) : []);
+
+    // Sync fetched data to form (including color from Garment Wash form)
     React.useEffect(() => {
         // Sync Style No from other forms if available
         if ((!formData.styleNo || formData.styleNo === '')) {
@@ -43,7 +110,35 @@ const HTTestingForm = ({
         if (styleDescription && styleDescription !== '' && (!formData.styleDescription || formData.styleDescription === '')) handleInputChange('styleDescription', styleDescription);
         if (custStyle && custStyle !== '' && (!formData.custStyle || formData.custStyle === '')) handleInputChange('custStyle', custStyle);
         if (fabrication && fabrication !== '' && (!formData.fabrication || formData.fabrication === '')) handleInputChange('fabrication', fabrication);
-    }, [season, styleDescription, custStyle, fabrication, formData.moNo, formData.ymStyle, formData.styleNo]);
+
+        // Take color value from Garment Wash form (or order availableColors) and put into Fabric Color when empty (HT. color is read-only, no user input)
+        const garmentColor = formData.color;
+        let colorArr = Array.isArray(garmentColor) ? garmentColor : (garmentColor ? [String(garmentColor).trim()].filter(Boolean) : []);
+        if (colorArr.length === 0 && Array.isArray(availableColors) && availableColors.length > 0) colorArr = [...availableColors];
+        if (colorArr.length > 0) {
+            const hasFabricColor = Array.isArray(formData.fabricColor) ? formData.fabricColor.length > 0 : (formData.fabricColor && String(formData.fabricColor).trim() !== '');
+            if (!hasFabricColor) handleInputChange('fabricColor', fabricOptions.length > 0 ? colorArr : colorArr.join(', '));
+        }
+    }, [season, styleDescription, custStyle, fabrication, formData.moNo, formData.ymStyle, formData.styleNo, formData.color, fabricOptions.length, availableColors]);
+
+    // Default final Date to current date when empty
+    useEffect(() => {
+        if (!formData.finalDate || formData.finalDate === '') {
+            handleInputChange('finalDate', dayjs().format('YYYY-MM-DD'));
+        }
+    }, []);
+
+    // Normalize checkedBy when options change (match GarmentWashForm behavior)
+    useEffect(() => {
+        if (users.length === 0 || !formData.checkedBy) return;
+        if (checkedByOptions.some((o) => o.value === formData.checkedBy)) return;
+        const byName = users.find((u) => u.name === formData.checkedBy || formData.checkedBy === `(${u.emp_id}) ${u.name}`);
+        if (byName && checkedByOptions.some((o) => o.value === byName.emp_id)) {
+            handleInputChange("checkedBy", byName.emp_id);
+        } else {
+            handleInputChange("checkedBy", "");
+        }
+    }, [users.length, checkedByOptions, formData.checkedBy]);
 
     return (
         <div className="space-y-8">
@@ -127,33 +222,116 @@ const HTTestingForm = ({
                             />
                         </div>
 
-                        {/* Fabric Color */}
-                        <div>
+                        {/* Fabric Color - multi-select from order fabricContent (like COLOR dropdown) or type manually; disabled when form is completed */}
+                        <div className="relative fabric-dropdown-container">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Fabric Color
+                                {fabricOptions.length > 0 && (
+                                    <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto-filled)</span>
+                                )}
                             </label>
-                            <input
-                                type="text"
-                                value={formData.fabricColor || ''}
-                                onChange={(e) => handleInputChange("fabricColor", e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                required
-                                placeholder="e.g., BLACK"
-                            />
+                            {fabricOptions.length > 0 ? (
+                                <>
+                                    <div className="relative">
+                                        <button
+                                            type="button"
+                                            disabled={isCompleting}
+                                            onClick={() => !isCompleting && setShowFabricDropdown(!showFabricDropdown)}
+                                            className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between ${isCompleting ? 'cursor-not-allowed bg-gray-100 dark:bg-gray-600 opacity-90' : ''}`}
+                                        >
+                                            <span className="truncate">
+                                                {selectedFabricColors.length === 0
+                                                    ? "Select fabric(s)"
+                                                    : selectedFabricColors.length === fabricOptions.length
+                                                        ? "All fabrics selected"
+                                                        : `${selectedFabricColors.length} fabric(s) selected`}
+                                            </span>
+                                            <svg
+                                                className={`w-4 h-4 transition-transform flex-shrink-0 ${showFabricDropdown ? "rotate-180" : ""}`}
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+
+                                        {showFabricDropdown && !isCompleting && (
+                                            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                                <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleInputChange("fabricColor", [...fabricOptions])}
+                                                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                                                    >
+                                                        Select All
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleInputChange("fabricColor", [])}
+                                                        className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                                                    >
+                                                        Clear All
+                                                    </button>
+                                                </div>
+                                                <div className="p-2">
+                                                    <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                        Available Fabrics:
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        {fabricOptions.map((label, index) => (
+                                                            <label
+                                                                key={index}
+                                                                className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedFabricColors.includes(label)}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.checked) {
+                                                                            handleInputChange("fabricColor", [...selectedFabricColors, label]);
+                                                                        } else {
+                                                                            handleInputChange("fabricColor", selectedFabricColors.filter((c) => c !== label));
+                                                                        }
+                                                                    }}
+                                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                                                                />
+                                                                <span className="ml-2 text-sm text-gray-900 dark:text-white">{label}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {selectedFabricColors.length === 0 && (
+                                        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Select at least one fabric</p>
+                                    )}
+                                </>
+                            ) : (
+                                <input
+                                    type="text"
+                                    value={typeof formData.fabricColor === 'string' ? formData.fabricColor : (Array.isArray(formData.fabricColor) ? formData.fabricColor.join(', ') : '')}
+                                    onChange={(e) => !isCompleting && handleInputChange("fabricColor", e.target.value)}
+                                    readOnly={isCompleting}
+                                    className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white ${isCompleting ? 'cursor-not-allowed bg-gray-100 dark:bg-gray-600' : ''}`}
+                                    required
+                                    placeholder="e.g., BLACK"
+                                />
+                            )}
                         </div>
 
-                        {/* HT. color */}
+                        {/* HT. color - read-only, no user input required */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 HT. color
                             </label>
                             <input
                                 type="text"
-                                value={formData.htColor || ''}
-                                onChange={(e) => handleInputChange("htColor", e.target.value)}
+                                value=""
+                                readOnly
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                required
-                                placeholder="e.g., GREY"
+                                placeholder="—"
                             />
                         </div>
 
@@ -235,17 +413,24 @@ const HTTestingForm = ({
                             </div>
                         </div>
 
-                        {/* Time */}
+                        {/* Time - 12-hour picker (Ant Design) */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Time <span className="text-gray-400 text-xs">(Optional)</span>
                             </label>
-                            <input
-                                type="text"
-                                value={formData.time || ''}
-                                onChange={(e) => handleInputChange("time", e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                placeholder="e.g., 12:21PM"
+                            <TimePicker
+                                value={formData.time ? (() => {
+                                    const t = dayjs(formData.time, ['h:mm A', 'HH:mm', 'h:mm a']);
+                                    return t.isValid() ? t : null;
+                                })() : null}
+                                onChange={(date, dateString) => handleInputChange("time", dateString || '')}
+                                format="h:mm A"
+                                use12Hours
+                                placeholder="e.g., 12:21 PM"
+                                className="w-full [&_.ant-picker-input>input]:text-left"
+                                allowClear
+                                inputReadOnly
+                                minuteStep={1}
                             />
                         </div>
 
@@ -466,7 +651,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorChangeFabric3 || ''}
+                                            value={formData.colorChangeFabric3 || PRINT_WASH_TEST_DEFAULTS.colorChangeFabric3}
                                             onChange={(e) => handleInputChange("colorChangeFabric3", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="5"
@@ -475,7 +660,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorChangeFabric5 || ''}
+                                            value={formData.colorChangeFabric5 || PRINT_WASH_TEST_DEFAULTS.colorChangeFabric5}
                                             onChange={(e) => handleInputChange("colorChangeFabric5", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="4-5"
@@ -484,7 +669,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorChangeFabric10 || ''}
+                                            value={formData.colorChangeFabric10 || PRINT_WASH_TEST_DEFAULTS.colorChangeFabric10}
                                             onChange={(e) => handleInputChange("colorChangeFabric10", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="4-5"
@@ -493,7 +678,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorChangeFabric15 || ''}
+                                            value={formData.colorChangeFabric15 || PRINT_WASH_TEST_DEFAULTS.colorChangeFabric15}
                                             onChange={(e) => handleInputChange("colorChangeFabric15", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="4-5"
@@ -509,7 +694,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorStainingHT3 || ''}
+                                            value={formData.colorStainingHT3 || PRINT_WASH_TEST_DEFAULTS.colorStainingHT3}
                                             onChange={(e) => handleInputChange("colorStainingHT3", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="5"
@@ -518,7 +703,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorStainingHT5 || ''}
+                                            value={formData.colorStainingHT5 || PRINT_WASH_TEST_DEFAULTS.colorStainingHT5}
                                             onChange={(e) => handleInputChange("colorStainingHT5", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="4-5"
@@ -527,7 +712,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorStainingHT10 || ''}
+                                            value={formData.colorStainingHT10 || PRINT_WASH_TEST_DEFAULTS.colorStainingHT10}
                                             onChange={(e) => handleInputChange("colorStainingHT10", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="4-5"
@@ -536,7 +721,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.colorStainingHT15 || ''}
+                                            value={formData.colorStainingHT15 || PRINT_WASH_TEST_DEFAULTS.colorStainingHT15}
                                             onChange={(e) => handleInputChange("colorStainingHT15", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="4-5"
@@ -552,7 +737,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.appearanceAfterWashing3 || ''}
+                                            value={formData.appearanceAfterWashing3 || PRINT_WASH_TEST_DEFAULTS.appearanceAfterWashing3}
                                             onChange={(e) => handleInputChange("appearanceAfterWashing3", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="Accepted"
@@ -561,7 +746,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.appearanceAfterWashing5 || ''}
+                                            value={formData.appearanceAfterWashing5 || PRINT_WASH_TEST_DEFAULTS.appearanceAfterWashing5}
                                             onChange={(e) => handleInputChange("appearanceAfterWashing5", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="Accepted"
@@ -570,7 +755,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.appearanceAfterWashing10 || ''}
+                                            value={formData.appearanceAfterWashing10 || PRINT_WASH_TEST_DEFAULTS.appearanceAfterWashing10}
                                             onChange={(e) => handleInputChange("appearanceAfterWashing10", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="Accepted"
@@ -579,7 +764,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.appearanceAfterWashing15 || ''}
+                                            value={formData.appearanceAfterWashing15 || PRINT_WASH_TEST_DEFAULTS.appearanceAfterWashing15}
                                             onChange={(e) => handleInputChange("appearanceAfterWashing15", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="Accepted"
@@ -595,7 +780,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.peelOff3 || ''}
+                                            value={formData.peelOff3 || PRINT_WASH_TEST_DEFAULTS.peelOff3}
                                             onChange={(e) => handleInputChange("peelOff3", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="OK"
@@ -604,7 +789,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.peelOff5 || ''}
+                                            value={formData.peelOff5 || PRINT_WASH_TEST_DEFAULTS.peelOff5}
                                             onChange={(e) => handleInputChange("peelOff5", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="OK"
@@ -613,7 +798,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.peelOff10 || ''}
+                                            value={formData.peelOff10 || PRINT_WASH_TEST_DEFAULTS.peelOff10}
                                             onChange={(e) => handleInputChange("peelOff10", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="OK"
@@ -622,7 +807,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.peelOff15 || ''}
+                                            value={formData.peelOff15 || PRINT_WASH_TEST_DEFAULTS.peelOff15}
                                             onChange={(e) => handleInputChange("peelOff15", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="OK"
@@ -638,7 +823,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.fading3 || ''}
+                                            value={formData.fading3 || PRINT_WASH_TEST_DEFAULTS.fading3}
                                             onChange={(e) => handleInputChange("fading3", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="OK"
@@ -647,7 +832,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.fading5 || ''}
+                                            value={formData.fading5 || PRINT_WASH_TEST_DEFAULTS.fading5}
                                             onChange={(e) => handleInputChange("fading5", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="OK"
@@ -656,7 +841,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.fading10 || ''}
+                                            value={formData.fading10 || PRINT_WASH_TEST_DEFAULTS.fading10}
                                             onChange={(e) => handleInputChange("fading10", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="OK"
@@ -665,7 +850,7 @@ const HTTestingForm = ({
                                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-2">
                                         <input
                                             type="text"
-                                            value={formData.fading15 || ''}
+                                            value={formData.fading15 || PRINT_WASH_TEST_DEFAULTS.fading15}
                                             onChange={(e) => handleInputChange("fading15", e.target.value)}
                                             className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center"
                                             placeholder="OK"
@@ -750,13 +935,13 @@ const HTTestingForm = ({
                         </h3>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-6">
-                        {/* Final Results Selection */}
-                        <div className="flex flex-col gap-3">
-                            <label className="text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 items-end">
+                        {/* Final Results */}
+                        <div className="flex flex-col gap-2">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                                 Final Results
                             </label>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-3 min-h-[42px]">
                                 <button
                                     type="button"
                                     onClick={() => handleInputChange("finalResults", "Accepted")}
@@ -765,7 +950,7 @@ const HTTestingForm = ({
                                         : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-green-200"
                                         }`}
                                 >
-                                    <CheckCircle2 className={`w-4 h-4 ${formData.finalResults === "Accepted" ? "text-white" : "text-gray-300"}`} />
+                                    <CheckCircle2 className={`w-4 h-4 shrink-0 ${formData.finalResults === "Accepted" ? "text-white" : "text-gray-300"}`} />
                                     Accepted
                                 </button>
                                 <button
@@ -776,37 +961,40 @@ const HTTestingForm = ({
                                         : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-red-200"
                                         }`}
                                 >
-                                    <XCircle className={`w-4 h-4 ${formData.finalResults === "Rejected" ? "text-white" : "text-gray-300"}`} />
+                                    <XCircle className={`w-4 h-4 shrink-0 ${formData.finalResults === "Rejected" ? "text-white" : "text-gray-300"}`} />
                                     Rejected
                                 </button>
                             </div>
                         </div>
 
-                        {/* Checked by */}
+                        {/* Checked By */}
                         <div className="flex flex-col gap-2">
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Checked by
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                                Checked By
                             </label>
-                            <div className="relative group">
-                                <input
-                                    type="text"
-                                    value={formData.checkedBy || ''}
-                                    onChange={(e) => handleInputChange("checkedBy", e.target.value)}
-                                    className="w-full pl-3 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white outline-none transition-all text-gray-800 placeholder:font-normal placeholder:text-gray-400"
-                                    placeholder="e.g., A LONG"
-                                />
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 transition-opacity">
-                                    <CheckCircle2 className="w-4 h-4 text-blue-500" />
-                                </div>
-                            </div>
+                            <Select
+                                showSearch
+                                value={formData.checkedBy || undefined}
+                                placeholder="Select User"
+                                optionFilterProp="label"
+                                onChange={(value) => handleInputChange("checkedBy", value)}
+                                filterOption={(input, option) =>
+                                    (option?.label ?? "")
+                                        .toLowerCase()
+                                        .includes(input.toLowerCase())
+                                }
+                                options={checkedByOptions}
+                                className="w-full h-[42px]"
+                                loading={isLoadingUsers}
+                            />
                         </div>
 
                         {/* Date */}
                         <div className="flex flex-col gap-2">
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                                 Date
                             </label>
-                            <div className="relative group ant-datepicker-container">
+                            <div className="relative group ant-datepicker-container min-h-[42px]">
                                 <AntDatePicker
                                     value={formData.finalDate ? dayjs(formData.finalDate) : null}
                                     onChange={(date, dateString) => handleInputChange("finalDate", dateString ? dayjs(date).format('YYYY-MM-DD') : '')}
@@ -839,38 +1027,34 @@ const HTTestingForm = ({
                                 {formData.images?.length || 0}/5 images
                             </span>
                         </div>
-                        <div className="mt-1 space-y-4">
-                            {/* Image Preview Area */}
+                        <div className="mt-1">
+                            {/* Image Preview Area - compact flex thumbnails */}
                             {formData.images && formData.images.length > 0 ? (
-                                <div className="space-y-4">
+                                <div className="flex flex-wrap gap-2">
                                     {formData.images.map((imageFile, index) => {
                                         const imageUrl = URL.createObjectURL(imageFile);
                                         return (
                                             <div
                                                 key={index}
-                                                className="relative border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50/50 dark:bg-gray-800/50 p-3"
+                                                className="relative w-20 h-20 sm:w-24 sm:h-24 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50 flex-shrink-0 group"
                                             >
-                                                <div className="relative w-full flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-md overflow-hidden">
-                                                    <img
-                                                        src={imageUrl}
-                                                        alt={`Preview ${index + 1}`}
-                                                        className="max-w-xs max-h-64 object-contain rounded-md"
-                                                    />
-                                                    <div className="absolute top-2 right-2 flex gap-2 z-10">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                URL.revokeObjectURL(imageUrl);
-                                                                handleRemoveImage(index);
-                                                            }}
-                                                            className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
-                                                            aria-label="Remove image"
-                                                            title="Remove"
-                                                        >
-                                                            <X size={18} />
-                                                        </button>
-                                                    </div>
-                                                </div>
+                                                <img
+                                                    src={imageUrl}
+                                                    alt={`Preview ${index + 1}`}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        URL.revokeObjectURL(imageUrl);
+                                                        handleRemoveImage(index);
+                                                    }}
+                                                    className="absolute top-0.5 right-0.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                                                    aria-label="Remove image"
+                                                    title="Remove"
+                                                >
+                                                    <X size={14} />
+                                                </button>
                                             </div>
                                         );
                                     })}

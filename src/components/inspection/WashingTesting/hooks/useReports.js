@@ -1,12 +1,13 @@
-import { useState, useCallback, useEffect } from "react";
-import { io } from "socket.io-client";
+import { useState, useCallback } from "react";
 import { API_BASE_URL } from "../../../../../config.js";
 import showToast from "../../../../utils/toast.js";
 
 /**
- * Custom hook for report CRUD operations
+ * Custom hook for report CRUD operations.
+ * NOTE: This hook is superseded by useWashingReportsStore (Zustand).
+ * Kept for potential re-use; socket dependency removed.
  */
-export const useReports = (socket) => {
+export const useReports = () => {
   const [reports, setReports] = useState([]);
   const [isLoadingReports, setIsLoadingReports] = useState(false);
   const [expandedReports, setExpandedReports] = useState(new Set());
@@ -22,7 +23,6 @@ export const useReports = (socket) => {
   const fetchReports = useCallback(async (filters = {}) => {
     setIsLoadingReports(true);
     try {
-      // Build query string from filters
       const queryParams = new URLSearchParams();
       queryParams.append("limit", filters.limit || 10);
       queryParams.append("page", filters.page || 1);
@@ -44,15 +44,12 @@ export const useReports = (socket) => {
             setPagination(result.pagination);
           }
         } else {
-          console.error("Failed to fetch reports:", result.message);
           showToast.error("Failed to load reports. Please check your connection.");
         }
       } else {
-        console.error("Failed to fetch reports:", response.status, response.statusText);
         showToast.error("Failed to load reports. Please check your connection.");
       }
     } catch (error) {
-      console.error("Error fetching reports:", error);
       if (error.message.includes("Failed to fetch") || error.message.includes("ERR_CONNECTION_REFUSED")) {
         showToast.error(`Cannot connect to backend server at ${API_BASE_URL}. Please ensure the backend server is running on port 5001.`);
       } else {
@@ -62,44 +59,6 @@ export const useReports = (socket) => {
       setIsLoadingReports(false);
     }
   }, []);
-
-  // Socket.IO for real-time updates - Now accepts socket from parent
-  useEffect(() => {
-    if (!socket) return;
-
-    // Listen for events
-    const handleReportCreated = (newReport) => {
-      setReports((prev) => {
-        // Prevent duplicate if already added
-        if (prev.some(r => r._id === newReport._id || r.id === newReport._id)) {
-          return prev;
-        }
-        return [newReport, ...prev];
-      });
-    };
-
-    const handleReportUpdated = (updatedReport) => {
-      setReports((prev) => prev.map((report) =>
-        (report._id === updatedReport._id || report.id === updatedReport._id) ? updatedReport : report
-      ));
-    };
-
-    const handleReportDeleted = (deletedId) => {
-      setReports((prev) => prev.filter((report) =>
-        report._id !== deletedId && report.id !== deletedId
-      ));
-    };
-
-    socket.on("washing-report-created", handleReportCreated);
-    socket.on("washing-report-updated", handleReportUpdated);
-    socket.on("washing-report-deleted", handleReportDeleted);
-
-    return () => {
-      socket.off("washing-report-created", handleReportCreated);
-      socket.off("washing-report-updated", handleReportUpdated);
-      socket.off("washing-report-deleted", handleReportDeleted);
-    };
-  }, [socket]);
 
   // Delete report
   const deleteReport = useCallback(async (reportId) => {
@@ -151,4 +110,3 @@ export const useReports = (socket) => {
     pagination,
   };
 };
-

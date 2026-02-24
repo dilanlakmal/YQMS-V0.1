@@ -30,6 +30,54 @@ export const FIELD_TYPES = {
     CUSTOM: 'custom',
 };
 
+/** Print Wash Test default values (HT Testing) – used when field is left empty on submit */
+export const PRINT_WASH_TEST_DEFAULTS = {
+    colorChangeFabric3: '5',
+    colorChangeFabric5: '4-5',
+    colorChangeFabric10: '4-5',
+    colorChangeFabric15: '4-5',
+    colorStainingHT3: '5',
+    colorStainingHT5: '4-5',
+    colorStainingHT10: '4-5',
+    colorStainingHT15: '4-5',
+    appearanceAfterWashing3: 'Accepted',
+    appearanceAfterWashing5: 'Accepted',
+    appearanceAfterWashing10: 'Accepted',
+    appearanceAfterWashing15: 'Accepted',
+    peelOff3: 'OK',
+    peelOff5: 'OK',
+    peelOff10: 'OK',
+    peelOff15: 'OK',
+    fading3: 'OK',
+    fading5: 'OK',
+    fading10: 'OK',
+    fading15: 'OK',
+};
+
+/** EMB/Print Wash Test default values (EMB/Printing Testing) – used when field is left empty on submit */
+export const EMB_PRINT_WASH_TEST_DEFAULTS = {
+    colorChange1: '5',
+    colorChange5: '4-5.',
+    colorChange10: '4-5.',
+    colorChange15: '4-5.',
+    colorStaining1: '5',
+    colorStaining5: '4-5.',
+    colorStaining10: '4-5.',
+    colorStaining15: '4-5.',
+    appearance1: 'Accepted',
+    appearance5: 'Accepted',
+    appearance10: 'Accepted',
+    appearance15: 'Accepted',
+    cracking1: 'N/A',
+    cracking5: 'N/A',
+    cracking10: 'N/A',
+    cracking15: 'N/A',
+    fading1: 'Accepted',
+    fading5: 'Accepted',
+    fading10: 'Accepted',
+    fading15: 'Accepted',
+};
+
 // Common fields shared across multiple report types
 const COMMON_FIELDS = {
     ymStyle: {
@@ -302,35 +350,35 @@ const EMB_TESTING_FIELDS = {
     fabricColor: {
         type: FIELD_TYPES.TEXT,
         label: 'Fabric Color',
-        required: true,
-        placeholder: 'Enter Fabric Color (e.g., PORT ROYALE)',
+        required: false,
+        placeholder: 'e.g., PORT ROYALE',
     },
     embColor: {
         type: FIELD_TYPES.TEXT,
         label: 'EMB/Print Color',
-        required: true,
-        placeholder: 'Enter EMB/Print Color (e.g., PORT ROYALE)',
+        required: false,
+        placeholder: 'e.g., PORT ROYALE',
     },
     embName: {
         type: FIELD_TYPES.TEXT,
         label: 'EMB/Print Name',
-        required: true,
-        placeholder: 'Enter EMB/Print Name (e.g., LOGO)',
+        required: false,
+        placeholder: 'e.g., LOGO',
     },
     styleDescription: {
         type: FIELD_TYPES.TEXT,
         label: 'Style Description',
-        required: true,
-        placeholder: 'Enter Style Description (e.g., LADIES\' T-SHIRT)',
+        required: false,
+        placeholder: "e.g., LADIES' T-SHIRT",
     },
     reportDate: {
         type: FIELD_TYPES.DATE,
         label: 'Report Date',
         required: true,
     },
-    recDate: {
+    receivedDate: {
         type: FIELD_TYPES.DATE,
-        label: 'Rec. Date',
+        label: 'Received Date',
         required: true,
     },
     embPlacement: {
@@ -462,6 +510,12 @@ const PULLING_TEST_FIELDS = {
         label: 'COLOR',
         required: true,
         placeholder: 'Enter Color',
+    },
+    fabricColor: {
+        type: FIELD_TYPES.TEXT,
+        label: 'Fabric Color',
+        required: false,
+        placeholder: 'e.g., PORT ROYALE',
     },
     buyer: {
         type: FIELD_TYPES.TEXT,
@@ -634,7 +688,7 @@ export const REPORT_TYPE_CONFIGS = {
             'embName',
             'styleDescription',
             'reportDate',
-            'recDate',
+            'receivedDate',
             'embPlacement',
             'fabrication',
             'time',
@@ -677,6 +731,7 @@ export const REPORT_TYPE_CONFIGS = {
         fields: [
             'poNumber',
             'color',
+            'fabricColor',
             'buyer',
             'testDate',
             'testTime',

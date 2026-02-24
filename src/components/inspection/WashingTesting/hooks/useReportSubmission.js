@@ -1,81 +1,112 @@
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { API_BASE_URL } from "../../../../../config.js";
 import showToast from "../../../../utils/toast.js";
+import { PRINT_WASH_TEST_DEFAULTS, EMB_PRINT_WASH_TEST_DEFAULTS } from "../constants/reportTypes.js";
+import { useFormStore } from "../../../../stores/washing/index.js";
+import { useModalStore } from "../../../../stores/washing/index.js";
 
 /**
- * Custom hook for report submission and status updates
+ * Custom hook for report submission and status updates.
+ * Loading flags live in useFormStore (isSubmitting) and useModalStore
+ * (isSavingReceived, isSavingCompletion) so modals/forms can read them
+ * without prop drilling.
  */
 export const useReportSubmission = (user, fetchReports) => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSavingReceived, setIsSavingReceived] = useState(false);
-  const [isSavingCompletion, setIsSavingCompletion] = useState(false);
+  const { setIsSubmitting }       = useFormStore();
+  const { setIsSavingReceived, setIsSavingCompletion } = useModalStore();
 
   // Submit new report
   const submitReport = useCallback(async (formData, onSuccess) => {
-    // Validate that at least one color is selected
-    if (!formData.color || formData.color.length === 0) {
+    // Validate that at least one color is selected (Garment/Home Wash)
+    if ((formData.reportType === "Garment Wash Report" || formData.reportType === "Home Wash Test") && (!formData.color || formData.color.length === 0)) {
       showToast.warning("Please select at least one color");
+      return false;
+    }
+    // Validate fabric selection for HT Testing when fabricColor is multi-select array
+    if (formData.reportType === "HT Testing" && Array.isArray(formData.fabricColor) && formData.fabricColor.length === 0) {
+      showToast.warning("Please select at least one fabric");
       return false;
     }
 
     setIsSubmitting(true);
     try {
+      // For HT Testing or EMB/Printing Testing, fill empty test result fields with defaults before submit
+      const defaultsMap = formData.reportType === "HT Testing"
+        ? PRINT_WASH_TEST_DEFAULTS
+        : formData.reportType === "EMB/Printing Testing"
+          ? EMB_PRINT_WASH_TEST_DEFAULTS
+          : null;
+      const dataToSubmit = defaultsMap
+        ? {
+            ...formData,
+            ...Object.fromEntries(
+              Object.entries(defaultsMap).map(([k, v]) => [
+                k,
+                formData[k] != null && String(formData[k]).trim() !== "" ? formData[k] : v,
+              ])
+            ),
+          }
+        : formData;
+
       const formDataToSubmit = new FormData();
 
       // Add common form fields
-      formDataToSubmit.append("reportType", formData.reportType || "Garment Wash Report");
-      formDataToSubmit.append("ymStyle", formData.ymStyle || formData.style || "");
-      formDataToSubmit.append("buyerStyle", formData.buyerStyle || "");
-      formDataToSubmit.append("color", JSON.stringify(formData.color || []));
-      formDataToSubmit.append("po", JSON.stringify(formData.po || []));
-      formDataToSubmit.append("exFtyDate", JSON.stringify(formData.exFtyDate || []));
-      formDataToSubmit.append("factory", formData.factory || "");
-      formDataToSubmit.append("sendToHomeWashingDate", formData.sendToHomeWashingDate || "");
-      formDataToSubmit.append("notes", formData.notes || "");
+      formDataToSubmit.append("reportType", dataToSubmit.reportType || "Garment Wash Report");
+      formDataToSubmit.append("ymStyle", dataToSubmit.ymStyle || dataToSubmit.style || "");
+      formDataToSubmit.append("buyerStyle", dataToSubmit.buyerStyle || "");
+      formDataToSubmit.append("color", JSON.stringify(dataToSubmit.color || []));
+      formDataToSubmit.append("po", JSON.stringify(dataToSubmit.po || []));
+      formDataToSubmit.append("exFtyDate", JSON.stringify(dataToSubmit.exFtyDate || []));
+      formDataToSubmit.append("factory", dataToSubmit.factory || "");
+      formDataToSubmit.append("sendToHomeWashingDate", dataToSubmit.sendToHomeWashingDate || "");
+      formDataToSubmit.append("notes", dataToSubmit.notes || "");
       formDataToSubmit.append("reporter_emp_id", user?.emp_id || user?.id || user?._id || "");
       formDataToSubmit.append("reporter_name", user?.name || user?.username || "");
 
       // Add all other fields dynamically (avoiding already added ones, images, and complex objects)
       const skipFields = ["reportType", "ymStyle", "buyerStyle", "color", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "notes", "images", "userId", "userName", "reporter_emp_id", "reporter_name", "careLabelImage"];
-      Object.keys(formData).forEach(key => {
-        if (!skipFields.includes(key) && formData[key] !== undefined && formData[key] !== null) {
-          if (key === 'shrinkageRows' && Array.isArray(formData[key])) {
+      Object.keys(dataToSubmit).forEach(key => {
+        if (!skipFields.includes(key) && dataToSubmit[key] !== undefined && dataToSubmit[key] !== null) {
+          if (key === 'fabricColor' && Array.isArray(dataToSubmit[key])) {
+            // Multi-select fabric: send as comma-separated string
+            formDataToSubmit.append(key, dataToSubmit[key].join(', '));
+          } else if (key === 'shrinkageRows' && Array.isArray(dataToSubmit[key])) {
             // Filter shrinkageRows to only include selected rows
-            const selectedRows = formData[key].filter(row => row.selected);
+            const selectedRows = dataToSubmit[key].filter(row => row.selected);
             formDataToSubmit.append(key, JSON.stringify(selectedRows));
-          } else if (Array.isArray(formData[key])) {
-            formDataToSubmit.append(key, JSON.stringify(formData[key]));
-          } else if (typeof formData[key] === 'object') {
-            formDataToSubmit.append(key, JSON.stringify(formData[key]));
+          } else if (Array.isArray(dataToSubmit[key])) {
+            formDataToSubmit.append(key, JSON.stringify(dataToSubmit[key]));
+          } else if (typeof dataToSubmit[key] === 'object') {
+            formDataToSubmit.append(key, JSON.stringify(dataToSubmit[key]));
           } else {
-            formDataToSubmit.append(key, formData[key]);
+            formDataToSubmit.append(key, dataToSubmit[key]);
           }
         }
       });
 
       // Handle careLabelImage as an array of files or URLs
-      if (formData.careLabelImage && Array.isArray(formData.careLabelImage)) {
-        formData.careLabelImage.forEach(item => {
+      if (dataToSubmit.careLabelImage && Array.isArray(dataToSubmit.careLabelImage)) {
+        dataToSubmit.careLabelImage.forEach(item => {
           if (item instanceof File) {
             formDataToSubmit.append("careLabelImage", item);
           }
         });
         // Also send existing URLs if any
-        const existingUrls = formData.careLabelImage.filter(item => typeof item === 'string');
+        const existingUrls = dataToSubmit.careLabelImage.filter(item => typeof item === 'string');
         if (existingUrls.length > 0) {
           formDataToSubmit.append("careLabelImageUrls", JSON.stringify(existingUrls));
         }
-      } else if (formData.careLabelImage instanceof File) {
-        formDataToSubmit.append("careLabelImage", formData.careLabelImage);
-      } else if (formData.careLabelImage && typeof formData.careLabelImage === 'string') {
-        formDataToSubmit.append("careLabelImageUrls", JSON.stringify([formData.careLabelImage]));
+      } else if (dataToSubmit.careLabelImage instanceof File) {
+        formDataToSubmit.append("careLabelImage", dataToSubmit.careLabelImage);
+      } else if (dataToSubmit.careLabelImage && typeof dataToSubmit.careLabelImage === 'string') {
+        formDataToSubmit.append("careLabelImageUrls", JSON.stringify([dataToSubmit.careLabelImage]));
       }
 
       // Validate and add image files
-      if (formData.images && formData.images.length > 0) {
+      if (dataToSubmit.images && dataToSubmit.images.length > 0) {
         const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
 
-        formData.images.forEach((imageFile) => {
+        dataToSubmit.images.forEach((imageFile) => {
           if (imageFile instanceof File) {
             const fileType = imageFile.type.toLowerCase();
             if (!allowedTypes.includes(fileType)) {
@@ -190,17 +221,17 @@ export const useReportSubmission = (user, fetchReports) => {
       }
 
       if (response.ok && result.success) {
-        showToast.success("✓ Received details saved successfully!");
+        showToast.success("✓ Received saved successfully!");
         await fetchReports();
         if (onSuccess) onSuccess(reportId);
         return true;
       } else {
-        showToast.error(result.message || "Failed to save received details. Please try again.");
+        showToast.error(result.message || "Failed to save received. Please try again.");
         return false;
       }
     } catch (error) {
-      console.error("Error saving received details:", error);
-      showToast.error(error.message || "An error occurred while saving received details. Please try again.");
+      console.error("Error saving received:", error);
+      showToast.error(error.message || "An error occurred while saving received. Please try again.");
       return false;
     } finally {
       setIsSavingReceived(false);
@@ -459,9 +490,6 @@ export const useReportSubmission = (user, fetchReports) => {
   }, [fetchReports]);
 
   return {
-    isSubmitting,
-    isSavingReceived,
-    isSavingCompletion,
     submitReport,
     saveReceivedStatus,
     saveCompletionStatus,

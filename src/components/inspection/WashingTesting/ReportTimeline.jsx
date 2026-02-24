@@ -42,7 +42,7 @@ const ReportTimeline = ({ report, savedImageRotations, openImageViewer, onEditIn
                 <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
                   {report.images && report.images.length > 0 ? `Images (${report.images.length})` : "Images"}
                 </p>
-                {onEditInitialImages && report.status !== 'completed' && (
+                {onEditInitialImages && report.status !== 'completed' && report.status !== 'rejected' && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -182,7 +182,7 @@ const ReportTimeline = ({ report, savedImageRotations, openImageViewer, onEditIn
                   <p className="text-xs font-medium text-yellow-600 dark:text-yellow-400">
                     {report.receivedImages && report.receivedImages.length > 0 ? `Images (${report.receivedImages.length})` : "Images"}
                   </p>
-                  {onEditReceivedImages && report.status !== 'completed' && (
+                  {onEditReceivedImages && report.status !== 'completed' && report.status !== 'rejected' && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -284,7 +284,7 @@ const ReportTimeline = ({ report, savedImageRotations, openImageViewer, onEditIn
                   <p className="text-xs font-medium text-green-600 dark:text-green-400">
                     {report.completionImages && report.completionImages.length > 0 ? `Images (${report.completionImages.length})` : "Images"}
                   </p>
-                  {onEditCompletionImages && report.status !== 'completed' && (
+                  {onEditCompletionImages && report.status !== 'completed' && report.status !== 'rejected' && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

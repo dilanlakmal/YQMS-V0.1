@@ -2,8 +2,9 @@ import React from "react";
 import Select from "react-select";
 import { DatePicker as AntDatePicker } from "antd";
 import dayjs from "dayjs";
-import { Calendar, Trash2, RotateCw, Plus } from "lucide-react";
-import CareSymbolsSelector from "../forms/CareSymbolsSelector";
+import { Calendar } from "lucide-react";
+import MultiSelectDropdown from "./MultiSelectDropdown";
+import { useOrderDataStore } from "../../../../stores/washing";
 
 const EditReportModal = ({
   isOpen,
@@ -19,11 +20,10 @@ const EditReportModal = ({
   setShowEditPODropdown,
   showEditETDDropdown,
   setShowEditETDDropdown,
-  factories,
-  isLoadingFactories,
   onClose,
   onSubmit,
 }) => {
+  const { factories, isLoadingFactories } = useOrderDataStore();
   if (!isOpen || !editingReport) return null;
 
   return (
@@ -92,287 +92,63 @@ const EditReportModal = ({
                 />
               </div>
 
-              {/* Color - Multi-Select */}
-              <div className="relative color-dropdown-container">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  COLOR <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowEditColorDropdown(!showEditColorDropdown)}
-                    disabled={editAvailableColors.length === 0}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <span className="truncate">
-                      {editAvailableColors.length === 0
-                        ? "No colors available"
-                        : editFormData.color.length === 0
-                          ? "Select Color(s)"
-                          : editFormData.color.length === editAvailableColors.length
-                            ? "All colors selected"
-                            : `${editFormData.color.length} color(s) selected`}
-                    </span>
-                    <svg
-                      className={`w-4 h-4 transition-transform ${showEditColorDropdown ? 'rotate-180' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-
-                  {showEditColorDropdown && editAvailableColors.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                      <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditFormData((prev) => ({
-                              ...prev,
-                              color: [...editAvailableColors],
-                            }));
-                          }}
-                          className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                        >
-                          Select All
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditFormData((prev) => ({
-                              ...prev,
-                              color: [],
-                            }));
-                          }}
-                          className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                        >
-                          Clear All
-                        </button>
-                      </div>
-                      <div className="p-2">
-                        {editAvailableColors.map((color, index) => (
-                          <label
-                            key={index}
-                            className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={editFormData.color.includes(color)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setEditFormData((prev) => ({
-                                    ...prev,
-                                    color: [...prev.color, color],
-                                  }));
-                                } else {
-                                  setEditFormData((prev) => ({
-                                    ...prev,
-                                    color: prev.color.filter((c) => c !== color),
-                                  }));
-                                }
-                              }}
-                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                            />
-                            <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                              {color}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+              {/* Color - Multi-Select: fixed list = report's colors at open (so unchecking keeps labels visible); read-only when report completed */}
+              <MultiSelectDropdown
+                containerClass="color-dropdown-container"
+                label="COLOR"
+                required
+                options={
+                  (() => {
+                    const reportColors = Array.isArray(editingReport.color)
+                      ? editingReport.color
+                      : editingReport.color
+                        ? [editingReport.color]
+                        : [];
+                    return reportColors.length > 0 ? reportColors : editAvailableColors || [];
+                  })()
+                }
+                selected={editFormData.color}
+                onChange={(v) => setEditFormData((p) => ({ ...p, color: v }))}
+                isOpen={showEditColorDropdown}
+                onToggle={setShowEditColorDropdown}
+                emptyText="No colors available"
+                placeholder="Select Color(s)"
+                allSelectedText="All colors selected"
+                countLabel="color(s)"
+                readOnly={editingReport?.status === "completed"}
+              />
 
               {/* PO - Multi-Select */}
-              <div className="relative po-dropdown-container">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  PO <span className="text-gray-400 text-xs">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowEditPODropdown(!showEditPODropdown)}
-                    disabled={editAvailablePOs.length === 0}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <span className="truncate">
-                      {editAvailablePOs.length === 0
-                        ? "No PO available (Optional)"
-                        : editFormData.po.length === 0
-                          ? "Select PO(s) (Optional)"
-                          : editFormData.po.length === editAvailablePOs.length
-                            ? "All PO(s) selected"
-                            : `${editFormData.po.length} PO(s) selected`}
-                    </span>
-                    <svg
-                      className={`w-4 h-4 transition-transform ${showEditPODropdown ? 'rotate-180' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-
-                  {showEditPODropdown && editAvailablePOs.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                      <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditFormData((prev) => ({
-                              ...prev,
-                              po: [...editAvailablePOs],
-                            }));
-                          }}
-                          className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                        >
-                          Select All
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditFormData((prev) => ({
-                              ...prev,
-                              po: [],
-                            }));
-                          }}
-                          className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                        >
-                          Clear All
-                        </button>
-                      </div>
-                      <div className="p-2">
-                        {editAvailablePOs.map((po, index) => (
-                          <label
-                            key={index}
-                            className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={editFormData.po.includes(po)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setEditFormData((prev) => ({
-                                    ...prev,
-                                    po: [...prev.po, po],
-                                  }));
-                                } else {
-                                  setEditFormData((prev) => ({
-                                    ...prev,
-                                    po: prev.po.filter((p) => p !== po),
-                                  }));
-                                }
-                              }}
-                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                            />
-                            <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                              {po}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <MultiSelectDropdown
+                containerClass="po-dropdown-container"
+                label="PO (Optional)"
+                options={editAvailablePOs}
+                selected={editFormData.po}
+                onChange={(v) => setEditFormData((p) => ({ ...p, po: v }))}
+                isOpen={showEditPODropdown}
+                onToggle={setShowEditPODropdown}
+                emptyText="No PO available (Optional)"
+                placeholder="Select PO(s) (Optional)"
+                allSelectedText="All PO(s) selected"
+                countLabel="PO(s)"
+                readOnly={editingReport?.status === "completed"}
+              />
 
               {/* Ex Fty Date - Multi-Select */}
-              <div className="relative etd-dropdown-container">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Ex Fty Date <span className="text-gray-400 text-xs">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowEditETDDropdown(!showEditETDDropdown)}
-                    disabled={editAvailableETDs.length === 0}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <span className="truncate">
-                      {editAvailableETDs.length === 0
-                        ? "No ETD dates available (Optional)"
-                        : editFormData.exFtyDate.length === 0
-                          ? "Select ETD Date(s) (Optional)"
-                          : editFormData.exFtyDate.length === editAvailableETDs.length
-                            ? "All ETD dates selected"
-                            : `${editFormData.exFtyDate.length} date(s) selected`}
-                    </span>
-                    <svg
-                      className={`w-4 h-4 transition-transform ${showEditETDDropdown ? 'rotate-180' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-
-                  {showEditETDDropdown && editAvailableETDs.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                      <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditFormData((prev) => ({
-                              ...prev,
-                              exFtyDate: [...editAvailableETDs],
-                            }));
-                          }}
-                          className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                        >
-                          Select All
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditFormData((prev) => ({
-                              ...prev,
-                              exFtyDate: [],
-                            }));
-                          }}
-                          className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                        >
-                          Clear All
-                        </button>
-                      </div>
-                      <div className="p-2">
-                        {editAvailableETDs.map((etd, index) => (
-                          <label
-                            key={index}
-                            className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={editFormData.exFtyDate.includes(etd)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setEditFormData((prev) => ({
-                                    ...prev,
-                                    exFtyDate: [...prev.exFtyDate, etd],
-                                  }));
-                                } else {
-                                  setEditFormData((prev) => ({
-                                    ...prev,
-                                    exFtyDate: prev.exFtyDate.filter((d) => d !== etd),
-                                  }));
-                                }
-                              }}
-                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                            />
-                            <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                              {etd}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <MultiSelectDropdown
+                containerClass="etd-dropdown-container"
+                label="Ex Fty Date (Optional)"
+                options={editAvailableETDs}
+                selected={editFormData.exFtyDate}
+                onChange={(v) => setEditFormData((p) => ({ ...p, exFtyDate: v }))}
+                isOpen={showEditETDDropdown}
+                onToggle={setShowEditETDDropdown}
+                emptyText="No ETD dates available (Optional)"
+                placeholder="Select ETD Date(s) (Optional)"
+                allSelectedText="All ETD dates selected"
+                countLabel="date(s)"
+                readOnly={editingReport?.status === "completed"}
+              />
 
               {/* Factory */}
               <div>
@@ -475,98 +251,6 @@ const EditReportModal = ({
                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none z-10" />
                 </div>
               </div>
-
-              {/* Care Label Section for Garment Wash */}
-              {editFormData.reportType === "Garment Wash Report" && (
-                <div className="md:col-span-2 bg-blue-50 dark:bg-gray-700/30 p-3 rounded-md border border-blue-200 dark:border-gray-600 mt-2">
-                  <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2 border-b border-blue-100 dark:border-gray-600 pb-2">
-                    Care Label Information
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {/* Care Symbols Selector - Added to View/Edit */}
-                    <div className="md:col-span-2 mb-2">
-                      <CareSymbolsSelector
-                        compact
-                        value={typeof editFormData.careSymbols === 'string' ? JSON.parse(editFormData.careSymbols || '{}') : (editFormData.careSymbols || {})}
-                        onChange={(newSymbols) => setEditFormData(prev => ({ ...prev, careSymbols: newSymbols }))}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">
-                        Care Label Gallery
-                      </label>
-                      <div className="space-y-3">
-                        {/* 1. Gallery Grid (Appears Above) */}
-                        {(Array.isArray(editFormData.careLabelImage) && editFormData.careLabelImage.length > 0) && (
-                          <div className="grid grid-cols-2 gap-3">
-                            {editFormData.careLabelImage.map((img, index) => (
-                              <div key={index} className="relative aspect-square bg-gray-50 dark:bg-gray-900 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 group shadow-sm">
-                                <img
-                                  src={img instanceof File ? URL.createObjectURL(img) : img}
-                                  alt={`Care Label ${index + 1}`}
-                                  className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                                />
-                                <div className="absolute inset-x-0 bottom-0 p-1.5 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex justify-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const currentImages = Array.isArray(editFormData.careLabelImage) ? [...editFormData.careLabelImage] : (editFormData.careLabelImage ? [editFormData.careLabelImage] : []);
-                                      currentImages.splice(index, 1);
-                                      setEditFormData(prev => ({ ...prev, careLabelImage: currentImages }));
-                                    }}
-                                    className="bg-red-500 hover:bg-red-600 text-white p-1 rounded-md shadow-lg transition-colors"
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                </div>
-                                <div className="absolute top-1 left-1 px-1 py-0.5 bg-black/40 backdrop-blur-sm rounded text-[8px] text-white font-bold">
-                                  #{index + 1}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* 2. Add Action (Always at Bottom) */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const input = document.createElement('input');
-                            input.type = 'file';
-                            input.accept = 'image/*';
-                            input.multiple = true;
-                            input.onchange = (e) => {
-                              const files = Array.from(e.target.files);
-                              if (files.length > 0) {
-                                const currentImages = Array.isArray(editFormData.careLabelImage) ? [...editFormData.careLabelImage] : (editFormData.careLabelImage ? [editFormData.careLabelImage] : []);
-                                setEditFormData(prev => ({ ...prev, careLabelImage: [...currentImages, ...files] }));
-                              }
-                            };
-                            input.click();
-                          }}
-                          className="w-full py-3 border-2 border-dashed border-blue-200 dark:border-gray-700 rounded-xl flex items-center justify-center gap-2 bg-blue-50/20 dark:bg-gray-800/40 hover:bg-blue-50/50 dark:hover:bg-gray-800/20 hover:border-blue-400 dark:hover:border-blue-500 transition-all group"
-                        >
-                          <Plus size={18} className="text-blue-500 group-hover:scale-110 transition-transform" />
-                          <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">ADD CARE LABEL PHOTOS</span>
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Care Label Notes
-                      </label>
-                      <textarea
-                        value={editFormData.careLabelNotes || ""}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, careLabelNotes: e.target.value }))}
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-gray-700 dark:text-white"
-                        placeholder="Care label notes..."
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Modal Actions */}

@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { io } from "socket.io-client";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../components/authentication/AuthContext";
 import { useSearchParams } from "react-router-dom";
@@ -12,8 +11,10 @@ import {
   MdOutlineExpand,
   MdAssignmentInd,
 } from "react-icons/md";
+import { Camera } from "lucide-react";
 import { Select, Checkbox } from "antd";
 import axios from "axios";
+import { io } from "socket.io-client";
 import { API_BASE_URL, QR_CODE_BASE_URL } from "../../config.js";
 import { pdf } from "@react-pdf/renderer";
 import { Html5Qrcode } from "html5-qrcode";
@@ -30,15 +31,14 @@ import {
   ReceivedModal,
   CompletionModal,
   DeleteConfirmationModal,
+  RejectReportModal,
   EditImagesModal,
   EditReportModal,
   QRCodeModal,
   QRScannerModal,
   useOrderData,
   useQRCode,
-  useReports,
   useImageHandling,
-  useFormState,
   useReportSubmission,
   // Constants
   getQRCodeBaseURL,
@@ -65,6 +65,15 @@ import {
   triggerCameraInput as triggerCameraInputHandler,
 } from "../components/inspection/WashingTesting/lib";
 import showToast from "../utils/toast";
+import {
+  useWashingFilterStore,
+  useModalStore,
+  useWashingReportsStore,
+  useFormStore,
+  useOrderDataStore,
+  useAssignControlStore,
+  computeUserRoles,
+} from "../stores/washing";
 
 const LaundryWashingMachineTest = () => {
   const { t } = useTranslation();
@@ -72,92 +81,58 @@ const LaundryWashingMachineTest = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const dateValue = getCurrentDate(); // Use helper instead of inline code
   const fileInputRef = useRef(null);
+  const scannerUploadInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const receivedImageInputRef = useRef(null);
   const completionImageInputRef = useRef(null);
 
-  // Initialize custom hooks
-  const initialFormData = getInitialFormData(REPORT_TYPES.GARMENT_WASH);
+  // ─── Form store (replaces useFormState + scattered UI states) ───────
+  // Seed the store synchronously before the first render so child
+  // components never receive undefined for array fields (e.g. formData.images).
+  if (!useFormStore.getState().formData.reportType) {
+    useFormStore.getState().resetForm(getInitialFormData(REPORT_TYPES.GARMENT_WASH));
+  }
 
   const {
     formData,
     setFormData,
     handleInputChange: handleFormInputChange,
     resetForm,
-  } = useFormState(initialFormData);
+    orderNoSuggestions, setOrderNoSuggestions,
+    showOrderNoSuggestions, setShowOrderNoSuggestions,
+    isSearchingOrderNo, setIsSearchingOrderNo,
+    showColorDropdown, setShowColorDropdown,
+    showPODropdown, setShowPODropdown,
+    showETDDropdown, setShowETDDropdown,
+    isReportTypeOpen, setIsReportTypeOpen,
+    activeTab, setActiveTab,
+  } = useFormStore();
 
-  // Initialize Socket.IO connection once for the component
-  const [socket, setSocket] = useState(null);
-
-  useEffect(() => {
-    const newSocket = io(API_BASE_URL);
-
-    newSocket.on("connect", () => {
-      console.log("? Socket connected to:", API_BASE_URL);
-    });
-
-    setSocket(newSocket);
-
-    return () => {
-      newSocket.disconnect();
-    };
-  }, []);
-
-  // Standard Reports Hook - share socket
-  const reportsHook = useReports(socket);
+  // ─── Reports store (replaces two separate useReports instances) ─────
   const {
-    reports,
-    isLoadingReports,
-    expandedReports,
-    printingReportId,
-    setPrintingReportId,
-    fetchReports,
-    deleteReport,
-    toggleReport,
-    pagination,
-  } = reportsHook;
+    standard: { reports, isLoading: isLoadingReports, printingReportId, pagination },
+    warehouse: { reports: whReports, isLoading: isLoadingWhReports, printingReportId: whPrintingReportId, pagination: whPagination },
+    fetchReports: _fetchReports,
+    deleteReport: _deleteReport,
+    rejectReport: _rejectReport,
+    setPrintingReportId: _setPrintingReportId,
+  } = useWashingReportsStore();
 
-  // Warehouse Reports Hook - share socket
-  const whReportsHook = useReports(socket);
-  const {
-    reports: whReports,
-    isLoadingReports: isLoadingWhReports,
-    expandedReports: whExpandedReports,
-    printingReportId: whPrintingReportId,
-    setPrintingReportId: setWhPrintingReportId,
-    fetchReports: fetchWhReports,
-    deleteReport: deleteWhReport,
-    toggleReport: toggleWhReport,
-    pagination: whPagination,
-  } = whReportsHook;
+  // Stable tab-scoped wrappers (store fns are stable, empty dep array is safe)
+  const fetchReports = useCallback((f) => _fetchReports("standard", f), []);  // eslint-disable-line
+  const setPrintingReportId = useCallback((id) => _setPrintingReportId("standard", id), []);  // eslint-disable-line
+  const setWhPrintingReportId = useCallback((id) => _setPrintingReportId("warehouse", id), []);  // eslint-disable-line
 
+  // ─── Order data hook (fetch actions only — state lives in useOrderDataStore) ─
   const {
-    availableColors,
-    availablePOs,
-    availableETDs,
-    availableSizes,
-    usedColors,
-    fabrication,
-    season,
-    styleDescription,
-    custStyle,
-    isLoadingColors,
-    isLoadingSpecs,
     fetchOrderColors,
     fetchUsedColors,
     fetchYorksysOrderETD,
     fetchAnfSpecs,
     resetOrderData,
-    anfSpecs,
   } = useOrderData();
 
   const {
-    showReportDateQR,
-    setShowReportDateQR,
-    showReportDateScanner,
-    setShowReportDateScanner,
-    scanningReportId,
-    setScanningReportId,
     generateQRCodeDataURL: generateQRCodeDataURLHook,
     downloadQRCode: downloadQRCodeHook,
     printQRCode,
@@ -166,6 +141,7 @@ const LaundryWashingMachineTest = () => {
 
   // Local scanner instance state (needed for custom scanner logic)
   const [html5QrCodeInstance, setHtml5QrCodeInstance] = useState(null);
+  const [scannerFlashOn, setScannerFlashOn] = useState(false);
 
   const {
     imageRotations,
@@ -180,116 +156,6 @@ const LaundryWashingMachineTest = () => {
     handleRemoveImage,
   } = useImageHandling();
 
-  // Standard Filter states
-  const [filterStartDate, setFilterStartDate] = useState("");
-  const [filterEndDate, setFilterEndDate] = useState("");
-  const [filterSearch, setFilterSearch] = useState("");
-  const [filterColor, setFilterColor] = useState("");
-  const [filterFactory, setFilterFactory] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterPage, setFilterPage] = useState(1);
-  const [filterLimit, setFilterLimit] = useState(10);
-  const [filterReportType, setFilterReportType] = useState("");
-
-  // Warehouse Filter states
-  const [whFilterStartDate, setWhFilterStartDate] = useState("");
-  const [whFilterEndDate, setWhFilterEndDate] = useState("");
-  const [whFilterSearch, setWhFilterSearch] = useState("");
-  const [whFilterColor, setWhFilterColor] = useState("");
-  const [whFilterFactory, setWhFilterFactory] = useState("");
-  const [whFilterStatus, setWhFilterStatus] = useState("");
-  const [whFilterPage, setWhFilterPage] = useState(1);
-  const [whFilterLimit, setWhFilterLimit] = useState(10);
-  const [whFilterReportType, setWhFilterReportType] = useState("");
-
-  // Create a combined fetch function to refresh both or active tab
-  const refreshAllReports = useCallback(async () => {
-    // We refresh both to ensure consistency across tabs
-    const promises = [
-      fetchReports({
-        startDate: filterStartDate,
-        endDate: filterEndDate,
-        search: filterSearch,
-        color: filterColor,
-        factory: filterFactory,
-        status: filterStatus,
-        reportType: filterReportType,
-        page: filterPage,
-        limit: filterLimit,
-      }),
-      fetchWhReports({
-        startDate: whFilterStartDate,
-        endDate: whFilterEndDate,
-        search: whFilterSearch,
-        color: whFilterColor,
-        factory: whFilterFactory,
-        status: whFilterStatus,
-        reportType: whFilterReportType,
-        page: whFilterPage,
-        limit: whFilterLimit,
-      }),
-    ];
-
-    // Also refresh used colors if a style is currently being edited/selected
-    if (formData.ymStyle || formData.style) {
-      promises.push(fetchUsedColors(formData.ymStyle || formData.style));
-    }
-
-    await Promise.all(promises);
-  }, [
-    formData.ymStyle,
-    formData.style,
-    fetchUsedColors,
-    fetchReports,
-    filterStartDate,
-    filterEndDate,
-    filterSearch,
-    filterColor,
-    filterFactory,
-    filterStatus,
-    filterReportType,
-    filterPage,
-    filterLimit,
-    fetchWhReports,
-    whFilterStartDate,
-    whFilterEndDate,
-    whFilterSearch,
-    whFilterColor,
-    whFilterFactory,
-    whFilterStatus,
-    whFilterReportType,
-    whFilterPage,
-    whFilterLimit,
-  ]);
-
-  const {
-    isSubmitting,
-    isSavingReceived,
-    isSavingCompletion,
-    submitReport,
-    saveReceivedStatus,
-    saveCompletionStatus,
-    updateReport, // Expose updateReport
-  } = useReportSubmission(user, refreshAllReports);
-
-  // Received modal state
-  const [showReceivedModal, setShowReceivedModal] = useState(false);
-  const [receivedReportId, setReceivedReportId] = useState(null);
-  const [receivedImages, setReceivedImages] = useState([]);
-  const [receivedNotes, setReceivedNotes] = useState("");
-  const [shouldUpdateReceivedStatus, setShouldUpdateReceivedStatus] =
-    useState(false);
-
-  // Completion modal state
-  const [showCompletionModal, setShowCompletionModal] = useState(false);
-  const [completionReportId, setCompletionReportId] = useState(null);
-  const [completionImages, setCompletionImages] = useState([]);
-  const [completionNotes, setCompletionNotes] = useState("");
-
-  // Track if we are completing a report via the form
-  const [completingReport, setCompletingReport] = useState(null);
-
-  // Image viewer hook
   const {
     imageViewer,
     savedImageRotations,
@@ -307,127 +173,123 @@ const LaundryWashingMachineTest = () => {
     downloadImageViewer,
   } = useImageViewer();
 
-  // Delete confirmation modal state
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [reportToDelete, setReportToDelete] = useState(null);
+  // ─── Filter store (replaces 18 individual useState hooks) ───────────
+  // ReportsList reads & writes filters directly from useWashingFilterStore.
+  // No per-field aliases needed here — the store is read via getState() in callbacks.
+  const { standard: _stdF, warehouse: _whF } = useWashingFilterStore();
 
-  // Edit modal state
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingReport, setEditingReport] = useState(null);
+  // Refresh both tabs using current store state (no stale-closure dependencies)
+  const refreshAllReports = useCallback(async () => {
+    const { standard: sf, warehouse: wf } = useWashingFilterStore.getState();
+    const { ymStyle, style } = useFormStore.getState().formData;
 
-  // Edit image modals state
-  const [showEditInitialImagesModal, setShowEditInitialImagesModal] =
-    useState(false);
-  const [showEditReceivedImagesModal, setShowEditReceivedImagesModal] =
-    useState(false);
-  const [showEditCompletionImagesModal, setShowEditCompletionImagesModal] =
-    useState(false);
-  const [editingImageReport, setEditingImageReport] = useState(null);
-  const [editingImageType, setEditingImageType] = useState(null); // 'initial', 'received', 'completion'
-  const [editingImages, setEditingImages] = useState([]);
-  const [editingNotes, setEditingNotes] = useState("");
-  const [isUpdatingImages, setIsUpdatingImages] = useState(false);
-  const [editFormData, setEditFormData] = useState({
-    color: [],
-    buyerStyle: "",
-    po: [],
-    exFtyDate: [],
-    factory: "",
-    sendToHomeWashingDate: "",
-  });
-  const [editAvailableColors, setEditAvailableColors] = useState([]);
-  const [editAvailablePOs, setEditAvailablePOs] = useState([]);
-  const [editAvailableETDs, setEditAvailableETDs] = useState([]);
-  const [showEditColorDropdown, setShowEditColorDropdown] = useState(false);
-  const [showEditPODropdown, setShowEditPODropdown] = useState(false);
-  const [showEditETDDropdown, setShowEditETDDropdown] = useState(false);
+    const promises = [
+      _fetchReports("standard", sf),
+      _fetchReports("warehouse", wf),
+    ];
+    if (ymStyle || style) promises.push(fetchUsedColors(ymStyle || style));
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState("form"); // "form" or "reports"
+    await Promise.all(promises);
+  }, [_fetchReports, fetchUsedColors]); // eslint-disable-line
 
-  // Custom Dropdown State
-  const [isReportTypeOpen, setIsReportTypeOpen] = useState(false);
+  const {
+    submitReport,
+    saveReceivedStatus,
+    saveCompletionStatus,
+    updateReport,
+  } = useReportSubmission(user, refreshAllReports);
+
+  // ─── Modal store (replaces ~20 individual useState hooks) ───────────
+  const {
+    receivedModal,
+    openReceivedModal,
+    closeReceivedModal,
+    setReceivedImages,
+    setReceivedNotes,
+    setShouldUpdateReceivedStatus,
+    completionModal,
+    openCompletionModal,
+    closeCompletionModal,
+    setCompletionImages,
+    setCompletionNotes,
+    completingReport,
+    setCompletingReport,
+    deleteModal,
+    openDeleteModal,
+    closeDeleteModal,
+    rejectModal,
+    openRejectModal,
+    closeRejectModal,
+    editModal,
+    openEditModal,
+    closeEditModal,
+    editImagesModal,
+    openEditImagesModal,
+    closeEditImagesModal,
+    setEditImages,
+    setEditNotes,
+    setIsUpdatingImages,
+    editFormData,
+    setEditFormData,
+    editAvailableColors, setEditAvailableColors,
+    editAvailablePOs, setEditAvailablePOs,
+    editAvailableETDs, setEditAvailableETDs,
+    showEditColorDropdown, setShowEditColorDropdown,
+    showEditPODropdown, setShowEditPODropdown,
+    showEditETDDropdown, setShowEditETDDropdown,
+    // ─── QR states (moved from useQRCode) ───────────────────────────
+    showReportDateQR, setShowReportDateQR,
+    showReportDateScanner, setShowReportDateScanner,
+    scanningReportId, setScanningReportId,
+  } = useModalStore();
+
+  // ─── Modal store value shortcuts ────────────────────────────────────
+  const showReceivedModal = receivedModal.isOpen;
+  const receivedReportId = receivedModal.reportId;
+  const receivedImages = receivedModal.images;
+  const receivedNotes = receivedModal.notes;
+  const shouldUpdateReceivedStatus = receivedModal.shouldUpdateStatus;
+  const showCompletionModal = completionModal.isOpen;
+  const completionReportId = completionModal.reportId;
+  const completionImages = completionModal.images;
+  const completionNotes = completionModal.notes;
+  const showDeleteConfirm = deleteModal.isOpen;
+  const reportToDelete = deleteModal.report;
+  const showEditModal = editModal.isOpen;
+  const editingReport = editModal.report;
+  const showEditInitialImagesModal = editImagesModal.isOpen && editImagesModal.type === "initial";
+  const showEditReceivedImagesModal = editImagesModal.isOpen && editImagesModal.type === "received";
+  const showEditCompletionImagesModal = editImagesModal.isOpen && editImagesModal.type === "completion";
+  const editingImageReport = editImagesModal.report;
+  const editingImageType = editImagesModal.type;
+  const editingImages = editImagesModal.images;
+  const editingNotes = editImagesModal.notes;
+  const isUpdatingImages = editImagesModal.isUpdating;
+
   const dropdownRef = useRef(null);
-
-  // normalizeImageUrl and getImageFilename are now imported from utils
-
-  // Order_No autocomplete state
-  const [orderNoSuggestions, setOrderNoSuggestions] = useState([]);
-  const [showOrderNoSuggestions, setShowOrderNoSuggestions] = useState(false);
-  const [isSearchingOrderNo, setIsSearchingOrderNo] = useState(false);
 
   // Debounce timer for auto-fetching colors when typing
   const colorFetchTimerRef = useRef(null);
 
-  // Factory dropdown state
-  const [factories, setFactories] = useState([]);
-  const [isLoadingFactories, setIsLoadingFactories] = useState(false);
+  // ─── Factories (now in useOrderDataStore) ───────────────────────────
+  const { fetchFactories } = useOrderDataStore();
 
-  // Assign Control State
-  const [users, setUsers] = useState([]);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
-  const [assignData, setAssignData] = useState({
-    _id: null,
-    preparedBy: null,
-    checkedBy: null,
-    approvedBy: null,
-    admin: null,
-    userWarehouse: null,
-  });
-  const [selectedUserForAssign, setSelectedUserForAssign] = useState(null);
+  // ─── Assign control + users (now in useAssignControlStore) ──────────
+  const {
+    users,
+    causeAssignHistory,
+    fetchAssignControl,
+    fetchUsers,
+  } = useAssignControlStore();
 
-  const [causeAssignHistory, setCauseAssignHistory] = useState([]);
+  const { isAdminUser, isWarehouseUser } = computeUserRoles(user, causeAssignHistory);
 
-  // Determine current user role restrictions based on active assignment
-  const activeAssign =
-    causeAssignHistory.length > 0 ? causeAssignHistory[0] : null;
-  
-  // Find the most recent assignment where current user is assigned as warehouse
-  // (assignments are already sorted by updatedAt descending, so first match is most recent)
-  const warehouseAssignment = causeAssignHistory.find(assign => 
-    assign.userWarehouse && 
-    String(user?.emp_id) === String(assign.userWarehouse)
-  );
-  
-  // Debug logging for warehouse user detection
-  if (user?.emp_id && causeAssignHistory.length > 0) {
-    console.log('[Warehouse Check]', {
-      userEmpId: user?.emp_id,
-      activeAssign: activeAssign ? {
-        userWarehouse: activeAssign.userWarehouse,
-        admin: activeAssign.admin,
-        updatedAt: activeAssign.updatedAt,
-      } : null,
-      warehouseAssignment: warehouseAssignment ? {
-        userWarehouse: warehouseAssignment.userWarehouse,
-        admin: warehouseAssignment.admin,
-        updatedAt: warehouseAssignment.updatedAt,
-      } : null,
-      recentAssignments: causeAssignHistory.slice(0, 3).map(a => ({
-        userWarehouse: a.userWarehouse,
-        admin: a.admin,
-        updatedAt: a.updatedAt,
-      }))
-    });
-  }
-  
-  const isAdminUser =
-    user?.emp_id === "TYM055" ||
-    user?.role === "admin" ||
-    user?.role === "super_admin" ||
-    user?.role === "user_admin" ||
-    (activeAssign && String(user?.emp_id) === String(activeAssign.admin));
-  
-  // User is warehouse if they're assigned as warehouse in any recent assignment
-  // and they're not currently an admin (admin takes precedence)
-  const isWarehouseUser =
-    warehouseAssignment &&
-    String(user?.emp_id) === String(warehouseAssignment.userWarehouse) &&
-    !isAdminUser;
-
-  // Handle tab access based on assigned roles
+  // Handle tab access: warehouse default is Warehouse Report; redirect from form unless completing a report (e.g. after scan).
   useEffect(() => {
     if (isWarehouseUser && activeTab === "reports") {
+      setActiveTab("warehouse_reports");
+    } else if (isWarehouseUser && activeTab === "form" && !completingReport) {
+      // After reload, activeTab can still be "form" (store default) — send warehouse user to Warehouse Report so Create tab stays hidden
       setActiveTab("warehouse_reports");
     } else if (
       !isAdminUser &&
@@ -436,182 +298,50 @@ const LaundryWashingMachineTest = () => {
     ) {
       // Unassigned users should not see warehouse reports
       setActiveTab("reports");
+    } else if (!isAdminUser && activeTab === "assign_control") {
+      // Unassigned/warehouse users must not see Assign Control; redirect to a valid tab
+      setActiveTab(isWarehouseUser ? "warehouse_reports" : "reports");
     }
-  }, [isWarehouseUser, activeTab, isAdminUser]);
+  }, [isWarehouseUser, activeTab, isAdminUser, completingReport]);
 
-  const fetchAssignControl = useCallback(async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/assign-control`);
-      if (response.data && Array.isArray(response.data)) {
-        setCauseAssignHistory(response.data);
-      }
-    } catch (error) {
-      console.error("Error fetching assign control:", error);
-    }
-  }, []);
-
-  // Load users and cause assign data with polling
+  // Start polling assign control on mount; fetch users once
   useEffect(() => {
     fetchAssignControl();
-
-    // Poll every 5 seconds for real-time updates
-    const intervalId = setInterval(fetchAssignControl, 5000);
-
-    // Also refetch immediately when window regains focus (user switches tabs)
-    const handleFocus = () => {
-      fetchAssignControl();
-    };
-    window.addEventListener("focus", handleFocus);
-
-    const fetchUsers = async () => {
-      setIsLoadingUsers(true);
-      try {
-        const response = await axios.get(`${API_BASE_URL}/api/users`);
-        if (response.data) {
-          setUsers(response.data);
-        }
-      } catch (error) {
-        console.error("Error fetching users:", error);
-        showToast.error("Failed to load users list");
-      } finally {
-        setIsLoadingUsers(false);
-      }
-    };
     fetchUsers();
-
-    // Cleanup
+    const intervalId = setInterval(fetchAssignControl, 5000);
+    const handleFocus = () => fetchAssignControl();
+    window.addEventListener("focus", handleFocus);
     return () => {
       clearInterval(intervalId);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [fetchAssignControl]);
+  }, []); // eslint-disable-line
 
-  // Prepare user options for Select
-  const userOptions = users.map((user) => {
-    const id = user.emp_id;
-    const name = user.name || user.eng_name || "Unknown";
-    return {
-      value: id || name, // Fallback to name if ID is missing
-      label: id ? `(${id}) ${name}` : name,
-      key: user._id || id || name,
+  // Page auto-resets to 1 on filter change — handled inside useWashingFilterStore.setFilter()
+
+  // Fetch standard reports whenever the standard filter object changes (debounced)
+  useEffect(() => {
+    const t = setTimeout(() => _fetchReports("standard", _stdF), 500);
+    return () => clearTimeout(t);
+  }, [_stdF]); // eslint-disable-line
+
+  // Fetch warehouse reports whenever the warehouse filter object changes (debounced)
+  useEffect(() => {
+    const t = setTimeout(() => _fetchReports("warehouse", _whF), 500);
+    return () => clearTimeout(t);
+  }, [_whF]); // eslint-disable-line
+
+  // When any client updates a report (e.g. warehouse edits/rejects colors), refetch so list shows latest (e.g. colorEditedByWarehouseAt)
+  useEffect(() => {
+    if (!API_BASE_URL) return;
+    const socket = io(API_BASE_URL, { path: "/socket.io", transports: ["websocket"], secure: API_BASE_URL.startsWith("https") });
+    const onUpdated = () => refreshAllReports();
+    socket.on("washing-report-updated", onUpdated);
+    return () => {
+      socket.off("washing-report-updated", onUpdated);
+      socket.disconnect();
     };
-  });
-
-  // Reset page to 1 when filters (except page) change for standard reports
-  useEffect(() => {
-    setFilterPage(1);
-  }, [
-    filterStartDate,
-    filterEndDate,
-    filterSearch,
-    filterColor,
-    filterFactory,
-    filterStatus,
-    filterReportType,
-    filterLimit,
-  ]);
-
-  // Reset page to 1 when filters (except page) change for warehouse reports
-  useEffect(() => {
-    setWhFilterPage(1);
-  }, [
-    whFilterStartDate,
-    whFilterEndDate,
-    whFilterSearch,
-    whFilterColor,
-    whFilterFactory,
-    whFilterStatus,
-    whFilterReportType,
-    whFilterLimit,
-  ]);
-
-  // Fetch standard reports when filters or page change
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchReports({
-        startDate: filterStartDate,
-        endDate: filterEndDate,
-        search: filterSearch,
-        color: filterColor,
-        factory: filterFactory,
-        status: filterStatus,
-        reportType: filterReportType,
-        page: filterPage,
-        limit: filterLimit,
-      });
-    }, 500); // Debounce
-    return () => clearTimeout(timer);
-  }, [
-    filterStartDate,
-    filterEndDate,
-    filterSearch,
-    filterColor,
-    filterFactory,
-    filterStatus,
-    filterReportType,
-    filterPage,
-    filterLimit,
-    fetchReports,
-  ]);
-
-  // Fetch warehouse reports when filters or page change
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchWhReports({
-        startDate: whFilterStartDate,
-        endDate: whFilterEndDate,
-        search: whFilterSearch,
-        color: whFilterColor,
-        factory: whFilterFactory,
-        status: whFilterStatus,
-        reportType: whFilterReportType,
-        page: whFilterPage,
-        limit: whFilterLimit,
-      });
-    }, 500); // Debounce
-    return () => clearTimeout(timer);
-  }, [
-    whFilterStartDate,
-    whFilterEndDate,
-    whFilterSearch,
-    whFilterColor,
-    whFilterFactory,
-    whFilterStatus,
-    whFilterReportType,
-    whFilterPage,
-    whFilterLimit,
-    fetchWhReports,
-  ]);
-
-  // Proactively prevent duplicate color reporting in real-time when usedColors load
-  /* 
-  Removed this useEffect as it was blocking the manual re-selection of colors.
-  Duplicate handling is now managed by the color selection UI.
-  useEffect(() => {
-    if (usedColors && usedColors.length > 0 && formData.color && formData.color.length > 0 && !completingReport) {
-      const selectedColors = Array.isArray(formData.color) ? formData.color : [formData.color];
-      const duplicates = selectedColors.filter(c =>
-        usedColors.some(uc => uc.trim().toUpperCase() === String(c).trim().toUpperCase())
-      );
-
-      if (duplicates.length > 0) {
-        const filteredColors = selectedColors.filter(c =>
-          !usedColors.some(uc => uc.trim().toUpperCase() === String(c).trim().toUpperCase())
-        );
-        showToast.warning(`Already reported color(s) removed: ${duplicates.join(', ')}`);
-        setFormData(prev => ({
-          ...prev,
-          color: filteredColors
-        }));
-      }
-    }
-  }, [usedColors, formData.color, completingReport, setFormData]);
-  */
-
-  // Dropdown states
-  const [showColorDropdown, setShowColorDropdown] = useState(false);
-  const [showPODropdown, setShowPODropdown] = useState(false);
-  const [showETDDropdown, setShowETDDropdown] = useState(false);
+  }, [refreshAllReports]);
 
   // Handle input change with order data clearing
   const handleInputChange = (field, value) => {
@@ -626,12 +356,6 @@ const LaundryWashingMachineTest = () => {
       // Stop here - don't reset anything else
       return;
     }
-
-    // Proactively prevent selecting already reported colors
-    /* 
-    The UI now handles this by filtering availableColors based on usedColors 
-    and providing a re-select button. Removing this block to allow re-selection.
-    */
 
     handleFormInputChange(field, value, (field, value, newData, prev) => {
       // Clear user-selected choices (color, PO, ETD) when Style changes manually
@@ -859,19 +583,25 @@ const LaundryWashingMachineTest = () => {
   // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Check if we are completing a report (e.g. after QR scan on "received" report)
+
+    // Check if we are completing a report (e.g. after QR scan — skip received, go direct to form)
     if (completingReport) {
-      // Send form-uploaded images as completionImages (so they get completion-* prefix and show in Step 3)
-      // Keep existing report.images so we don't overwrite Step 1 images
+      const now = new Date().toISOString();
+      const dateOnly = now.split("T")[0];
       const completionPayload = {
         ...formData,
-        images: completingReport.images || [], // keep existing initial images (URLs)
-        completionImages: formData.images || [], // form uploads go to Step 3 completion
+        images: completingReport.images || [],
+        completionImages: formData.images || [],
         status: "completed",
-        completedDate: new Date().toISOString().split("T")[0],
-        completedAt: new Date().toISOString(),
+        completedDate: dateOnly,
+        completedAt: now,
       };
+      // If report was still pending (QR scan skipped received), set received timestamps on completion
+      if (completingReport.status === "pending" || !completingReport.status) {
+        completionPayload.receivedDate = dateOnly;
+        completionPayload.receivedAt = now;
+        if (user?.emp_id) completionPayload.receiver_emp_id = user.emp_id;
+      }
       const success = await updateReport(completingReport._id, completionPayload);
 
       if (success) {
@@ -910,36 +640,40 @@ const LaundryWashingMachineTest = () => {
 
   // Handle delete report - open confirmation modal
   const handleDelete = (id) => {
-    setReportToDelete(id);
-    setShowDeleteConfirm(true);
+    openDeleteModal(id);
   };
 
   // Confirm delete report
   const confirmDelete = async () => {
     if (!reportToDelete) return;
-    const success = await deleteReport(reportToDelete);
+    const success = await _deleteReport(
+      activeTab === "warehouse_reports" ? "warehouse" : "standard",
+      reportToDelete,
+    );
     if (success) {
-      setShowDeleteConfirm(false);
-      setReportToDelete(null);
-      // Manually refresh warehouse reports too to keep them in sync
-      fetchWhReports({
-        startDate: whFilterStartDate,
-        endDate: whFilterEndDate,
-        search: whFilterSearch,
-        color: whFilterColor,
-        factory: whFilterFactory,
-        status: whFilterStatus,
-        page: whFilterPage,
-        limit: whFilterLimit,
-      });
+      closeDeleteModal();
+      // Refresh both tabs to keep counts/pagination accurate
+      refreshAllReports();
     }
+  };
+
+  // Reject report (warehouse: e.g. color mismatch) – only for pending reports
+  const handleReject = async (reportId, rejectedNotes = "") => {
+    const tab = activeTab === "warehouse_reports" ? "warehouse" : "standard";
+    const filters = activeTab === "warehouse_reports"
+      ? useWashingFilterStore.getState().warehouse
+      : useWashingFilterStore.getState().standard;
+    const success = await _rejectReport(
+      tab,
+      reportId,
+      { receiver_emp_id: user?.emp_id || user?.id, rejectedNotes },
+      filters,
+    );
+    if (success) refreshAllReports();
   };
 
   // Handle edit report - use handler function
   const handleEditReport = async (report) => {
-    setEditingReport(report);
-
-    // Use handler function to prepare edit form
     await prepareEditFormData(
       report,
       setEditFormData,
@@ -947,13 +681,12 @@ const LaundryWashingMachineTest = () => {
       setEditAvailablePOs,
       setEditAvailableETDs,
     );
-
-    setShowEditModal(true);
+    openEditModal(report);
   };
 
   // Handle edit form submit - use handler
   const resetEditState = () => {
-    setEditingReport(null);
+    closeEditModal();
     setEditFormData({
       color: [],
       buyerStyle: "",
@@ -973,8 +706,15 @@ const LaundryWashingMachineTest = () => {
       editingReport,
       editFormData,
       refreshAllReports,
-      setShowEditModal,
+      closeEditModal,
       resetEditState,
+      {
+        editedByWarehouse: isWarehouseUser,
+        editorUserId: user?.emp_id || user?.id,
+        editorEmpId: user?.emp_id || user?.id,
+        editorUserName: user?.name || user?.eng_name || "",
+        editorName: user?.name || user?.eng_name || "",
+      },
     );
 
   // Initialize QR Code Scanner for a specific report
@@ -1024,6 +764,12 @@ const LaundryWashingMachineTest = () => {
             // 2. "REPORT_DATE_SCAN" (old format from UI)
             // 3. "REPORT_DATE_SCAN:REPORT_ID" (old format from PDF)
             let targetReportId = reportId;
+
+            // Only assigned users (Admin or Warehouse) can process a scan
+            if (!isAdminUser && !isWarehouseUser) {
+              showToast.warning("You are not assigned to scan reports. Only assigned users can complete this action.");
+              return;
+            }
 
             // Check if it's a URL format
             if (decodedText.includes("?scan=")) {
@@ -1076,57 +822,36 @@ const LaundryWashingMachineTest = () => {
               const currentDateOnly = currentDate.split("T")[0];
 
               if (currentStatus === "pending" || !currentStatus) {
-                // First scan - Open received modal (status will be updated when user saves)
-                // Stop scanner and close all modals
+                // Normal flow: open received modal (add images/notes, save → received)
                 stopScanner();
                 setShowReportDateScanner(null);
-                setShowReportDateQR(null); // Close QR code modal if open
-
-                // Open received modal for user to upload images and add notes
-                setReceivedReportId(targetReportId);
-                setReceivedImages([]);
-                setReceivedNotes("");
-                setShouldUpdateReceivedStatus(true); // Flag to update status when saving
-                setShowReceivedModal(true);
-
-                // Switch to Reports tab
+                setShowReportDateQR(null);
+                openReceivedModal(targetReportId);
+                setShouldUpdateReceivedStatus(true);
                 setActiveTab("reports");
-
                 showToast.success(
-                  `QR Scan Success! Please add images and notes, then save to update status to "Received".`,
+                  "QR Scan success! Add images and notes, then save to set status to Received.",
                 );
               } else if (currentStatus === "received") {
-                // Second scan - Load report into form for completion
+                // User already clicked "Accept received" → go direct to completion form
                 stopScanner();
                 setShowReportDateScanner(null);
-                setShowReportDateQR(null); // Close QR code modal if open
-
-                // Set completing report state
+                setShowReportDateQR(null);
                 setCompletingReport(currentReport);
-
-                // Populate form data (form will always show HomeWashForm regardless of reportType)
                 setFormData({
                   ...currentReport,
                   reportType: currentReport.reportType || "Garment Wash Report",
                   color: currentReport.color || [],
                   po: currentReport.po || [],
                   exFtyDate: currentReport.exFtyDate || [],
-                  images: [], // Don't preload previous images into input (unless we want to display them, but file input can't be preloaded)
-                  // Note: If we want to show existing images, we might need a separate display or handle it in the form.
+                  images: [],
+                  moNo: currentReport.moNo || currentReport.ymStyle || "",
                 });
-
-                // Fetch colors and other data for the style
                 if (currentReport.ymStyle) {
                   fetchOrderColors(currentReport.ymStyle, setFormData);
                   fetchYorksysOrderETD(currentReport.ymStyle, setFormData);
                 }
-
-                // Switch to Form tab
                 setActiveTab("form");
-
-                showToast.success(
-                  "Report loaded for completion. Please fill in the results and submit.",
-                );
               } else if (currentStatus === "completed") {
                 showToast.info("This report is already completed.");
                 stopScanner();
@@ -1175,14 +900,35 @@ const LaundryWashingMachineTest = () => {
       } finally {
         setHtml5QrCodeInstance(null);
         setScanningReportId(null);
+        setScannerFlashOn(false);
       }
     }
   }, [html5QrCodeInstance, setScanningReportId]);
+
+  // Toggle scanner torch/flash (when supported)
+  const toggleScannerFlash = useCallback(() => {
+    if (!html5QrCodeInstance || !html5QrCodeInstance.isScanning) return;
+    try {
+      const caps = html5QrCodeInstance.getRunningTrackCameraCapabilities?.();
+      const torch = caps?.torchFeature?.();
+      if (torch) {
+        torch.apply?.(!torch.value?.());
+        setScannerFlashOn((prev) => !prev);
+      }
+    } catch (_) {
+      // Torch not supported on this device/browser
+    }
+  }, [html5QrCodeInstance]);
 
   // Handle QR code file upload and scan
   const handleQRCodeFileUpload = async (event, reportId) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (!isAdminUser && !isWarehouseUser) {
+      showToast.error("You are not assigned to scan reports. Only assigned users can complete this action.");
+      event.target.value = "";
+      return;
+    }
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
@@ -1251,42 +997,29 @@ const LaundryWashingMachineTest = () => {
 
       if (currentStatus === "pending" || !currentStatus) {
         setShowReportDateQR(null);
-        setReceivedReportId(targetReportId);
-        setReceivedImages([]);
-        setReceivedNotes("");
+        openReceivedModal(targetReportId);
         setShouldUpdateReceivedStatus(true);
-        setShowReceivedModal(true);
         setActiveTab("reports");
         showToast.success(
-          `QR Scan Success! Please add images and notes, then save to update status to "Received".`,
+          "QR Scan success! Add images and notes, then save to set status to Received.",
         );
       } else if (currentStatus === "received") {
         setShowReportDateQR(null);
-
-        // Second scan - Load report into form for completion
         setCompletingReport(currentReport);
-
-        // Populate form data (form will always show HomeWashForm regardless of reportType)
         setFormData({
           ...currentReport,
           reportType: currentReport.reportType || "Garment Wash Report",
           color: currentReport.color || [],
           po: currentReport.po || [],
           exFtyDate: currentReport.exFtyDate || [],
-          images: [], // Don't preload previous images into input
+          images: [],
+          moNo: currentReport.moNo || currentReport.ymStyle || "",
         });
-
-        // Fetch colors and other data for the style
         if (currentReport.ymStyle) {
           fetchOrderColors(currentReport.ymStyle, setFormData);
-          fetchYorksysOrderETD(currentReport.ymStyle);
+          fetchYorksysOrderETD(currentReport.ymStyle, setFormData);
         }
-
-        // Switch to Form tab
         setActiveTab("form");
-        showToast.success(
-          "Report loaded for completion. Please fill in the results and submit.",
-        );
       } else if (currentStatus === "completed") {
         showToast.info("This report is already completed.");
         setShowReportDateQR(null);
@@ -1498,31 +1231,25 @@ const LaundryWashingMachineTest = () => {
     };
   }, [showReportDateQR, reports]);
 
-  // Handle URL-based QR code scan (when page is opened via QR code URL)
+  // Handle URL-based QR code scan (when page is opened via QR code URL e.g. after download and scan)
+  // Always fetch report by ID and branch on status (pending → received modal, received → completion form, completed → toast)
   useEffect(() => {
     const scanReportId = searchParams.get("scan");
-    if (scanReportId) {
-      // Switch to Reports tab immediately when scan parameter is detected
-      setActiveTab("reports");
-
-      if (reports.length > 0) {
-        // Find the report
-        const report = reports.find(
-          (r) => r._id === scanReportId || r.id === scanReportId,
-        );
-        if (report) {
-          // Process the scan automatically
-          processQRScanFromURL(scanReportId);
-          // Clear the URL parameter
-          setSearchParams({});
-        }
-      }
-    }
-  }, [searchParams, reports]);
+    if (!scanReportId) return;
+    // Switch to Reports tab when scan parameter is detected
+    setActiveTab("reports");
+    // Process scan by ID regardless of reports list (so received/completed reports work even if filtered out)
+    processQRScanFromURL(scanReportId);
+    setSearchParams({});
+  }, [searchParams]);
 
   // Process QR scan from URL - Enhanced handler for QR scan success
   const processQRScanFromURL = async (targetReportId) => {
     if (!targetReportId) return;
+    if (!isAdminUser && !isWarehouseUser) {
+      showToast.error("You are not assigned to scan reports. Only assigned users can complete this action.");
+      return;
+    }
 
     try {
       // Show loading state
@@ -1544,12 +1271,9 @@ const LaundryWashingMachineTest = () => {
       const currentDateOnly = currentDate.split("T")[0];
 
       if (currentStatus === "pending" || !currentStatus) {
-        // First scan - Open received modal (status will be updated when user saves)
-        // 1. Close QR code modal immediately
+        // Normal flow: open received modal (add images/notes, save → received)
         setShowReportDateQR(null);
         setShowReportDateScanner(null);
-
-        // 2. Stop scanner if running
         if (html5QrCodeInstance) {
           try {
             await html5QrCodeInstance.stop();
@@ -1559,27 +1283,16 @@ const LaundryWashingMachineTest = () => {
           }
         }
         setScanningReportId(null);
-
-        // 3. Open received modal for user to upload images and add notes
-        setReceivedReportId(targetReportId);
-        setReceivedImages([]);
-        setReceivedNotes("");
-        setShouldUpdateReceivedStatus(true); // Flag to update status when saving
-        setShowReceivedModal(true);
-
-        // 4. Switch to Reports tab
+        openReceivedModal(targetReportId);
+        setShouldUpdateReceivedStatus(true);
         setActiveTab("reports");
-
         showToast.success(
-          `✓ QR Scan Success! Please add images and notes, then save to update status to "Received".`,
+          "QR Scan success! Add images and notes, then save to set status to Received.",
         );
       } else if (currentStatus === "received") {
-        // Second scan - Open completion mode in form
-        // 1. Close QR code modal
+        // User already clicked "Accept received" → go direct to completion form
         setShowReportDateQR(null);
         setShowReportDateScanner(null);
-
-        // 2. Stop scanner if running
         if (html5QrCodeInstance) {
           try {
             await html5QrCodeInstance.stop();
@@ -1589,32 +1302,21 @@ const LaundryWashingMachineTest = () => {
           }
         }
         setScanningReportId(null);
-
-        // 3. Load report into form for completion
         setCompletingReport(currentReport);
-
-        // Populate form data
         setFormData({
           ...currentReport,
           reportType: currentReport.reportType || "Garment Wash Report",
           color: currentReport.color || [],
           po: currentReport.po || [],
           exFtyDate: currentReport.exFtyDate || [],
-          images: [], // Don't preload previous images into input
+          images: [],
+          moNo: currentReport.moNo || currentReport.ymStyle || "",
         });
-
-        // Fetch colors and other data for the style
         if (currentReport.ymStyle) {
           fetchOrderColors(currentReport.ymStyle, setFormData);
-          fetchYorksysOrderETD(currentReport.ymStyle);
+          fetchYorksysOrderETD(currentReport.ymStyle, setFormData);
         }
-
-        // 4. Switch to Form tab
         setActiveTab("form");
-
-        showToast.success(
-          "Report loaded for completion. Please fill in the results and submit.",
-        );
       } else if (currentStatus === "completed") {
         // Close modal and show info
         setShowReportDateQR(null);
@@ -1659,44 +1361,25 @@ const LaundryWashingMachineTest = () => {
     }
   };
 
-  // Handle received image upload
-  const handleReceivedImageUpload = (files) => {
+  // Shared image-upload helper — used by received, completion, and edit modals
+  const makeImageUploadHandler = (getImages, setImages) => (files) => {
     if (!files || files.length === 0) return;
-
-    const currentCount = receivedImages.length;
-    if (currentCount >= 5) {
-      showToast.warning("Maximum of 5 images allowed per section.");
-      return;
-    }
-
-    const allowedTypes = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-    ];
-    const filesArray = Array.from(files);
-    const availableSlots = 5 - currentCount;
-    const filesToProcess = filesArray.slice(0, availableSlots);
-
-    if (filesArray.length > availableSlots) {
-      showToast.info(
-        `Only ${availableSlots} more image(s) can be added (Limit: 5).`,
-      );
-    }
-
-    filesToProcess.forEach((file) => {
-      const isValidType = allowedTypes.includes(file.type.toLowerCase());
-      if (!isValidType) {
-        showToast.error(
-          `Invalid file type: ${file.name}. Only JPEG, PNG, GIF, and WebP images are allowed.`,
-        );
+    const currentCount = getImages().length;
+    if (currentCount >= 5) { showToast.warning("Maximum of 5 images allowed per section."); return; }
+    const ALLOWED = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    const arr = Array.from(files);
+    const slots = 5 - currentCount;
+    if (arr.length > slots) showToast.info(`Only ${slots} more image(s) can be added (Limit: 5).`);
+    arr.slice(0, slots).forEach((file) => {
+      if (!ALLOWED.includes(file.type.toLowerCase())) {
+        showToast.error(`Invalid file type: ${file.name}. Only JPEG, PNG, GIF, and WebP images are allowed.`);
         return;
       }
-      setReceivedImages((prev) => [...prev, file]);
+      setImages((prev) => [...prev, file]);
     });
   };
+
+  const handleReceivedImageUpload = makeImageUploadHandler(() => receivedImages, setReceivedImages);
 
   // Handle received form submit - Save images and notes for received status
   const handleReceivedSubmit = async () => {
@@ -1709,7 +1392,7 @@ const LaundryWashingMachineTest = () => {
       shouldUpdateReceivedStatus,
       (reportId) => {
         // 1. Close received modal immediately
-        setShowReceivedModal(false);
+        closeReceivedModal();
 
         // 2. Close QR code modal if it's open for this report
         if (showReportDateQR === reportId) {
@@ -1717,12 +1400,8 @@ const LaundryWashingMachineTest = () => {
           setShowReportDateScanner(null);
         }
 
-        // 3. Reset received form data
-        setReceivedReportId(null);
-        setReceivedImages([]);
-        setReceivedNotes("");
-        setShouldUpdateReceivedStatus(false); // Clear the flag
-        setReceivedImageRotations({}); // Clear received image rotations
+        // 3. Clear received image rotations
+        setReceivedImageRotations({});
 
         // 4. Scroll to updated report with visual feedback
         setTimeout(() => {
@@ -1746,44 +1425,42 @@ const LaundryWashingMachineTest = () => {
     );
   };
 
-  // Handle completion image upload
-  const handleCompletionImageUpload = (files) => {
-    if (!files || files.length === 0) return;
+  // Accept received from card action bar (no modal) — quick accept without images/notes
+  const handleAcceptReceivedFromCard = async (report) => {
+    const reportId = report._id || report.id;
+    if (!reportId) return;
 
-    const currentCount = completionImages.length;
-    if (currentCount >= 5) {
-      showToast.warning("Maximum of 5 images allowed per section.");
-      return;
-    }
-
-    const allowedTypes = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-    ];
-    const filesArray = Array.from(files);
-    const availableSlots = 5 - currentCount;
-    const filesToProcess = filesArray.slice(0, availableSlots);
-
-    if (filesArray.length > availableSlots) {
-      showToast.info(
-        `Only ${availableSlots} more image(s) can be added (Limit: 5).`,
-      );
-    }
-
-    filesToProcess.forEach((file) => {
-      const isValidType = allowedTypes.includes(file.type.toLowerCase());
-      if (!isValidType) {
-        showToast.error(
-          `Invalid file type: ${file.name}. Only JPEG, PNG, GIF, and WebP images are allowed.`,
-        );
-        return;
-      }
-      setCompletionImages((prev) => [...prev, file]);
-    });
+    await saveReceivedStatus(
+      reportId,
+      [],
+      "",
+      true,
+      (id) => {
+        if (showReportDateQR === id) {
+          setShowReportDateQR(null);
+          setShowReportDateScanner(null);
+        }
+        setTimeout(() => {
+          const reportElement = document.querySelector(
+            `[data-report-id="${id}"]`,
+          );
+          if (reportElement) {
+            reportElement.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+            reportElement.style.transition = "background-color 0.5s ease";
+            reportElement.style.backgroundColor = "#d4edda";
+            setTimeout(() => {
+              reportElement.style.backgroundColor = "";
+            }, 2000);
+          }
+        }, 200);
+      },
+    );
   };
+
+  const handleCompletionImageUpload = makeImageUploadHandler(() => completionImages, setCompletionImages);
 
   // Handle completion form submit - Enhanced with better feedback
   // Handle completion form submit - Enhanced with better feedback
@@ -1818,7 +1495,7 @@ const LaundryWashingMachineTest = () => {
       completionNotes,
       (reportId) => {
         // 1. Close completion modal immediately
-        setShowCompletionModal(false);
+        closeCompletionModal();
 
         // 2. Close QR code modal if it's open for this report
         if (showReportDateQR === reportId) {
@@ -1826,11 +1503,8 @@ const LaundryWashingMachineTest = () => {
           setShowReportDateScanner(null);
         }
 
-        // 3. Reset completion form data
-        setCompletionReportId(null);
-        setCompletionImages([]);
-        setCompletionNotes("");
-        setCompletionImageRotations({}); // Clear completion image rotations
+        // 3. Reset completion image rotations
+        setCompletionImageRotations({});
 
         // 4. Scroll to updated report with visual feedback
         setTimeout(() => {
@@ -1858,77 +1532,30 @@ const LaundryWashingMachineTest = () => {
 
   // Handle edit initial images
   const handleEditInitialImages = (report) => {
-    setEditingImageReport(report);
-    setEditingImageType("initial");
-    setEditingImages(report.images || []);
-    setEditingNotes(report.notes || "");
-    setShowEditInitialImagesModal(true);
+    openEditImagesModal(report, "initial", report.images || [], report.notes || "");
   };
 
   // Handle edit received images
   const handleEditReceivedImages = (report) => {
-    setEditingImageReport(report);
-    setEditingImageType("received");
-    setEditingImages(report.receivedImages || []);
-    setEditingNotes(report.receivedNotes || "");
-    setShowEditReceivedImagesModal(true);
+    openEditImagesModal(report, "received", report.receivedImages || [], report.receivedNotes || "");
   };
 
   // Handle edit completion images
   const handleEditCompletionImages = (report) => {
-    setEditingImageReport(report);
-    setEditingImageType("completion");
-    setEditingImages(report.completionImages || []);
-
-    // Get notes from the specific field based on report type, fallback to generic completionNotes
     const noteField = getCompletionNotesField(report.reportType);
-    setEditingNotes(report[noteField] || report.completionNotes || "");
-
-    setShowEditCompletionImagesModal(true);
+    openEditImagesModal(
+      report,
+      "completion",
+      report.completionImages || [],
+      report[noteField] || report.completionNotes || "",
+    );
   };
 
-  // Handle image upload for edit modals
-  const handleEditImageUpload = (files, type) => {
-    if (!files || files.length === 0) return;
-
-    const currentCount = editingImages.length;
-    if (currentCount >= 5) {
-      showToast.warning("Maximum of 5 images allowed per section.");
-      return;
-    }
-
-    const allowedTypes = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-    ];
-    const filesArray = Array.from(files);
-    const availableSlots = 5 - currentCount;
-    const filesToProcess = filesArray.slice(0, availableSlots);
-
-    if (filesArray.length > availableSlots) {
-      showToast.info(
-        `Only ${availableSlots} more image(s) can be added (Limit: 5).`,
-      );
-    }
-
-    filesToProcess.forEach((file) => {
-      const isValidType = allowedTypes.includes(file.type.toLowerCase());
-      if (!isValidType) {
-        showToast.error(
-          `Invalid file type: ${file.name}. Only JPEG, PNG, GIF, and WebP images are allowed.`,
-        );
-        return;
-      }
-      setEditingImages((prev) => [...prev, file]);
-    });
-  };
+  const handleEditImageUpload = makeImageUploadHandler(() => editingImages, setEditImages);
 
   // Handle remove image from edit modal
   const handleRemoveEditImage = (index) => {
-    setEditingImages((prev) => prev.filter((_, i) => i !== index));
+    setEditImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   // Handle update images
@@ -2016,12 +1643,8 @@ const LaundryWashingMachineTest = () => {
         showToast.success("Images updated successfully!");
 
         // Close modal
-        setShowEditInitialImagesModal(false);
-        setShowEditReceivedImagesModal(false);
-        setShowEditCompletionImagesModal(false);
-        setEditingImageReport(null);
-        setEditingImageType(null);
-        setEditingImages([]);
+        closeEditImagesModal();
+        setEditImages([]);
 
         // Refresh all reports
         await refreshAllReports();
@@ -2134,7 +1757,6 @@ const LaundryWashingMachineTest = () => {
     currentSetPrintingId(reportId);
 
     try {
-      // Generate QR code data URL for the report - use URL format for mobile compatibility
       const qrCodeValue = `${getQRCodeBaseURL(QR_CODE_BASE_URL)}/Launch-washing-machine-test?scan=${reportId}`;
       const qrCodeDataURL = await generateQRCodeDataURL(qrCodeValue, 100);
 
@@ -2149,58 +1771,32 @@ const LaundryWashingMachineTest = () => {
       ).toBlob();
       const url = URL.createObjectURL(blob);
 
-      // Open PDF in a new window for printing (reliable in Chrome/Edge; iframe + blob URL often fails)
-      const printWin = window.open(url, "_blank", "noopener,noreferrer");
-      if (!printWin) {
-        try {
-          URL.revokeObjectURL(url);
-        } catch (e) {
-          // Ignore
-        }
-        showToast.error(
-          "Pop-up blocked. Allow pop-ups for this site and try again, or use the PDF button to download and print."
-        );
-        return;
-      }
+      // Use a hidden iframe so no new tab opens — only the print dialog appears
+      const iframe = document.createElement("iframe");
+      iframe.style.cssText =
+        "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;border:none;";
+      document.body.appendChild(iframe);
 
-      let printTriggered = false;
-      // Trigger print once the PDF viewer has loaded (Chrome/Edge need a short delay)
-      const triggerPrint = () => {
-        if (printTriggered) return;
-        printTriggered = true;
+      iframe.onload = () => {
         try {
-          if (!printWin.closed) {
-            printWin.focus();
-            printWin.print();
-          }
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
         } catch (printError) {
           console.error("Error calling print:", printError);
           showToast.error("Print failed. Use the PDF button to download and print manually.");
         }
-        // Revoke blob URL after a delay so the new tab has finished using it
+        // Clean up after the print dialog is dismissed
         setTimeout(() => {
-          try {
-            URL.revokeObjectURL(url);
-          } catch (e) {
-            // Ignore
-          }
-        }, 3000);
+          try { document.body.removeChild(iframe); } catch (e) { /* ignore */ }
+          try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ }
+        }, 60000);
       };
 
-      // Try on load (may not fire for PDF in some browsers)
-      printWin.onload = () => {
-        setTimeout(triggerPrint, 400);
-      };
-
-      // Fallback: trigger print after delay in case onload doesn't fire (common with PDF in Chrome/Edge)
-      setTimeout(() => {
-        if (!printTriggered) triggerPrint();
-      }, 1200);
+      iframe.src = url;
     } catch (error) {
       console.error("Error generating PDF:", error);
       showToast.error("Failed to generate PDF. Please try again.");
     } finally {
-      // Reset printing state after a delay
       setTimeout(() => {
         currentSetPrintingId(null);
       }, 3000);
@@ -2255,116 +1851,28 @@ const LaundryWashingMachineTest = () => {
     }
   };
 
-  // Fetch factories from subcon-sewing-factories-manage
+  // Fetch factories once on mount (state lives in useOrderDataStore)
   useEffect(() => {
-    const fetchFactories = async () => {
-      setIsLoadingFactories(true);
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/subcon-sewing-factories-manage`,
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setFactories(data);
-        } else {
-          console.error("Failed to fetch factories");
-          showToast.error(
-            "Failed to load factories. Please check your connection.",
-          );
-        }
-      } catch (error) {
-        console.error("Error fetching factories:", error);
-        // Check if it's a connection error
-        if (
-          error.message.includes("Failed to fetch") ||
-          error.message.includes("ERR_CONNECTION_REFUSED")
-        ) {
-          showToast.error(
-            `Cannot connect to backend server at ${API_BASE_URL}. Please ensure the backend server is running on port 5001.`,
-          );
-        } else {
-          showToast.error("Error loading factories. Please try again.");
-        }
-      } finally {
-        setIsLoadingFactories(false);
-      }
-    };
-
     fetchFactories();
-    // fetchReports(); // Handled by filter useEffect
-
-    // Cleanup timer on unmount
     return () => {
-      if (colorFetchTimerRef.current) {
-        clearTimeout(colorFetchTimerRef.current);
-      }
+      if (colorFetchTimerRef.current) clearTimeout(colorFetchTimerRef.current);
     };
-  }, []);
+  }, []); // eslint-disable-line
 
-  // Close color, PO, and ETD dropdowns when clicking outside
+  // Close all custom dropdowns when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        showColorDropdown &&
-        !event.target.closest(".color-dropdown-container")
-      ) {
-        setShowColorDropdown(false);
-      }
-      if (showPODropdown && !event.target.closest(".po-dropdown-container")) {
-        setShowPODropdown(false);
-      }
-      if (showETDDropdown && !event.target.closest(".etd-dropdown-container")) {
-        setShowETDDropdown(false);
-      }
+    const onMouseDown = (e) => {
+      if (showColorDropdown && !e.target.closest(".color-dropdown-container")) setShowColorDropdown(false);
+      if (showPODropdown && !e.target.closest(".po-dropdown-container")) setShowPODropdown(false);
+      if (showETDDropdown && !e.target.closest(".etd-dropdown-container")) setShowETDDropdown(false);
+      if (showEditColorDropdown && !e.target.closest(".color-dropdown-container")) setShowEditColorDropdown(false);
+      if (showEditPODropdown && !e.target.closest(".po-dropdown-container")) setShowEditPODropdown(false);
+      if (showEditETDDropdown && !e.target.closest(".etd-dropdown-container")) setShowEditETDDropdown(false);
+      if (isReportTypeOpen && dropdownRef.current && !dropdownRef.current.contains(e.target)) setIsReportTypeOpen(false);
     };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [showColorDropdown, showPODropdown, showETDDropdown]);
-
-  // Close edit color, PO, and ETD dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        showEditColorDropdown &&
-        !event.target.closest(".color-dropdown-container")
-      ) {
-        setShowEditColorDropdown(false);
-      }
-      if (
-        showEditPODropdown &&
-        !event.target.closest(".po-dropdown-container")
-      ) {
-        setShowEditPODropdown(false);
-      }
-      if (
-        showEditETDDropdown &&
-        !event.target.closest(".etd-dropdown-container")
-      ) {
-        setShowEditETDDropdown(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [showEditColorDropdown, showEditPODropdown, showEditETDDropdown]);
-
-  // Close Report Type dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsReportTypeOpen(false);
-      }
-    };
-    if (isReportTypeOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isReportTypeOpen]);
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [showColorDropdown, showPODropdown, showETDDropdown, showEditColorDropdown, showEditPODropdown, showEditETDDropdown, isReportTypeOpen]);
 
   // Close QR code modal if report becomes completed
   useEffect(() => {
@@ -2419,31 +1927,32 @@ const LaundryWashingMachineTest = () => {
               aria-label="Tabs"
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             >
-              <button
-                onClick={() => setActiveTab("form")}
-                className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
-                  activeTab === "form"
+              {/* Create New Report tab — hidden for warehouse by default; visible when they're on form (e.g. after scan → completion form) */}
+              {((isAdminUser || !isWarehouseUser) || (isWarehouseUser && activeTab === "form")) && (
+                <button
+                  onClick={() => setActiveTab("form")}
+                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "form"
                     ? "border-blue-500 text-blue-600 dark:text-blue-400"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                }`}
-              >
-                <span className="flex items-center gap-1.5 sm:gap-2">
-                  <HiDocumentAdd
-                    className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "form" ? "text-emerald-600" : "text-emerald-500/70"}`}
-                  />
-                  <span className="hidden sm:inline">Create New Report</span>
-                  <span className="sm:hidden">Create</span>
-                </span>
-              </button>
+                    }`}
+                >
+                  <span className="flex items-center gap-1.5 sm:gap-2">
+                    <HiDocumentAdd
+                      className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "form" ? "text-emerald-600" : "text-emerald-500/70"}`}
+                    />
+                    <span className="hidden sm:inline">Create New Report</span>
+                    <span className="sm:hidden">Create</span>
+                  </span>
+                </button>
+              )}
 
               {(isAdminUser || !isWarehouseUser) && (
                 <button
                   onClick={() => setActiveTab("reports")}
-                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
-                    activeTab === "reports"
-                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
+                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "reports"
+                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+                    }`}
                 >
                   <span className="flex items-center gap-1.5 sm:gap-2">
                     <HiClipboardList
@@ -2466,11 +1975,10 @@ const LaundryWashingMachineTest = () => {
               {(isAdminUser || isWarehouseUser) && (
                 <button
                   onClick={() => setActiveTab("warehouse_reports")}
-                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
-                    activeTab === "warehouse_reports"
-                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
+                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "warehouse_reports"
+                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+                    }`}
                 >
                   <span className="flex items-center gap-1.5 sm:gap-2">
                     <MdWarehouse
@@ -2485,11 +1993,10 @@ const LaundryWashingMachineTest = () => {
               {isAdminUser && (
                 <button
                   onClick={() => setActiveTab("assign_control")}
-                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
-                    activeTab === "assign_control"
-                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
+                  className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "assign_control"
+                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+                    }`}
                 >
                   <span className="flex items-center gap-1.5 sm:gap-2">
                     <MdAssignmentInd
@@ -2500,38 +2007,34 @@ const LaundryWashingMachineTest = () => {
                   </span>
                 </button>
               )}
+
+              <div className="ml-auto flex items-center flex-shrink-0 pr-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowReportDateScanner("standalone");
+                    setTimeout(() => initializeScanner("standalone"), 300);
+                  }}
+                  className="p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transform transition-all duration-300 hover:scale-125 active:scale-95 group border-b-2 border-transparent"
+                  title="Open Live Camera Scanner"
+                >
+                  <Camera size={32} className="group-hover:rotate-12 transition-transform" />
+                </button>
+              </div>
             </nav>
           </div>
 
-          {/* Form Section - Dynamic based on Report Type */}
+          {/* Form Section — shown when Create tab is active (including for warehouse users) */}
           {activeTab === "form" && (
             <DynamicFormSection
-              formData={formData}
               handleInputChange={handleInputChange}
               handleSubmit={handleSubmit}
-              isSubmitting={isSubmitting}
               isCompleting={!!completingReport}
-              orderNoSuggestions={orderNoSuggestions}
-              showOrderNoSuggestions={showOrderNoSuggestions}
-              setShowOrderNoSuggestions={setShowOrderNoSuggestions}
-              isSearchingOrderNo={isSearchingOrderNo}
               handleOrderNoSelect={handleOrderNoSelect}
               searchOrderNo={searchOrderNo}
               fetchOrderColors={fetchOrderColors}
               fetchYorksysOrderETD={fetchYorksysOrderETD}
-              availableColors={availableColors}
-              usedColors={usedColors}
-              isLoadingColors={isLoadingColors}
-              showColorDropdown={showColorDropdown}
-              setShowColorDropdown={setShowColorDropdown}
-              availablePOs={availablePOs}
-              showPODropdown={showPODropdown}
-              setShowPODropdown={setShowPODropdown}
-              availableETDs={availableETDs}
-              showETDDropdown={showETDDropdown}
-              setShowETDDropdown={setShowETDDropdown}
-              factories={factories}
-              isLoadingFactories={isLoadingFactories}
+              fetchAnfSpecs={fetchAnfSpecs}
               handleFileInputChange={handleFileInputChange}
               handleCameraInputChange={handleCameraInputChange}
               triggerFileInput={triggerFileInput}
@@ -2540,16 +2043,6 @@ const LaundryWashingMachineTest = () => {
               fileInputRef={fileInputRef}
               cameraInputRef={cameraInputRef}
               imageRotations={imageRotations}
-              availableSizes={availableSizes}
-              season={season}
-              styleDescription={styleDescription}
-              custStyle={custStyle}
-              fabrication={fabrication}
-              anfSpecs={anfSpecs}
-              isLoadingSpecs={isLoadingSpecs}
-              fetchAnfSpecs={fetchAnfSpecs}
-              isReportTypeOpen={isReportTypeOpen}
-              setIsReportTypeOpen={setIsReportTypeOpen}
               dropdownRef={dropdownRef}
               reportTypeIcons={{
                 "Home Wash Test": <MdLocalLaundryService />,
@@ -2561,16 +2054,9 @@ const LaundryWashingMachineTest = () => {
               reportTypes={[
                 { val: "Garment Wash Report", icon: <MdLocalLaundryService /> },
                 { val: "HT Testing", icon: <MdOutlineDeviceThermostat /> },
-                {
-                  val: "EMB/Printing Testing",
-                  icon: <MdOutlineImagesearchRoller />,
-                },
+                { val: "EMB/Printing Testing", icon: <MdOutlineImagesearchRoller /> },
                 { val: "Pulling Test", icon: <MdOutlineExpand /> },
               ]}
-              causeAssignData={assignData}
-              assignHistory={causeAssignHistory}
-              users={users} // Pass users to form
-              isLoadingUsers={isLoadingUsers}
             />
           )}
 
@@ -2579,152 +2065,58 @@ const LaundryWashingMachineTest = () => {
           {/* Submitted Reports Section - Standard Tab */}
           {activeTab === "reports" && (
             <ReportsList
-              activeTab={activeTab}
-              reports={reports}
-              isLoadingReports={isLoadingReports}
-              onRefresh={() =>
-                fetchReports({
-                  startDate: filterStartDate,
-                  endDate: filterEndDate,
-                  search: filterSearch,
-                  color: filterColor,
-                  factory: filterFactory,
-                  status: filterStatus,
-                  reportType: filterReportType,
-                  page: filterPage,
-                  limit: filterLimit,
-                })
-              }
-              expandedReports={expandedReports}
-              onToggleReport={toggleReport}
+              tab="standard"
               onPrintPDF={handlePrintPDF}
               onDownloadPDF={handleDownloadPDF}
               onExportExcel={handleExportExcel}
               onEdit={handleEditReport}
               onDelete={handleDelete}
-              onShowQRCode={(reportId) =>
-                setShowReportDateQR(
-                  showReportDateQR === reportId ? null : reportId,
-                )
-              }
-              printingReportId={printingReportId}
+              onReject={handleReject}
+              openRejectModal={openRejectModal}
+              onAcceptReceived={handleAcceptReceivedFromCard}
               savedImageRotations={savedImageRotations}
               openImageViewer={openImageViewer}
-              setActiveTab={setActiveTab}
               restrictDeleteStatuses={["received", "completed"]}
               restrictEditStatuses={["received", "completed"]}
               onEditInitialImages={handleEditInitialImages}
               onEditReceivedImages={handleEditReceivedImages}
               onEditCompletionImages={handleEditCompletionImages}
-              // Filter props
-              filterStartDate={filterStartDate}
-              setFilterStartDate={setFilterStartDate}
-              filterEndDate={filterEndDate}
-              setFilterEndDate={setFilterEndDate}
-              filterSearch={filterSearch}
-              setFilterSearch={setFilterSearch}
-              filterColor={filterColor}
-              setFilterColor={setFilterColor}
-              filterFactory={filterFactory}
-              setFilterFactory={setFilterFactory}
-              filterStatus={filterStatus}
-              setFilterStatus={setFilterStatus}
-              filterPage={filterPage}
-              setFilterPage={setFilterPage}
-              filterLimit={filterLimit}
-              setFilterLimit={setFilterLimit}
-              pagination={pagination}
-              factories={factories}
-              filterReportType={filterReportType}
-              setFilterReportType={setFilterReportType}
-              isAdminUser={isAdminUser}
-              isWarehouseUser={isWarehouseUser}
-              users={users}
             />
           )}
 
           {/* Submitted Reports Section - Warehouse Tab */}
           {activeTab === "warehouse_reports" && (
             <ReportsList
-              activeTab={activeTab}
-              reports={whReports}
-              isLoadingReports={isLoadingWhReports}
-              onRefresh={() =>
-                fetchWhReports({
-                  startDate: whFilterStartDate,
-                  endDate: whFilterEndDate,
-                  search: whFilterSearch,
-                  color: whFilterColor,
-                  factory: whFilterFactory,
-                  status: whFilterStatus,
-                  reportType: whFilterReportType,
-                  page: whFilterPage,
-                  limit: whFilterLimit,
-                })
-              }
-              expandedReports={whExpandedReports}
-              onToggleReport={toggleWhReport}
+              tab="warehouse"
               onPrintPDF={handlePrintPDF}
               onDownloadPDF={handleDownloadPDF}
               onExportExcel={handleExportExcel}
               onEdit={handleEditReport}
               onDelete={handleDelete}
-              onShowQRCode={(reportId) =>
-                setShowReportDateQR(
-                  showReportDateQR === reportId ? null : reportId,
-                )
-              }
-              printingReportId={whPrintingReportId}
+              onReject={handleReject}
+              openRejectModal={openRejectModal}
+              onAcceptReceived={handleAcceptReceivedFromCard}
               savedImageRotations={savedImageRotations}
               openImageViewer={openImageViewer}
-              setActiveTab={setActiveTab}
               restrictDeleteStatuses={["received", "completed"]}
               restrictEditStatuses={["received", "completed"]}
               onEditInitialImages={handleEditInitialImages}
               onEditReceivedImages={handleEditReceivedImages}
               onEditCompletionImages={handleEditCompletionImages}
-              // Warehouse Filter props
-              filterStartDate={whFilterStartDate}
-              setFilterStartDate={setWhFilterStartDate}
-              filterEndDate={whFilterEndDate}
-              setFilterEndDate={setWhFilterEndDate}
-              filterSearch={whFilterSearch}
-              setFilterSearch={setWhFilterSearch}
-              filterColor={whFilterColor}
-              setFilterColor={setWhFilterColor}
-              filterFactory={whFilterFactory}
-              setFilterFactory={setWhFilterFactory}
-              filterStatus={whFilterStatus}
-              setFilterStatus={setWhFilterStatus}
-              filterPage={whFilterPage}
-              setFilterPage={setWhFilterPage}
-              filterLimit={whFilterLimit}
-              setFilterLimit={setWhFilterLimit}
-              pagination={whPagination}
-              factories={factories}
-              filterReportType={whFilterReportType}
-              setFilterReportType={setWhFilterReportType}
               enableRoleLocking={true}
-              isAdminUser={isAdminUser}
-              isWarehouseUser={isWarehouseUser}
-              users={users}
             />
           )}
 
-          {/* Assign Control Tab */}
-          {activeTab === "assign_control" && (
-            <GameAssignControl socket={socket} user={user} />
+          {/* Assign Control Tab — only render for admin so unassigned users never see it */}
+          {activeTab === "assign_control" && isAdminUser && (
+            <GameAssignControl user={user} />
           )}
 
           {/* Modals */}
           <ReceivedModal
             isOpen={showReceivedModal}
             onClose={() => {
-              setShowReceivedModal(false);
-              setReceivedReportId(null);
-              setReceivedImages([]);
-              setReceivedNotes("");
-              setShouldUpdateReceivedStatus(false);
+              closeReceivedModal();
               setReceivedImageRotations({});
             }}
             receivedImages={receivedImages}
@@ -2734,7 +2126,6 @@ const LaundryWashingMachineTest = () => {
             receivedImageInputRef={receivedImageInputRef}
             handleReceivedImageUpload={handleReceivedImageUpload}
             handleReceivedSubmit={handleReceivedSubmit}
-            isSavingReceived={isSavingReceived}
             receivedImageRotations={receivedImageRotations}
             setReceivedImageRotations={setReceivedImageRotations}
           />
@@ -2742,10 +2133,7 @@ const LaundryWashingMachineTest = () => {
           <CompletionModal
             isOpen={showCompletionModal}
             onClose={() => {
-              setShowCompletionModal(false);
-              setCompletionReportId(null);
-              setCompletionImages([]);
-              setCompletionNotes("");
+              closeCompletionModal();
               setCompletionImageRotations({});
             }}
             completionImages={completionImages}
@@ -2755,7 +2143,6 @@ const LaundryWashingMachineTest = () => {
             completionImageInputRef={completionImageInputRef}
             handleCompletionImageUpload={handleCompletionImageUpload}
             handleCompletionSubmit={handleCompletionSubmit}
-            isSavingCompletion={isSavingCompletion}
             completionImageRotations={completionImageRotations}
             setCompletionImageRotations={setCompletionImageRotations}
           />
@@ -2774,34 +2161,17 @@ const LaundryWashingMachineTest = () => {
             setShowEditPODropdown={setShowEditPODropdown}
             showEditETDDropdown={showEditETDDropdown}
             setShowEditETDDropdown={setShowEditETDDropdown}
-            factories={factories}
-            isLoadingFactories={isLoadingFactories}
-            onClose={() => {
-              setShowEditModal(false);
-              setEditingReport(null);
-              setEditFormData({
-                color: [],
-                buyerStyle: "",
-                po: [],
-                exFtyDate: [],
-                factory: "",
-                sendToHomeWashingDate: "",
-              });
-              setEditAvailableColors([]);
-              setEditAvailablePOs([]);
-              setEditAvailableETDs([]);
-            }}
+            onClose={resetEditState}
             onSubmit={handleEditSubmit}
           />
 
           <DeleteConfirmationModal
             isOpen={showDeleteConfirm}
-            onClose={() => {
-              setShowDeleteConfirm(false);
-              setReportToDelete(null);
-            }}
+            onClose={closeDeleteModal}
             onConfirm={confirmDelete}
           />
+
+          <RejectReportModal onConfirm={handleReject} />
 
           <QRCodeModal
             isOpen={!!showReportDateQR}
@@ -2832,72 +2202,45 @@ const LaundryWashingMachineTest = () => {
                 ? `report-date-scanner-${showReportDateScanner}`
                 : ""
             }
+            onUploadQRClick={() => scannerUploadInputRef.current?.click()}
+            onFlashToggle={toggleScannerFlash}
+            flashOn={scannerFlashOn}
+          />
+          <input
+            type="file"
+            accept="image/*"
+            ref={scannerUploadInputRef}
+            className="hidden"
+            aria-hidden
+            onChange={(e) => {
+              if (showReportDateScanner) {
+                handleQRCodeFileUpload(e, showReportDateScanner);
+              }
+              e.target.value = "";
+            }}
           />
 
-          {/* Edit Initial Images Modal */}
-          <EditImagesModal
-            isOpen={showEditInitialImagesModal}
-            onClose={() => {
-              setShowEditInitialImagesModal(false);
-              setEditingImageReport(null);
-              setEditingImageType(null);
-              setEditingImages([]);
-              setEditingNotes("");
-            }}
-            title={`Edit Initial Images - ${editingImageReport?.ymStyle || "N/A"}`}
-            images={editingImages}
-            notes={editingNotes}
-            onNotesChange={setEditingNotes}
-            onRemoveImage={handleRemoveEditImage}
-            onUploadImage={(files) => handleEditImageUpload(files, "initial")}
-            onSave={handleUpdateImages}
-            isSaving={isUpdatingImages}
-            saveButtonColor="blue"
-          />
-
-          {/* Edit Received Images Modal */}
-          <EditImagesModal
-            isOpen={showEditReceivedImagesModal}
-            onClose={() => {
-              setShowEditReceivedImagesModal(false);
-              setEditingImageReport(null);
-              setEditingImageType(null);
-              setEditingImages([]);
-              setEditingNotes("");
-            }}
-            title={`Edit Received Images - ${editingImageReport?.ymStyle || "N/A"}`}
-            images={editingImages}
-            notes={editingNotes}
-            onNotesChange={setEditingNotes}
-            onRemoveImage={handleRemoveEditImage}
-            onUploadImage={(files) => handleEditImageUpload(files, "received")}
-            onSave={handleUpdateImages}
-            isSaving={isUpdatingImages}
-            saveButtonColor="yellow"
-          />
-
-          {/* Edit Completion Images Modal */}
-          <EditImagesModal
-            isOpen={showEditCompletionImagesModal}
-            onClose={() => {
-              setShowEditCompletionImagesModal(false);
-              setEditingImageReport(null);
-              setEditingImageType(null);
-              setEditingImages([]);
-              setEditingNotes("");
-            }}
-            title={`Edit Completion Images - ${editingImageReport?.ymStyle || "N/A"}`}
-            images={editingImages}
-            notes={editingNotes}
-            onNotesChange={setEditingNotes}
-            onRemoveImage={handleRemoveEditImage}
-            onUploadImage={(files) =>
-              handleEditImageUpload(files, "completion")
-            }
-            onSave={handleUpdateImages}
-            isSaving={isUpdatingImages}
-            saveButtonColor="green"
-          />
+          {/* Edit Images Modals — one per type, all share the same store state */}
+          {[
+            { type: "initial", isOpen: showEditInitialImagesModal, color: "blue", uploadType: "initial" },
+            { type: "received", isOpen: showEditReceivedImagesModal, color: "yellow", uploadType: "received" },
+            { type: "completion", isOpen: showEditCompletionImagesModal, color: "green", uploadType: "completion" },
+          ].map(({ type, isOpen, color, uploadType }) => (
+            <EditImagesModal
+              key={type}
+              isOpen={isOpen}
+              onClose={() => { closeEditImagesModal(); setEditImages([]); setEditNotes(""); }}
+              title={`Edit ${type.charAt(0).toUpperCase() + type.slice(1)} Images - ${editingImageReport?.ymStyle || "N/A"}`}
+              images={editingImages}
+              notes={editingNotes}
+              onNotesChange={setEditNotes}
+              onRemoveImage={handleRemoveEditImage}
+              onUploadImage={(files) => handleEditImageUpload(files, uploadType)}
+              onSave={handleUpdateImages}
+              isSaving={isUpdatingImages}
+              saveButtonColor={color}
+            />
+          ))}
 
           {/* Image Viewer Modal */}
           <ImageViewerModal

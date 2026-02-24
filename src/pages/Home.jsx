@@ -746,7 +746,7 @@ function Home() {
           },
           {
             path: "/Launch-washing-machine-test",
-            roles: ["QC Washing", "QA"],
+            roles: ["Washing Testing"],
             image: "assets/Home/Launch-washing-machine-test.png",
             title: "Launch Washing Machine Test",
             description: "Launch Washing Machine Test",

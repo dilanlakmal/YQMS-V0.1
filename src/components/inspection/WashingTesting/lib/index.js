@@ -32,6 +32,7 @@ export { default as EditReportModal } from '../washing-modal/EditReportModal';
 export { default as QRCodeModal } from '../washing-modal/QRCodeModal';
 export { default as QRScannerModal } from '../washing-modal/QRScannerModal';
 export { default as DeleteConfirmationModal } from '../washing-modal/DeleteConfirmationModal';
+export { default as RejectReportModal } from '../washing-modal/RejectReportModal';
 export { default as EditImagesModal } from '../washing-modal/EditImagesModal';
 
 // =============================================================================

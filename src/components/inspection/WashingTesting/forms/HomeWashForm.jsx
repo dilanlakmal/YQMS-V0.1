@@ -221,6 +221,19 @@ const HomeWashForm = ({
             COLOR
           </label>
           <div className="relative">
+            {isCompleting ? (
+              <div
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300 text-gray-700"
+                title={Array.isArray(formData.color) && formData.color?.length > 0 ? formData.color.join(", ") : ""}
+              >
+                <span className="truncate block">
+                  {formData.color?.length > 0
+                    ? `${formData.color.length} color(s) selected`
+                    : "No colors selected"}
+                </span>
+              </div>
+            ) : (
+            <>
             <button
               type="button"
               onClick={() => setShowColorDropdown(!showColorDropdown)}
@@ -388,6 +401,8 @@ const HomeWashForm = ({
                   </div>
                 </div>
               )}
+            </>
+            )}
           </div>
           {formData.ymStyle && filteredColors.length > 0 && (
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -803,38 +818,34 @@ const HomeWashForm = ({
               {formData.images.length}/5 images
             </span>
           </div>
-          <div className="mt-1 space-y-4">
-            {/* Image Preview Area */}
+          <div className="mt-1">
+            {/* Image Preview Area - compact flex thumbnails */}
             {formData.images.length > 0 ? (
-              <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
                 {formData.images.map((imageFile, index) => {
                   const imageUrl = URL.createObjectURL(imageFile);
                   return (
                     <div
                       key={index}
-                      className="relative border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50/50 dark:bg-gray-800/50 p-3"
+                      className="relative w-20 h-20 sm:w-24 sm:h-24 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50 flex-shrink-0 group"
                     >
-                      <div className="relative w-full flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-md overflow-hidden">
-                        <img
-                          src={imageUrl}
-                          alt={`Preview ${index + 1}`}
-                          className="max-w-xs max-h-64 object-contain rounded-md"
-                        />
-                        <div className="absolute top-2 right-2 flex gap-2 z-10">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              URL.revokeObjectURL(imageUrl);
-                              handleRemoveImage(index);
-                            }}
-                            className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
-                            aria-label="Remove image"
-                            title="Remove"
-                          >
-                            <X size={18} />
-                          </button>
-                        </div>
-                      </div>
+                      <img
+                        src={imageUrl}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          URL.revokeObjectURL(imageUrl);
+                          handleRemoveImage(index);
+                        }}
+                        className="absolute top-0.5 right-0.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                        aria-label="Remove image"
+                        title="Remove"
+                      >
+                        <X size={14} />
+                      </button>
                     </div>
                   );
                 })}

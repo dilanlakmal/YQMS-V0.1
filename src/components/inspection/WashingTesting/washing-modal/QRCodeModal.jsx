@@ -1,5 +1,5 @@
-import React, { useRef, useEffect } from "react";
-import { X, Upload, Waves, Droplets, Printer, Camera } from "lucide-react";
+import React, { useRef, useState, useEffect } from "react";
+import { X, Upload, Printer, Camera, Download } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import "./QRCodeModal.css";
 
@@ -16,6 +16,11 @@ const QRCodeModal = ({
   isLocked = false,
 }) => {
   const qrCodeContainerRef = useRef(null);
+  const [hideQR, setHideQR] = useState(false);
+  // Unassigned users (isLocked) can't scan — default to hiding QR; they use Print/Download only
+  useEffect(() => {
+    if (isOpen && reportId) setHideQR(!!isLocked);
+  }, [isOpen, reportId, isLocked]);
   // Animated Logo Component for the QR center
   const QRLogoAnimated = () => (
     <div className="w-10 h-10 flex items-center justify-center bg-white rounded-md shadow-[0_4px_12px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.05)] dark:bg-gray-800 overflow-hidden relative group">
@@ -70,9 +75,11 @@ const QRCodeModal = ({
               <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
                 Set Report Date for ID: <span className="text-indigo-500 font-mono">#{reportId}</span>
               </p>
+              
             </div>
 
-            {/* QR Code Container with Animations */}
+            {/* QR Code Container with Animations - can be hidden */}
+            {!hideQR && (
             <div className="relative group perspective-1000">
               <div className="qr-glow group-hover:bg-blue-500/20 transition-all duration-500"></div>
 
@@ -125,6 +132,8 @@ const QRCodeModal = ({
               </div>
 
             </div>
+            )}
+           
 
             {!isLocked && (
               <div className="mt-0 flex justify-center">
@@ -160,6 +169,18 @@ const QRCodeModal = ({
                 <Printer size={18} className="group-hover:rotate-12 transition-transform" />
                 <span className="font-bold text-sm tracking-wide">Print QR Stamp</span>
               </button>
+
+              {isLocked && (
+                <button
+                  type="button"
+                  onClick={() => onDownloadQRCode(reportId)}
+                  className="group relative w-full px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden shadow-lg hover:shadow-indigo-500/25 active:scale-95"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
+                  <Download size={18} className="group-hover:scale-110 transition-transform" />
+                  <span className="font-bold text-sm tracking-wide">Download QR</span>
+                </button>
+              )}
 
               {!isLocked && (
                 <>

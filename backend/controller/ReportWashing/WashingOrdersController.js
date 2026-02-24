@@ -203,9 +203,10 @@ export const getWashingOrderDetailsStrict = async (req, res) => {
         const { moNo } = req.params;
         // Querying the dt_orders collection using the ymProdConnection (same as ymEco defined in other files)
 
-        const order = await ymProdConnection.db
-            .collection("dt_orders")
-            .findOne({ Order_No: moNo });
+        const [order, yorksysOrder] = await Promise.all([
+            ymProdConnection.db.collection("dt_orders").findOne({ Order_No: moNo }),
+            ymProdConnection.db.collection("yorksys_orders").findOne({ moNo: moNo })
+        ]);
 
         if (!order) {
             return res
@@ -239,7 +240,8 @@ export const getWashingOrderDetailsStrict = async (req, res) => {
             origin: order.Origin || "N/A",
             totalOrderQty: order.TotalQty,
             colorOptions: colorOptions.map((c) => ({ value: c, label: c })),
-            colorQtyBySize
+            colorQtyBySize,
+            engName: yorksysOrder?.skuDescription || "",
         });
     } catch (error) {
         console.error(

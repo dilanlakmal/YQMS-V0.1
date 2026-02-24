@@ -577,6 +577,7 @@ export default function RoleManagement() {
     "P88",
     "QC Ironing",
     "Humidity QC",
+    "Washing Testing"
   ].sort();
 
   // User Roles tab data
