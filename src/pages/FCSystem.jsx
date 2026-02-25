@@ -6,10 +6,18 @@ import {
   Shield,
   Sparkles,
   Factory,
+  Palette,
+  Droplets,
+  ClipboardList,
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
 import FCMarkerRatio from "../components/inspection/FC/FCMarkerRatio";
+import FCShrinkageTest from "../components/inspection/FC/FCShrinkageTest";
+import FCDensityTest from "../components/inspection/FC/FCDensityTest";
+import FCSeperationColorList from "../components/inspection/FC/FCSeperationColorList";
+import FCCrockingTest from "../components/inspection/FC/FCCrockingTest";
+import FCSupplierEvaluation from "../components/inspection/FC/FCSupplierEvaluation";
 
 const PlaceholderComponent = ({ title, icon: Icon }) => {
   return (
@@ -45,9 +53,7 @@ const FCSystem = () => {
         id: "shrinkage-test",
         label: "Shrinkage Test",
         icon: <TrendingUp size={20} />,
-        component: (
-          <PlaceholderComponent title="Shrinkage Test" icon={TrendingUp} />
-        ),
+        component: <FCShrinkageTest />, // Updated Component
         gradient: "from-purple-500 to-pink-500",
         description: "Shrinkage test reports",
       },
@@ -55,9 +61,33 @@ const FCSystem = () => {
         id: "density-test",
         label: "Density Test",
         icon: <Layers size={20} />,
-        component: <PlaceholderComponent title="Density Test" icon={Layers} />,
+        component: <FCDensityTest />, // Updated: Now points to real component
         gradient: "from-green-500 to-emerald-500",
         description: "Density test reports",
+      },
+      {
+        id: "seperation-color", // New ID
+        label: "Seperation Color",
+        icon: <Palette size={20} />, // New Icon
+        component: <FCSeperationColorList />, // New Component
+        gradient: "from-orange-500 to-amber-500",
+        description: "Seperation color list reports",
+      },
+      {
+        id: "crocking-test", // New ID
+        label: "Crocking Test",
+        icon: <Droplets size={20} />, // New Icon
+        component: <FCCrockingTest />, // New Component
+        gradient: "from-cyan-500 to-blue-500",
+        description: "Crocking test reports",
+      },
+      {
+        id: "supplier-evaluation", // New ID
+        label: "Supplier Eval",
+        icon: <ClipboardList size={20} />, // New Icon
+        component: <FCSupplierEvaluation />, // New Component
+        gradient: "from-emerald-500 to-teal-500",
+        description: "Supplier evaluation reports",
       },
     ],
     [],
