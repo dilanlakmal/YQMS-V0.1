@@ -10,7 +10,20 @@ import {
   Layers,
   Percent,
   Tag,
-  XCircle
+  XCircle,
+  Home,
+  ArrowLeft,
+  Shield,
+  Sparkles,
+  User,
+  Plus,
+  FileText,
+  FileSpreadsheet,
+  ClipboardCheck,
+  Settings,
+  PlusCircle,
+  RotateCcw, // For Restore button
+  Trash2, // For Discard button
 } from "lucide-react"; // Added icons for stats
 
 import React, { useEffect, useRef, useState } from "react";
@@ -28,12 +41,28 @@ import CuttingMeasurementPointsModify from "../components/inspection/cutting/Cut
 import CuttingOrderModify from "../components/inspection/cutting/CuttingOrderModify";
 import MeasurementTable from "../components/inspection/cutting/MeasurementTable";
 import CuttingReportQCView from "../components/inspection/cutting/report/CuttingReportQCView";
+import { useNavigate } from "react-router-dom";
 
 import { useSearchParams } from "react-router-dom";
 
+import {
+  saveCuttingDraft,
+  loadCuttingDraft,
+  clearCuttingDraft,
+} from "../components/inspection/cutting/CuttingDBUtils";
+
 const CuttingPage = () => {
+  const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { user, loading: authLoading } = useAuth();
+
+  // --- STATE FOR DB ---
+  const [hasDraft, setHasDraft] = useState(false);
+  const [draftData, setDraftData] = useState(null);
+  const [isRestoring, setIsRestoring] = useState(true);
+  const [restoredIssuesData, setRestoredIssuesData] = useState(null);
+
+  // Other states
   const [activeTab, setActiveTab] = useState("form");
   const [inspectionDate, setInspectionDate] = useState(new Date());
   const [moNo, setMoNo] = useState("");
@@ -90,7 +119,7 @@ const CuttingPage = () => {
       rejectMeasurement: 0,
       rejectDefects: 0,
       passRate: 0,
-      bundles: []
+      bundles: [],
     },
     Middle: {
       totalParts: 0,
@@ -99,7 +128,7 @@ const CuttingPage = () => {
       rejectMeasurement: 0,
       rejectDefects: 0,
       passRate: 0,
-      bundles: []
+      bundles: [],
     },
     Bottom: {
       totalParts: 0,
@@ -108,8 +137,8 @@ const CuttingPage = () => {
       rejectMeasurement: 0,
       rejectDefects: 0,
       passRate: 0,
-      bundles: []
-    }
+      bundles: [],
+    },
   });
   const [tableData, setTableData] = useState([]);
   const [columnDefects, setColumnDefects] = useState([]);
@@ -117,7 +146,7 @@ const CuttingPage = () => {
     panelName: "",
     side: "",
     direction: "",
-    lw: ""
+    lw: "",
   });
   const [measurementPoints, setMeasurementPoints] = useState([]);
   const [fabricDefects, setFabricDefects] = useState([]);
@@ -126,7 +155,250 @@ const CuttingPage = () => {
   const [searchParams] = useSearchParams();
 
   const cuttingIssuesRef = useRef(null); // Ref for CuttingIssues component
+  const restoringRef = useRef(false); // Restoring ref
+  const lastKnownIssuesDataRef = useRef(null);
 
+  // Define your tabs configuration here to map icons and labels
+  const tabs = [
+    { id: "form", label: "Cutting Form", icon: <FileText size={18} /> },
+    { id: "data", label: "Data", icon: <FileSpreadsheet size={18} /> },
+    { id: "report", label: "Report", icon: <ClipboardCheck size={18} /> },
+    { id: "Modify", label: "Modify", icon: <Settings size={18} /> },
+    { id: "Adding", label: "Adding", icon: <PlusCircle size={18} /> },
+    { id: "db", label: "DB", icon: <Database size={18} /> },
+  ];
+
+  // Add this handler
+  const handleGoHome = () => navigate("/home");
+
+  // --- CHECK FOR DRAFT ON MOUNT ---
+  useEffect(() => {
+    const checkDB = async () => {
+      setIsRestoring(true);
+      const draft = await loadCuttingDraft();
+      if (draft && draft.totalBundleQty) {
+        // ← ADD THIS CHECK
+        setDraftData(draft);
+        setHasDraft(true);
+      } else if (draft) {
+        // Draft exists but has no meaningful data — silently clear it
+        await clearCuttingDraft();
+      }
+      setIsRestoring(false);
+    };
+    checkDB();
+  }, []);
+
+  // useEffect(() => {
+  //   const checkDB = async () => {
+  //     setIsRestoring(true);
+  //     const draft = await loadCuttingDraft();
+  //     if (draft) {
+  //       setDraftData(draft);
+  //       setHasDraft(true);
+  //     }
+  //     setIsRestoring(false);
+  //   };
+  //   checkDB();
+  // }, []);
+
+  // --- 4. RESTORE FUNCTION ---
+  const handleRestore = () => {
+    if (!draftData) return;
+
+    // SET REF TO TRUE BEFORE RESTORING
+    restoringRef.current = true;
+
+    // Restore generic fields
+    if (draftData.inspectionDate)
+      setInspectionDate(new Date(draftData.inspectionDate));
+    if (draftData.moNo) {
+      setMoNo(draftData.moNo);
+      setMoNoSearch(draftData.moNo);
+    }
+    if (draftData.tableNo) {
+      setTableNo(draftData.tableNo);
+      setTableNoSearch(draftData.tableNo);
+    }
+    if (draftData.totalBundleQty) setTotalBundleQty(draftData.totalBundleQty);
+    if (draftData.bundleQtyCheck) setBundleQtyCheck(draftData.bundleQtyCheck);
+    if (draftData.totalInspectionQty)
+      setTotalInspectionQty(draftData.totalInspectionQty);
+
+    // Restore Complex Data
+    if (draftData.cutPanelData) {
+      setCutPanelData(draftData.cutPanelData);
+      // Recalculate dependent sizes from cached data
+      const sizes =
+        draftData.cutPanelData.MarkerRatio?.filter(
+          (mr) => mr.cuttingRatio && mr.cuttingRatio > 0,
+        ).map((mr) => mr.size) || [];
+      setAvailableSizes([...new Set(sizes)]);
+      setPlanLayerQty(draftData.cutPanelData.PlanLayer || 0);
+      setTotalPlanPcs(draftData.cutPanelData.TotalPcs || 0);
+      setActualLayers(draftData.cutPanelData.ActualLayer || 0);
+    }
+
+    if (draftData.aggregatedTotalOrderQty)
+      setAggregatedTotalOrderQty(draftData.aggregatedTotalOrderQty);
+
+    // Restore Selections & Checkboxes
+    setCuttingByAuto(draftData.cuttingByAuto ?? true);
+    setCuttingByManual(draftData.cuttingByManual ?? false);
+    setSelectedPanel(draftData.selectedPanel || "");
+    setSelectedSize(draftData.selectedSize || "");
+
+    setBundleQty(draftData.bundleQty || "");
+
+    if (draftData.tolerance) setTolerance(draftData.tolerance);
+
+    // RESTORE METADATA FIRST (Prevents MeasurementTable from wiping data)
+    if (draftData.measurementPoints)
+      setMeasurementPoints(draftData.measurementPoints);
+    if (draftData.fabricDefects) setFabricDefects(draftData.fabricDefects);
+    if (draftData.panels) setPanels(draftData.panels);
+    if (draftData.panelIndexNames)
+      setPanelIndexNames(draftData.panelIndexNames);
+
+    // Restore Tables & Grids
+    if (draftData.bundleTableData)
+      setBundleTableData(draftData.bundleTableData);
+    if (draftData.colCounts) setColCounts(draftData.colCounts);
+    if (draftData.summary) setSummary(draftData.summary);
+    if (draftData.filters) setFilters(draftData.filters);
+    if (draftData.activeMeasurementTab)
+      setActiveMeasurementTab(draftData.activeMeasurementTab);
+
+    if (draftData.tableData) setTableData(draftData.tableData);
+    if (draftData.columnDefects) setColumnDefects(draftData.columnDefects);
+
+    // RESTORE CUTTING ISSUES (Comments & Bottom Table)
+    if (draftData.cuttingDefects) {
+      setRestoredIssuesData(draftData.cuttingDefects);
+      lastKnownIssuesDataRef.current = draftData.cuttingDefects; // pre-populate cache
+    }
+
+    // Close Modal
+    setHasDraft(false);
+    setDraftData(null);
+    Swal.fire({
+      icon: "success",
+      title: "Restored",
+      text: "Your previous session has been restored.",
+      timer: 1500,
+      showConfirmButton: false,
+    });
+  };
+
+  // --- 5. DISCARD FUNCTION ---
+  const handleDiscard = async () => {
+    await clearCuttingDraft();
+    setHasDraft(false);
+    setDraftData(null);
+    lastKnownIssuesDataRef.current = null;
+  };
+
+  // --- 6. AUTO-SAVE EFFECT ---
+  // We use a ref to debounce the save so it doesn't freeze the UI while typing
+  const saveTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    // Don't save if we are currently in the process of restoring or deciding
+    if (isRestoring || hasDraft) return;
+
+    // Clear previous timer
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+
+    // Set new timer (1.5 seconds after last change)
+    saveTimeoutRef.current = setTimeout(() => {
+      if (!totalBundleQty) return;
+      // Create the object to save
+      const stateToSave = {
+        inspectionDate: inspectionDate.toISOString(),
+        moNo,
+        tableNo,
+        // Save cached API data so we don't have to re-fetch immediately on restore
+        cutPanelData,
+        aggregatedTotalOrderQty,
+        // Form inputs
+        totalBundleQty,
+        bundleQtyCheck,
+        totalInspectionQty,
+        cuttingByAuto,
+        cuttingByManual,
+        selectedPanel,
+        selectedSize,
+        bundleQty,
+        tolerance,
+        // Big Data Tables
+        bundleTableData,
+        tableData,
+        colCounts,
+        columnDefects,
+        summary,
+        filters,
+        activeMeasurementTab,
+        // CACHE METADATA (Crucial for Measurement Table to work offline/restore)
+        measurementPoints,
+        fabricDefects,
+        panels,
+        panelIndexNames,
+
+        // CAPTURE ISSUES DATA
+        cuttingDefects: cuttingIssuesRef.current
+          ? (() => {
+              const data = cuttingIssuesRef.current.getIssuesData();
+              lastKnownIssuesDataRef.current = data; // cache it
+              return data;
+            })()
+          : lastKnownIssuesDataRef.current,
+      };
+
+      saveCuttingDraft(stateToSave);
+      // Optional: console.log("Draft saved to IndexDB");
+    }, 1500);
+
+    return () => clearTimeout(saveTimeoutRef.current);
+  }, [
+    // Add ALL dependencies that should trigger a save
+    inspectionDate,
+    moNo,
+    tableNo,
+    cutPanelData,
+    aggregatedTotalOrderQty,
+    totalBundleQty,
+    bundleQtyCheck,
+    totalInspectionQty,
+    cuttingByAuto,
+    cuttingByManual,
+    selectedPanel,
+    selectedSize,
+    bundleQty,
+    tolerance,
+    bundleTableData,
+    tableData,
+    colCounts,
+    columnDefects,
+    summary,
+    filters,
+    activeMeasurementTab,
+    isRestoring,
+    hasDraft,
+  ]);
+
+  // Auto-discard stale draft if user begins a new inspection without clicking Discard
+  useEffect(() => {
+    if (hasDraft && (moNo || tableNo || totalBundleQty)) {
+      clearCuttingDraft();
+      setHasDraft(false);
+      setDraftData(null);
+      lastKnownIssuesDataRef.current = null;
+    }
+  }, [moNo, tableNo, totalBundleQty]);
+
+  //-----------------------------------------------------------------
+
+  // Use effect to fetch data based on selected MO and Table
   useEffect(() => {
     const notifMoNo = searchParams.get("moNo");
     const notifTableNo = searchParams.get("tableNo");
@@ -158,8 +430,8 @@ const CuttingPage = () => {
           {
             params: { search: moNoSearch },
             headers: { "Content-Type": "application/json" },
-            withCredentials: true
-          }
+            withCredentials: true,
+          },
         );
         setMoNoOptions(response.data);
         setShowMoNoDropdown(response.data.length > 0);
@@ -170,7 +442,7 @@ const CuttingPage = () => {
         Swal.fire({
           icon: "error",
           title: t("cutting.error"),
-          text: t("cutting.failedToFetchMONumbers")
+          text: t("cutting.failedToFetchMONumbers"),
         });
       }
     };
@@ -190,8 +462,8 @@ const CuttingPage = () => {
           {
             params: { styleNo: moNo },
             headers: { "Content-Type": "application/json" },
-            withCredentials: true
-          }
+            withCredentials: true,
+          },
         );
         setAggregatedTotalOrderQty(response.data.aggregatedTotalOrderQty);
       } catch (error) {
@@ -218,8 +490,8 @@ const CuttingPage = () => {
           {
             params: { styleNo: moNo },
             headers: { "Content-Type": "application/json" },
-            withCredentials: true
-          }
+            withCredentials: true,
+          },
         );
         setTableNoOptions(response.data);
       } catch (error) {
@@ -228,7 +500,7 @@ const CuttingPage = () => {
         Swal.fire({
           icon: "error",
           title: t("cutting.error"),
-          text: t("cutting.failedToFetchTableNos")
+          text: t("cutting.failedToFetchTableNos"),
         });
       }
     };
@@ -265,15 +537,15 @@ const CuttingPage = () => {
           {
             params: { styleNo: moNo, tableNo },
             headers: { "Content-Type": "application/json" },
-            withCredentials: true
-          }
+            withCredentials: true,
+          },
         );
         setCutPanelData(response.data);
         const sizes = response.data.MarkerRatio.filter(
           (mr) =>
             mr.cuttingRatio !== null &&
             mr.cuttingRatio !== "" &&
-            mr.cuttingRatio > 0
+            mr.cuttingRatio > 0,
         ).map((mr) => mr.size);
         setAvailableSizes([...new Set(sizes)]);
         setPlanLayerQty(response.data.PlanLayer || 0);
@@ -286,7 +558,7 @@ const CuttingPage = () => {
         Swal.fire({
           icon: "error",
           title: t("cutting.error"),
-          text: t("cutting.failedToFetchCutPanelData")
+          text: t("cutting.failedToFetchCutPanelData"),
         });
       }
     };
@@ -308,8 +580,8 @@ const CuttingPage = () => {
           {
             params: { moNo, tableNo, garmentType: selectedPanel },
             headers: { "Content-Type": "application/json" },
-            withCredentials: true
-          }
+            withCredentials: true,
+          },
         );
         setInspectionProgress(response.data.progress);
         setInspectedSizes(response.data.inspectedSizes || []);
@@ -320,7 +592,7 @@ const CuttingPage = () => {
         Swal.fire({
           icon: "error",
           title: t("cutting.error"),
-          text: t("cutting.failedToFetchInspectionProgress")
+          text: t("cutting.failedToFetchInspectionProgress"),
         });
       }
     };
@@ -376,7 +648,7 @@ const CuttingPage = () => {
           const response = await axios.get(`${API_BASE_URL}/api/aql-details`, {
             params: { lotSize: multiplication },
             headers: { "Content-Type": "application/json" },
-            withCredentials: true
+            withCredentials: true,
           });
           setAQLDetails(response.data);
         } catch (error) {
@@ -400,16 +672,20 @@ const CuttingPage = () => {
   }, [bundleQtyCheck, isTotalInspectionQtyManual]);
 
   useEffect(() => {
+    // IF RESTORING, DO NOT WIPE DATA
+    if (restoringRef.current) {
+      return;
+    }
     const newBundleQty = parseInt(bundleQty) || 0;
     const newTableData = Array.from({ length: newBundleQty }, () => ({
       Top: [],
       Middle: [],
-      Bottom: []
+      Bottom: [],
     }));
     const newColCounts = Array.from({ length: newBundleQty }, () => ({
       Top: 5,
       Middle: 5,
-      Bottom: 5
+      Bottom: 5,
     }));
     const newColumnDefects = Array.from({ length: newBundleQty }, () => ({
       Top: Array(5)
@@ -420,7 +696,7 @@ const CuttingPage = () => {
         .map(() => Array(5).fill([])),
       Bottom: Array(5)
         .fill([])
-        .map(() => Array(5).fill([]))
+        .map(() => Array(5).fill([])),
     }));
     setTableData(newTableData);
     setColCounts(newColCounts);
@@ -433,7 +709,7 @@ const CuttingPage = () => {
         rejectMeasurement: 0,
         rejectDefects: 0,
         passRate: 0,
-        bundles: Array(newBundleQty).fill(null)
+        bundles: Array(newBundleQty).fill(null),
       },
       Middle: {
         totalParts: 0,
@@ -442,7 +718,7 @@ const CuttingPage = () => {
         rejectMeasurement: 0,
         rejectDefects: 0,
         passRate: 0,
-        bundles: Array(newBundleQty).fill(null)
+        bundles: Array(newBundleQty).fill(null),
       },
       Bottom: {
         totalParts: 0,
@@ -451,8 +727,8 @@ const CuttingPage = () => {
         rejectMeasurement: 0,
         rejectDefects: 0,
         passRate: 0,
-        bundles: Array(newBundleQty).fill(null)
-      }
+        bundles: Array(newBundleQty).fill(null),
+      },
     });
     setFilters({ panelName: "", side: "", direction: "", lw: "" });
   }, [bundleQty, selectedPanel]);
@@ -461,7 +737,7 @@ const CuttingPage = () => {
     const newColCounts = bundleTableData.map((row) => ({
       Top: parseInt(row.tValue) || 5,
       Middle: parseInt(row.mValue) || 5,
-      Bottom: parseInt(row.bValue) || 5
+      Bottom: parseInt(row.bValue) || 5,
     }));
 
     // Only update colCounts if they actually changed
@@ -475,7 +751,7 @@ const CuttingPage = () => {
         const currentBundleData = bundleData || {
           Top: [],
           Middle: [],
-          Bottom: []
+          Bottom: [],
         };
         const updatedBundleData = { ...currentBundleData };
 
@@ -487,7 +763,7 @@ const CuttingPage = () => {
             if (row.values.length !== targetColCount) {
               const newValues = Array(targetColCount).fill({
                 decimal: 0,
-                fraction: "0"
+                fraction: "0",
               });
               for (
                 let i = 0;
@@ -511,14 +787,14 @@ const CuttingPage = () => {
         const currentBundleDefects = bundleDefects || {
           Top: [],
           Middle: [],
-          Bottom: []
+          Bottom: [],
         };
         const updatedBundleDefects = { ...currentBundleDefects };
         const maxPanelIndexForCurrentPanel = Math.max(
           1,
           ...measurementPoints
             .filter((mp) => mp.panel === selectedPanel)
-            .map((mp) => mp.panelIndex)
+            .map((mp) => mp.panelIndex),
         );
 
         ["Top", "Middle", "Bottom"].forEach((tab) => {
@@ -534,7 +810,7 @@ const CuttingPage = () => {
               newTabDefects.push(
                 Array(maxPanelIndexForCurrentPanel)
                   .fill(null)
-                  .map(() => [])
+                  .map(() => []),
               );
             }
           }
@@ -573,8 +849,8 @@ const CuttingPage = () => {
           `${API_BASE_URL}/api/cutting-measurement-panels`,
           {
             headers: { "Content-Type": "application/json" },
-            withCredentials: true
-          }
+            withCredentials: true,
+          },
         );
         setPanels(response.data);
       } catch (error) {
@@ -582,7 +858,7 @@ const CuttingPage = () => {
         Swal.fire({
           icon: "error",
           title: t("cutting.error"),
-          text: t("cutting.failedToFetchPanels")
+          text: t("cutting.failedToFetchPanels"),
         });
       }
     };
@@ -601,8 +877,8 @@ const CuttingPage = () => {
           {
             params: { moNo, panel: selectedPanel },
             headers: { "Content-Type": "application/json" },
-            withCredentials: true
-          }
+            withCredentials: true,
+          },
         );
         // Log the actual data received from the API
         console.log("Fetched panelIndexNames data:", response.data);
@@ -613,7 +889,7 @@ const CuttingPage = () => {
         Swal.fire({
           icon: "error",
           title: t("cutting.error"),
-          text: t("cutting.failedToFetchPanelIndexNames")
+          text: t("cutting.failedToFetchPanelIndexNames"),
         });
       }
     };
@@ -632,8 +908,8 @@ const CuttingPage = () => {
           {
             params: { moNo, panel: selectedPanel },
             headers: { "Content-Type": "application/json" },
-            withCredentials: true
-          }
+            withCredentials: true,
+          },
         );
         // Fetch Common measurement points
         const commonResponse = await axios.get(
@@ -641,8 +917,8 @@ const CuttingPage = () => {
           {
             params: { moNo: "Common", panel: selectedPanel },
             headers: { "Content-Type": "application/json" },
-            withCredentials: true
-          }
+            withCredentials: true,
+          },
         );
         // Combine and deduplicate measurement points, prioritizing specific moNo
         const combinedPoints = [...response.data];
@@ -651,7 +927,7 @@ const CuttingPage = () => {
             !combinedPoints.some(
               (p) =>
                 p.panelIndexName === commonPoint.panelIndexName &&
-                p.pointNameEng === commonPoint.pointNameEng
+                p.pointNameEng === commonPoint.pointNameEng,
             )
           ) {
             combinedPoints.push(commonPoint);
@@ -664,7 +940,7 @@ const CuttingPage = () => {
         Swal.fire({
           icon: "error",
           title: t("cutting.error"),
-          text: t("cutting.failedToFetchMeasurementPoints")
+          text: t("cutting.failedToFetchMeasurementPoints"),
         });
       }
     };
@@ -679,8 +955,8 @@ const CuttingPage = () => {
           `${API_BASE_URL}/api/cutting-fabric-defects`,
           {
             headers: { "Content-Type": "application/json" },
-            withCredentials: true
-          }
+            withCredentials: true,
+          },
         );
         setFabricDefects(response.data);
       } catch (error) {
@@ -688,7 +964,7 @@ const CuttingPage = () => {
         Swal.fire({
           icon: "error",
           title: t("cutting.error"),
-          text: t("cutting.failedToFetchDefects")
+          text: t("cutting.failedToFetchDefects"),
         });
       }
     };
@@ -729,7 +1005,7 @@ const CuttingPage = () => {
         rejectMeasurement: 0,
         rejectDefects: 0,
         passRate: 0,
-        bundles: []
+        bundles: [],
       },
       Middle: {
         totalParts: 0,
@@ -738,7 +1014,7 @@ const CuttingPage = () => {
         rejectMeasurement: 0,
         rejectDefects: 0,
         passRate: 0,
-        bundles: []
+        bundles: [],
       },
       Bottom: {
         totalParts: 0,
@@ -747,8 +1023,8 @@ const CuttingPage = () => {
         rejectMeasurement: 0,
         rejectDefects: 0,
         passRate: 0,
-        bundles: []
-      }
+        bundles: [],
+      },
     });
     setTableData([]);
     setColumnDefects([]);
@@ -756,6 +1032,7 @@ const CuttingPage = () => {
     setInspectionProgress(null); // Reset progress
     setInspectedSizes([]); // Reset inspected sizes
     setBundleQtyError(""); // Reset bundle qty error
+    lastKnownIssuesDataRef.current = null;
   };
 
   const resetMeasurementData = () => {
@@ -768,7 +1045,7 @@ const CuttingPage = () => {
         rejectMeasurement: 0,
         rejectDefects: 0,
         passRate: 0,
-        bundles: Array(newBundleQty).fill(null)
+        bundles: Array(newBundleQty).fill(null),
       },
       Middle: {
         totalParts: 0,
@@ -777,7 +1054,7 @@ const CuttingPage = () => {
         rejectMeasurement: 0,
         rejectDefects: 0,
         passRate: 0,
-        bundles: Array(newBundleQty).fill(null)
+        bundles: Array(newBundleQty).fill(null),
       },
       Bottom: {
         totalParts: 0,
@@ -786,15 +1063,15 @@ const CuttingPage = () => {
         rejectMeasurement: 0,
         rejectDefects: 0,
         passRate: 0,
-        bundles: Array(newBundleQty).fill(null)
-      }
+        bundles: Array(newBundleQty).fill(null),
+      },
     });
     setTableData(
       Array.from({ length: newBundleQty }, () => ({
         Top: [],
         Middle: [],
-        Bottom: []
-      }))
+        Bottom: [],
+      })),
     );
     setColumnDefects(
       Array.from({ length: newBundleQty }, (_, i) => ({
@@ -806,8 +1083,8 @@ const CuttingPage = () => {
           .map(() => Array(5).fill([])),
         Bottom: Array(colCounts[i]?.Bottom || 5)
           .fill([])
-          .map(() => Array(5).fill([]))
-      }))
+          .map(() => Array(5).fill([])),
+      })),
     );
     setFilters({ panelName: "", side: "", direction: "", lw: "" });
   };
@@ -818,12 +1095,12 @@ const CuttingPage = () => {
     tableDataTab,
     defectsTab,
     tolerance,
-    numColumns
+    numColumns,
   ) => {
     const usedPanelIndices = [
       ...new Set(
-        tableDataTab.filter((row) => row.isUsed).map((row) => row.panelIndex)
-      )
+        tableDataTab.filter((row) => row.isUsed).map((row) => row.panelIndex),
+      ),
     ];
     return usedPanelIndices.map((panelIndex) => {
       let totalMeasurementDefects = 0;
@@ -862,16 +1139,16 @@ const CuttingPage = () => {
                 value.decimal !== null &&
                 (value.decimal < tolerance.min || value.decimal > tolerance.max)
                   ? "Fail"
-                  : "Pass"
-            }))
+                  : "Pass",
+            })),
           })),
         defectData: Array.from({ length: numColumns }, (_, colIndex) => ({
           column: `${tab[0]}${colIndex + 1}`,
           defects: defectsTab[colIndex][panelIndex - 1].map((d) => ({
             defectName: d.defectName,
-            defectQty: d.count
-          }))
-        }))
+            defectQty: d.count,
+          })),
+        })),
       };
     });
   };
@@ -904,7 +1181,7 @@ const CuttingPage = () => {
       Swal.fire({
         icon: "warning",
         title: t("cutting.missingInformation"),
-        text: t("cutting.fillRequiredFields")
+        text: t("cutting.fillRequiredFields"),
       });
       return;
     }
@@ -923,18 +1200,18 @@ const CuttingPage = () => {
       top: bundleTableData.reduce(
         (acc, bundle) =>
           acc + bundle.parts.length * (parseInt(bundle.tValue) || 5),
-        0
+        0,
       ),
       middle: bundleTableData.reduce(
         (acc, bundle) =>
           acc + bundle.parts.length * (parseInt(bundle.mValue) || 5),
-        0
+        0,
       ),
       bottom: bundleTableData.reduce(
         (acc, bundle) =>
           acc + bundle.parts.length * (parseInt(bundle.bValue) || 5),
-        0
-      )
+        0,
+      ),
     };
 
     const totalReject =
@@ -946,7 +1223,7 @@ const CuttingPage = () => {
       total: totalReject,
       top: summary.Top.totalReject,
       middle: summary.Middle.totalReject,
-      bottom: summary.Bottom.totalReject
+      bottom: summary.Bottom.totalReject,
     };
 
     // Calculate passSize as pcsSize - rejectSize
@@ -954,14 +1231,14 @@ const CuttingPage = () => {
       total: totalPcsSize - totalReject,
       top: pcsSize.top - summary.Top.totalReject,
       middle: pcsSize.middle - summary.Middle.totalReject,
-      bottom: pcsSize.bottom - summary.Bottom.totalReject
+      bottom: pcsSize.bottom - summary.Bottom.totalReject,
     };
 
     if (!totalPcsSize || !bundleTableData.length) {
       Swal.fire({
         icon: "warning",
         title: t("cutting.invalidData"),
-        text: t("cutting.missingInspectionData")
+        text: t("cutting.missingInspectionData"),
       });
       return;
     }
@@ -989,7 +1266,7 @@ const CuttingPage = () => {
           summary.Bottom.rejectDefects,
         top: summary.Top.rejectDefects,
         middle: summary.Middle.rejectDefects,
-        bottom: summary.Bottom.rejectDefects
+        bottom: summary.Bottom.rejectDefects,
       },
 
       rejectMeasurementSize: {
@@ -999,7 +1276,7 @@ const CuttingPage = () => {
           summary.Bottom.rejectMeasurement,
         top: summary.Top.rejectMeasurement,
         middle: summary.Middle.rejectMeasurement,
-        bottom: summary.Bottom.rejectMeasurement
+        bottom: summary.Bottom.rejectMeasurement,
       },
       passrateSize: {
         total:
@@ -1017,7 +1294,7 @@ const CuttingPage = () => {
         bottom:
           pcsSize.bottom > 0
             ? parseFloat(((passSize.bottom / pcsSize.bottom) * 100).toFixed(2))
-            : 0
+            : 0,
       },
 
       bundleInspectionData: bundleTableData.map((bundle, bundleIndex) => ({
@@ -1028,7 +1305,7 @@ const CuttingPage = () => {
           total: calculateTotalPcs(bundle),
           top: bundle.parts.length * (parseInt(bundle.tValue) || 5),
           middle: bundle.parts.length * (parseInt(bundle.mValue) || 5),
-          bottom: bundle.parts.length * (parseInt(bundle.bValue) || 5)
+          bottom: bundle.parts.length * (parseInt(bundle.bValue) || 5),
         },
         pass: {
           total:
@@ -1044,7 +1321,7 @@ const CuttingPage = () => {
             (summary.Middle.bundles[bundleIndex]?.totalReject || 0),
           bottom:
             bundle.parts.length * (parseInt(bundle.bValue) || 5) -
-            (summary.Bottom.bundles[bundleIndex]?.totalReject || 0)
+            (summary.Bottom.bundles[bundleIndex]?.totalReject || 0),
         },
         reject: {
           total:
@@ -1053,7 +1330,7 @@ const CuttingPage = () => {
             (summary.Bottom.bundles[bundleIndex]?.totalReject || 0),
           top: summary.Top.bundles[bundleIndex]?.totalReject || 0,
           middle: summary.Middle.bundles[bundleIndex]?.totalReject || 0,
-          bottom: summary.Bottom.bundles[bundleIndex]?.totalReject || 0
+          bottom: summary.Bottom.bundles[bundleIndex]?.totalReject || 0,
         },
         rejectGarment: {
           total:
@@ -1062,7 +1339,7 @@ const CuttingPage = () => {
             (summary.Bottom.bundles[bundleIndex]?.rejectDefects || 0),
           top: summary.Top.bundles[bundleIndex]?.rejectDefects || 0,
           middle: summary.Middle.bundles[bundleIndex]?.rejectDefects || 0,
-          bottom: summary.Bottom.bundles[bundleIndex]?.rejectDefects || 0
+          bottom: summary.Bottom.bundles[bundleIndex]?.rejectDefects || 0,
         },
 
         rejectMeasurement: {
@@ -1072,7 +1349,7 @@ const CuttingPage = () => {
             (summary.Bottom.bundles[bundleIndex]?.rejectMeasurement || 0),
           top: summary.Top.bundles[bundleIndex]?.rejectMeasurement || 0,
           middle: summary.Middle.bundles[bundleIndex]?.rejectMeasurement || 0,
-          bottom: summary.Bottom.bundles[bundleIndex]?.rejectMeasurement || 0
+          bottom: summary.Bottom.bundles[bundleIndex]?.rejectMeasurement || 0,
         },
         passrate: {
           total:
@@ -1087,7 +1364,7 @@ const CuttingPage = () => {
                           0))) /
                       calculateTotalPcs(bundle)) *
                     100
-                  ).toFixed(2)
+                  ).toFixed(2),
                 )
               : 0,
           top:
@@ -1098,7 +1375,7 @@ const CuttingPage = () => {
                       (summary.Top.bundles[bundleIndex]?.totalReject || 0)) /
                       (bundle.parts.length * (parseInt(bundle.tValue) || 5))) *
                     100
-                  ).toFixed(2)
+                  ).toFixed(2),
                 )
               : 0,
           middle:
@@ -1109,7 +1386,7 @@ const CuttingPage = () => {
                       (summary.Middle.bundles[bundleIndex]?.totalReject || 0)) /
                       (bundle.parts.length * (parseInt(bundle.mValue) || 5))) *
                     100
-                  ).toFixed(2)
+                  ).toFixed(2),
                 )
               : 0,
           bottom:
@@ -1120,13 +1397,13 @@ const CuttingPage = () => {
                       (summary.Bottom.bundles[bundleIndex]?.totalReject || 0)) /
                       (bundle.parts.length * (parseInt(bundle.bValue) || 5))) *
                     100
-                  ).toFixed(2)
+                  ).toFixed(2),
                 )
-              : 0
+              : 0,
         },
         measurementInsepctionData: bundle.parts.map((partName) => {
           const partInfo = panelIndexNames.find(
-            (p) => p.panelIndexName === partName
+            (p) => p.panelIndexName === partName,
           );
           return {
             partName,
@@ -1147,7 +1424,8 @@ const CuttingPage = () => {
                     measurements: (tableData[bundleIndex]?.[location] || [])
                       .filter(
                         (row) =>
-                          row.measurementPoint === mp.pointNameEng && row.isUsed
+                          row.measurementPoint === mp.pointNameEng &&
+                          row.isUsed,
                       )
                       .flatMap((row) =>
                         row.values.map((val, idx) => ({
@@ -1158,11 +1436,11 @@ const CuttingPage = () => {
                             val.decimal < tolerance.min ||
                             val.decimal > tolerance.max
                               ? "Fail"
-                              : "Pass"
-                        }))
-                      )
-                  })
-                )
+                              : "Pass",
+                        })),
+                      ),
+                  }),
+                ),
               })),
             fabricDefects: ["Top", "Middle", "Bottom"].map((location) => {
               // Determine number of pieces for this location (e.g., T1 to T5)
@@ -1189,38 +1467,38 @@ const CuttingPage = () => {
                         typeof d.defectName === "string" &&
                         d.defectName.trim() !== "" &&
                         d.count != null &&
-                        Number(d.count) > 0
+                        Number(d.count) > 0,
                     );
                   return {
                     pcsName: `${location[0]}${colIdx + 1}`,
                     totalDefects: validDefects.reduce(
                       (sum, d) => sum + Number(d.count),
-                      0
+                      0,
                     ),
                     defects: validDefects.map((d) => ({
                       defectName: d.defectName.trim(),
-                      defectQty: Number(d.count)
-                    }))
+                      defectQty: Number(d.count),
+                    })),
                   };
-                }
+                },
               );
               return {
                 location,
-                defectData
+                defectData,
               };
-            })
+            }),
           };
-        })
+        }),
       })),
 
       cuttingDefects: {
         issues: cuttingIssuesData.issues,
         additionalComments: cuttingIssuesData.additionalComments,
-        additionalImages: cuttingIssuesData.additionalImages
+        additionalImages: cuttingIssuesData.additionalImages,
       },
       inspectionTime: new Date().toLocaleTimeString("en-US", { hour12: false }),
       created_at: new Date(), // Add timestamps to inspectionData
-      updated_at: new Date()
+      updated_at: new Date(),
     };
 
     const report = {
@@ -1249,7 +1527,7 @@ const CuttingPage = () => {
         unit: cutPanelData?.Unit || "",
         grossKgs: cutPanelData?.GrossKgs || 0,
         netKgs: cutPanelData?.NetKgs || 0,
-        totalTTLRoll: cutPanelData?.TotalTTLRoll || 0
+        totalTTLRoll: cutPanelData?.TotalTTLRoll || 0,
       },
       cuttingTableDetails: {
         spreadTable: cutPanelData?.SpreadTable || "",
@@ -1258,25 +1536,25 @@ const CuttingPage = () => {
         actualLayers: actualLayers,
         totalPcs: totalPlanPcs,
         mackerNo: cutPanelData?.MackerNo || "",
-        mackerLength: cutPanelData?.MackerLength || 0
+        mackerLength: cutPanelData?.MackerLength || 0,
       },
       mackerRatio:
         cutPanelData?.MarkerRatio.filter(
           (mr) =>
             mr.cuttingRatio !== null &&
             mr.cuttingRatio !== 0 &&
-            mr.cuttingRatio !== ""
+            mr.cuttingRatio !== "",
         ).map((data, index) => ({
           index: index + 1,
           markerSize: data.size,
-          ratio: data.cuttingRatio
+          ratio: data.cuttingRatio,
         })) || [],
       totalBundleQty: parseInt(totalBundleQty),
       bundleQtyCheck: parseInt(bundleQtyCheck),
       totalInspectionQty,
       cuttingtype,
       garmentType: selectedPanel,
-      inspectionData: [inspectionData] // Wrap in array as schema expects an array
+      inspectionData: [inspectionData], // Wrap in array as schema expects an array
     };
 
     try {
@@ -1285,13 +1563,19 @@ const CuttingPage = () => {
         report,
         {
           headers: { "Content-Type": "application/json" },
-          withCredentials: true // Add for CORS/auth
-        }
+          withCredentials: true, // Add for CORS/auth
+        },
       );
+
+      await clearCuttingDraft(); // Clear the IndexedDB
+      setHasDraft(false); // Update local state
+      setDraftData(null); // Clear local draft data
+      lastKnownIssuesDataRef.current = null;
+
       Swal.fire({
         icon: "success",
         title: t("cutting.success"),
-        text: t("cutting.dataSaved")
+        text: t("cutting.dataSaved"),
       });
 
       // Reset form and refresh inspected sizes
@@ -1308,7 +1592,7 @@ const CuttingPage = () => {
           rejectMeasurement: 0,
           rejectDefects: 0,
           passRate: 0,
-          bundles: []
+          bundles: [],
         },
         Middle: {
           totalParts: 0,
@@ -1317,7 +1601,7 @@ const CuttingPage = () => {
           rejectMeasurement: 0,
           rejectDefects: 0,
           passRate: 0,
-          bundles: []
+          bundles: [],
         },
         Bottom: {
           totalParts: 0,
@@ -1326,8 +1610,8 @@ const CuttingPage = () => {
           rejectMeasurement: 0,
           rejectDefects: 0,
           passRate: 0,
-          bundles: []
-        }
+          bundles: [],
+        },
       });
       setActiveMeasurementTab("Top");
       setFilters({ panelName: "", side: "", direction: "", lw: "" });
@@ -1339,8 +1623,8 @@ const CuttingPage = () => {
         {
           params: { moNo, tableNo, garmentType: selectedPanel },
           headers: { "Content-Type": "application/json" },
-          withCredentials: true
-        }
+          withCredentials: true,
+        },
       );
       setInspectedSizes(progressResponse.data.inspectedSizes || []);
       setInspectionProgress(progressResponse.data.progress);
@@ -1349,25 +1633,25 @@ const CuttingPage = () => {
       Swal.fire({
         icon: "error",
         title: t("cutting.error"),
-        text: error.response?.data?.message || t("cutting.failedToSaveData")
+        text: error.response?.data?.message || t("cutting.failedToSaveData"),
       });
     }
   };
 
   const filteredMeasurementPoints = measurementPoints.filter(
-    (point) => point.panel === selectedPanel
+    (point) => point.panel === selectedPanel,
   );
   const serialLetters = Array.from({ length: 26 }, (_, i) =>
-    String.fromCharCode(65 + i)
+    String.fromCharCode(65 + i),
   );
   const toleranceOptions = [
     { label: "-1/16, 1/16", value: { min: -0.0625, max: 0.0625 } },
-    { label: "-1/8, 1/8", value: { min: -0.125, max: 0.125 } }
+    { label: "-1/8, 1/8", value: { min: -0.125, max: 0.125 } },
   ];
 
   const handleToleranceChange = (e) => {
     const selectedOption = toleranceOptions.find(
-      (option) => option.label === e.target.value
+      (option) => option.label === e.target.value,
     );
     if (selectedOption) setTolerance(selectedOption.value);
   };
@@ -1388,7 +1672,7 @@ const CuttingPage = () => {
       const newColCounts = [...prev];
       newColCounts[bundleIndex] = {
         ...newColCounts[bundleIndex],
-        [tab]: newCount
+        [tab]: newCount,
       };
       return newColCounts;
     });
@@ -1418,23 +1702,23 @@ const CuttingPage = () => {
 
         const totalParts = newSummary[tab].bundles.reduce(
           (acc, curr) => acc + (curr?.totalParts || 0),
-          0
+          0,
         );
         const totalPass = newSummary[tab].bundles.reduce(
           (acc, curr) => acc + (curr?.totalPass || 0),
-          0
+          0,
         );
         const totalReject = newSummary[tab].bundles.reduce(
           (acc, curr) => acc + (curr?.totalReject || 0),
-          0
+          0,
         );
         const rejectMeasurement = newSummary[tab].bundles.reduce(
           (acc, curr) => acc + (curr?.rejectMeasurement || 0),
-          0
+          0,
         );
         const rejectDefects = newSummary[tab].bundles.reduce(
           (acc, curr) => acc + (curr?.rejectDefects || 0),
-          0
+          0,
         );
         const passRate =
           totalParts > 0 ? ((totalPass / totalParts) * 100).toFixed(2) : 0;
@@ -1445,12 +1729,12 @@ const CuttingPage = () => {
           rejectMeasurement,
           rejectDefects,
           passRate,
-          bundles: newSummary[tab].bundles
+          bundles: newSummary[tab].bundles,
         };
         return newSummary;
       });
     },
-    [bundleQty]
+    [bundleQty],
   ); // bundleQty is needed if it determines the structure of summary.bundles
 
   const updateTableData = React.useCallback((bundleIndex, tab, data) => {
@@ -1475,13 +1759,13 @@ const CuttingPage = () => {
           const currentBundleColCounts = colCounts[bundleIndex] || {
             Top: 5,
             Middle: 5,
-            Bottom: 5
+            Bottom: 5,
           };
           const maxPanelIdx = Math.max(
             1,
             ...measurementPoints
               .filter((mp) => mp.panel === selectedPanel)
-              .map((mp) => mp.panelIndex)
+              .map((mp) => mp.panelIndex),
           );
           newDefectsData[bundleIndex] = {
             Top: Array(currentBundleColCounts.Top)
@@ -1492,17 +1776,17 @@ const CuttingPage = () => {
               .map(() => Array(maxPanelIdx).fill([])),
             Bottom: Array(currentBundleColCounts.Bottom)
               .fill(null)
-              .map(() => Array(maxPanelIdx).fill([]))
+              .map(() => Array(maxPanelIdx).fill([])),
           };
         }
         newDefectsData[bundleIndex] = {
           ...newDefectsData[bundleIndex],
-          [tab]: newDefects
+          [tab]: newDefects,
         };
         return newDefectsData;
       });
     },
-    [colCounts, measurementPoints, selectedPanel]
+    [colCounts, measurementPoints, selectedPanel],
   ); // Dependencies for initializing defect structure
 
   const totalParts =
@@ -1517,1904 +1801,2103 @@ const CuttingPage = () => {
     summary.Bottom.totalReject;
 
   const uniqueOptions = (key) => [
-    ...new Set(measurementPoints.map((point) => point[key]).filter(Boolean))
+    ...new Set(measurementPoints.map((point) => point[key]).filter(Boolean)),
   ];
 
   if (authLoading) return <div>{t("cutting.loading")}</div>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 p-6">
-      <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">
-          {t("cutting.cutting_inspection")}
-        </h1>
-        <div className="flex justify-center mb-4">
-          <button
-            onClick={() => setActiveTab("form")}
-            className={`px-4 py-2 ${
-              activeTab === "form"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-700"
-            } rounded-l-lg`}
-          >
-            {t("cutting.cuttingForm")}
-          </button>
-          <button
-            onClick={() => setActiveTab("data")}
-            className={`px-4 py-2 ${
-              activeTab === "data"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-700"
-            }`}
-          >
-            {t("cutting.data")}
-          </button>
-          <button
-            onClick={() => setActiveTab("report")}
-            className={`px-4 py-2 ${
-              activeTab === "report"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-700"
-            }`}
-          >
-            {t("cutting.report")}
-          </button>
-          <button
-            onClick={() => setActiveTab("Modify")}
-            className={`px-4 py-2 ${
-              activeTab === "Modify"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-700"
-            }`}
-          >
-            {t("cutting.modify")}
-          </button>
-          <button
-            onClick={() => setActiveTab("Adding")}
-            className={`px-4 py-2 ${
-              activeTab === "Adding"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-700"
-            }`}
-          >
-            {t("cutting.adding")}
-          </button>
-          <button
-            onClick={() => setActiveTab("db")}
-            className={`px-4 py-2 flex items-center space-x-2 ${
-              activeTab === "db"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-700"
-            } rounded-r-lg`}
-          >
-            <Database className="w-5 h-5" />
-            <span>DB</span>
-          </button>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800">
+      {/* --- START OF NEW HEADER --- */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 shadow-xl">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:16px_16px]"></div>
 
-        {activeTab === "form" ? (
-          <>
-            <div className="mb-6">
-              <div className="flex flex-wrap gap-4 items-end">
-                <div className="flex-1 min-w-[150px]">
-                  <label className="block text-sm font-medium text-gray-700">
-                    {t("cutting.date")}
-                  </label>
-                  <DatePicker
-                    selected={inspectionDate}
-                    onChange={(date) => setInspectionDate(date)}
-                    className="mt-1 w-full p-2 border border-gray-300 rounded-lg bg-gray-100"
-                  />
+        <div className="relative max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 py-2 lg:py-3">
+          {/* MOBILE/TABLET LAYOUT */}
+          <div className="lg:hidden space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <button
+                  onClick={handleGoHome}
+                  className="flex-shrink-0 flex items-center justify-center w-9 h-9 bg-gradient-to-br from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 rounded-lg shadow-lg text-white"
+                >
+                  <Home size={18} />
+                </button>
+                <div className="flex items-center justify-center w-9 h-9 bg-white/20 backdrop-blur-sm rounded-lg shadow-lg flex-shrink-0">
+                  <Shield size={18} className="text-white" />
                 </div>
-                <div className="flex-1 min-w-[150px]">
-                  <label className="block text-sm font-medium text-gray-700">
-                    {t("cutting.moNo")}
-                  </label>
-                  <div className="relative" ref={moNoDropdownRef}>
-                    <input
-                      type="text"
-                      value={moNoSearch}
-                      onChange={(e) => setMoNoSearch(e.target.value)}
-                      onFocus={() =>
-                        moNoOptions.length > 0 && setShowMoNoDropdown(true)
-                      }
-                      placeholder={t("cutting.search_mono")}
-                      className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                    />
-                    {showMoNoDropdown && (
-                      <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto shadow-lg">
-                        {moNoOptions.map((option, index) => (
-                          <li
-                            key={index}
-                            onClick={() => {
-                              const newMoNo = option;
-                              // Check if MO No actually changed to prevent unnecessary resets
-                              if (moNo !== newMoNo) {
-                                setMoNo(newMoNo);
-                                setTableNo(""); // Reset selected Table No
-                                setTableNoSearch(""); // Reset Table No search input
-                                setTableNoOptions([]); // Clear old table options
-                                setCutPanelData(null); // Reset cut panel data
-                                setAvailableSizes([]); // Reset sizes
-                                setAggregatedTotalOrderQty(null); // Reset aggregated Qty
-                                // Add any other state resets that depend on MO or TableNo
-                              }
-                              setMoNoSearch(newMoNo); // Update search to reflect selection
-                              setShowMoNoDropdown(false);
-                            }}
-                            // onClick={() => {
-                            //   setMoNo(option);
-                            //   setMoNoSearch(option);
-                            //   setShowMoNoDropdown(false);
-                            // }}
-                            className="p-2 hover:bg-blue-100 cursor-pointer"
-                          >
-                            {option}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <h1 className="text-sm font-black text-white tracking-tight truncate">
+                      Cutting QC
+                    </h1>
+                    <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white/20 backdrop-blur-sm rounded-full flex-shrink-0">
+                      <Sparkles size={8} className="text-yellow-300" />
+                      <span className="text-[8px] font-bold text-white">
+                        PRO
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-indigo-100 font-medium truncate">
+                    {tabs.find((t) => t.id === activeTab)?.label} • Active
+                  </p>
+                </div>
+              </div>
+              {user && (
+                <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-2 py-1 shadow-lg flex-shrink-0">
+                  <div className="flex items-center justify-center w-7 h-7 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-md shadow">
+                    <User size={14} className="text-white" />
                   </div>
                 </div>
-                <div className="flex-1 min-w-[150px]">
-                  <label className="block text-sm font-medium text-gray-700">
-                    {t("cutting.tableNo")}
-                  </label>
-                  <div className="flex items-center gap-2">
-                    {cutPanelData && (
-                      <button
-                        onClick={() => setShowOrderDetails(!showOrderDetails)}
-                        className="text-gray-600 hover:text-gray-800"
+              )}
+            </div>
+            {/* Mobile Scrollable Tabs */}
+            <div className="overflow-x-auto scrollbar-hide -mx-3 px-3">
+              <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1 min-w-max">
+                {tabs.map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`group relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${
+                        isActive
+                          ? "bg-white shadow-lg scale-105"
+                          : "bg-transparent hover:bg-white/20"
+                      }`}
+                    >
+                      <div
+                        className={`transition-colors duration-300 ${isActive ? "text-indigo-600" : "text-white"}`}
                       >
-                        {showOrderDetails ? (
-                          <Eye className="w-5 h-5" />
-                        ) : (
-                          <EyeOff className="w-5 h-5" />
-                        )}
-                      </button>
-                    )}
-                    <div className="relative flex-1" ref={tableNoDropdownRef}>
+                        {React.cloneElement(tab.icon, { className: "w-4 h-4" })}
+                      </div>
+                      <span
+                        className={`text-[9px] font-bold transition-colors duration-300 whitespace-nowrap ${isActive ? "text-indigo-600" : "text-white"}`}
+                      >
+                        {tab.label}
+                      </span>
+                      {isActive && (
+                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow animate-pulse"></div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* DESKTOP LAYOUT */}
+          <div className="hidden lg:flex lg:items-center lg:justify-between lg:gap-4">
+            <div className="flex items-center gap-4 flex-1">
+              <button
+                onClick={handleGoHome}
+                className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 rounded-xl shadow-lg transition-all hover:scale-105 text-white"
+              >
+                <ArrowLeft size={16} />
+                <span className="text-sm font-bold">YQMS</span>
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl shadow-lg">
+                  <Shield size={22} className="text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-black text-white tracking-tight">
+                    Cutting Inspection
+                  </h1>
+                  <p className="text-xs text-indigo-100 font-medium">
+                    Quality Control Data
+                  </p>
+                </div>
+              </div>
+              {/* Desktop Tabs */}
+              <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1.5">
+                {tabs.map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`group relative flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-300 ${
+                        isActive
+                          ? "bg-white shadow-lg scale-105"
+                          : "bg-transparent hover:bg-white/20"
+                      }`}
+                    >
+                      <div
+                        className={`transition-colors duration-300 ${isActive ? "text-indigo-600" : "text-white"}`}
+                      >
+                        {React.cloneElement(tab.icon, { className: "w-4 h-4" })}
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold transition-colors duration-300 ${isActive ? "text-indigo-600" : "text-white"}`}
+                      >
+                        {tab.label}
+                      </span>
+                      {isActive && (
+                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow animate-pulse"></div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {/* User Info Desktop */}
+            {user && (
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3 py-2 shadow-lg">
+                <div className="flex items-center justify-center w-9 h-9 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow">
+                  <User size={18} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-white font-bold text-sm leading-tight">
+                    {user.eng_name || "User"}
+                  </p>
+                  <p className="text-indigo-200 text-xs font-medium leading-tight">
+                    {user.emp_id}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Container with Padding Top for Fixed Header */}
+      <div className="relative max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 pb-6 pt-[140px] lg:pt-[85px]">
+        {hasDraft && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-100 rounded-full text-amber-600">
+                <Database size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-800">
+                  Unsaved Inspection Found
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Date:{" "}
+                  {draftData?.inspectionDate
+                    ? new Date(draftData.inspectionDate).toLocaleDateString()
+                    : "Unknown"}
+                  {draftData?.moNo ? ` | MO No: ${draftData.moNo}` : ""}
+                  {draftData?.tableNo
+                    ? ` | Table No: ${draftData.tableNo}`
+                    : ""}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDiscard}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              >
+                <Trash2 size={16} /> Discard
+              </button>
+              <button
+                onClick={handleRestore}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md text-sm font-bold"
+              >
+                <RotateCcw size={16} /> Restore Data
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6">
+          {activeTab === "form" ? (
+            <>
+              <div className="mb-6">
+                <div className="flex flex-wrap gap-4 items-end">
+                  <div className="flex-1 min-w-[150px]">
+                    <label className="block text-sm font-medium text-gray-700">
+                      {t("cutting.date")}
+                    </label>
+                    <DatePicker
+                      selected={inspectionDate}
+                      onChange={(date) => setInspectionDate(date)}
+                      className="mt-1 w-full p-2 border border-gray-300 rounded-lg bg-gray-100"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[150px]">
+                    <label className="block text-sm font-medium text-gray-700">
+                      {t("cutting.moNo")}
+                    </label>
+                    <div className="relative" ref={moNoDropdownRef}>
                       <input
                         type="text"
-                        inputMode="numeric"
-                        value={tableNoSearch}
-                        onChange={(e) => {
-                          setTableNoSearch(e.target.value);
-                          setShowTableNoDropdown(true);
-                        }}
+                        value={moNoSearch}
+                        onChange={(e) => setMoNoSearch(e.target.value)}
                         onFocus={() =>
-                          tableNoOptions.length > 0 &&
-                          setShowTableNoDropdown(true)
+                          moNoOptions.length > 0 && setShowMoNoDropdown(true)
                         }
-                        placeholder={t("cutting.search_table_no")}
-                        className={`mt-1 w-full p-2 border border-gray-300 rounded-lg ${
-                          !moNo ? "bg-gray-100 cursor-not-allowed" : ""
-                        }`}
-                        disabled={!moNo}
+                        placeholder={t("cutting.search_mono")}
+                        className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
                       />
-                      {showTableNoDropdown && (
+                      {showMoNoDropdown && (
                         <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto shadow-lg">
-                          {tableNoOptions
-                            .filter((table) =>
-                              table
-                                .toLowerCase()
-                                .includes(tableNoSearch.toLowerCase())
-                            )
-                            .map((table, index) => (
-                              <li
-                                key={index}
-                                onClick={() => {
-                                  setTableNo(table);
-                                  setTableNoSearch(table);
-                                  setShowTableNoDropdown(false);
-                                }}
-                                className="p-2 hover:bg-blue-100 cursor-pointer"
-                              >
-                                {table}
-                              </li>
-                            ))}
+                          {moNoOptions.map((option, index) => (
+                            <li
+                              key={index}
+                              onClick={() => {
+                                const newMoNo = option;
+                                // Check if MO No actually changed to prevent unnecessary resets
+                                if (moNo !== newMoNo) {
+                                  setMoNo(newMoNo);
+                                  setTableNo(""); // Reset selected Table No
+                                  setTableNoSearch(""); // Reset Table No search input
+                                  setTableNoOptions([]); // Clear old table options
+                                  setCutPanelData(null); // Reset cut panel data
+                                  setAvailableSizes([]); // Reset sizes
+                                  setAggregatedTotalOrderQty(null); // Reset aggregated Qty
+                                  // Add any other state resets that depend on MO or TableNo
+                                }
+                                setMoNoSearch(newMoNo); // Update search to reflect selection
+                                setShowMoNoDropdown(false);
+                              }}
+                              // onClick={() => {
+                              //   setMoNo(option);
+                              //   setMoNoSearch(option);
+                              //   setShowMoNoDropdown(false);
+                              // }}
+                              className="p-2 hover:bg-blue-100 cursor-pointer"
+                            >
+                              {option}
+                            </li>
+                          ))}
                         </ul>
                       )}
                     </div>
                   </div>
-                </div>
-              </div>
-              {cutPanelData && showOrderDetails && (
-                <div className="mt-4">
-                  <h2 className="text-sm font-semibold text-gray-700">
-                    {t("cutting.orderDetails")}
-                  </h2>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border border-gray-300 mt-2">
-                      <thead>
-                        <tr className="bg-gray-100">
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.buyer")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.buyerStyle")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.color")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.lotNo")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.orderQty")}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="border border-gray-300 p-2 text-sm">
-                            {cutPanelData.Buyer}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-sm">
-                            {cutPanelData.BuyerStyle}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-center text-sm">
-                            {cutPanelData.Color}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-sm">
-                            {cutPanelData.LotNos.join(", ")}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-center text-sm">
-                            {cutPanelData.TotalOrderQty}
-                            {/* New aggregated total display */}
-                            {aggregatedTotalOrderQty !== null &&
-                              aggregatedTotalOrderQty !== undefined && (
-                                <div className="mt-1">
-                                  <span className="font-bold text-xs text-green-600">
-                                    Total: {aggregatedTotalOrderQty}
-                                  </span>
-                                </div>
-                              )}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <h2 className="text-sm font-semibold text-gray-700 mt-4">
-                    {t("cutting.fabricDetails")}
-                  </h2>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border border-gray-300 mt-2">
-                      <thead>
-                        <tr className="bg-gray-100">
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.fabricType")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.material")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.rollQty")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.spreadYds")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.unit")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.grossKgs")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.netKgs")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.totalTTLRoll")}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="border border-gray-300 p-2 text-sm">
-                            {cutPanelData.FabricType}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-sm">
-                            {cutPanelData.Material}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-center text-sm">
-                            {cutPanelData.RollQty}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-center text-sm">
-                            {cutPanelData.SpreadYds}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-center text-sm">
-                            {cutPanelData.Unit}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-center text-sm">
-                            {cutPanelData.GrossKgs}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-center text-sm">
-                            {cutPanelData.NetKgs}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-center text-sm">
-                            {cutPanelData.TotalTTLRoll}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <h2 className="text-sm font-semibold text-gray-700 mt-4">
-                    {t("cutting.cuttingTableDetails")}
-                  </h2>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border border-gray-300 mt-2">
-                      <thead>
-                        <tr className="bg-gray-100">
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.spreadTable")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.spreadTableNo")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.planLayers")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.actualLayers")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.totalPcs")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.mackerNo")}
-                          </th>
-                          <th className="border border-gray-300 p-2 text-sm">
-                            {t("cutting.mackerLength")}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="border border-gray-300 p-2 text-center  text-sm">
-                            {cutPanelData.SpreadTable}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-center text-sm">
-                            {tableNo ? tableNo.replace(/^T\s*/, "") : ""}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-center text-sm">
-                            {cutPanelData.PlanLayer}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-center text-sm">
-                            {cutPanelData.ActualLayer}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-center text-sm">
-                            {cutPanelData.TotalPcs}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-center text-sm">
-                            {cutPanelData.MackerNo}
-                          </td>
-                          <td className="border border-gray-300 p-2 text-center text-sm">
-                            {cutPanelData.MackerLength}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <h2 className="text-sm font-semibold text-gray-700 mt-4">
-                    {t("cutting.markerRatio")}
-                  </h2>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border border-gray-300 mt-2">
-                      <thead>
-                        <tr className="bg-gray-100">
-                          {cutPanelData.MarkerRatio.filter(
-                            (mr) =>
-                              mr.cuttingRatio !== null &&
-                              mr.cuttingRatio !== "" &&
-                              mr.cuttingRatio > 0
-                          ).map((mr, index) => (
-                            <th
-                              key={index}
-                              className="border border-gray-300 p-2 text-sm"
-                            >
-                              {mr.size}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          {cutPanelData.MarkerRatio.filter(
-                            (mr) =>
-                              mr.cuttingRatio !== null &&
-                              mr.cuttingRatio !== "" &&
-                              mr.cuttingRatio > 0
-                          ).map((mr, index) => (
-                            <td
-                              key={index}
-                              className="border border-gray-300 p-2 text-sm text-center"
-                            >
-                              {mr.cuttingRatio}
-                            </td>
-                          ))}
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  {/* Progress Bar and Inspection Stats */}
-                  {selectedPanel && (
-                    <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <h3 className="text-sm font-semibold text-gray-700 mb-2">
-                        {t("cutting.inspectionProgress")}
-                      </h3>
-                      <div className="w-full bg-gray-200 rounded-full h-4">
-                        <div
-                          className="bg-blue-800 h-4 rounded-full"
-                          style={{
-                            width: `${
-                              inspectionProgress && inspectionProgress.total > 0
-                                ? (inspectionProgress.completed /
-                                    inspectionProgress.total) *
-                                  100
-                                : 0
-                            }%`
-                          }}
-                        ></div>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-2">
-                        {inspectionProgress
-                          ? `${inspectionProgress.completed}/${
-                              inspectionProgress.total
-                            } ${t("cutting.completed")}`
-                          : t("cutting.inspectionNotStarted")}
-                      </p>
-                      {inspectionProgress && (
-                        <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-700">
-                          <div className="flex items-center">
-                            <AlertCircle className="w-4 h-4 mr-1 text-blue-600" />
-                            <span>
-                              {t("cutting.totalInspected")}:{" "}
-                              {inspectionProgress.inspected}
-                            </span>
-                          </div>
-                          <div className="flex items-center">
-                            <CheckCircle className="w-4 h-4 mr-1 text-green-600" />
-                            <span>
-                              {t("cutting.pass")}: {inspectionProgress.pass}
-                            </span>
-                          </div>
-                          <div className="flex items-center">
-                            <XCircle className="w-4 h-4 mr-1 text-red-600" />
-                            <span>
-                              {t("cutting.reject")}: {inspectionProgress.reject}
-                            </span>
-                          </div>
-                          <div className="flex items-center">
-                            <Percent className="w-4 h-4 mr-1 text-purple-600" />
-                            <span>
-                              {t("cutting.passRate")}:{" "}
-                              {inspectionProgress.passRate.toFixed(2)}%
-                            </span>
-                          </div>
-                        </div>
+                  <div className="flex-1 min-w-[150px]">
+                    <label className="block text-sm font-medium text-gray-700">
+                      {t("cutting.tableNo")}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {cutPanelData && (
+                        <button
+                          onClick={() => setShowOrderDetails(!showOrderDetails)}
+                          className="text-gray-600 hover:text-gray-800"
+                        >
+                          {showOrderDetails ? (
+                            <Eye className="w-5 h-5" />
+                          ) : (
+                            <EyeOff className="w-5 h-5" />
+                          )}
+                        </button>
                       )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {cutPanelData && (
-                <div className="mt-6">
-                  <hr className="my-4 border-gray-300" />
-                  <div className="flex flex-wrap items-center gap-4 mt-4">
-                    <div className="flex-1 min-w-[200px]">
-                      <label className="block text-sm font-medium text-gray-700">
-                        {t("cutting.totalBundleQty")}
-                      </label>
-                      <div className="relative">
+                      <div className="relative flex-1" ref={tableNoDropdownRef}>
                         <input
-                          type={isTablet ? "number" : "text"}
+                          type="text"
                           inputMode="numeric"
-                          value={totalBundleQty}
-                          onChange={(e) => setTotalBundleQty(e.target.value)}
-                          className="mt-1 w-full p-2 border border-gray-300 rounded-lg pr-10"
-                          placeholder="Enter Total Bundle Qty"
+                          value={tableNoSearch}
+                          onChange={(e) => {
+                            setTableNoSearch(e.target.value);
+                            setShowTableNoDropdown(true);
+                          }}
+                          onFocus={() =>
+                            tableNoOptions.length > 0 &&
+                            setShowTableNoDropdown(true)
+                          }
+                          placeholder={t("cutting.search_table_no")}
+                          className={`mt-1 w-full p-2 border border-gray-300 rounded-lg ${
+                            !moNo ? "bg-gray-100 cursor-not-allowed" : ""
+                          }`}
+                          disabled={!moNo}
                         />
-                        {!isTablet && (
-                          <button
-                            onClick={() => setShowNumberPad(true)}
-                            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800"
-                          >
-                            <Keyboard className="w-5 h-5" />
-                          </button>
+                        {showTableNoDropdown && (
+                          <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto shadow-lg">
+                            {tableNoOptions
+                              .filter((table) =>
+                                table
+                                  .toLowerCase()
+                                  .includes(tableNoSearch.toLowerCase()),
+                              )
+                              .map((table, index) => (
+                                <li
+                                  key={index}
+                                  onClick={() => {
+                                    setTableNo(table);
+                                    setTableNoSearch(table);
+                                    setShowTableNoDropdown(false);
+                                  }}
+                                  className="p-2 hover:bg-blue-100 cursor-pointer"
+                                >
+                                  {table}
+                                </li>
+                              ))}
+                          </ul>
                         )}
                       </div>
-                      {showNumberPad && (
-                        <NumberPad
-                          onClose={() => setShowNumberPad(false)}
-                          onInput={(value) => setTotalBundleQty(value)}
-                          initialValue={totalBundleQty}
-                        />
-                      )}
                     </div>
-                    <div className="flex-1 min-w-[200px]">
-                      <label className="block text-sm font-medium text-gray-700">
-                        {t("cutting.bundleQtyCheck")}
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={isTablet ? "number" : "text"}
-                          inputMode="numeric"
-                          value={bundleQtyCheck}
-                          onChange={(e) => setBundleQtyCheck(e.target.value)}
-                          className="mt-1 w-full p-2 border border-gray-300 rounded-lg pr-10"
-                          placeholder="Enter Bundle Qty Check"
-                          readOnly={
-                            totalBundleQty &&
-                            (actualLayers || planLayerQty) &&
-                            parseInt(totalBundleQty) *
-                              (actualLayers || planLayerQty) >=
-                              501 &&
-                            parseInt(totalBundleQty) *
-                              (actualLayers || planLayerQty) <=
-                              35000
-                          }
-                        />
-                        {!isTablet &&
-                          (!totalBundleQty ||
-                            (!actualLayers && !planLayerQty) ||
-                            parseInt(totalBundleQty) *
-                              (actualLayers || planLayerQty) <
-                              501 ||
-                            parseInt(totalBundleQty) *
-                              (actualLayers || planLayerQty) >
-                              35000) && (
+                  </div>
+                </div>
+                {cutPanelData && showOrderDetails && (
+                  <div className="mt-4">
+                    <h2 className="text-sm font-semibold text-gray-700">
+                      {t("cutting.orderDetails")}
+                    </h2>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border border-gray-300 mt-2">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.buyer")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.buyerStyle")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.color")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.lotNo")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.orderQty")}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td className="border border-gray-300 p-2 text-sm">
+                              {cutPanelData.Buyer}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-sm">
+                              {cutPanelData.BuyerStyle}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center text-sm">
+                              {cutPanelData.Color}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-sm">
+                              {cutPanelData.LotNos.join(", ")}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center text-sm">
+                              {cutPanelData.TotalOrderQty}
+                              {/* New aggregated total display */}
+                              {aggregatedTotalOrderQty !== null &&
+                                aggregatedTotalOrderQty !== undefined && (
+                                  <div className="mt-1">
+                                    <span className="font-bold text-xs text-green-600">
+                                      Total: {aggregatedTotalOrderQty}
+                                    </span>
+                                  </div>
+                                )}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <h2 className="text-sm font-semibold text-gray-700 mt-4">
+                      {t("cutting.fabricDetails")}
+                    </h2>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border border-gray-300 mt-2">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.fabricType")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.material")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.rollQty")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.spreadYds")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.unit")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.grossKgs")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.netKgs")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.totalTTLRoll")}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td className="border border-gray-300 p-2 text-sm">
+                              {cutPanelData.FabricType}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-sm">
+                              {cutPanelData.Material}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center text-sm">
+                              {cutPanelData.RollQty}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center text-sm">
+                              {cutPanelData.SpreadYds}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center text-sm">
+                              {cutPanelData.Unit}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center text-sm">
+                              {cutPanelData.GrossKgs}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center text-sm">
+                              {cutPanelData.NetKgs}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center text-sm">
+                              {cutPanelData.TotalTTLRoll}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <h2 className="text-sm font-semibold text-gray-700 mt-4">
+                      {t("cutting.cuttingTableDetails")}
+                    </h2>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border border-gray-300 mt-2">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.spreadTable")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.spreadTableNo")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.planLayers")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.actualLayers")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.totalPcs")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.mackerNo")}
+                            </th>
+                            <th className="border border-gray-300 p-2 text-sm">
+                              {t("cutting.mackerLength")}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td className="border border-gray-300 p-2 text-center  text-sm">
+                              {cutPanelData.SpreadTable}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center text-sm">
+                              {tableNo ? tableNo.replace(/^T\s*/, "") : ""}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center text-sm">
+                              {cutPanelData.PlanLayer}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center text-sm">
+                              {cutPanelData.ActualLayer}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center text-sm">
+                              {cutPanelData.TotalPcs}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center text-sm">
+                              {cutPanelData.MackerNo}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center text-sm">
+                              {cutPanelData.MackerLength}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <h2 className="text-sm font-semibold text-gray-700 mt-4">
+                      {t("cutting.markerRatio")}
+                    </h2>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border border-gray-300 mt-2">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            {cutPanelData.MarkerRatio.filter(
+                              (mr) =>
+                                mr.cuttingRatio !== null &&
+                                mr.cuttingRatio !== "" &&
+                                mr.cuttingRatio > 0,
+                            ).map((mr, index) => (
+                              <th
+                                key={index}
+                                className="border border-gray-300 p-2 text-sm"
+                              >
+                                {mr.size}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            {cutPanelData.MarkerRatio.filter(
+                              (mr) =>
+                                mr.cuttingRatio !== null &&
+                                mr.cuttingRatio !== "" &&
+                                mr.cuttingRatio > 0,
+                            ).map((mr, index) => (
+                              <td
+                                key={index}
+                                className="border border-gray-300 p-2 text-sm text-center"
+                              >
+                                {mr.cuttingRatio}
+                              </td>
+                            ))}
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* Progress Bar and Inspection Stats */}
+                    {selectedPanel && (
+                      <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                          {t("cutting.inspectionProgress")}
+                        </h3>
+                        <div className="w-full bg-gray-200 rounded-full h-4">
+                          <div
+                            className="bg-blue-800 h-4 rounded-full"
+                            style={{
+                              width: `${
+                                inspectionProgress &&
+                                inspectionProgress.total > 0
+                                  ? (inspectionProgress.completed /
+                                      inspectionProgress.total) *
+                                    100
+                                  : 0
+                              }%`,
+                            }}
+                          ></div>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-2">
+                          {inspectionProgress
+                            ? `${inspectionProgress.completed}/${
+                                inspectionProgress.total
+                              } ${t("cutting.completed")}`
+                            : t("cutting.inspectionNotStarted")}
+                        </p>
+                        {inspectionProgress && (
+                          <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-700">
+                            <div className="flex items-center">
+                              <AlertCircle className="w-4 h-4 mr-1 text-blue-600" />
+                              <span>
+                                {t("cutting.totalInspected")}:{" "}
+                                {inspectionProgress.inspected}
+                              </span>
+                            </div>
+                            <div className="flex items-center">
+                              <CheckCircle className="w-4 h-4 mr-1 text-green-600" />
+                              <span>
+                                {t("cutting.pass")}: {inspectionProgress.pass}
+                              </span>
+                            </div>
+                            <div className="flex items-center">
+                              <XCircle className="w-4 h-4 mr-1 text-red-600" />
+                              <span>
+                                {t("cutting.reject")}:{" "}
+                                {inspectionProgress.reject}
+                              </span>
+                            </div>
+                            <div className="flex items-center">
+                              <Percent className="w-4 h-4 mr-1 text-purple-600" />
+                              <span>
+                                {t("cutting.passRate")}:{" "}
+                                {inspectionProgress.passRate.toFixed(2)}%
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {cutPanelData && (
+                  <div className="mt-6">
+                    <hr className="my-4 border-gray-300" />
+                    <div className="flex flex-wrap items-center gap-4 mt-4">
+                      <div className="flex-1 min-w-[200px]">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t("cutting.totalBundleQty")}
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={isTablet ? "number" : "text"}
+                            inputMode="numeric"
+                            value={totalBundleQty}
+                            onChange={(e) => setTotalBundleQty(e.target.value)}
+                            className="mt-1 w-full p-2 border border-gray-300 rounded-lg pr-10"
+                            placeholder="Enter Total Bundle Qty"
+                          />
+                          {!isTablet && (
+                            <button
+                              onClick={() => setShowNumberPad(true)}
+                              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800"
+                            >
+                              <Keyboard className="w-5 h-5" />
+                            </button>
+                          )}
+                        </div>
+                        {showNumberPad && (
+                          <NumberPad
+                            onClose={() => setShowNumberPad(false)}
+                            onInput={(value) => setTotalBundleQty(value)}
+                            initialValue={totalBundleQty}
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-[200px]">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t("cutting.bundleQtyCheck")}
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={isTablet ? "number" : "text"}
+                            inputMode="numeric"
+                            value={bundleQtyCheck}
+                            onChange={(e) => setBundleQtyCheck(e.target.value)}
+                            className="mt-1 w-full p-2 border border-gray-300 rounded-lg pr-10"
+                            placeholder="Enter Bundle Qty Check"
+                            readOnly={
+                              totalBundleQty &&
+                              (actualLayers || planLayerQty) &&
+                              parseInt(totalBundleQty) *
+                                (actualLayers || planLayerQty) >=
+                                501 &&
+                              parseInt(totalBundleQty) *
+                                (actualLayers || planLayerQty) <=
+                                35000
+                            }
+                          />
+                          {!isTablet &&
+                            (!totalBundleQty ||
+                              (!actualLayers && !planLayerQty) ||
+                              parseInt(totalBundleQty) *
+                                (actualLayers || planLayerQty) <
+                                501 ||
+                              parseInt(totalBundleQty) *
+                                (actualLayers || planLayerQty) >
+                                35000) && (
+                              <button
+                                onClick={() =>
+                                  setShowBundleQtyCheckNumberPad(true)
+                                }
+                                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800"
+                              >
+                                <Keyboard className="w-5 h-5" />
+                              </button>
+                            )}
+                        </div>
+                        {showBundleQtyCheckNumberPad && (
+                          <NumberPad
+                            onClose={() =>
+                              setShowBundleQtyCheckNumberPad(false)
+                            }
+                            onInput={(value) => setBundleQtyCheck(value)}
+                            initialValue={bundleQtyCheck}
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-[200px]">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t("cutting.totalInspectionQty")}
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={isTablet ? "number" : "text"}
+                            inputMode="numeric"
+                            value={totalInspectionQty}
+                            onChange={(e) => {
+                              setTotalInspectionQty(e.target.value);
+                              setIsTotalInspectionQtyManual(true);
+                            }}
+                            className="mt-1 w-full p-2 border border-gray-300 rounded-lg pr-10"
+                            placeholder="Enter Total Inspection Qty"
+                          />
+                          {!isTablet && (
                             <button
                               onClick={() =>
-                                setShowBundleQtyCheckNumberPad(true)
+                                setShowTotalInspectionQtyNumberPad(true)
                               }
                               className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800"
                             >
                               <Keyboard className="w-5 h-5" />
                             </button>
                           )}
-                      </div>
-                      {showBundleQtyCheckNumberPad && (
-                        <NumberPad
-                          onClose={() => setShowBundleQtyCheckNumberPad(false)}
-                          onInput={(value) => setBundleQtyCheck(value)}
-                          initialValue={bundleQtyCheck}
-                        />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-[200px]">
-                      <label className="block text-sm font-medium text-gray-700">
-                        {t("cutting.totalInspectionQty")}
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={isTablet ? "number" : "text"}
-                          inputMode="numeric"
-                          value={totalInspectionQty}
-                          onChange={(e) => {
-                            setTotalInspectionQty(e.target.value);
-                            setIsTotalInspectionQtyManual(true);
-                          }}
-                          className="mt-1 w-full p-2 border border-gray-300 rounded-lg pr-10"
-                          placeholder="Enter Total Inspection Qty"
-                        />
-                        {!isTablet && (
-                          <button
-                            onClick={() =>
-                              setShowTotalInspectionQtyNumberPad(true)
+                        </div>
+                        {showTotalInspectionQtyNumberPad && (
+                          <NumberPad
+                            onClose={() =>
+                              setShowTotalInspectionQtyNumberPad(false)
                             }
-                            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800"
-                          >
-                            <Keyboard className="w-5 h-5" />
-                          </button>
+                            onInput={(value) => {
+                              setTotalInspectionQty(value);
+                              setIsTotalInspectionQtyManual(true);
+                            }}
+                            initialValue={totalInspectionQty}
+                          />
                         )}
                       </div>
-                      {showTotalInspectionQtyNumberPad && (
-                        <NumberPad
-                          onClose={() =>
-                            setShowTotalInspectionQtyNumberPad(false)
-                          }
-                          onInput={(value) => {
-                            setTotalInspectionQty(value);
-                            setIsTotalInspectionQtyManual(true);
-                          }}
-                          initialValue={totalInspectionQty}
-                        />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-[200px]">
-                      <label className="block text-sm font-medium text-gray-700">
-                        {t("cutting.cuttingBy")}
-                      </label>
-                      <div className="flex items-center space-x-4 mt-1">
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={cuttingByAuto}
-                            onChange={(e) => setCuttingByAuto(e.target.checked)}
-                            className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                          />
-                          <label className="ml-2 text-sm text-gray-700">
-                            {t("cutting.auto")}
-                          </label>
-                        </div>
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={cuttingByManual}
-                            onChange={(e) =>
-                              setCuttingByManual(e.target.checked)
-                            }
-                            className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                          />
-                          <label className="ml-2 text-sm text-gray-700">
-                            {t("cutting.manual")}
-                          </label>
+                      <div className="flex-1 min-w-[200px]">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t("cutting.cuttingBy")}
+                        </label>
+                        <div className="flex items-center space-x-4 mt-1">
+                          <div className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={cuttingByAuto}
+                              onChange={(e) =>
+                                setCuttingByAuto(e.target.checked)
+                              }
+                              className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                            />
+                            <label className="ml-2 text-sm text-gray-700">
+                              {t("cutting.auto")}
+                            </label>
+                          </div>
+                          <div className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={cuttingByManual}
+                              onChange={(e) =>
+                                setCuttingByManual(e.target.checked)
+                              }
+                              className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                            />
+                            <label className="ml-2 text-sm text-gray-700">
+                              {t("cutting.manual")}
+                            </label>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-2 text-sm text-gray-600">
-                    {t("cutting.samplingStandard")}
-                  </div>
-
-                  {aqlDetails && (
-                    <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg shadow-sm hover:bg-blue-100 transition-colors flex flex-wrap gap-4 text-sm text-gray-800 font-medium">
-                      <div className="flex items-center gap-1">
-                        <Tag className="w-4 h-4 text-blue-600" />
-                        <span>Type: General</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Layers className="w-4 h-4 text-blue-600" />
-                        <span>Level: II</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Tag className="w-4 h-4 text-blue-600" />
-                        <span>
-                          Sample Size Code Letter:{" "}
-                          {aqlDetails.SampleSizeLetterCode}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Box className="w-4 h-4 text-blue-600" />
-                        <span>
-                          AQL Sample Requirement: {aqlDetails.SampleSize}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <CheckCircle className="w-4 h-4 text-blue-600" />
-                        <span>Ac: {aqlDetails.AcceptDefect}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <XCircle className="w-4 h-4 text-blue-600" />
-                        <span>Re: {aqlDetails.RejectDefect}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  <hr className="my-4 border-gray-300" />
-                  <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex-1 min-w-[200px]">
-                      <label className="block text-sm font-medium text-gray-700">
-                        {t("cutting.panel")}
-                      </label>
-                      <select
-                        value={selectedPanel}
-                        onChange={(e) => {
-                          setSelectedPanel(e.target.value);
-                          setBundleQty("");
-                          setBundleTableData([]);
-                        }}
-                        className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                      >
-                        <option value="">{t("cutting.select_panel")}</option>
-                        {panels.map((panelObj, index) => (
-                          <option key={index} value={panelObj.panel}>
-                            {i18n.language === "km"
-                              ? panelObj.panelKhmer || panelObj.panel
-                              : i18n.language === "zh"
-                              ? panelObj.panelChinese || panelObj.panel
-                              : panelObj.panel}
-                            :--({panelObj.panelKhmer})
-                          </option>
-                        ))}
-                      </select>
+                    <div className="mt-2 text-sm text-gray-600">
+                      {t("cutting.samplingStandard")}
                     </div>
 
-                    <div className="flex-1 min-w-[200px]">
-                      <label className="block text-sm font-medium text-gray-700">
-                        {t("cutting.size")}
-                      </label>
-                      <select
-                        value={selectedSize}
-                        onChange={(e) => {
-                          setSelectedSize(e.target.value);
-                          setBundleQty("");
-                          setBundleTableData([]);
-                          setBundleQtyError("");
-                        }}
-                        className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                        disabled={
-                          !tableNo ||
-                          availableSizes.length === 0 ||
-                          !selectedPanel ||
-                          (inspectionProgress &&
-                            inspectionProgress.completed ===
-                              inspectionProgress.total)
-                        }
-                      >
-                        <option value="">{t("cutting.select_size")}</option>
-                        {availableSizes.map((size, index) => (
-                          <option
-                            key={index}
-                            value={size}
-                            disabled={
-                              inspectedSizes.includes(size) ||
-                              (inspectionProgress &&
-                                inspectionProgress.completed ===
-                                  inspectionProgress.total)
-                            }
-                            className={
-                              inspectedSizes.includes(size) ||
-                              (inspectionProgress &&
-                                inspectionProgress.completed ===
-                                  inspectionProgress.total)
-                                ? "text-gray-400"
-                                : ""
-                            }
-                          >
-                            {size}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {aqlDetails && (
+                      <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg shadow-sm hover:bg-blue-100 transition-colors flex flex-wrap gap-4 text-sm text-gray-800 font-medium">
+                        <div className="flex items-center gap-1">
+                          <Tag className="w-4 h-4 text-blue-600" />
+                          <span>Type: General</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Layers className="w-4 h-4 text-blue-600" />
+                          <span>Level: II</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Tag className="w-4 h-4 text-blue-600" />
+                          <span>
+                            Sample Size Code Letter:{" "}
+                            {aqlDetails.SampleSizeLetterCode}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Box className="w-4 h-4 text-blue-600" />
+                          <span>
+                            AQL Sample Requirement: {aqlDetails.SampleSize}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <CheckCircle className="w-4 h-4 text-blue-600" />
+                          <span>Ac: {aqlDetails.AcceptDefect}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <XCircle className="w-4 h-4 text-blue-600" />
+                          <span>Re: {aqlDetails.RejectDefect}</span>
+                        </div>
+                      </div>
+                    )}
 
-                    <div className="flex-1 min-w-[200px]">
-                      <label className="block text-sm font-medium text-gray-700">
-                        {t("cutting.bundleQty")}
-                      </label>
-                      <select
-                        value={bundleQty}
-                        onChange={(e) => {
-                          const qty = parseInt(e.target.value) || 0;
-                          // Validate bundleQty against bundleQtyCheck and inspected sizes
-                          const totalInspectedQty = inspectionProgress
-                            ? inspectionProgress.completed
-                            : 0;
-                          const remainingQty =
-                            parseInt(bundleQtyCheck) - totalInspectedQty;
-                          if (qty > remainingQty) {
-                            setBundleQtyError(t("cutting.invalidBundleQty"));
+                    <hr className="my-4 border-gray-300" />
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="flex-1 min-w-[200px]">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t("cutting.panel")}
+                        </label>
+                        <select
+                          value={selectedPanel}
+                          onChange={(e) => {
+                            setSelectedPanel(e.target.value);
                             setBundleQty("");
                             setBundleTableData([]);
-                            return;
+                          }}
+                          className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
+                        >
+                          <option value="">{t("cutting.select_panel")}</option>
+                          {panels.map((panelObj, index) => (
+                            <option key={index} value={panelObj.panel}>
+                              {i18n.language === "km"
+                                ? panelObj.panelKhmer || panelObj.panel
+                                : i18n.language === "zh"
+                                  ? panelObj.panelChinese || panelObj.panel
+                                  : panelObj.panel}
+                              :--({panelObj.panelKhmer})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex-1 min-w-[200px]">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t("cutting.size")}
+                        </label>
+                        <select
+                          value={selectedSize}
+                          onChange={(e) => {
+                            setSelectedSize(e.target.value);
+                            setBundleQty("");
+                            setBundleTableData([]);
+                            setBundleQtyError("");
+                          }}
+                          className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
+                          disabled={
+                            !tableNo ||
+                            availableSizes.length === 0 ||
+                            !selectedPanel ||
+                            (inspectionProgress &&
+                              inspectionProgress.completed ===
+                                inspectionProgress.total)
                           }
-                          setBundleQtyError("");
-                          setBundleQty(e.target.value);
-                          const newBundleTableData = Array.from(
-                            { length: qty },
-                            (_, i) => ({
-                              bundleNo: i + 1,
-                              serialLetter: "",
-                              parts: [],
-                              tValue: 5,
-                              mValue: 5,
-                              bValue: 5
-                            })
-                          );
-                          setBundleTableData(newBundleTableData);
-                          setColCounts(
-                            Array.from({ length: qty }, () => ({
-                              Top: 5,
-                              Middle: 5,
-                              Bottom: 5
-                            }))
-                          );
-                          setTableData(
-                            Array.from({ length: qty }, () => ({
-                              Top: [],
-                              Middle: [],
-                              Bottom: []
-                            }))
-                          );
-                          setColumnDefects(
-                            Array.from({ length: qty }, () => ({
-                              Top: Array(5)
-                                .fill([])
-                                .map(() => Array(5).fill([])),
-                              Middle: Array(5)
-                                .fill([])
-                                .map(() => Array(5).fill([])),
-                              Bottom: Array(5)
-                                .fill([])
-                                .map(() => Array(5).fill([]))
-                            }))
-                          );
-                          setSummary({
-                            Top: {
-                              totalParts: 0,
-                              totalPass: 0,
-                              totalReject: 0,
-                              rejectMeasurement: 0,
-                              rejectDefects: 0,
-                              passRate: 0,
-                              bundles: Array(qty).fill(null)
-                            },
-                            Middle: {
-                              totalParts: 0,
-                              totalPass: 0,
-                              totalReject: 0,
-                              rejectMeasurement: 0,
-                              rejectDefects: 0,
-                              passRate: 0,
-                              bundles: Array(qty).fill(null)
-                            },
-                            Bottom: {
-                              totalParts: 0,
-                              totalPass: 0,
-                              totalReject: 0,
-                              rejectMeasurement: 0,
-                              rejectDefects: 0,
-                              passRate: 0,
-                              bundles: Array(qty).fill(null)
+                        >
+                          <option value="">{t("cutting.select_size")}</option>
+                          {availableSizes.map((size, index) => (
+                            <option
+                              key={index}
+                              value={size}
+                              disabled={
+                                inspectedSizes.includes(size) ||
+                                (inspectionProgress &&
+                                  inspectionProgress.completed ===
+                                    inspectionProgress.total)
+                              }
+                              className={
+                                inspectedSizes.includes(size) ||
+                                (inspectionProgress &&
+                                  inspectionProgress.completed ===
+                                    inspectionProgress.total)
+                                  ? "text-gray-400"
+                                  : ""
+                              }
+                            >
+                              {size}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex-1 min-w-[200px]">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t("cutting.bundleQty")}
+                        </label>
+                        <select
+                          value={bundleQty}
+                          onChange={(e) => {
+                            const qty = parseInt(e.target.value) || 0;
+                            // Validate bundleQty against bundleQtyCheck and inspected sizes
+                            const totalInspectedQty = inspectionProgress
+                              ? inspectionProgress.completed
+                              : 0;
+                            const remainingQty =
+                              parseInt(bundleQtyCheck) - totalInspectedQty;
+                            if (qty > remainingQty) {
+                              setBundleQtyError(t("cutting.invalidBundleQty"));
+                              setBundleQty("");
+                              setBundleTableData([]);
+                              return;
                             }
-                          });
-                        }}
-                        className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                        disabled={!selectedSize}
-                      >
-                        <option value="">
-                          {t("cutting.select_bundle_qty")}
-                        </option>
-                        {[...Array(20)].map((_, i) => (
-                          <option key={i + 1} value={i + 1}>
-                            {i + 1}
+                            setBundleQtyError("");
+                            setBundleQty(e.target.value);
+                            const newBundleTableData = Array.from(
+                              { length: qty },
+                              (_, i) => ({
+                                bundleNo: i + 1,
+                                serialLetter: "",
+                                parts: [],
+                                tValue: 5,
+                                mValue: 5,
+                                bValue: 5,
+                              }),
+                            );
+                            setBundleTableData(newBundleTableData);
+                            setColCounts(
+                              Array.from({ length: qty }, () => ({
+                                Top: 5,
+                                Middle: 5,
+                                Bottom: 5,
+                              })),
+                            );
+                            setTableData(
+                              Array.from({ length: qty }, () => ({
+                                Top: [],
+                                Middle: [],
+                                Bottom: [],
+                              })),
+                            );
+                            setColumnDefects(
+                              Array.from({ length: qty }, () => ({
+                                Top: Array(5)
+                                  .fill([])
+                                  .map(() => Array(5).fill([])),
+                                Middle: Array(5)
+                                  .fill([])
+                                  .map(() => Array(5).fill([])),
+                                Bottom: Array(5)
+                                  .fill([])
+                                  .map(() => Array(5).fill([])),
+                              })),
+                            );
+                            setSummary({
+                              Top: {
+                                totalParts: 0,
+                                totalPass: 0,
+                                totalReject: 0,
+                                rejectMeasurement: 0,
+                                rejectDefects: 0,
+                                passRate: 0,
+                                bundles: Array(qty).fill(null),
+                              },
+                              Middle: {
+                                totalParts: 0,
+                                totalPass: 0,
+                                totalReject: 0,
+                                rejectMeasurement: 0,
+                                rejectDefects: 0,
+                                passRate: 0,
+                                bundles: Array(qty).fill(null),
+                              },
+                              Bottom: {
+                                totalParts: 0,
+                                totalPass: 0,
+                                totalReject: 0,
+                                rejectMeasurement: 0,
+                                rejectDefects: 0,
+                                passRate: 0,
+                                bundles: Array(qty).fill(null),
+                              },
+                            });
+                          }}
+                          className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
+                          disabled={!selectedSize}
+                        >
+                          <option value="">
+                            {t("cutting.select_bundle_qty")}
                           </option>
-                        ))}
-                      </select>
-                      {bundleQtyError && (
-                        <p className="mt-1 text-sm text-red-600">
-                          {bundleQtyError}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-[200px]">
-                      <label className="block text-sm font-medium text-gray-700">
-                        {t("cutting.tolerance")}
-                      </label>
-                      <select
-                        value={
-                          toleranceOptions.find(
-                            (opt) =>
-                              opt.value.min === tolerance.min &&
-                              opt.value.max === tolerance.max
-                          )?.label
-                        }
-                        onChange={handleToleranceChange}
-                        className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                      >
-                        {toleranceOptions.map((option, index) => (
-                          <option key={index} value={option.label}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {bundleQty && !bundleQtyError && (
-                    <div className="mt-4">
-                      <h2 className="text-sm font-semibold text-gray-700">
-                        {t("cutting.bundleDetails")}
-                      </h2>
-                      <div className="overflow-x-auto">
-                        <table className="w-full border-collapse border border-gray-300 mt-2">
-                          <thead>
-                            <tr className="bg-gray-100">
-                              <th className="border border-gray-300 p-2 text-sm w-16">
-                                {t("cutting.bundleNo")}
-                              </th>
-                              <th className="border border-gray-300 p-2 text-sm w-24">
-                                {t("cutting.serialLetter")}
-                              </th>
-                              <th className="border border-gray-300 p-2 text-sm w-auto">
-                                {t("cutting.parts")}
-                              </th>
-                              <th className="border border-gray-300 p-2 text-sm w-40">
-                                {t("cutting.pcs")}
-                              </th>
-                              <th className="border border-gray-300 p-2 text-sm w-20">
-                                {t("cutting.totalPcs")}
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {bundleTableData.map((row, index) => (
-                              <tr key={index}>
-                                <td className="border border-gray-300 p-2 text-sm text-center w-16">
-                                  {row.bundleNo}
-                                </td>
-                                <td className="border border-gray-300 p-2 text-sm w-24">
-                                  <select
-                                    value={row.serialLetter}
-                                    onChange={(e) => {
-                                      const newData = [...bundleTableData];
-                                      newData[index].serialLetter =
-                                        e.target.value;
-                                      setBundleTableData(newData);
-                                    }}
-                                    className="w-full p-1 border border-gray-300 rounded-lg text-sm"
-                                  >
-                                    <option value="">
-                                      {t("cutting.select_serial_letter")}
-                                    </option>
-                                    {serialLetters.map((letter, i) => (
-                                      <option key={i} value={letter}>
-                                        {letter}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </td>
-
-                                <td className="border border-gray-300 p-2 text-sm w-auto">
-                                  <div className="flex flex-wrap gap-2">
-                                    {panelIndexNames.map((item, i) => {
-                                      // Using 'i' for the inner loop index
-                                      const isChecked = row.parts.includes(
-                                        item.panelIndexName
-                                      );
-                                      // 'row' comes from the outer map (bundleTableData.map((row, index) => ...))
-                                      const isDisabled = isPartCheckboxDisabled(
-                                        row,
-                                        item.panelIndexName
-                                      );
-
-                                      return (
-                                        // Explicit return for the label JSX
-                                        <label
-                                          key={i} // Using 'i' for the key
-                                          className={`flex items-center space-x-1 text-sm ${
-                                            isDisabled
-                                              ? "text-gray-400 cursor-not-allowed"
-                                              : "cursor-pointer"
-                                          }`}
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={isChecked}
-                                            disabled={isDisabled}
-                                            onChange={(e) => {
-                                              const newBundleTableDataState = [
-                                                ...bundleTableData
-                                              ];
-                                              // Use 'index' from the outer map to get the correct bundle object
-                                              const currentBundleObject =
-                                                newBundleTableDataState[index];
-                                              const partName =
-                                                item.panelIndexName;
-                                              let updatedPartsArray;
-
-                                              if (e.target.checked) {
-                                                updatedPartsArray = [partName]; // Single selection logic
-                                              } else {
-                                                updatedPartsArray = []; // Clear selection on uncheck
-                                              }
-                                              // Use 'index' from the outer map to update the correct bundle's parts
-                                              newBundleTableDataState[
-                                                index
-                                              ].parts = updatedPartsArray;
-                                              setBundleTableData(
-                                                newBundleTableDataState
-                                              );
-                                            }}
-                                            className={`h-4 w-4 text-blue-600 border-gray-300 rounded ${
-                                              isDisabled
-                                                ? "cursor-not-allowed"
-                                                : "cursor-pointer"
-                                            }`}
-                                          />
-                                          <span>
-                                            {(() => {
-                                              if (i18n.language === "km") {
-                                                return (
-                                                  item.panelIndexNameKhmer ||
-                                                  item.panelIndexName
-                                                );
-                                              } else if (
-                                                i18n.language === "zh" &&
-                                                item.panelIndexNameChinese
-                                              ) {
-                                                return (
-                                                  item.panelIndexNameChinese ||
-                                                  item.panelIndexName
-                                                );
-                                              } else {
-                                                return item.panelIndexName;
-                                              }
-                                            })()}
-                                            {i18n.language !== "km" &&
-                                              item.panelIndexNameKhmer &&
-                                              ` (${item.panelIndexNameKhmer})`}
-                                          </span>
-                                        </label>
-                                      );
-                                    })}
-                                  </div>
-                                  <div className="mt-2 text-sm">
-                                    {row.parts
-                                      .map((part) => {
-                                        const partDetail = panelIndexNames.find(
-                                          (p) => p.panelIndexName === part
-                                        );
-                                        if (!partDetail) return part;
-
-                                        if (i18n.language === "km") {
-                                          return (
-                                            partDetail.panelIndexNameKhmer ||
-                                            partDetail.panelIndexName
-                                          );
-                                        } else if (
-                                          i18n.language === "zh" &&
-                                          partDetail.panelIndexNameChinese
-                                        ) {
-                                          return (
-                                            partDetail.panelIndexNameChinese ||
-                                            partDetail.panelIndexName
-                                          );
-                                        } else {
-                                          return partDetail.panelIndexName;
-                                        }
-                                      })
-                                      .join(", ")}
-                                  </div>
-                                </td>
-
-                                <td className="border border-gray-300 p-2 text-sm w-40">
-                                  <div className="flex items-center gap-2">
-                                    <span>T:</span>
-                                    <select
-                                      value={row.tValue || 5}
-                                      onChange={(e) => {
-                                        //if (row.parts.length > 0) return; // Prevent state update if parts selected
-                                        const newData = [...bundleTableData];
-                                        newData[index].tValue = e.target.value;
-                                        setBundleTableData(newData);
-                                      }}
-                                      className="p-1 border border-gray-300 rounded-lg text-sm"
-                                      //disabled={row.parts.length > 0}
-                                    >
-                                      {[...Array(10)].map((_, i) => (
-                                        <option key={i + 1} value={i + 1}>
-                                          {i + 1}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <span>M:</span>
-                                    <select
-                                      value={row.mValue || 5}
-                                      onChange={(e) => {
-                                        //if (row.parts.length > 0) return; // Prevent state update if parts selected
-                                        const newData = [...bundleTableData];
-                                        newData[index].mValue = e.target.value;
-                                        setBundleTableData(newData);
-                                      }}
-                                      className="p-1 border border-gray-300 rounded-lg text-sm"
-                                      //disabled={row.parts.length > 0}
-                                    >
-                                      {[...Array(10)].map((_, i) => (
-                                        <option key={i + 1} value={i + 1}>
-                                          {i + 1}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <span>B:</span>
-                                    <select
-                                      value={row.bValue || 5}
-                                      onChange={(e) => {
-                                        //if (row.parts.length > 0) return; // Prevent state update if parts selected
-                                        const newData = [...bundleTableData];
-                                        newData[index].bValue = e.target.value;
-                                        setBundleTableData(newData);
-                                      }}
-                                      className="p-1 border border-gray-300 rounded-lg text-sm"
-                                      //disabled={row.parts.length > 0}
-                                    >
-                                      {[...Array(10)].map((_, i) => (
-                                        <option key={i + 1} value={i + 1}>
-                                          {i + 1}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                </td>
-                                <td className="border border-gray-300 p-2 text-sm text-center w-20">
-                                  {calculateTotalPcs(row)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                          {[...Array(20)].map((_, i) => (
+                            <option key={i + 1} value={i + 1}>
+                              {i + 1}
+                            </option>
+                          ))}
+                        </select>
+                        {bundleQtyError && (
+                          <p className="mt-1 text-sm text-red-600">
+                            {bundleQtyError}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-[200px]">
+                        <label className="block text-sm font-medium text-gray-700">
+                          {t("cutting.tolerance")}
+                        </label>
+                        <select
+                          value={
+                            toleranceOptions.find(
+                              (opt) =>
+                                opt.value.min === tolerance.min &&
+                                opt.value.max === tolerance.max,
+                            )?.label
+                          }
+                          onChange={handleToleranceChange}
+                          className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
+                        >
+                          {toleranceOptions.map((option, index) => (
+                            <option key={index} value={option.label}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
-                  )}
-                  {selectedPanel && filteredMeasurementPoints.length > 0 && (
-                    <>
-                      <hr className="my-4 border-gray-300" />
-                      <h3 className="text-sm font-medium text-gray-600 mb-2">
-                        {t("cutting.summaryDetails")}
-                      </h3>
-                      <div className="mb-4">
-                        <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-6 gap-4">
-                          <div className="p-4 bg-blue-100 rounded-lg text-center">
-                            <p className="text-xs font-medium text-gray-700">
-                              {t("cutting.parts")}
-                            </p>
-                            <p className="text-lg font-bold">
-                              {bundleTableData.reduce(
-                                (acc, row) => acc + calculateTotalPcs(row),
-                                0
-                              )}
-                            </p>
-                            <p className="text-xs text-gray-600 mt-1">
-                              T:{" "}
-                              {bundleTableData.reduce(
-                                (acc, row) =>
-                                  acc +
-                                  row.parts.length *
-                                    (parseInt(row.tValue) || 5),
-                                0
-                              )}
-                              , M:{" "}
-                              {bundleTableData.reduce(
-                                (acc, row) =>
-                                  acc +
-                                  row.parts.length *
-                                    (parseInt(row.mValue) || 5),
-                                0
-                              )}
-                              , B:{" "}
-                              {bundleTableData.reduce(
-                                (acc, row) =>
-                                  acc +
-                                  row.parts.length *
-                                    (parseInt(row.bValue) || 5),
-                                0
-                              )}
-                            </p>
-                          </div>
-                          <div className="p-4 bg-green-100 rounded-lg text-center">
-                            <p className="text-xs font-medium text-gray-700">
-                              {t("cutting.pass")}
-                            </p>
-                            <p className="text-lg font-bold">
-                              {bundleTableData.reduce((acc, row) => {
-                                const bundleIndex = row.bundleNo - 1;
-                                const totalPcs = calculateTotalPcs(row);
-                                const totalReject = [
-                                  "Top",
-                                  "Middle",
-                                  "Bottom"
-                                ].reduce(
-                                  (rejectAcc, tab) =>
-                                    rejectAcc +
-                                    (summary[tab].bundles?.[bundleIndex]
-                                      ?.totalReject || 0),
-                                  0
-                                );
-                                return acc + (totalPcs - totalReject);
-                              }, 0)}
-                            </p>
-                            <p className="text-xs text-gray-600 mt-1">
-                              T:{" "}
-                              {bundleTableData.reduce((acc, row) => {
-                                const bundleIndex = row.bundleNo - 1;
-                                const totalPcs =
-                                  row.parts.length *
-                                  (parseInt(row.tValue) || 5);
-                                const reject =
-                                  summary.Top.bundles?.[bundleIndex]
-                                    ?.totalReject || 0;
-                                return acc + (totalPcs - reject);
-                              }, 0)}
-                              , M:{" "}
-                              {bundleTableData.reduce((acc, row) => {
-                                const bundleIndex = row.bundleNo - 1;
-                                const totalPcs =
-                                  row.parts.length *
-                                  (parseInt(row.mValue) || 5);
-                                const reject =
-                                  summary.Middle.bundles?.[bundleIndex]
-                                    ?.totalReject || 0;
-                                return acc + (totalPcs - reject);
-                              }, 0)}
-                              , B:{" "}
-                              {bundleTableData.reduce((acc, row) => {
-                                const bundleIndex = row.bundleNo - 1;
-                                const totalPcs =
-                                  row.parts.length *
-                                  (parseInt(row.bValue) || 5);
-                                const reject =
-                                  summary.Bottom.bundles?.[bundleIndex]
-                                    ?.totalReject || 0;
-                                return acc + (totalPcs - reject);
-                              }, 0)}
-                            </p>
-                          </div>
-                          <div className="p-4 bg-red-100 rounded-lg text-center">
-                            <p className="text-xs font-medium text-gray-700">
-                              {t("cutting.reject")}
-                            </p>
-                            <p className="text-lg font-bold">{totalReject}</p>
-                            <p className="text-xs text-gray-600 mt-1">
-                              T: {summary.Top.totalReject}, M:{" "}
-                              {summary.Middle.totalReject}, B:{" "}
-                              {summary.Bottom.totalReject}
-                            </p>
-                          </div>
-                          <div className="p-4 bg-orange-100 rounded-lg text-center">
-                            <p className="text-xs font-medium text-gray-700">
-                              {t("cutting.rejectMeasurements")}
-                            </p>
-                            <p className="text-lg font-bold">
-                              {summary.Top.rejectMeasurement +
-                                summary.Middle.rejectMeasurement +
-                                summary.Bottom.rejectMeasurement}
-                            </p>
-                            <p className="text-xs text-gray-600 mt-1">
-                              T: {summary.Top.rejectMeasurement}, M:{" "}
-                              {summary.Middle.rejectMeasurement}, B:{" "}
-                              {summary.Bottom.rejectMeasurement}
-                            </p>
-                          </div>
-                          <div className="p-4 bg-purple-100 rounded-lg text-center">
-                            <p className="text-xs font-medium text-gray-700">
-                              {t("cutting.rejectDefects")}
-                            </p>
-                            <p className="text-lg font-bold">
-                              {summary.Top.rejectDefects +
-                                summary.Middle.rejectDefects +
-                                summary.Bottom.rejectDefects}
-                            </p>
-                            <p className="text-xs text-gray-600 mt-1">
-                              T: {summary.Top.rejectDefects}, M:{" "}
-                              {summary.Middle.rejectDefects}, B:{" "}
-                              {summary.Bottom.rejectDefects}
-                            </p>
-                          </div>
-                          {(() => {
-                            const totalParts = bundleTableData.reduce(
-                              (acc, row) => acc + calculateTotalPcs(row),
-                              0
-                            );
-                            const totalPass = bundleTableData.reduce(
-                              (acc, row) => {
-                                const bundleIndex = row.bundleNo - 1;
-                                const totalPcs = calculateTotalPcs(row);
-                                const totalReject = [
-                                  "Top",
-                                  "Middle",
-                                  "Bottom"
-                                ].reduce(
-                                  (rejectAcc, tab) =>
-                                    rejectAcc +
-                                    (summary[tab].bundles?.[bundleIndex]
-                                      ?.totalReject || 0),
-                                  0
-                                );
-                                return acc + (totalPcs - totalReject);
-                              },
-                              0
-                            );
-                            const passRate =
-                              totalParts > 0
-                                ? ((totalPass / totalParts) * 100).toFixed(2)
-                                : 0;
-                            const bgColor =
-                              passRate < 90 ? "bg-red-100" : "bg-green-100";
 
+                    {bundleQty && !bundleQtyError && (
+                      <div className="mt-4">
+                        <h2 className="text-sm font-semibold text-gray-700">
+                          {t("cutting.bundleDetails")}
+                        </h2>
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse border border-gray-300 mt-2">
+                            <thead>
+                              <tr className="bg-gray-100">
+                                <th className="border border-gray-300 p-2 text-sm w-16">
+                                  {t("cutting.bundleNo")}
+                                </th>
+                                <th className="border border-gray-300 p-2 text-sm w-24">
+                                  {t("cutting.serialLetter")}
+                                </th>
+                                <th className="border border-gray-300 p-2 text-sm w-auto">
+                                  {t("cutting.parts")}
+                                </th>
+                                <th className="border border-gray-300 p-2 text-sm w-40">
+                                  {t("cutting.pcs")}
+                                </th>
+                                <th className="border border-gray-300 p-2 text-sm w-20">
+                                  {t("cutting.totalPcs")}
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {bundleTableData.map((row, index) => (
+                                <tr key={index}>
+                                  <td className="border border-gray-300 p-2 text-sm text-center w-16">
+                                    {row.bundleNo}
+                                  </td>
+                                  <td className="border border-gray-300 p-2 text-sm w-24">
+                                    <select
+                                      value={row.serialLetter}
+                                      onChange={(e) => {
+                                        const newData = [...bundleTableData];
+                                        newData[index].serialLetter =
+                                          e.target.value;
+                                        setBundleTableData(newData);
+                                      }}
+                                      className="w-full p-1 border border-gray-300 rounded-lg text-sm"
+                                    >
+                                      <option value="">
+                                        {t("cutting.select_serial_letter")}
+                                      </option>
+                                      {serialLetters.map((letter, i) => (
+                                        <option key={i} value={letter}>
+                                          {letter}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </td>
+
+                                  <td className="border border-gray-300 p-2 text-sm w-auto">
+                                    <div className="flex flex-wrap gap-2">
+                                      {panelIndexNames.map((item, i) => {
+                                        // Using 'i' for the inner loop index
+                                        const isChecked = row.parts.includes(
+                                          item.panelIndexName,
+                                        );
+                                        // 'row' comes from the outer map (bundleTableData.map((row, index) => ...))
+                                        const isDisabled =
+                                          isPartCheckboxDisabled(
+                                            row,
+                                            item.panelIndexName,
+                                          );
+
+                                        return (
+                                          // Explicit return for the label JSX
+                                          <label
+                                            key={i} // Using 'i' for the key
+                                            className={`flex items-center space-x-1 text-sm ${
+                                              isDisabled
+                                                ? "text-gray-400 cursor-not-allowed"
+                                                : "cursor-pointer"
+                                            }`}
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={isChecked}
+                                              disabled={isDisabled}
+                                              onChange={(e) => {
+                                                const newBundleTableDataState =
+                                                  [...bundleTableData];
+                                                // Use 'index' from the outer map to get the correct bundle object
+                                                const currentBundleObject =
+                                                  newBundleTableDataState[
+                                                    index
+                                                  ];
+                                                const partName =
+                                                  item.panelIndexName;
+                                                let updatedPartsArray;
+
+                                                if (e.target.checked) {
+                                                  updatedPartsArray = [
+                                                    partName,
+                                                  ]; // Single selection logic
+                                                } else {
+                                                  updatedPartsArray = []; // Clear selection on uncheck
+                                                }
+                                                // Use 'index' from the outer map to update the correct bundle's parts
+                                                newBundleTableDataState[
+                                                  index
+                                                ].parts = updatedPartsArray;
+                                                setBundleTableData(
+                                                  newBundleTableDataState,
+                                                );
+                                              }}
+                                              className={`h-4 w-4 text-blue-600 border-gray-300 rounded ${
+                                                isDisabled
+                                                  ? "cursor-not-allowed"
+                                                  : "cursor-pointer"
+                                              }`}
+                                            />
+                                            <span>
+                                              {(() => {
+                                                if (i18n.language === "km") {
+                                                  return (
+                                                    item.panelIndexNameKhmer ||
+                                                    item.panelIndexName
+                                                  );
+                                                } else if (
+                                                  i18n.language === "zh" &&
+                                                  item.panelIndexNameChinese
+                                                ) {
+                                                  return (
+                                                    item.panelIndexNameChinese ||
+                                                    item.panelIndexName
+                                                  );
+                                                } else {
+                                                  return item.panelIndexName;
+                                                }
+                                              })()}
+                                              {i18n.language !== "km" &&
+                                                item.panelIndexNameKhmer &&
+                                                ` (${item.panelIndexNameKhmer})`}
+                                            </span>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                    <div className="mt-2 text-sm">
+                                      {row.parts
+                                        .map((part) => {
+                                          const partDetail =
+                                            panelIndexNames.find(
+                                              (p) => p.panelIndexName === part,
+                                            );
+                                          if (!partDetail) return part;
+
+                                          if (i18n.language === "km") {
+                                            return (
+                                              partDetail.panelIndexNameKhmer ||
+                                              partDetail.panelIndexName
+                                            );
+                                          } else if (
+                                            i18n.language === "zh" &&
+                                            partDetail.panelIndexNameChinese
+                                          ) {
+                                            return (
+                                              partDetail.panelIndexNameChinese ||
+                                              partDetail.panelIndexName
+                                            );
+                                          } else {
+                                            return partDetail.panelIndexName;
+                                          }
+                                        })
+                                        .join(", ")}
+                                    </div>
+                                  </td>
+
+                                  <td className="border border-gray-300 p-2 text-sm w-40">
+                                    <div className="flex items-center gap-2">
+                                      <span>T:</span>
+                                      <select
+                                        value={row.tValue || 5}
+                                        onChange={(e) => {
+                                          //if (row.parts.length > 0) return; // Prevent state update if parts selected
+                                          const newData = [...bundleTableData];
+                                          newData[index].tValue =
+                                            e.target.value;
+                                          setBundleTableData(newData);
+                                        }}
+                                        className="p-1 border border-gray-300 rounded-lg text-sm"
+                                        //disabled={row.parts.length > 0}
+                                      >
+                                        {[...Array(10)].map((_, i) => (
+                                          <option key={i + 1} value={i + 1}>
+                                            {i + 1}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <span>M:</span>
+                                      <select
+                                        value={row.mValue || 5}
+                                        onChange={(e) => {
+                                          //if (row.parts.length > 0) return; // Prevent state update if parts selected
+                                          const newData = [...bundleTableData];
+                                          newData[index].mValue =
+                                            e.target.value;
+                                          setBundleTableData(newData);
+                                        }}
+                                        className="p-1 border border-gray-300 rounded-lg text-sm"
+                                        //disabled={row.parts.length > 0}
+                                      >
+                                        {[...Array(10)].map((_, i) => (
+                                          <option key={i + 1} value={i + 1}>
+                                            {i + 1}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <span>B:</span>
+                                      <select
+                                        value={row.bValue || 5}
+                                        onChange={(e) => {
+                                          //if (row.parts.length > 0) return; // Prevent state update if parts selected
+                                          const newData = [...bundleTableData];
+                                          newData[index].bValue =
+                                            e.target.value;
+                                          setBundleTableData(newData);
+                                        }}
+                                        className="p-1 border border-gray-300 rounded-lg text-sm"
+                                        //disabled={row.parts.length > 0}
+                                      >
+                                        {[...Array(10)].map((_, i) => (
+                                          <option key={i + 1} value={i + 1}>
+                                            {i + 1}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </td>
+                                  <td className="border border-gray-300 p-2 text-sm text-center w-20">
+                                    {calculateTotalPcs(row)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                    {selectedPanel && filteredMeasurementPoints.length > 0 && (
+                      <>
+                        <hr className="my-4 border-gray-300" />
+                        <h3 className="text-sm font-medium text-gray-600 mb-2">
+                          {t("cutting.summaryDetails")}
+                        </h3>
+                        <div className="mb-4">
+                          <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-6 gap-4">
+                            <div className="p-4 bg-blue-100 rounded-lg text-center">
+                              <p className="text-xs font-medium text-gray-700">
+                                {t("cutting.parts")}
+                              </p>
+                              <p className="text-lg font-bold">
+                                {bundleTableData.reduce(
+                                  (acc, row) => acc + calculateTotalPcs(row),
+                                  0,
+                                )}
+                              </p>
+                              <p className="text-xs text-gray-600 mt-1">
+                                T:{" "}
+                                {bundleTableData.reduce(
+                                  (acc, row) =>
+                                    acc +
+                                    row.parts.length *
+                                      (parseInt(row.tValue) || 5),
+                                  0,
+                                )}
+                                , M:{" "}
+                                {bundleTableData.reduce(
+                                  (acc, row) =>
+                                    acc +
+                                    row.parts.length *
+                                      (parseInt(row.mValue) || 5),
+                                  0,
+                                )}
+                                , B:{" "}
+                                {bundleTableData.reduce(
+                                  (acc, row) =>
+                                    acc +
+                                    row.parts.length *
+                                      (parseInt(row.bValue) || 5),
+                                  0,
+                                )}
+                              </p>
+                            </div>
+                            <div className="p-4 bg-green-100 rounded-lg text-center">
+                              <p className="text-xs font-medium text-gray-700">
+                                {t("cutting.pass")}
+                              </p>
+                              <p className="text-lg font-bold">
+                                {bundleTableData.reduce((acc, row) => {
+                                  const bundleIndex = row.bundleNo - 1;
+                                  const totalPcs = calculateTotalPcs(row);
+                                  const totalReject = [
+                                    "Top",
+                                    "Middle",
+                                    "Bottom",
+                                  ].reduce(
+                                    (rejectAcc, tab) =>
+                                      rejectAcc +
+                                      (summary[tab].bundles?.[bundleIndex]
+                                        ?.totalReject || 0),
+                                    0,
+                                  );
+                                  return acc + (totalPcs - totalReject);
+                                }, 0)}
+                              </p>
+                              <p className="text-xs text-gray-600 mt-1">
+                                T:{" "}
+                                {bundleTableData.reduce((acc, row) => {
+                                  const bundleIndex = row.bundleNo - 1;
+                                  const totalPcs =
+                                    row.parts.length *
+                                    (parseInt(row.tValue) || 5);
+                                  const reject =
+                                    summary.Top.bundles?.[bundleIndex]
+                                      ?.totalReject || 0;
+                                  return acc + (totalPcs - reject);
+                                }, 0)}
+                                , M:{" "}
+                                {bundleTableData.reduce((acc, row) => {
+                                  const bundleIndex = row.bundleNo - 1;
+                                  const totalPcs =
+                                    row.parts.length *
+                                    (parseInt(row.mValue) || 5);
+                                  const reject =
+                                    summary.Middle.bundles?.[bundleIndex]
+                                      ?.totalReject || 0;
+                                  return acc + (totalPcs - reject);
+                                }, 0)}
+                                , B:{" "}
+                                {bundleTableData.reduce((acc, row) => {
+                                  const bundleIndex = row.bundleNo - 1;
+                                  const totalPcs =
+                                    row.parts.length *
+                                    (parseInt(row.bValue) || 5);
+                                  const reject =
+                                    summary.Bottom.bundles?.[bundleIndex]
+                                      ?.totalReject || 0;
+                                  return acc + (totalPcs - reject);
+                                }, 0)}
+                              </p>
+                            </div>
+                            <div className="p-4 bg-red-100 rounded-lg text-center">
+                              <p className="text-xs font-medium text-gray-700">
+                                {t("cutting.reject")}
+                              </p>
+                              <p className="text-lg font-bold">{totalReject}</p>
+                              <p className="text-xs text-gray-600 mt-1">
+                                T: {summary.Top.totalReject}, M:{" "}
+                                {summary.Middle.totalReject}, B:{" "}
+                                {summary.Bottom.totalReject}
+                              </p>
+                            </div>
+                            <div className="p-4 bg-orange-100 rounded-lg text-center">
+                              <p className="text-xs font-medium text-gray-700">
+                                {t("cutting.rejectMeasurements")}
+                              </p>
+                              <p className="text-lg font-bold">
+                                {summary.Top.rejectMeasurement +
+                                  summary.Middle.rejectMeasurement +
+                                  summary.Bottom.rejectMeasurement}
+                              </p>
+                              <p className="text-xs text-gray-600 mt-1">
+                                T: {summary.Top.rejectMeasurement}, M:{" "}
+                                {summary.Middle.rejectMeasurement}, B:{" "}
+                                {summary.Bottom.rejectMeasurement}
+                              </p>
+                            </div>
+                            <div className="p-4 bg-purple-100 rounded-lg text-center">
+                              <p className="text-xs font-medium text-gray-700">
+                                {t("cutting.rejectDefects")}
+                              </p>
+                              <p className="text-lg font-bold">
+                                {summary.Top.rejectDefects +
+                                  summary.Middle.rejectDefects +
+                                  summary.Bottom.rejectDefects}
+                              </p>
+                              <p className="text-xs text-gray-600 mt-1">
+                                T: {summary.Top.rejectDefects}, M:{" "}
+                                {summary.Middle.rejectDefects}, B:{" "}
+                                {summary.Bottom.rejectDefects}
+                              </p>
+                            </div>
+                            {(() => {
+                              const totalParts = bundleTableData.reduce(
+                                (acc, row) => acc + calculateTotalPcs(row),
+                                0,
+                              );
+                              const totalPass = bundleTableData.reduce(
+                                (acc, row) => {
+                                  const bundleIndex = row.bundleNo - 1;
+                                  const totalPcs = calculateTotalPcs(row);
+                                  const totalReject = [
+                                    "Top",
+                                    "Middle",
+                                    "Bottom",
+                                  ].reduce(
+                                    (rejectAcc, tab) =>
+                                      rejectAcc +
+                                      (summary[tab].bundles?.[bundleIndex]
+                                        ?.totalReject || 0),
+                                    0,
+                                  );
+                                  return acc + (totalPcs - totalReject);
+                                },
+                                0,
+                              );
+                              const passRate =
+                                totalParts > 0
+                                  ? ((totalPass / totalParts) * 100).toFixed(2)
+                                  : 0;
+                              const bgColor =
+                                passRate < 90 ? "bg-red-100" : "bg-green-100";
+
+                              return (
+                                <div
+                                  className={`p-4 ${bgColor} rounded-lg text-center`}
+                                >
+                                  <p className="text-xs font-medium text-gray-700">
+                                    {t("cutting.passRate")}
+                                  </p>
+                                  <p className="text-lg font-bold">
+                                    {passRate}%
+                                  </p>
+                                  <p className="text-xs text-gray-600 mt-1">
+                                    T:{" "}
+                                    {(() => {
+                                      const parts = bundleTableData.reduce(
+                                        (acc, row) =>
+                                          acc +
+                                          row.parts.length *
+                                            (parseInt(row.tValue) || 5),
+                                        0,
+                                      );
+                                      const pass = bundleTableData.reduce(
+                                        (acc, row) => {
+                                          const bundleIndex = row.bundleNo - 1;
+                                          const totalPcs =
+                                            row.parts.length *
+                                            (parseInt(row.tValue) || 5);
+                                          const reject =
+                                            summary.Top.bundles?.[bundleIndex]
+                                              ?.totalReject || 0;
+                                          return acc + (totalPcs - reject);
+                                        },
+                                        0,
+                                      );
+                                      return parts > 0
+                                        ? ((pass / parts) * 100).toFixed(0)
+                                        : 0;
+                                    })()}
+                                    %, M:{" "}
+                                    {(() => {
+                                      const parts = bundleTableData.reduce(
+                                        (acc, row) =>
+                                          acc +
+                                          row.parts.length *
+                                            (parseInt(row.mValue) || 5),
+                                        0,
+                                      );
+                                      const pass = bundleTableData.reduce(
+                                        (acc, row) => {
+                                          const bundleIndex = row.bundleNo - 1;
+                                          const totalPcs =
+                                            row.parts.length *
+                                            (parseInt(row.mValue) || 5);
+                                          const reject =
+                                            summary.Middle.bundles?.[
+                                              bundleIndex
+                                            ]?.totalReject || 0;
+                                          return acc + (totalPcs - reject);
+                                        },
+                                        0,
+                                      );
+                                      return parts > 0
+                                        ? ((pass / parts) * 100).toFixed(0)
+                                        : 0;
+                                    })()}
+                                    %, B:{" "}
+                                    {(() => {
+                                      const parts = bundleTableData.reduce(
+                                        (acc, row) =>
+                                          acc +
+                                          row.parts.length *
+                                            (parseInt(row.bValue) || 5),
+                                        0,
+                                      );
+                                      const pass = bundleTableData.reduce(
+                                        (acc, row) => {
+                                          const bundleIndex = row.bundleNo - 1;
+                                          const totalPcs =
+                                            row.parts.length *
+                                            (parseInt(row.bValue) || 5);
+                                          const reject =
+                                            summary.Bottom.bundles?.[
+                                              bundleIndex
+                                            ]?.totalReject || 0;
+                                          return acc + (totalPcs - reject);
+                                        },
+                                        0,
+                                      );
+                                      return parts > 0
+                                        ? ((pass / parts) * 100).toFixed(0)
+                                        : 0;
+                                    })()}
+                                    %
+                                  </p>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                        <hr className="my-4 border-gray-300" />
+                        <h3 className="text-sm font-medium text-gray-600 mb-2">
+                          {t("cutting.measurementDetails")}
+                        </h3>
+                        <div className="flex justify-center mb-4">
+                          <button
+                            onClick={() => setActiveMeasurementTab("Top")}
+                            className={`px-4 py-2 ${
+                              activeMeasurementTab === "Top"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-200 text-gray-700"
+                            } rounded-l-lg`}
+                          >
+                            {t("cutting.top")}
+                          </button>
+                          <button
+                            onClick={() => setActiveMeasurementTab("Middle")}
+                            className={`px-4 py-2 ${
+                              activeMeasurementTab === "Middle"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-200 text-gray-700"
+                            }`}
+                          >
+                            {t("cutting.middle")}
+                          </button>
+                          <button
+                            onClick={() => setActiveMeasurementTab("Bottom")}
+                            className={`px-4 py-2 ${
+                              activeMeasurementTab === "Bottom"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-200 text-gray-700"
+                            } rounded-r-lg`}
+                          >
+                            {t("cutting.bottom")}
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-4 gap-4 mb-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                              {t("cutting.panelType")}
+                            </label>
+                            <select
+                              value={filters.panelName}
+                              onChange={(e) =>
+                                setFilters({
+                                  ...filters,
+                                  panelName: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
+                            >
+                              <option value="">All</option>
+                              {uniqueOptions("panelName").map(
+                                (option, index) => (
+                                  <option key={index} value={option}>
+                                    {option}
+                                  </option>
+                                ),
+                              )}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                              {t("cutting.side")}
+                            </label>
+                            <select
+                              value={filters.side}
+                              onChange={(e) =>
+                                setFilters({
+                                  ...filters,
+                                  side: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
+                            >
+                              <option value="">All</option>
+                              {uniqueOptions("panelSide").map(
+                                (option, index) => (
+                                  <option key={index} value={option}>
+                                    {option}
+                                  </option>
+                                ),
+                              )}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                              {t("cutting.direction")}
+                            </label>
+                            <select
+                              value={filters.direction}
+                              onChange={(e) =>
+                                setFilters({
+                                  ...filters,
+                                  direction: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
+                            >
+                              <option value="">All</option>
+                              {uniqueOptions("panelDirection").map(
+                                (option, index) => (
+                                  <option key={index} value={option}>
+                                    {option}
+                                  </option>
+                                ),
+                              )}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                              {t("cutting.lw")}
+                            </label>
+                            <select
+                              value={filters.lw}
+                              onChange={(e) =>
+                                setFilters({
+                                  ...filters,
+                                  lw: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
+                            >
+                              <option value="">All</option>
+                              {uniqueOptions("measurementSide").map(
+                                (option, index) => (
+                                  <option key={index} value={option}>
+                                    {option}
+                                  </option>
+                                ),
+                              )}
+                            </select>
+                          </div>
+                        </div>
+                        {bundleTableData.map((bundle, bundleIndex) => {
+                          if (
+                            !tableData[bundleIndex] ||
+                            bundle.parts.length === 0
+                          ) {
                             return (
-                              <div
-                                className={`p-4 ${bgColor} rounded-lg text-center`}
-                              >
-                                <p className="text-xs font-medium text-gray-700">
-                                  {t("cutting.passRate")}
-                                </p>
-                                <p className="text-lg font-bold">{passRate}%</p>
-                                <p className="text-xs text-gray-600 mt-1">
-                                  T:{" "}
-                                  {(() => {
-                                    const parts = bundleTableData.reduce(
-                                      (acc, row) =>
-                                        acc +
-                                        row.parts.length *
-                                          (parseInt(row.tValue) || 5),
-                                      0
-                                    );
-                                    const pass = bundleTableData.reduce(
-                                      (acc, row) => {
-                                        const bundleIndex = row.bundleNo - 1;
-                                        const totalPcs =
-                                          row.parts.length *
-                                          (parseInt(row.tValue) || 5);
-                                        const reject =
-                                          summary.Top.bundles?.[bundleIndex]
-                                            ?.totalReject || 0;
-                                        return acc + (totalPcs - reject);
-                                      },
-                                      0
-                                    );
-                                    return parts > 0
-                                      ? ((pass / parts) * 100).toFixed(0)
-                                      : 0;
-                                  })()}
-                                  %, M:{" "}
-                                  {(() => {
-                                    const parts = bundleTableData.reduce(
-                                      (acc, row) =>
-                                        acc +
-                                        row.parts.length *
-                                          (parseInt(row.mValue) || 5),
-                                      0
-                                    );
-                                    const pass = bundleTableData.reduce(
-                                      (acc, row) => {
-                                        const bundleIndex = row.bundleNo - 1;
-                                        const totalPcs =
-                                          row.parts.length *
-                                          (parseInt(row.mValue) || 5);
-                                        const reject =
-                                          summary.Middle.bundles?.[bundleIndex]
-                                            ?.totalReject || 0;
-                                        return acc + (totalPcs - reject);
-                                      },
-                                      0
-                                    );
-                                    return parts > 0
-                                      ? ((pass / parts) * 100).toFixed(0)
-                                      : 0;
-                                  })()}
-                                  %, B:{" "}
-                                  {(() => {
-                                    const parts = bundleTableData.reduce(
-                                      (acc, row) =>
-                                        acc +
-                                        row.parts.length *
-                                          (parseInt(row.bValue) || 5),
-                                      0
-                                    );
-                                    const pass = bundleTableData.reduce(
-                                      (acc, row) => {
-                                        const bundleIndex = row.bundleNo - 1;
-                                        const totalPcs =
-                                          row.parts.length *
-                                          (parseInt(row.bValue) || 5);
-                                        const reject =
-                                          summary.Bottom.bundles?.[bundleIndex]
-                                            ?.totalReject || 0;
-                                        return acc + (totalPcs - reject);
-                                      },
-                                      0
-                                    );
-                                    return parts > 0
-                                      ? ((pass / parts) * 100).toFixed(0)
-                                      : 0;
-                                  })()}
-                                  %
+                              <div key={bundleIndex} className="mt-4">
+                                <h2 className="text-sm font-semibold text-gray-700 mb-2">
+                                  {t("cutting.bundleNo")}: {bundle.bundleNo}
+                                </h2>
+                                <p className="text-sm text-gray-600">
+                                  {t("cutting.noPartsSelected")}
                                 </p>
                               </div>
                             );
-                          })()}
-                        </div>
-                      </div>
-                      <hr className="my-4 border-gray-300" />
-                      <h3 className="text-sm font-medium text-gray-600 mb-2">
-                        {t("cutting.measurementDetails")}
-                      </h3>
-                      <div className="flex justify-center mb-4">
-                        <button
-                          onClick={() => setActiveMeasurementTab("Top")}
-                          className={`px-4 py-2 ${
-                            activeMeasurementTab === "Top"
-                              ? "bg-blue-600 text-white"
-                              : "bg-gray-200 text-gray-700"
-                          } rounded-l-lg`}
-                        >
-                          {t("cutting.top")}
-                        </button>
-                        <button
-                          onClick={() => setActiveMeasurementTab("Middle")}
-                          className={`px-4 py-2 ${
-                            activeMeasurementTab === "Middle"
-                              ? "bg-blue-600 text-white"
-                              : "bg-gray-200 text-gray-700"
-                          }`}
-                        >
-                          {t("cutting.middle")}
-                        </button>
-                        <button
-                          onClick={() => setActiveMeasurementTab("Bottom")}
-                          className={`px-4 py-2 ${
-                            activeMeasurementTab === "Bottom"
-                              ? "bg-blue-600 text-white"
-                              : "bg-gray-200 text-gray-700"
-                          } rounded-r-lg`}
-                        >
-                          {t("cutting.bottom")}
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-4 gap-4 mb-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700">
-                            {t("cutting.panelType")}
-                          </label>
-                          <select
-                            value={filters.panelName}
-                            onChange={(e) =>
-                              setFilters({
-                                ...filters,
-                                panelName: e.target.value
-                              })
-                            }
-                            className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                          >
-                            <option value="">All</option>
-                            {uniqueOptions("panelName").map((option, index) => (
-                              <option key={index} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700">
-                            {t("cutting.side")}
-                          </label>
-                          <select
-                            value={filters.side}
-                            onChange={(e) =>
-                              setFilters({
-                                ...filters,
-                                side: e.target.value
-                              })
-                            }
-                            className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                          >
-                            <option value="">All</option>
-                            {uniqueOptions("panelSide").map((option, index) => (
-                              <option key={index} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700">
-                            {t("cutting.direction")}
-                          </label>
-                          <select
-                            value={filters.direction}
-                            onChange={(e) =>
-                              setFilters({
-                                ...filters,
-                                direction: e.target.value
-                              })
-                            }
-                            className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                          >
-                            <option value="">All</option>
-                            {uniqueOptions("panelDirection").map(
-                              (option, index) => (
-                                <option key={index} value={option}>
-                                  {option}
-                                </option>
-                              )
-                            )}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700">
-                            {t("cutting.lw")}
-                          </label>
-                          <select
-                            value={filters.lw}
-                            onChange={(e) =>
-                              setFilters({
-                                ...filters,
-                                lw: e.target.value
-                              })
-                            }
-                            className="mt-1 w-full p-2 border border-gray-300 rounded-lg"
-                          >
-                            <option value="">All</option>
-                            {uniqueOptions("measurementSide").map(
-                              (option, index) => (
-                                <option key={index} value={option}>
-                                  {option}
-                                </option>
-                              )
-                            )}
-                          </select>
-                        </div>
-                      </div>
-                      {bundleTableData.map((bundle, bundleIndex) => {
-                        if (
-                          !tableData[bundleIndex] ||
-                          bundle.parts.length === 0
-                        ) {
+                          }
                           return (
                             <div key={bundleIndex} className="mt-4">
                               <h2 className="text-sm font-semibold text-gray-700 mb-2">
                                 {t("cutting.bundleNo")}: {bundle.bundleNo}
                               </h2>
-                              <p className="text-sm text-gray-600">
-                                {t("cutting.noPartsSelected")}
-                              </p>
-                            </div>
-                          );
-                        }
-                        return (
-                          <div key={bundleIndex} className="mt-4">
-                            <h2 className="text-sm font-semibold text-gray-700 mb-2">
-                              {t("cutting.bundleNo")}: {bundle.bundleNo}
-                            </h2>
 
-                            <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-6 gap-4 mb-4">
-                              <div className="p-4 bg-blue-100 rounded-lg text-center">
-                                <p className="text-xs font-medium text-gray-700">
-                                  {t("cutting.parts")}
-                                </p>
+                              <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-6 gap-4 mb-4">
+                                <div className="p-4 bg-blue-100 rounded-lg text-center">
+                                  <p className="text-xs font-medium text-gray-700">
+                                    {t("cutting.parts")}
+                                  </p>
 
-                                <p className="text-lg font-bold">
-                                  {calculateTotalPcs(bundle)}
-                                </p>
-                                <p className="text-xs text-gray-600 mt-1">
-                                  T:{" "}
-                                  {bundle.parts.length *
-                                    (parseInt(bundle.tValue) || 5)}
-                                  , M:{" "}
-                                  {bundle.parts.length *
-                                    (parseInt(bundle.mValue) || 5)}
-                                  , B:{" "}
-                                  {bundle.parts.length *
-                                    (parseInt(bundle.bValue) || 5)}
-                                </p>
-                              </div>
-                              <div className="p-4 bg-green-100 rounded-lg text-center">
-                                <p className="text-xs font-medium text-gray-700">
-                                  {t("cutting.pass")}
-                                </p>
-                                <p className="text-lg font-bold">
-                                  {(() => {
-                                    const totalPcs = calculateTotalPcs(bundle);
-                                    const totalReject = [
-                                      "Top",
-                                      "Middle",
-                                      "Bottom"
-                                    ].reduce(
+                                  <p className="text-lg font-bold">
+                                    {calculateTotalPcs(bundle)}
+                                  </p>
+                                  <p className="text-xs text-gray-600 mt-1">
+                                    T:{" "}
+                                    {bundle.parts.length *
+                                      (parseInt(bundle.tValue) || 5)}
+                                    , M:{" "}
+                                    {bundle.parts.length *
+                                      (parseInt(bundle.mValue) || 5)}
+                                    , B:{" "}
+                                    {bundle.parts.length *
+                                      (parseInt(bundle.bValue) || 5)}
+                                  </p>
+                                </div>
+                                <div className="p-4 bg-green-100 rounded-lg text-center">
+                                  <p className="text-xs font-medium text-gray-700">
+                                    {t("cutting.pass")}
+                                  </p>
+                                  <p className="text-lg font-bold">
+                                    {(() => {
+                                      const totalPcs =
+                                        calculateTotalPcs(bundle);
+                                      const totalReject = [
+                                        "Top",
+                                        "Middle",
+                                        "Bottom",
+                                      ].reduce(
+                                        (acc, tab) =>
+                                          acc +
+                                          (summary[tab].bundles?.[bundleIndex]
+                                            ?.totalReject || 0),
+                                        0,
+                                      );
+                                      return totalPcs - totalReject;
+                                    })()}
+                                  </p>
+                                  <p className="text-xs text-gray-600 mt-1">
+                                    T:{" "}
+                                    {bundle.parts.length *
+                                      (parseInt(bundle.tValue) || 5) -
+                                      (summary.Top.bundles?.[bundleIndex]
+                                        ?.totalReject || 0)}
+                                    , M:{" "}
+                                    {bundle.parts.length *
+                                      (parseInt(bundle.mValue) || 5) -
+                                      (summary.Middle.bundles?.[bundleIndex]
+                                        ?.totalReject || 0)}
+                                    , B:{" "}
+                                    {bundle.parts.length *
+                                      (parseInt(bundle.bValue) || 5) -
+                                      (summary.Bottom.bundles?.[bundleIndex]
+                                        ?.totalReject || 0)}
+                                  </p>
+                                </div>
+                                <div className="p-4 bg-red-100 rounded-lg text-center">
+                                  <p className="text-xs font-medium text-gray-700">
+                                    {t("cutting.reject")}
+                                  </p>
+                                  <p className="text-lg font-bold">
+                                    {["Top", "Middle", "Bottom"].reduce(
                                       (acc, tab) =>
                                         acc +
                                         (summary[tab].bundles?.[bundleIndex]
                                           ?.totalReject || 0),
-                                      0
+                                      0,
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-gray-600 mt-1">
+                                    T:{" "}
+                                    {summary.Top.bundles?.[bundleIndex]
+                                      ?.totalReject || 0}
+                                    , M:{" "}
+                                    {summary.Middle.bundles?.[bundleIndex]
+                                      ?.totalReject || 0}
+                                    , B:{" "}
+                                    {summary.Bottom.bundles?.[bundleIndex]
+                                      ?.totalReject || 0}
+                                  </p>
+                                </div>
+                                <div className="p-4 bg-orange-100 rounded-lg text-center">
+                                  <p className="text-xs font-medium text-gray-700">
+                                    {t("cutting.rejectMeasurements")}
+                                  </p>
+                                  <p className="text-lg font-bold">
+                                    {["Top", "Middle", "Bottom"].reduce(
+                                      (acc, tab) =>
+                                        acc +
+                                        (summary[tab].bundles?.[bundleIndex]
+                                          ?.rejectMeasurement || 0),
+                                      0,
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-gray-600 mt-1">
+                                    T:{" "}
+                                    {summary.Top.bundles?.[bundleIndex]
+                                      ?.rejectMeasurement || 0}
+                                    , M:{" "}
+                                    {summary.Middle.bundles?.[bundleIndex]
+                                      ?.rejectMeasurement || 0}
+                                    , B:{" "}
+                                    {summary.Bottom.bundles?.[bundleIndex]
+                                      ?.rejectMeasurement || 0}
+                                  </p>
+                                </div>
+                                <div className="p-4 bg-purple-100 rounded-lg text-center">
+                                  <p className="text-xs font-medium text-gray-700">
+                                    {t("cutting.rejectDefects")}
+                                  </p>
+                                  <p className="text-lg font-bold">
+                                    {["Top", "Middle", "Bottom"].reduce(
+                                      (acc, tab) =>
+                                        acc +
+                                        (summary[tab].bundles?.[bundleIndex]
+                                          ?.rejectDefects || 0),
+                                      0,
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-gray-600 mt-1">
+                                    T:{" "}
+                                    {summary.Top.bundles?.[bundleIndex]
+                                      ?.rejectDefects || 0}
+                                    , M:{" "}
+                                    {summary.Middle.bundles?.[bundleIndex]
+                                      ?.rejectDefects || 0}
+                                    , B:{" "}
+                                    {summary.Bottom.bundles?.[bundleIndex]
+                                      ?.rejectDefects || 0}
+                                  </p>
+                                </div>
+                                {(() => {
+                                  const totalPcs = calculateTotalPcs(bundle);
+                                  const totalPass =
+                                    totalPcs -
+                                    ["Top", "Middle", "Bottom"].reduce(
+                                      (acc, tab) =>
+                                        acc +
+                                        (summary[tab].bundles?.[bundleIndex]
+                                          ?.totalReject || 0),
+                                      0,
                                     );
-                                    return totalPcs - totalReject;
-                                  })()}
-                                </p>
-                                <p className="text-xs text-gray-600 mt-1">
-                                  T:{" "}
-                                  {bundle.parts.length *
-                                    (parseInt(bundle.tValue) || 5) -
-                                    (summary.Top.bundles?.[bundleIndex]
-                                      ?.totalReject || 0)}
-                                  , M:{" "}
-                                  {bundle.parts.length *
-                                    (parseInt(bundle.mValue) || 5) -
-                                    (summary.Middle.bundles?.[bundleIndex]
-                                      ?.totalReject || 0)}
-                                  , B:{" "}
-                                  {bundle.parts.length *
-                                    (parseInt(bundle.bValue) || 5) -
-                                    (summary.Bottom.bundles?.[bundleIndex]
-                                      ?.totalReject || 0)}
-                                </p>
-                              </div>
-                              <div className="p-4 bg-red-100 rounded-lg text-center">
-                                <p className="text-xs font-medium text-gray-700">
-                                  {t("cutting.reject")}
-                                </p>
-                                <p className="text-lg font-bold">
-                                  {["Top", "Middle", "Bottom"].reduce(
-                                    (acc, tab) =>
-                                      acc +
-                                      (summary[tab].bundles?.[bundleIndex]
-                                        ?.totalReject || 0),
-                                    0
-                                  )}
-                                </p>
-                                <p className="text-xs text-gray-600 mt-1">
-                                  T:{" "}
-                                  {summary.Top.bundles?.[bundleIndex]
-                                    ?.totalReject || 0}
-                                  , M:{" "}
-                                  {summary.Middle.bundles?.[bundleIndex]
-                                    ?.totalReject || 0}
-                                  , B:{" "}
-                                  {summary.Bottom.bundles?.[bundleIndex]
-                                    ?.totalReject || 0}
-                                </p>
-                              </div>
-                              <div className="p-4 bg-orange-100 rounded-lg text-center">
-                                <p className="text-xs font-medium text-gray-700">
-                                  {t("cutting.rejectMeasurements")}
-                                </p>
-                                <p className="text-lg font-bold">
-                                  {["Top", "Middle", "Bottom"].reduce(
-                                    (acc, tab) =>
-                                      acc +
-                                      (summary[tab].bundles?.[bundleIndex]
-                                        ?.rejectMeasurement || 0),
-                                    0
-                                  )}
-                                </p>
-                                <p className="text-xs text-gray-600 mt-1">
-                                  T:{" "}
-                                  {summary.Top.bundles?.[bundleIndex]
-                                    ?.rejectMeasurement || 0}
-                                  , M:{" "}
-                                  {summary.Middle.bundles?.[bundleIndex]
-                                    ?.rejectMeasurement || 0}
-                                  , B:{" "}
-                                  {summary.Bottom.bundles?.[bundleIndex]
-                                    ?.rejectMeasurement || 0}
-                                </p>
-                              </div>
-                              <div className="p-4 bg-purple-100 rounded-lg text-center">
-                                <p className="text-xs font-medium text-gray-700">
-                                  {t("cutting.rejectDefects")}
-                                </p>
-                                <p className="text-lg font-bold">
-                                  {["Top", "Middle", "Bottom"].reduce(
-                                    (acc, tab) =>
-                                      acc +
-                                      (summary[tab].bundles?.[bundleIndex]
-                                        ?.rejectDefects || 0),
-                                    0
-                                  )}
-                                </p>
-                                <p className="text-xs text-gray-600 mt-1">
-                                  T:{" "}
-                                  {summary.Top.bundles?.[bundleIndex]
-                                    ?.rejectDefects || 0}
-                                  , M:{" "}
-                                  {summary.Middle.bundles?.[bundleIndex]
-                                    ?.rejectDefects || 0}
-                                  , B:{" "}
-                                  {summary.Bottom.bundles?.[bundleIndex]
-                                    ?.rejectDefects || 0}
-                                </p>
-                              </div>
-                              {(() => {
-                                const totalPcs = calculateTotalPcs(bundle);
-                                const totalPass =
-                                  totalPcs -
-                                  ["Top", "Middle", "Bottom"].reduce(
-                                    (acc, tab) =>
-                                      acc +
-                                      (summary[tab].bundles?.[bundleIndex]
-                                        ?.totalReject || 0),
-                                    0
-                                  );
-                                const passRate =
-                                  totalPcs > 0
-                                    ? ((totalPass / totalPcs) * 100).toFixed(2)
-                                    : 0;
-                                const bgColor =
-                                  passRate < 90 ? "bg-red-100" : "bg-green-100";
+                                  const passRate =
+                                    totalPcs > 0
+                                      ? ((totalPass / totalPcs) * 100).toFixed(
+                                          2,
+                                        )
+                                      : 0;
+                                  const bgColor =
+                                    passRate < 90
+                                      ? "bg-red-100"
+                                      : "bg-green-100";
 
-                                return (
-                                  <div
-                                    className={`p-4 ${bgColor} rounded-lg text-center`}
-                                  >
-                                    <p className="text-xs font-medium text-gray-700">
-                                      {t("cutting.passRate")}
-                                    </p>
-                                    <p className="text-lg font-bold">
-                                      {passRate}%
-                                    </p>
-                                    <p className="text-xs text-gray-600 mt-1">
-                                      T:{" "}
-                                      {(() => {
-                                        const totalPcs =
-                                          bundle.parts.length *
-                                          (parseInt(bundle.tValue) || 5);
-                                        const totalPass =
-                                          totalPcs -
-                                          (summary.Top.bundles?.[bundleIndex]
-                                            ?.totalReject || 0);
-                                        return totalPcs > 0
-                                          ? (
-                                              (totalPass / totalPcs) *
-                                              100
-                                            ).toFixed(0)
-                                          : 0;
-                                      })()}
-                                      %, M:{" "}
-                                      {(() => {
-                                        const totalPcs =
-                                          bundle.parts.length *
-                                          (parseInt(bundle.mValue) || 5);
-                                        const totalPass =
-                                          totalPcs -
-                                          (summary.Middle.bundles?.[bundleIndex]
-                                            ?.totalReject || 0);
-                                        return totalPcs > 0
-                                          ? (
-                                              (totalPass / totalPcs) *
-                                              100
-                                            ).toFixed(0)
-                                          : 0;
-                                      })()}
-                                      %, B:{" "}
-                                      {(() => {
-                                        const totalPcs =
-                                          bundle.parts.length *
-                                          (parseInt(bundle.bValue) || 5);
-                                        const totalPass =
-                                          totalPcs -
-                                          (summary.Bottom.bundles?.[bundleIndex]
-                                            ?.totalReject || 0);
-                                        return totalPcs > 0
-                                          ? (
-                                              (totalPass / totalPcs) *
-                                              100
-                                            ).toFixed(0)
-                                          : 0;
-                                      })()}
-                                      %
-                                    </p>
-                                  </div>
-                                );
-                              })()}
+                                  return (
+                                    <div
+                                      className={`p-4 ${bgColor} rounded-lg text-center`}
+                                    >
+                                      <p className="text-xs font-medium text-gray-700">
+                                        {t("cutting.passRate")}
+                                      </p>
+                                      <p className="text-lg font-bold">
+                                        {passRate}%
+                                      </p>
+                                      <p className="text-xs text-gray-600 mt-1">
+                                        T:{" "}
+                                        {(() => {
+                                          const totalPcs =
+                                            bundle.parts.length *
+                                            (parseInt(bundle.tValue) || 5);
+                                          const totalPass =
+                                            totalPcs -
+                                            (summary.Top.bundles?.[bundleIndex]
+                                              ?.totalReject || 0);
+                                          return totalPcs > 0
+                                            ? (
+                                                (totalPass / totalPcs) *
+                                                100
+                                              ).toFixed(0)
+                                            : 0;
+                                        })()}
+                                        %, M:{" "}
+                                        {(() => {
+                                          const totalPcs =
+                                            bundle.parts.length *
+                                            (parseInt(bundle.mValue) || 5);
+                                          const totalPass =
+                                            totalPcs -
+                                            (summary.Middle.bundles?.[
+                                              bundleIndex
+                                            ]?.totalReject || 0);
+                                          return totalPcs > 0
+                                            ? (
+                                                (totalPass / totalPcs) *
+                                                100
+                                              ).toFixed(0)
+                                            : 0;
+                                        })()}
+                                        %, B:{" "}
+                                        {(() => {
+                                          const totalPcs =
+                                            bundle.parts.length *
+                                            (parseInt(bundle.bValue) || 5);
+                                          const totalPass =
+                                            totalPcs -
+                                            (summary.Bottom.bundles?.[
+                                              bundleIndex
+                                            ]?.totalReject || 0);
+                                          return totalPcs > 0
+                                            ? (
+                                                (totalPass / totalPcs) *
+                                                100
+                                              ).toFixed(0)
+                                            : 0;
+                                        })()}
+                                        %
+                                      </p>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                              {activeMeasurementTab === "Top" && (
+                                <MeasurementTable
+                                  key={`Top-${selectedPanel}-${bundleIndex}`}
+                                  tab="Top"
+                                  measurementPoints={measurementPoints} //{filteredMeasurementPoints}
+                                  numColumns={colCounts[bundleIndex]?.Top || 5}
+                                  tolerance={tolerance}
+                                  onUpdate={(data) =>
+                                    updateSummary("Top", data, bundleIndex)
+                                  }
+                                  tableData={tableData[bundleIndex]?.Top || []}
+                                  setTableData={(data) =>
+                                    updateTableData(bundleIndex, "Top", data)
+                                  }
+                                  filters={filters}
+                                  defects={
+                                    columnDefects[bundleIndex]?.Top || []
+                                  }
+                                  setDefects={(newDefects) =>
+                                    updateDefects(
+                                      bundleIndex,
+                                      "Top",
+                                      newDefects,
+                                    )
+                                  }
+                                  bundleIndex={bundleIndex}
+                                  selectedParts={bundle.parts}
+                                  moNo={moNo}
+                                  fabricDefects={fabricDefects} // Add this prop
+                                />
+                              )}
+                              {activeMeasurementTab === "Middle" && (
+                                <MeasurementTable
+                                  key={`Middle-${selectedPanel}-${bundleIndex}`}
+                                  tab="Middle"
+                                  measurementPoints={measurementPoints} //{filteredMeasurementPoints}
+                                  numColumns={
+                                    colCounts[bundleIndex]?.Middle || 5
+                                  }
+                                  tolerance={tolerance}
+                                  onUpdate={(data) =>
+                                    updateSummary("Middle", data, bundleIndex)
+                                  }
+                                  tableData={
+                                    tableData[bundleIndex]?.Middle || []
+                                  }
+                                  setTableData={(data) =>
+                                    updateTableData(bundleIndex, "Middle", data)
+                                  }
+                                  filters={filters}
+                                  defects={
+                                    columnDefects[bundleIndex]?.Middle || []
+                                  }
+                                  setDefects={(newDefects) =>
+                                    updateDefects(
+                                      bundleIndex,
+                                      "Middle",
+                                      newDefects,
+                                    )
+                                  }
+                                  bundleIndex={bundleIndex}
+                                  selectedParts={bundle.parts}
+                                  moNo={moNo}
+                                  fabricDefects={fabricDefects} // Add this prop
+                                />
+                              )}
+                              {activeMeasurementTab === "Bottom" && (
+                                <MeasurementTable
+                                  key={`Bottom-${selectedPanel}-${bundleIndex}`}
+                                  tab="Bottom"
+                                  measurementPoints={measurementPoints} //{filteredMeasurementPoints}
+                                  numColumns={
+                                    colCounts[bundleIndex]?.Bottom || 5
+                                  }
+                                  tolerance={tolerance}
+                                  onUpdate={(data) =>
+                                    updateSummary("Bottom", data, bundleIndex)
+                                  }
+                                  tableData={
+                                    tableData[bundleIndex]?.Bottom || []
+                                  }
+                                  setTableData={(data) =>
+                                    updateTableData(bundleIndex, "Bottom", data)
+                                  }
+                                  filters={filters}
+                                  defects={
+                                    columnDefects[bundleIndex]?.Bottom || []
+                                  }
+                                  setDefects={(newDefects) =>
+                                    updateDefects(
+                                      bundleIndex,
+                                      "Bottom",
+                                      newDefects,
+                                    )
+                                  }
+                                  bundleIndex={bundleIndex}
+                                  selectedParts={bundle.parts}
+                                  moNo={moNo}
+                                  fabricDefects={fabricDefects} // Add this prop
+                                />
+                              )}
                             </div>
-                            {activeMeasurementTab === "Top" && (
-                              <MeasurementTable
-                                key={`Top-${selectedPanel}-${bundleIndex}`}
-                                tab="Top"
-                                measurementPoints={measurementPoints} //{filteredMeasurementPoints}
-                                numColumns={colCounts[bundleIndex]?.Top || 5}
-                                tolerance={tolerance}
-                                onUpdate={(data) =>
-                                  updateSummary("Top", data, bundleIndex)
-                                }
-                                tableData={tableData[bundleIndex]?.Top || []}
-                                setTableData={(data) =>
-                                  updateTableData(bundleIndex, "Top", data)
-                                }
-                                filters={filters}
-                                defects={columnDefects[bundleIndex]?.Top || []}
-                                setDefects={(newDefects) =>
-                                  updateDefects(bundleIndex, "Top", newDefects)
-                                }
-                                bundleIndex={bundleIndex}
-                                selectedParts={bundle.parts}
-                                moNo={moNo}
-                                fabricDefects={fabricDefects} // Add this prop
-                              />
-                            )}
-                            {activeMeasurementTab === "Middle" && (
-                              <MeasurementTable
-                                key={`Middle-${selectedPanel}-${bundleIndex}`}
-                                tab="Middle"
-                                measurementPoints={measurementPoints} //{filteredMeasurementPoints}
-                                numColumns={colCounts[bundleIndex]?.Middle || 5}
-                                tolerance={tolerance}
-                                onUpdate={(data) =>
-                                  updateSummary("Middle", data, bundleIndex)
-                                }
-                                tableData={tableData[bundleIndex]?.Middle || []}
-                                setTableData={(data) =>
-                                  updateTableData(bundleIndex, "Middle", data)
-                                }
-                                filters={filters}
-                                defects={
-                                  columnDefects[bundleIndex]?.Middle || []
-                                }
-                                setDefects={(newDefects) =>
-                                  updateDefects(
-                                    bundleIndex,
-                                    "Middle",
-                                    newDefects
-                                  )
-                                }
-                                bundleIndex={bundleIndex}
-                                selectedParts={bundle.parts}
-                                moNo={moNo}
-                                fabricDefects={fabricDefects} // Add this prop
-                              />
-                            )}
-                            {activeMeasurementTab === "Bottom" && (
-                              <MeasurementTable
-                                key={`Bottom-${selectedPanel}-${bundleIndex}`}
-                                tab="Bottom"
-                                measurementPoints={measurementPoints} //{filteredMeasurementPoints}
-                                numColumns={colCounts[bundleIndex]?.Bottom || 5}
-                                tolerance={tolerance}
-                                onUpdate={(data) =>
-                                  updateSummary("Bottom", data, bundleIndex)
-                                }
-                                tableData={tableData[bundleIndex]?.Bottom || []}
-                                setTableData={(data) =>
-                                  updateTableData(bundleIndex, "Bottom", data)
-                                }
-                                filters={filters}
-                                defects={
-                                  columnDefects[bundleIndex]?.Bottom || []
-                                }
-                                setDefects={(newDefects) =>
-                                  updateDefects(
-                                    bundleIndex,
-                                    "Bottom",
-                                    newDefects
-                                  )
-                                }
-                                bundleIndex={bundleIndex}
-                                selectedParts={bundle.parts}
-                                moNo={moNo}
-                                fabricDefects={fabricDefects} // Add this prop
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
-                      {/* Add CuttingIssues here, after all bundles */}
-                      {bundleQty && (
-                        <>
-                          <hr className="my-4 border-gray-300" />
-                          <CuttingIssues
-                            ref={cuttingIssuesRef}
-                            moNo={moNo}
-                            selectedPanel={selectedPanel}
-                            //onIssuesChange={handleIssuesChange}
-                          />
-                        </>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
+                          );
+                        })}
+                        {/* Add CuttingIssues here, after all bundles */}
+                        {bundleQty && (
+                          <>
+                            <hr className="my-4 border-gray-300" />
+                            <CuttingIssues
+                              ref={cuttingIssuesRef}
+                              moNo={moNo}
+                              selectedPanel={selectedPanel}
+                              initialData={restoredIssuesData}
+                              onRestoreComplete={() =>
+                                setRestoredIssuesData(null)
+                              }
+                              //onIssuesChange={handleIssuesChange}
+                            />
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-center mt-6">
+                <button
+                  onClick={handleSubmit}
+                  className="px-6 py-3 bg-green-700 text-white rounded-lg hover:bg-green-800"
+                >
+                  {t("cutting.submit")}
+                </button>
+              </div>
+            </>
+          ) : activeTab === "data" ? (
+            <div className="text-gray-600">
+              <CuttingInspectionModify />
             </div>
-            <div className="flex justify-center mt-6">
-              <button
-                onClick={handleSubmit}
-                className="px-6 py-3 bg-green-700 text-white rounded-lg hover:bg-green-800"
-              >
-                {t("cutting.submit")}
-              </button>
+          ) : activeTab === "report" ? (
+            <div className="text-gray-600">
+              <CuttingReportQCView />
             </div>
-          </>
-        ) : activeTab === "data" ? (
-          <div className="text-gray-600">
-            <CuttingInspectionModify />
-          </div>
-        ) : activeTab === "report" ? (
-          <div className="text-gray-600">
-            <CuttingReportQCView />
-          </div>
-        ) : activeTab === "Modify" ? (
-          <div className="text-gray-600">
-            <CuttingMeasurementPointsModify />
-          </div>
-        ) : activeTab === "Adding" ? (
-          <div className="text-gray-600">
-            <CuttingOrderModify />
-          </div>
-        ) : (
-          // <div className="text-gray-600">{t("cutting.dataTabPlaceholder")}</div>
-          <div className="text-gray-600">
-            <AQLChart />
-          </div>
-        )}
+          ) : activeTab === "Modify" ? (
+            <div className="text-gray-600">
+              <CuttingMeasurementPointsModify />
+            </div>
+          ) : activeTab === "Adding" ? (
+            <div className="text-gray-600">
+              <CuttingOrderModify />
+            </div>
+          ) : (
+            // <div className="text-gray-600">{t("cutting.dataTabPlaceholder")}</div>
+            <div className="text-gray-600">
+              <AQLChart />
+            </div>
+          )}
+        </div>
       </div>
+      {/* Helper Styles for scrollbar hiding */}
+      <style jsx>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .bg-grid-white {
+          background-image:
+            linear-gradient(
+              to right,
+              rgba(255, 255, 255, 0.1) 1px,
+              transparent 1px
+            ),
+            linear-gradient(
+              to bottom,
+              rgba(255, 255, 255, 0.1) 1px,
+              transparent 1px
+            );
+        }
+      `}</style>
     </div>
   );
 };

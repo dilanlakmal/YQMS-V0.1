@@ -50,7 +50,9 @@
     "y_pivot_inspection": "Fin Check | Inspection",
     "y_pivot_report": "Fin Check | Reports",
     "afterIroning": "After Ironing",
-    "p88_Legacy": "P88 Legacy"
+    "p88_Legacy": "P88 Legacy",
+    "accessories": "Accessories",
+    "fc": "FC System"
   },
 
   "nav": {
@@ -878,7 +880,10 @@
     "inspectionQty": "Inspection Qty",
     "cutPanelDetailsTitle": "Cut Panel Details",
     "fabricDefectsTitle": "Fabric Defects",
-    "defectDetails": "Defect Details"
+    "defectDetails": "Defect Details",
+    "modifyCuttingInspection": "Modify Report",
+    "modifyInspection": "Modify Inspection",
+    "search": "Search..."
   },
 
   "cuttingReport": {

@@ -27,7 +27,17 @@ import {
   Loader2,
   AlertCircle,
   ChevronRight,
-  Home as HomeIcon
+  Home as HomeIcon,
+  FlaskConical,
+  Package,
+  LayoutDashboard,
+  Factory,
+  Droplets,
+  QrCode,
+  Sparkles,
+  FileCheck,
+  Cog,
+  TrendingUp,
 } from "lucide-react";
 
 // --- Theme Hook for Dark Mode ---
@@ -566,7 +576,7 @@ const TabletGridItem = ({ item, onClick, fincheckActionCount }) => {
       <img
         src={item.image}
         alt={item.title}
-        className="w-10 h-10 object-contain mb-2"
+        className="w-12 h-12 object-contain mb-2"
       />
       <h3 className="text-xs font-bold text-center text-slate-700 dark:text-slate-100 line-clamp-2">
         {item.title}
@@ -574,6 +584,97 @@ const TabletGridItem = ({ item, onClick, fincheckActionCount }) => {
       <p className="text-[10px] text-center text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
         {item.description}
       </p>
+    </div>
+  );
+};
+
+// --- Desktop Sidebar Navigation Item ---
+const DesktopNavItem = ({ section, isActive, onClick }) => {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 group ${
+        isActive
+          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25"
+          : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white"
+      }`}
+    >
+      <div
+        className={`p-2 rounded-lg transition-colors ${
+          isActive
+            ? "bg-white/20"
+            : "bg-slate-100 dark:bg-slate-800 group-hover:bg-slate-200 dark:group-hover:bg-slate-700"
+        }`}
+      >
+        {React.cloneElement(section.icon, {
+          className: `w-5 h-5 ${isActive ? "text-white" : ""}`,
+          style: { margin: 0 },
+        })}
+      </div>
+      <span
+        className={`font-semibold tracking-wide text-sm uppercase ${
+          isActive ? "text-white" : ""
+        }`}
+        style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}
+      >
+        {section.title}
+      </span>
+      <ChevronRight
+        className={`w-4 h-4 ml-auto transition-transform ${
+          isActive
+            ? "text-white/70 translate-x-1"
+            : "opacity-0 group-hover:opacity-50"
+        }`}
+      />
+    </button>
+  );
+};
+
+// --- Desktop Grid Item Component ---
+const DesktopGridItem = ({ item, onClick, fincheckActionCount }) => {
+  return (
+    // 1. Outer Wrapper (Acts as the trigger for 'group' hover effects)
+    <div
+      onClick={onClick}
+      className="group relative w-full h-full cursor-pointer"
+    >
+      {/* 2. NEW ANIMATION LAYER: Glowing/Rotating Gradient Background */}
+      {/* This sits behind the card. On hover, it appears with a blur, creating a glowing border effect */}
+      <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 rounded-2xl opacity-0 group-hover:opacity-100 blur transition duration-1000 group-hover:duration-200" />
+
+      {/* 3. Main Content Card (The visible white box) */}
+      <div className="relative flex flex-col items-center justify-center p-6 rounded-2xl bg-white dark:bg-slate-800 h-full border border-slate-100 dark:border-slate-700 shadow-sm transition-all duration-300 hover:-translate-y-1">
+        {/* Notification Badge */}
+        {item.path === "/fincheck-inspection" && fincheckActionCount > 0 && (
+          <div className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full min-w-[24px] h-6 flex items-center justify-center px-2 shadow-lg animate-pulse z-10">
+            {fincheckActionCount}
+          </div>
+        )}
+
+        {/* --- Image Container & Image Size --- */}
+        {/* Container increased to w-24 h-24 (96px) */}
+        <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-inner">
+          <img
+            src={item.image}
+            alt={item.title}
+            /* Image increased to w-20 h-20 (80px) */
+            className="w-20 h-20 object-contain"
+          />
+        </div>
+
+        {/* Title */}
+        <h3 className="text-sm font-bold text-center text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+          {item.title}
+        </h3>
+
+        {/* Description */}
+        <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-2">
+          {item.description}
+        </p>
+
+        {/* Bottom Line Indicator (Optional - kept from original) */}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full group-hover:w-1/2 transition-all duration-300" />
+      </div>
     </div>
   );
 };
@@ -605,10 +706,161 @@ function Home() {
   const allSections = useMemo(
     () => [
       {
-        id: "qc2-system",
-        title: "QC2",
-        icon: <Layers className="w-5 h-5 mr-2" />,
+        id: "development",
+        title: "Development",
+        icon: <FlaskConical className="w-5 h-5" />,
+        bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
+        gradientFrom: "from-emerald-500",
+        gradientTo: "to-teal-500",
+        items: [
+          {
+            path: "/Development",
+            roles: ["Development"],
+            image: "assets/Home/development.png",
+            title: "Development",
+            description: "---",
+          },
+        ],
+      },
+      {
+        id: "material",
+        title: "Material",
+        icon: <Package className="w-5 h-5" />,
+        bgColor: "bg-teal-50 dark:bg-teal-900/20",
+        gradientFrom: "from-teal-500",
+        gradientTo: "to-cyan-500",
+        items: [
+          {
+            path: "/Fabric",
+            roles: ["Fabric"],
+            image: "assets/Home/fabric-logo.png",
+            title: t("home.fabric"),
+            description: "Fabric Inspection",
+          },
+          {
+            path: "/Accessories",
+            roles: ["Accessories"],
+            image: "assets/Home/accessories-logo.png",
+            title: t("home.accessories"),
+            description: "Accessories Inspection",
+          },
+          {
+            path: "/fc-system",
+            roles: ["FC"],
+            image: "assets/Home/FC.jpg",
+            title: t("home.fc"),
+            description: "FC System",
+          },
+        ],
+      },
+      {
+        id: "cut-panel",
+        title: "Cut Panel",
+        icon: <Scissors className="w-5 h-5" />,
+        bgColor: "bg-orange-50 dark:bg-orange-900/20",
+        gradientFrom: "from-orange-500",
+        gradientTo: "to-amber-500",
+        items: [
+          {
+            path: "/cutting",
+            roles: ["Cutting"],
+            image: "assets/Home/cutting.webp",
+            title: t("home.cutting"),
+            description: "Cut Panel Inspection",
+          },
+          {
+            path: "/cutting-inline",
+            roles: ["Cutting"],
+            image: "assets/Home/cutting-inline.png",
+            title: t("home.cutting-inline"),
+            description: "Cutting Inline Inspection",
+          },
+          {
+            path: "/scc",
+            roles: ["SCC"],
+            image: "assets/Home/SCCLogo.jpg",
+            title: t("SCC"),
+            description: "Spreading & Cutting",
+          },
+        ],
+      },
+      {
+        id: "production",
+        title: "Production",
+        icon: <Factory className="w-5 h-5" />,
         bgColor: "bg-blue-50 dark:bg-blue-900/20",
+        gradientFrom: "from-blue-500",
+        gradientTo: "to-indigo-500",
+        items: [
+          {
+            path: "/roving",
+            roles: ["QC Roving"],
+            image: "assets/Home/qcinline.png",
+            title: "QC Inline Roving",
+            description: "QC Inline Roving Point",
+          },
+          {
+            path: "/details",
+            roles: ["QC1 Inspection"],
+            image: "assets/Home/qcc.png",
+            title: t("home.qc1_inspection"),
+            description: "QC1 Inspection Point",
+          },
+          {
+            path: "/sub-con-qc1",
+            roles: ["QC1 Sub Con"],
+            image: "assets/Home/sub-con-qc1.png",
+            title: t("home.qc1_subcon_inspection"),
+            description: "QC1 Sub Con Inspection",
+          },
+          {
+            path: "/qc-accuracy",
+            roles: ["QA"],
+            image: "assets/Home/qc-accuracy.png",
+            title: "QA Random Inspection",
+            description: "QA Random Checks",
+          },
+          {
+            path: "/qc-output",
+            roles: ["QA"],
+            image: "assets/Home/qcOutput.png",
+            title: "QC Output",
+            description: "QC Output | Sunrise & Old Barcode System",
+          },
+        ],
+      },
+      {
+        id: "washing",
+        title: "Washing",
+        icon: <Droplets className="w-5 h-5" />,
+        bgColor: "bg-cyan-50 dark:bg-cyan-900/20",
+        gradientFrom: "from-cyan-500",
+        gradientTo: "to-sky-500",
+        items: [
+          {
+            path: "/qcWashing",
+            roles: ["QC Washing"],
+            image: "assets/Home/qcwashing.png",
+            title: t("home.qcWashing"),
+            description: "Washing Report",
+          },
+
+          {
+            path: "/select-dt-specs",
+            roles: ["Washing Clerk", "QA Clerk"],
+            image: "assets/Home/select-specs.png",
+            title: t("home.select_dt_specs"),
+            description: "Select After Wash DT Specs",
+          },
+        ],
+      },
+      {
+        id: "qrcode-system",
+        title: "QR Code System",
+        icon: <QrCode className="w-5 h-5" />,
+        bgColor: "bg-purple-50 dark:bg-purple-900/20",
+        gradientFrom: "from-purple-500",
+        gradientTo: "to-violet-500",
         items: [
           {
             path: "/bundle-registration",
@@ -637,6 +889,13 @@ function Home() {
             image: "assets/Home/ironing.png",
             title: t("home.ironing"),
             description: "Scan orders for Ironing",
+          },
+          {
+            path: "/afterIroning",
+            roles: ["QC Ironing"],
+            image: "assets/Home/after_ironing.png",
+            title: t("home.afterIroning"),
+            description: "After Ironing Report",
           },
           {
             path: "/qc2-inspection",
@@ -676,45 +935,19 @@ function Home() {
         ],
       },
       {
-        id: "fabric-cutting",
-        title: "Fabric",
-        icon: <Scissors className="w-5 h-5 mr-2" />,
-        bgColor: "bg-teal-50 dark:bg-teal-900/20",
+        id: "finishing",
+        title: "Finishing",
+        icon: <Sparkles className="w-5 h-5" />,
+        bgColor: "bg-pink-50 dark:bg-pink-900/20",
+        gradientFrom: "from-pink-500",
+        gradientTo: "to-rose-500",
         items: [
           {
-            path: "/Fabric",
-            roles: ["Fabric"],
-            image: "assets/Home/fabric-logo.png",
-            title: t("home.fabric"),
-            description: "Fabric Inspection",
-          },
-          {
-            path: "/cutting",
-            roles: ["Cutting"],
-            image: "assets/Home/cutting.webp",
-            title: t("home.cutting"),
-            description: "Cut Panel Inspection",
-          },
-          {
-            path: "/cutting-inline",
-            roles: ["Cutting"],
-            image: "assets/Home/cutting-inline.png",
-            title: t("home.cutting-inline"),
-            description: "Cutting Inline Inspection",
-          },
-          {
-            path: "/scc",
-            roles: ["SCC"],
-            image: "assets/Home/SCCLogo.jpg",
-            title: t("SCC"),
-            description: "Spreading & Cutting",
-          },
-          {
-            path: "/qcWashing",
-            roles: ["QC Washing"],
-            image: "assets/Home/qcwashing.png",
-            title: t("home.qcWashing"),
-            description: "Washing Report",
+            path: "/anf-washing",
+            roles: ["ANF QA"],
+            image: "assets/Home/anf-washing.png",
+            title: t("home.anf_washing"),
+            description: "QC After Wash Measurements",
           },
           {
             path: "/afterIroning",
@@ -724,18 +957,11 @@ function Home() {
             description: "After Ironing Report",
           },
           {
-            path: "/select-dt-specs",
-            roles: ["Washing Clerk", "QA Clerk"],
-            image: "assets/Home/select-specs.png",
-            title: t("home.select_dt_specs"),
-            description: "Select After Wash DT Specs",
-          },
-          {
-            path: "/anf-washing",
-            roles: ["ANF QA"],
-            image: "assets/Home/anf-washing.png",
-            title: t("home.anf_washing"),
-            description: "QC After Wash Measurements",
+            path: "/humidity-report",
+            roles: ["Humidity QC"],
+            image: "assets/Home/Humidity.jpg",
+            title: "Humidity Report",
+            description: "View Humidity Report",
           },
           {
             path: "/supplier-issues",
@@ -755,53 +981,12 @@ function Home() {
         ]
       },
       {
-        id: "sewing-qc",
-        title: "Sewing",
-        icon: <CheckSquare className="w-5 h-5 mr-2" />,
-        bgColor: "bg-purple-50 dark:bg-purple-900/20",
-        items: [
-          {
-            path: "/roving",
-            roles: ["QC Roving"],
-            image: "assets/Home/qcinline.png",
-            title: "QC Inline Roving",
-            description: "QC Inline Roving Point",
-          },
-          {
-            path: "/details",
-            roles: ["QC1 Inspection"],
-            image: "assets/Home/qcc.png",
-            title: t("home.qc1_inspection"),
-            description: "QC1 Inspection Point",
-          },
-          {
-            path: "/sub-con-qc1",
-            roles: ["QC1 Sub Con"],
-            image: "assets/Home/sub-con-qc1.png",
-            title: t("home.qc1_subcon_inspection"),
-            description: "QC1 Sub Con Inspection",
-          },
-          {
-            path: "/inline-emp",
-            roles: ["Printing"],
-            image: "assets/Home/qc2.png",
-            title: "Print QR",
-            description: "Sewing Worker QR Code",
-          },
-          {
-            path: "/humidity-report",
-            roles: ["Humidity QC"],
-            image: "assets/Home/Humidity.jpg",
-            title: "Humidity Report",
-            description: "View Humidity Report",
-          },
-        ],
-      },
-      {
         id: "y-pivot",
         title: "Fincheck",
-        icon: <Layers className="w-5 h-5 mr-2" />,
-        bgColor: "bg-blue-50 dark:bg-blue-900/20",
+        icon: <FileCheck className="w-5 h-5" />,
+        bgColor: "bg-indigo-50 dark:bg-indigo-900/20",
+        gradientFrom: "from-indigo-500",
+        gradientTo: "to-blue-500",
         items: [
           {
             path: "/qa-sections",
@@ -849,10 +1034,12 @@ function Home() {
         ],
       },
       {
-        id: "qa-inspection",
-        title: "QA",
-        icon: <Shield className="w-5 h-5 mr-2" />,
-        bgColor: "bg-yellow-50 dark:bg-yellow-900/20",
+        id: "process",
+        title: "Process",
+        icon: <Shield className="w-5 h-5" />,
+        bgColor: "bg-amber-50 dark:bg-amber-900/20",
+        gradientFrom: "from-amber-500",
+        gradientTo: "to-yellow-500",
         items: [
           {
             path: "/audit",
@@ -860,34 +1047,6 @@ function Home() {
             image: "assets/Home/qaa.png",
             title: "QMS Audit",
             description: "QMS Audit Check Point",
-          },
-          {
-            path: "/qc2-upload-data",
-            roles: ["Washing Clerk"],
-            image: "assets/Home/qc2-workers-upload.png",
-            title: t("home.qc2_upload_data"),
-            description: "QC2 Upload Data",
-          },
-          {
-            path: "/qc2-washing-upload",
-            roles: ["Washing Clerk"],
-            image: "assets/Home/qc2WashingUpload.png",
-            title: t("home.qc2_washing_data"),
-            description: "QC2 Washing Data",
-          },
-          {
-            path: "/qc-accuracy",
-            roles: ["QA"],
-            image: "assets/Home/qc-accuracy.png",
-            title: "QA Random Inspection",
-            description: "QA Random Checks",
-          },
-          {
-            path: "/qc-output",
-            roles: ["QA"],
-            image: "assets/Home/qcOutput.png",
-            title: "QC Output",
-            description: "QC Output | Sunrise & Old Barcode System",
           },
           {
             path: "/training",
@@ -910,72 +1069,80 @@ function Home() {
             title: "Upload Packing List",
             description: "Packing List from Shipping Dept",
           },
-          {
-            path: "/final-inspection",
-            roles: ["QA"],
-            image: "assets/Home/qafinal.png",
-            title: "Final Inspection",
-            description: "QA Final Inspection",
-          },
-        ],
-      },
-      {
-        id: "ce-section",
-        title: "CE",
-        icon: <ClipboardList className="w-5 h-5 mr-2" />,
-        bgColor: "bg-orange-50 dark:bg-orange-900/20",
-        items: [
-          {
-            path: "/master-list",
-            roles: ["CE"],
-            image: "assets/Home/CE-System.png",
-            title: "CE",
-            description: "Production Control & Monitoring",
-          },
         ],
       },
       {
         id: "admin-panel",
         title: "Admin",
-        icon: <Settings className="w-5 h-5 mr-2" />,
-        bgColor: "bg-gray-100 dark:bg-gray-800/20",
+        icon: <Cog className="w-5 h-5" />,
+        bgColor: "bg-slate-100 dark:bg-slate-800/40",
+        gradientFrom: "from-slate-500",
+        gradientTo: "to-gray-500",
         items: [
+          // Primary Admin Items (first 4)
           {
             path: "/ieadmin",
             roles: ["IE", "System Administration"],
             image: "assets/Home/ie.png",
-            title: t("home.ieadmin"),
+            title: "IE Administration",
             description: "IE System Admin",
           },
           {
             path: "/sysadmin",
             roles: ["System Administration"],
             image: "assets/Home/sysadmin.jpg",
-            title: t("home.systemadmin"),
+            title: "System Administration",
             description: "Modify Defects",
           },
           {
-            path: "/yqms",
-            roles: ["YQMS"],
-            image: "assets/Home/yqms.png",
-            title: t("home.yqms"),
-            description: "Project Management",
+            path: "/user-list",
+            roles: ["Admin", "Super Admin"],
+            image: "assets/Home/user-management.png", // Add appropriate image
+            title: "User Management",
+            description: "Manage Users",
+          },
+          {
+            path: "/role-management",
+            roles: ["Admin", "Super Admin"],
+            image: "assets/Home/role-management.png", // Add appropriate image
+            title: "Role Management",
+            description: "Manage Roles & Permissions",
+          },
+          // Supporting Configuration Items
+          {
+            path: "/qc2-upload-data",
+            roles: ["Washing Clerk"],
+            image: "assets/Home/qc2-workers-upload.png",
+            title: t("home.qc2_upload_data"),
+            description: "QC2 Upload Data",
+            isSupporting: true, // Add this flag
+          },
+          {
+            path: "/qc2-washing-upload",
+            roles: ["Washing Clerk"],
+            image: "assets/Home/qc2WashingUpload.png",
+            title: t("home.qc2_washing_data"),
+            description: "QC2 Washing Data",
+            isSupporting: true,
+          },
+          {
+            path: "/inline-emp",
+            roles: ["Printing"],
+            image: "assets/Home/qc2.png",
+            title: "Print QR",
+            description: "Sewing Worker QR Code",
+            isSupporting: true,
           },
         ],
       },
       {
         id: "analytics",
         title: "Analytics",
-        icon: <BarChart3 className="w-5 h-5 mr-2" />,
-        bgColor: "bg-red-50 dark:bg-red-900/20",
+        icon: <TrendingUp className="w-5 h-5" />,
+        bgColor: "bg-rose-50 dark:bg-rose-900/20",
+        gradientFrom: "from-rose-500",
+        gradientTo: "to-red-500",
         items: [
-          {
-            path: "/download-data",
-            roles: ["Download Data"],
-            image: "assets/Home/download.jpg",
-            title: t("home.download_data"),
-            description: "Download Raw Data",
-          },
           {
             path: "/live-dashboard",
             roles: ["Live Dashboard"],
@@ -989,36 +1156,6 @@ function Home() {
             image: "assets/Home/powerbi.png",
             title: "Power BI",
             description: "View Power BI Reports",
-          },
-          {
-            path: "/qa-pivot",
-            roles: ["QA Pivot"],
-            image: "assets/Home/qalogo.png",
-            title: "QA Evaluation",
-            description: "Upload & View Data",
-          },
-          {
-            path: "/qc1-sunrise",
-            roles: ["QC1 Sunrise"],
-            image: "assets/Home/sunrise.png",
-            title: "QC1 Sunrise",
-            description: "Upload Excel Data",
-          },
-        ],
-      },
-      {
-        id: "ydt",
-        title: "YDT",
-        icon: <ClipboardList className="w-5 h-5 mr-2" />,
-        bgColor: "bg-blue-50 dark:bg-blue-900/20",
-        items: [
-          {
-            path: "/production-Sheet",
-            roles: ["production"],
-            image: "assets/Home/coverPage.png",
-            title: "Production Sheet",
-            description: "Maintain the production sheet",
-            version: "0",
           },
         ],
       },
@@ -1403,10 +1540,10 @@ function Home() {
     );
   }
 
-  // --- Desktop Layout (Original) ---
+  // --- Desktop Layout (Vertical Arrangement - Professional QMS Design) ---
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">
-      {/* Settings Modal */}
+    <div className="h-[calc(100vh-64px)] overflow-hidden bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      {/* Settings Modal */}  
       <SettingsModal
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -1416,30 +1553,67 @@ function Home() {
         toggleTheme={toggleTheme}
       />
 
-      <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <nav className="flex space-x-1 sm:space-x-4 overflow-x-auto flex-1">
-              {accessibleSections.map((section) => (
-                <button
-                  key={section.id}
-                  onClick={() => handleTabClick(section.id)}
-                  className="flex-shrink-0 flex items-center px-3 py-2 text-sm font-semibold rounded-md text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors"
+      <div className="flex h-full">
+        {/* --- Vertical Sidebar Navigation --- */}
+        <aside className="w-72 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 flex flex-col shadow-xl">
+          {/* Sidebar Header */}
+          <div className="p-6 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+                <LayoutDashboard className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1
+                  className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent tracking-tight"
+                  style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}
                 >
-                  {section.icon}
-                  <span>{section.title}</span>
-                </button>
-              ))}
-            </nav>
+                  YQMS
+                </h1>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  Quality Management System
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Navigation Items */}
+          <nav className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
+            {accessibleSections.map((section) => (
+              <DesktopNavItem
+                key={section.id}
+                section={section}
+                isActive={activeSection === section.id}
+                onClick={() => setActiveSection(section.id)}
+              />
+            ))}
+          </nav>
+
+          {/* Sidebar Footer - User Info & Settings */}
+          <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+            {user && (
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold shadow-md">
+                  {user.name ? user.name.charAt(0).toUpperCase() : "U"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm text-slate-800 dark:text-white truncate">
+                    {user.name || "User"}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                    {user.job_title || "Employee"}
+                  </p>
+                </div>
+              </div>
+            )}
             <button
               onClick={() => setSettingsOpen(true)}
-              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 ml-4 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-300 font-medium text-sm"
             >
-              <Settings className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+              <Settings className="w-4 h-4" />
+              Settings
             </button>
           </div>
-        </div>
-      </header>
+        </aside>
 
       <main className="max-w-screen-2xl mx-auto p-4 sm:p-6 lg:p-8">
         {errorMessage && (
@@ -1483,7 +1657,7 @@ function Home() {
                       <img
                         src={item.image}
                         alt={item.title}
-                        className={`${item.imageSize === "large" ? "w-20 h-20" : "w-14 h-14"} object-contain mb-3`}
+                        className="w-14 h-14 object-contain mb-3"
                       />
                       <h3 className="text-sm font-bold text-center text-slate-700 dark:text-slate-100">
                         {item.title}
@@ -1509,6 +1683,7 @@ function Home() {
           )}
         </div>
       </main>
+      </div>
     </div>
   );
 }

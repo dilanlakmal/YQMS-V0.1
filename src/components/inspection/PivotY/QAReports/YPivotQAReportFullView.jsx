@@ -2339,6 +2339,7 @@ const YPivotQAReportFullView = () => {
                                             stageData.specs.selected
                                           }
                                           sizeList={sizeList}
+                                          stage={stageData.stage}
                                         />
                                       </div>
                                     </>

@@ -109,6 +109,9 @@ import CoverPage from "./pages/coverPage.jsx";
 //Hummidity Report
 import HumidityReportPage from "./pages/HumidityReport.jsx";
 
+//FC Direct SQL
+import FCSystem from "./pages/FCSystem";
+
 export const BluetoothContext = createContext(null);
 
 function AppContent() {
@@ -528,6 +531,7 @@ function AppContent() {
 
               <Route path="/production-Sheet" element={<CoverPage />} />
               <Route path="/humidity-report" element={<HumidityReportPage />} />
+              <Route path="/fc-system" element={<FCSystem />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

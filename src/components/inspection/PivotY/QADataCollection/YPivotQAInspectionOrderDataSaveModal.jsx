@@ -226,6 +226,9 @@ const YPivotQAInspectionOrderDataSaveModal = ({
     if (upper.includes("RT")) return { buyer: "Reitmans", code: "RT" };
     if (upper.includes("AF")) return { buyer: "ANF", code: "AF" };
     if (upper.includes("NT")) return { buyer: "STORI", code: "NT" };
+    if (upper.includes("YMCMT") || upper.includes("YMCMH")) {
+      return { buyer: "Elite", code: "YMCMT/H" };
+    }
     return { buyer: "Unknown", code: "--" };
   };
 

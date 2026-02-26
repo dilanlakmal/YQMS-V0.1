@@ -2,18 +2,22 @@ import mongoose from "mongoose";
 
 const SpecItemSchema = new mongoose.Schema(
   {
-    id: { type: String }, // Unique ID for UI tracking
+    id: { type: String },
     no: { type: Number },
     kValue: { type: String },
     MeasurementPointEngName: { type: String },
     MeasurementPointChiName: { type: String },
     TolMinus: {
       fraction: { type: String },
-      decimal: { type: Number }
+      decimal: { type: Number },
     },
     TolPlus: {
       fraction: { type: String },
-      decimal: { type: Number }
+      decimal: { type: Number },
+    },
+    Shrinkage: {
+      fraction: { type: String, default: "0" },
+      decimal: { type: Number, default: 0 },
     },
     Specs: [
       {
@@ -21,39 +25,36 @@ const SpecItemSchema = new mongoose.Schema(
         size: { type: String },
         fraction: { type: String },
         decimal: { type: Number },
-        _id: false
-      }
-    ]
+        _id: false,
+      },
+    ],
   },
-  { _id: true }
+  { _id: true },
 );
 
 const QASectionsMeasurementSpecsSchema = new mongoose.Schema(
   {
     Order_No: { type: String, required: true, unique: true },
 
-    // Full copy from dt_orders
+    // Before Wash
     AllBeforeWashSpecs: [SpecItemSchema],
-
     isSaveAllBeforeWashSpecs: {
       type: String,
       default: "No",
-      enum: ["Yes", "No"]
+      enum: ["Yes", "No"],
     },
-
-    // User selected subset
     selectedBeforeWashSpecs: [SpecItemSchema],
 
-    // Placeholders for future logic
-    AllAfterWashSpecs: { type: Array, default: [] },
-    selectedAfterWashSpecs: { type: Array, default: [] }
+    // ✅ FIXED: Use SpecItemSchema instead of generic Array
+    AllAfterWashSpecs: [SpecItemSchema],
+    selectedAfterWashSpecs: [SpecItemSchema],
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export default (connection) =>
   connection.model(
     "QASectionsMeasurementSpecs",
     QASectionsMeasurementSpecsSchema,
-    "qa_sections_measurement_specs"
+    "qa_sections_measurement_specs",
   );

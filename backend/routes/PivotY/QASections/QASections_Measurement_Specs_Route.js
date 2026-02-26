@@ -7,6 +7,7 @@ import {
   fixAllToleranceValues,
   fixTolerancesByOrder,
   previewToleranceIssues,
+  applyBWSelectionToAW,
 } from "../../../controller/PivotY/QASections/QASections_Measurement_Specs_Controller.js";
 
 const router = express.Router();
@@ -43,6 +44,10 @@ router.post(
 router.get(
   "/api/qa-sections/measurement-specs/preview-tolerance-issues",
   previewToleranceIssues,
+);
+router.post(
+  "/api/qa-sections/measurement-specs/apply-to-aw",
+  applyBWSelectionToAW,
 );
 
 export default router;
