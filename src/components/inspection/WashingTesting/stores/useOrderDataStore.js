@@ -283,6 +283,14 @@ export const useOrderDataStore = create((set, get) => ({
                     ];
                     set({ availablePOs: uniquePOs.length > 0 ? uniquePOs : [] });
 
+                    if (setFormData) {
+                        setFormData((prev) => ({
+                            ...prev,
+                            po: uniquePOs.length > 0 ? uniquePOs : [],
+                            exFtyDate: uniqueETDs.length > 0 ? uniqueETDs : [],
+                        }));
+                    }
+
                     const sizes = result.data.sizeList || result.data.SizeList;
                     if (sizes && Array.isArray(sizes) && sizes.length > 0) set({ availableSizes: sizes });
 

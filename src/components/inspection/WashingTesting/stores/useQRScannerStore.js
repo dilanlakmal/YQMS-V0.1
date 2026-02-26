@@ -4,7 +4,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { API_BASE_URL, QR_CODE_BASE_URL } from "../../../../../config.js";
 import showToast from "../../../../utils/toast.js";
-import { getQRCodeBaseURL, parseQRCodeScanResult } from "../helpers/qrHelpers.js";
+import { getQRCodeBaseURL, parseQRCodeScanResult, buildQRCodeURLWithMeta } from "../helpers/qrHelpers.js";
 import { useModalStore } from "./useModalStore.js";
 import { useFormStore } from "./useFormStore.js";
 import { useOrderDataStore } from "./useOrderDataStore.js";
@@ -14,6 +14,119 @@ import { useWashingReportsStore } from "./useWashingReportsStore.js";
 let _statusCheckInterval = null;
 
 const _getBaseURL = () => getQRCodeBaseURL(QR_CODE_BASE_URL);
+
+const _getReportById = (reportId) => {
+    const { standard, warehouse } = useWashingReportsStore.getState();
+    const fromStandard = standard?.reports?.find((r) => (r._id || r.id) === reportId);
+    const fromWarehouse = warehouse?.reports?.find((r) => (r._id || r.id) === reportId);
+    return fromStandard || fromWarehouse || null;
+};
+
+/**
+ * Draw a full quality-report style image: header, report ID, QR code, detail rows, footer.
+ * Returns a Promise that resolves to PNG data URL.
+ */
+const _drawQRReportImage = (qrDataURL, report, idQr) => {
+    return new Promise((resolve, reject) => {
+        const width = 600;
+        const height = 920;
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+            reject(new Error("Canvas not supported"));
+            return;
+        }
+
+        const formatDate = (report) => {
+            const raw = report?.createdAt || report?.submittedAt || report?.reportDate;
+            return raw ? new Date(raw).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) : "N/A";
+        };
+        const formatColor = (report) => {
+            const c = report?.color;
+            return Array.isArray(c) ? c.join(", ") : (c ? String(c) : "N/A");
+        };
+        const formatSize = (report) => {
+            const s = report?.size ?? report?.sizes ?? report?.sizeList;
+            return Array.isArray(s) ? s.join(", ") : (s != null && s !== "" ? String(s) : "N/A");
+        };
+        const formatQty = (report) => {
+            const q = report?.qty ?? report?.quantity ?? report?.qtyTotal;
+            return q != null && q !== "" ? String(q) : "N/A";
+        };
+
+        // White background
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, width, height);
+
+        // Blue header
+        ctx.fillStyle = "#2563EB";
+        ctx.fillRect(0, 0, width, 140);
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "bold 28px sans-serif";
+        ctx.fillText("WASHING MACHINE TEST", width / 2, 70);
+        ctx.font = "20px sans-serif";
+        ctx.fillText("QUALITY REPORT", width / 2, 108);
+
+        // Report ID (large)
+        ctx.fillStyle = "#111827";
+        ctx.font = "bold 42px monospace";
+        ctx.fillText(String(idQr), width / 2, 230);
+        ctx.font = "16px sans-serif";
+        ctx.fillStyle = "#6B7280";
+        ctx.fillText("REPORT ID", width / 2, 258);
+
+        const drawRow = (label, value, y, valueColor = "#1F2937") => {
+            ctx.textAlign = "left";
+            ctx.font = "bold 18px sans-serif";
+            ctx.fillStyle = "#6B7280";
+            ctx.fillText(label, 40, y);
+            ctx.fillStyle = valueColor;
+            let text = value;
+            const maxW = width - 40 - 220;
+            if (ctx.measureText(text).width > maxW) {
+                while (text.length > 0 && ctx.measureText(text + "...").width > maxW) text = text.slice(0, -1);
+                text = text + "...";
+            }
+            ctx.fillText(text, 220, y);
+            ctx.beginPath();
+            ctx.moveTo(40, y + 14);
+            ctx.lineTo(width - 40, y + 14);
+            ctx.strokeStyle = "#E5E7EB";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        };
+
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+            const qrSize = 220;
+            const qrY = 290;
+            ctx.drawImage(img, (width - qrSize) / 2, qrY, qrSize, qrSize);
+
+            const startY = 560;
+            const rowHeight = 44;
+            drawRow("Date:", formatDate(report), startY);
+            drawRow("Style:", report?.ymStyle || "N/A", startY + rowHeight);
+            drawRow("Color:", formatColor(report), startY + rowHeight * 2);
+            drawRow("Size:", formatSize(report), startY + rowHeight * 3);
+            drawRow("Qty:", formatQty(report), startY + rowHeight * 4);
+            drawRow("Buyer Style:", report?.buyerStyle || "N/A", startY + rowHeight * 5);
+            drawRow("Report Type:", report?.reportType || "N/A", startY + rowHeight * 6);
+
+            ctx.textAlign = "center";
+            ctx.font = "italic 14px sans-serif";
+            ctx.fillStyle = "#9CA3AF";
+            ctx.fillText("Generated by YQMS System", width / 2, height - 32);
+
+            resolve(canvas.toDataURL("image/png"));
+        };
+        img.onerror = () => reject(new Error("Failed to load QR image"));
+        img.src = qrDataURL;
+    });
+};
 
 export const useQRScannerStore = create((set, get) => ({
     html5QrCodeInstance: null,
@@ -130,34 +243,52 @@ export const useQRScannerStore = create((set, get) => ({
         });
     },
 
-    // ─── Download QR code as image ────────────────────────────────────
+    // ─── Download QR code as quality-report image (header + report ID + QR + details + footer) ───
     downloadQRCode: (reportId) => {
-        const value = `${_getBaseURL()}/Launch-washing-machine-test?scan=${reportId}`;
+        const baseURL = _getBaseURL();
+        const report = _getReportById(reportId);
+        const value = buildQRCodeURLWithMeta(baseURL, reportId, report);
+        const idQr = report?.qrId || reportId;
         get()
             .generateQRCodeDataURLNoLogo(value, 1024)
-            .then((dataURL) => {
-                if (!dataURL) {
+            .then((qrDataURL) => {
+                if (!qrDataURL) {
                     showToast.error("Failed to generate QR code. Please try again.");
                     return;
                 }
-                try {
-                    const link = document.createElement("a");
-                    link.href = dataURL;
-                    link.download = `QR-Code-Report-${reportId}.png`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    showToast.success("QR code downloaded successfully!");
-                } catch (e) {
-                    console.error("Download failed:", e);
-                    showToast.error("Failed to download QR code. Please try again.");
+                const doDownload = (imageDataURL) => {
+                    try {
+                        const link = document.createElement("a");
+                        link.href = imageDataURL;
+                        link.download = `QR-Code-Report-${idQr}.png`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        showToast.success("QR report image downloaded successfully!");
+                    } catch (e) {
+                        console.error("Download failed:", e);
+                        showToast.error("Failed to download. Please try again.");
+                    }
+                };
+                if (report) {
+                    _drawQRReportImage(qrDataURL, report, idQr)
+                        .then(doDownload)
+                        .catch((err) => {
+                            console.error("Failed to build report image:", err);
+                            doDownload(qrDataURL);
+                        });
+                } else {
+                    doDownload(qrDataURL);
                 }
             });
     },
 
-    // ─── Print QR code as stamp ───────────────────────────────────────
+    // ─── Print QR code as stamp (same URL with meta as download) ───────
     printQRCode: (reportId) => {
-        const value = `${_getBaseURL()}/Launch-washing-machine-test?scan=${reportId}`;
+        const baseURL = _getBaseURL();
+        const report = _getReportById(reportId);
+        const value = buildQRCodeURLWithMeta(baseURL, reportId, report);
+        const idQr = report?.qrId || reportId;
         get()
             .generateQRCodeDataURLNoLogo(value, 1024)
             .then((qrDataURL) => {
@@ -173,7 +304,7 @@ export const useQRScannerStore = create((set, get) => ({
                 printWindow.document.write(`
       <html>
         <head>
-          <title>QR Stamp - ${reportId}</title>
+          <title>QR Stamp - ${idQr}</title>
           <style>
             @page { size: 5cm 4cm; margin: 0; }
             body { margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: hidden; }
@@ -195,7 +326,7 @@ export const useQRScannerStore = create((set, get) => ({
               <div class="label">Washing<br>Test Stamp</div>
               <div class="report-id-container">
                 <span class="id-label">REPORT ID:</span>
-                <div class="report-id">#${reportId}</div>
+                <div class="report-id">#${idQr}</div>
               </div>
             </div>
           </div>

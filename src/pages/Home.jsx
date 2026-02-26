@@ -10,8 +10,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/authentication/AuthContext";
 import { useTranslation } from "react-i18next";
 import { API_BASE_URL } from "../../config";
-// import { Loader2 } from "lucide-react";
-
 import {
   Layers,
   Settings,
@@ -28,9 +26,9 @@ import {
   AlertCircle,
   ChevronRight,
   Home as HomeIcon,
-  FlaskConical,
+  // New icons for sections
+  Beaker,
   Package,
-  LayoutDashboard,
   Factory,
   Droplets,
   QrCode,
@@ -38,6 +36,12 @@ import {
   FileCheck,
   Cog,
   TrendingUp,
+  FlaskConical,
+  Box,
+  Wrench,
+  Activity,
+  LayoutDashboard,
+  FolderOpen,
 } from "lucide-react";
 
 // --- Theme Hook for Dark Mode ---
@@ -274,7 +278,8 @@ const SettingsModal = ({
 
   return (
     <div
-      className={`fixed inset-0 z-[100] ${isMobile ? "" : "flex items-center justify-center"
+      className={`fixed inset-0 z-[100] ${
+        isMobile ? "" : "flex items-center justify-center"
         }`}
     >
       {/* Backdrop */}
@@ -285,9 +290,10 @@ const SettingsModal = ({
 
       {/* Modal Content */}
       <div
-        className={`relative bg-white dark:bg-slate-900 ${isMobile
-          ? "h-full w-full"
-          : "rounded-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl"
+        className={`relative bg-white dark:bg-slate-900 ${
+          isMobile
+            ? "h-full w-full"
+            : "rounded-2xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl"
           }`}
       >
         {/* Header */}
@@ -368,9 +374,10 @@ const SettingsModal = ({
               <button
                 onClick={subscribeToPush}
                 disabled={loading}
-                className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all ${loading
-                  ? "bg-gray-300 dark:bg-slate-700 cursor-not-allowed text-gray-500"
-                  : "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg active:scale-[0.98]"
+                className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all ${
+                  loading
+                    ? "bg-gray-300 dark:bg-slate-700 cursor-not-allowed text-gray-500"
+                    : "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg active:scale-[0.98]"
                   }`}
               >
                 {loading ? (
@@ -493,15 +500,17 @@ const MobileBottomNav = ({
             key={section.id}
             ref={activeSection === section.id ? activeButtonRef : null}
             onClick={() => onSectionChange(section.id)}
-            className={`flex-shrink-0 min-w-[72px] flex flex-col items-center py-2 px-2 transition-all duration-200 ${activeSection === section.id
-              ? "text-blue-600 dark:text-blue-400"
-              : "text-slate-400 dark:text-slate-500"
+            className={`flex-shrink-0 min-w-[72px] flex flex-col items-center py-2 px-2 transition-all duration-200 ${
+              activeSection === section.id
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-slate-400 dark:text-slate-500"
               }`}
           >
             <div
-              className={`p-1.5 rounded-lg transition-colors ${activeSection === section.id
-                ? "bg-blue-100 dark:bg-blue-900/30"
-                : ""
+              className={`p-1.5 rounded-lg transition-colors ${
+                activeSection === section.id
+                  ? "bg-blue-100 dark:bg-blue-900/30"
+                  : ""
                 }`}
             >
               {React.cloneElement(section.icon, {
@@ -597,14 +606,14 @@ const DesktopNavItem = ({ section, isActive, onClick }) => {
         isActive
           ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25"
           : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white"
-      }`}
+        }`}
     >
       <div
         className={`p-2 rounded-lg transition-colors ${
           isActive
             ? "bg-white/20"
             : "bg-slate-100 dark:bg-slate-800 group-hover:bg-slate-200 dark:group-hover:bg-slate-700"
-        }`}
+          }`}
       >
         {React.cloneElement(section.icon, {
           className: `w-5 h-5 ${isActive ? "text-white" : ""}`,
@@ -614,7 +623,7 @@ const DesktopNavItem = ({ section, isActive, onClick }) => {
       <span
         className={`font-semibold tracking-wide text-sm uppercase ${
           isActive ? "text-white" : ""
-        }`}
+          }`}
         style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}
       >
         {section.title}
@@ -624,7 +633,7 @@ const DesktopNavItem = ({ section, isActive, onClick }) => {
           isActive
             ? "text-white/70 translate-x-1"
             : "opacity-0 group-hover:opacity-50"
-        }`}
+          }`}
       />
     </button>
   );
@@ -852,6 +861,14 @@ function Home() {
             title: t("home.select_dt_specs"),
             description: "Select After Wash DT Specs",
           },
+          {
+            path: "/Launch-washing-machine-test",
+            roles: ["Washing Testing"],
+            image: "assets/Home/Launch-washing-machine-test.png",
+            title: "Launch Washing Machine Test",
+            description: "Launch Washing Machine Test",
+            imageSize: "large",
+          },
         ],
       },
       {
@@ -968,17 +985,9 @@ function Home() {
             roles: ["Supplier QC"],
             image: "assets/Home/supplier-issues.png",
             title: t("home.supplier-issues"),
-            description: "Supplier Issues Sub-Con Fty"
+            description: "Supplier Issues Sub-Con Fty",
           },
-          {
-            path: "/Launch-washing-machine-test",
-            roles: ["Washing Testing"],
-            image: "assets/Home/Launch-washing-machine-test.png",
-            title: "Launch Washing Machine Test",
-            description: "Launch Washing Machine Test",
-            imageSize: "large",
-          },
-        ]
+        ],
       },
       {
         id: "y-pivot",
@@ -1210,8 +1219,8 @@ function Home() {
               allSections
                 .flatMap((s) => s.items)
                 .filter((item) => item.pageId)
-                .map((item) => item.pageId)
-            )
+                .map((item) => item.pageId),
+            ),
           ];
 
           const accessPromises = pageIdsToCheck.map((pageId) =>
@@ -1543,7 +1552,7 @@ function Home() {
   // --- Desktop Layout (Vertical Arrangement - Professional QMS Design) ---
   return (
     <div className="h-[calc(100vh-64px)] overflow-hidden bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      {/* Settings Modal */}  
+      {/* Settings Modal */}
       <SettingsModal
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -1615,74 +1624,139 @@ function Home() {
           </div>
         </aside>
 
-      <main className="max-w-screen-2xl mx-auto p-4 sm:p-6 lg:p-8">
-        {errorMessage && (
-          <div className="bg-red-500 text-white text-center py-2 mb-6 rounded-md">
-            {errorMessage}
-          </div>
-        )}
-        <div className="space-y-12">
-          {accessibleSections.length > 0 ? (
-            accessibleSections.map((section) => (
-              <section
-                key={section.id}
-                ref={(el) => (sectionRefs.current[section.id] = el)}
-                className={`p-6 rounded-2xl ${section.bgColor} transition-colors`}
-              >
-                <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white mb-6 flex items-center">
-                  {section.icon}
-                  {section.title}
-                </h2>
-                <div
-                  className="grid gap-4"
-                  style={{
-                    gridTemplateColumns:
-                      "repeat(auto-fill, minmax(160px, 1fr))",
-                  }}
-                >
-                  {section.items.map((item, itemIndex) => (
-                    <div
-                      key={itemIndex}
-                      onClick={() => handleNavigation(item)}
-                      className="group relative flex flex-col items-center justify-center p-4 rounded-xl shadow-md transition-all duration-300 bg-white dark:bg-slate-800 cursor-pointer hover:shadow-xl hover:-translate-y-1"
-                    >
-                      {/* Notification Badge for Fincheck Inspection */}
-                      {item.path === "/fincheck-inspection" &&
-                        fincheckActionCount > 0 && (
-                          <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 animate-pulse">
-                            {fincheckActionCount}
-                          </div>
-                        )}
-
-                      <img
-                        src={item.image}
-                        alt={item.title}
-                        className="w-14 h-14 object-contain mb-3"
-                      />
-                      <h3 className="text-sm font-bold text-center text-slate-700 dark:text-slate-100">
-                        {item.title}
-                      </h3>
-                      <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1">
-                        {item.description}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ))
-          ) : (
-            <div className="text-center py-20">
-              <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-300">
-                No Accessible Modules
-              </h2>
-              <p className="mt-2 text-slate-500">
-                Please contact your administrator if you believe you should have
-                access.
-              </p>
+        {/* --- Main Content Area --- */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+          {/* Error Message */}
+          {errorMessage && (
+            <div className="mx-8 mt-6 bg-gradient-to-r from-red-500 to-pink-500 text-white text-center py-3 rounded-xl shadow-lg font-medium">
+              {errorMessage}
             </div>
           )}
-        </div>
-      </main>
+
+          {/* Content */}
+          <div className="p-8">
+            {currentSection ? (
+              <div>
+                {/* Section Header */}
+                <div className="mb-8">
+                  <div className="flex items-center gap-4 mb-2">
+                    <div
+                      className={`p-3 rounded-xl bg-gradient-to-br ${currentSection.gradientFrom} ${currentSection.gradientTo} shadow-lg`}
+                    >
+                      {React.cloneElement(currentSection.icon, {
+                        className: "w-6 h-6 text-white",
+                        style: { margin: 0 },
+                      })}
+                    </div>
+                    <div>
+                      <h2
+                        className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight uppercase"
+                        style={{
+                          fontFamily: "'Inter', 'Segoe UI', sans-serif",
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        {currentSection.title}
+                      </h2>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        {currentSectionItems.length} module
+                        {currentSectionItems.length !== 1 ? "s" : ""} available
+                      </p>
+                    </div>
+                  </div>
+                  {/* Decorative Line */}
+                  <div className="flex items-center gap-2 mt-4">
+                    <div
+                      className={`h-1 w-20 rounded-full bg-gradient-to-r ${currentSection.gradientFrom} ${currentSection.gradientTo}`}
+                    />
+                    <div className="h-1 w-8 rounded-full bg-slate-200 dark:bg-slate-700" />
+                    <div className="h-1 w-4 rounded-full bg-slate-200 dark:bg-slate-700" />
+                  </div>
+                </div>
+
+                {/* Grid Items */}
+                {currentSectionItems.length > 0 ? (
+                  <>
+                    {/* Primary Admin Items */}
+                    <div
+                      className="grid gap-5 mb-8"
+                      style={{
+                        gridTemplateColumns:
+                          "repeat(auto-fill, minmax(180px, 1fr))",
+                      }}
+                    >
+                      {currentSectionItems
+                        .filter((item) => !item.isSupporting)
+                        .map((item, itemIndex) => (
+                          <DesktopGridItem
+                            key={itemIndex}
+                            item={item}
+                            onClick={() => handleNavigation(item)}
+                            fincheckActionCount={fincheckActionCount}
+                          />
+                        ))}
+                    </div>
+
+                    {/* Supporting Configuration Section */}
+                    {currentSection.id === "admin-panel" &&
+                      currentSectionItems.some((item) => item.isSupporting) && (
+                        <>
+                          <div className="flex items-center gap-2 mt-8 mb-4">
+                            <h3 className="text-lg font-semibold text-slate-600 dark:text-slate-300">
+                              Supporting Tools
+                            </h3>
+                            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                          </div>
+                          <div
+                            className="grid gap-5"
+                            style={{
+                              gridTemplateColumns:
+                                "repeat(auto-fill, minmax(180px, 1fr))",
+                            }}
+                          >
+                            {currentSectionItems
+                              .filter((item) => item.isSupporting)
+                              .map((item, itemIndex) => (
+                                <DesktopGridItem
+                                  key={itemIndex}
+                                  item={item}
+                                  onClick={() => handleNavigation(item)}
+                                  fincheckActionCount={fincheckActionCount}
+                                />
+                              ))}
+                          </div>
+                        </>
+                      )}
+                  </>
+                ) : (
+                  <div className="text-center py-20">
+                    <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
+                      <FolderOpen className="w-12 h-12 text-slate-400" />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">
+                      No Modules Available
+                    </h3>
+                    <p className="text-slate-500 dark:text-slate-400">
+                      Select a different section from the sidebar
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-20">
+                <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
+                  <LayoutDashboard className="w-12 h-12 text-slate-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-300 mb-2">
+                  Welcome to YQMS
+                </h2>
+                <p className="text-slate-500 dark:text-slate-400">
+                  Select a section from the sidebar to get started
+                </p>
+              </div>
+            )}
+          </div>
+        </main>
       </div>
     </div>
   );

@@ -93,3 +93,47 @@ export const parseQRCodeScanResult = (decodedText, currentReportId) => {
 export const buildQRCodeURL = (baseURL, reportId) => {
     return `${baseURL}?scan=${reportId}`;
 };
+
+/**
+ * Build QR code URL with report meta (id qr, date, style, color, size, qty, buyer style, report type)
+ * Used for QR download so scanned data includes all key fields.
+ * @param {string} baseURL - Base URL (e.g. getQRCodeBaseURL() + '/Launch-washing-machine-test')
+ * @param {string} reportId - Report ID (scan param)
+ * @param {object} report - Report object (optional); if provided, adds idQr, date, style, color, size, qty, buyerStyle, reportType
+ * @returns {string} - URL with query params
+ */
+export const buildQRCodeURLWithMeta = (baseURL, reportId, report = null) => {
+    const path = baseURL.replace(/\/?$/, '') + '/Launch-washing-machine-test';
+    const params = new URLSearchParams();
+    params.set('scan', reportId);
+
+    if (report) {
+        const idQr = report.qrId || reportId;
+        params.set('idQr', String(idQr));
+
+        const dateRaw = report.createdAt || report.submittedAt || report.reportDate;
+        const dateStr = dateRaw ? new Date(dateRaw).toISOString().split('T')[0] : '';
+        if (dateStr) params.set('date', dateStr);
+
+        const style = report.ymStyle || '';
+        if (style) params.set('style', String(style));
+
+        const color = Array.isArray(report.color) ? report.color.join(',') : (report.color ? String(report.color) : '');
+        if (color) params.set('color', color);
+
+        const size = report.size ?? report.sizes ?? report.sizeList;
+        const sizeStr = Array.isArray(size) ? size.join(',') : (size != null && size !== '' ? String(size) : '');
+        if (sizeStr) params.set('size', sizeStr);
+
+        const qty = report.qty ?? report.quantity ?? report.qtyTotal;
+        if (qty != null && qty !== '') params.set('qty', String(qty));
+
+        const buyerStyle = report.buyerStyle || '';
+        if (buyerStyle) params.set('buyerStyle', String(buyerStyle));
+
+        const reportType = report.reportType || '';
+        if (reportType) params.set('reportType', String(reportType));
+    }
+
+    return `${path}?${params.toString()}`;
+};

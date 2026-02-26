@@ -1288,15 +1288,19 @@ export const getUsedColors = async (req, res) => {
       ReportHTTesting,
       ReportEMBPrinting,
       ReportPullingTest,
-      ReportWashing
+      ReportWashing,
     ];
 
     let usedColorsSet = new Set();
 
-    // Query each model for this style
+    // Query each model for this style, but ignore reports that have been
+    // fully rejected so their colors become available again for reuse.
     for (const model of models) {
       const reports = await model.find(
-        { ymStyle: ymStyle.trim() },
+        {
+          ymStyle: ymStyle.trim(),
+          status: { $ne: "rejected" },
+        },
         { color: 1 }
       ).lean();
 
