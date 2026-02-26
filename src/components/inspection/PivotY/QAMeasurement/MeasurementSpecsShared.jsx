@@ -19,10 +19,15 @@ import {
   Wrench,
   RefreshCw,
   Ruler,
+  Download,
+  Info,
+  RotateCcw, // Icon for Repair button
+  Languages,
 } from "lucide-react";
 import axios from "axios";
 import { debounce } from "lodash";
 import { API_BASE_URL } from "../../../../../config";
+import RepairNamesModal from "./RepairNamesModal";
 
 const MeasurementSpecsShared = ({
   title,
@@ -30,7 +35,7 @@ const MeasurementSpecsShared = ({
   apiEndpointBase,
   dataKey,
   selectedDataKey,
-  isAw = false, // Optional flag if specific After Wash logic is needed in UI
+  isAw = false,
 }) => {
   const [moNoSearch, setMoNoSearch] = useState("");
   const [loading, setLoading] = useState(false);
@@ -56,6 +61,22 @@ const MeasurementSpecsShared = ({
 
   // Applying to AW
   const [isApplyingAW, setIsApplyingAW] = useState(false);
+
+  // Update Specs State
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [updatePreview, setUpdatePreview] = useState(null);
+  const [isLoadingUpdatePreview, setIsLoadingUpdatePreview] = useState(false);
+  const [hasSavedConfig, setHasSavedConfig] = useState(false);
+
+  // =========================================================================
+  // Repair Specs State
+  // =========================================================================
+  const [isRepairing, setIsRepairing] = useState(false);
+  const [showRepairModal, setShowRepairModal] = useState(false);
+
+  // State for previewing name swap issues
+  const [showRepairNamesModal, setShowRepairNamesModal] = useState(false);
 
   // --- Autocomplete Logic ---
   const fetchMoSuggestions = useCallback(
@@ -114,6 +135,7 @@ const MeasurementSpecsShared = ({
     setSelectedPointNames([]);
     setError("");
     setSuccessMsg("");
+    setHasSavedConfig(false);
   };
 
   // --- Main Data Fetch Logic ---
@@ -130,9 +152,9 @@ const MeasurementSpecsShared = ({
     setSelectedPointNames([]);
     setIsPreviewMode(false);
     setShowSuggestions(false);
+    setHasSavedConfig(false);
 
     try {
-      // Dynamic endpoint based on props
       const response = await axios.get(
         `${API_BASE_URL}${apiEndpointBase}/${term.trim()}`,
       );
@@ -140,7 +162,6 @@ const MeasurementSpecsShared = ({
       const data = response.data.data;
       setAllSpecs(data[dataKey] || []);
 
-      // If data comes from QA Sections (already saved), pre-select the points
       if (response.data.source === "qa_sections" && data[selectedDataKey]) {
         const savedNames = [
           ...new Set(
@@ -148,6 +169,7 @@ const MeasurementSpecsShared = ({
           ),
         ];
         setSelectedPointNames(savedNames);
+        setHasSavedConfig(true);
       }
     } catch (err) {
       console.error(err);
@@ -203,7 +225,6 @@ const MeasurementSpecsShared = ({
         moNo: moNoSearch.trim(),
         allSpecs: allSpecs,
         selectedSpecs: selectedSpecsObjects,
-        // Only applicable for Before Wash usually, but safe to send for both
         isSaveAll: selectedPointNames.length === distinctPoints.length,
       };
 
@@ -217,12 +238,167 @@ const MeasurementSpecsShared = ({
           response.data.updatedAt,
         ).toLocaleTimeString()})`,
       );
+      setHasSavedConfig(true);
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err) {
       setError(err.response?.data?.error || "Failed to save.");
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // =========================================================================
+  // UPDATE SPECS FUNCTIONS
+  // =========================================================================
+
+  const handlePreviewUpdate = async () => {
+    if (!moNoSearch.trim()) {
+      setError("Please search for an order first.");
+      return;
+    }
+
+    setIsLoadingUpdatePreview(true);
+    setShowUpdateModal(true);
+    setUpdatePreview(null);
+    setError("");
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/qa-sections/measurement-specs/preview-update`,
+        {
+          moNo: moNoSearch.trim(),
+          isAW: isAw,
+        },
+      );
+
+      setUpdatePreview(response.data);
+    } catch (err) {
+      console.error("Error previewing update:", err);
+      if (err.response?.status === 404) {
+        setUpdatePreview({
+          success: false,
+          hasUpdates: false,
+          message:
+            err.response?.data?.message ||
+            "No saved configuration found. Please save configuration first.",
+          hasConfig: err.response?.data?.hasConfig ?? false,
+        });
+      } else {
+        setUpdatePreview({
+          success: false,
+          error:
+            err.response?.data?.message ||
+            err.message ||
+            "Failed to load preview",
+        });
+      }
+    } finally {
+      setIsLoadingUpdatePreview(false);
+    }
+  };
+
+  const handleUpdateSpecs = async () => {
+    if (!moNoSearch.trim()) {
+      setError("Please search for an order first.");
+      return;
+    }
+
+    setIsUpdating(true);
+    setError("");
+    setSuccessMsg("");
+
+    try {
+      const endpoint = isAw
+        ? "/api/qa-sections/measurement-specs-aw/update-from-master"
+        : "/api/qa-sections/measurement-specs/update-from-master";
+
+      const response = await axios.post(`${API_BASE_URL}${endpoint}`, {
+        moNo: moNoSearch.trim(),
+      });
+
+      if (response.data.success) {
+        setSuccessMsg(response.data.message);
+        setShowUpdateModal(false);
+        setUpdatePreview(null);
+        handleSearch(null, moNoSearch);
+        setTimeout(() => setSuccessMsg(""), 5000);
+      }
+    } catch (err) {
+      console.error("Error updating specs:", err);
+      setError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to update specs from master data.",
+      );
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // =========================================================================
+  // NEW: REPAIR CORRUPTED SPECS FUNCTIONS
+  // =========================================================================
+
+  const handleRepairSpecs = async () => {
+    if (!moNoSearch.trim()) {
+      setError("Please search for an order first.");
+      return;
+    }
+
+    setIsRepairing(true);
+    setError("");
+    setSuccessMsg("");
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/qa-sections/measurement-specs/repair-corrupted`,
+        {
+          moNo: moNoSearch.trim(),
+        },
+      );
+
+      if (response.data.success) {
+        const {
+          pointsRepaired,
+          corruptedSpecsRemoved,
+          specsRestoredFromMaster,
+        } = response.data.summary || {};
+
+        if (pointsRepaired > 0) {
+          setSuccessMsg(
+            `✅ ${response.data.message} | Removed: ${corruptedSpecsRemoved || 0} corrupted spec(s) | Restored: ${specsRestoredFromMaster || 0} spec(s) from master data.`,
+          );
+        } else {
+          setSuccessMsg(response.data.message);
+        }
+
+        setShowRepairModal(false);
+
+        // Refresh the data to show repaired specs
+        handleSearch(null, moNoSearch);
+
+        setTimeout(() => setSuccessMsg(""), 6000);
+      }
+    } catch (err) {
+      console.error("Error repairing specs:", err);
+      setError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to repair corrupted specs.",
+      );
+    } finally {
+      setIsRepairing(false);
+    }
+  };
+
+  // =========================================================================
+  // Handle Repair Names Success
+  // =========================================================================
+  const handleRepairNamesSuccess = (message) => {
+    setSuccessMsg(message);
+    // Refresh the data to show updated names
+    handleSearch(null, moNoSearch);
+    setTimeout(() => setSuccessMsg(""), 5000);
   };
 
   // --- Fix Tolerance Functions ---
@@ -232,7 +408,6 @@ const MeasurementSpecsShared = ({
     setPreviewIssues(null);
 
     try {
-      // Generic endpoint for previewing issues across collections
       const response = await axios.get(
         `${API_BASE_URL}/api/qa-sections/measurement-specs/preview-tolerance-issues`,
       );
@@ -296,7 +471,6 @@ const MeasurementSpecsShared = ({
       setShowFixModal(false);
       setPreviewIssues(null);
 
-      // Refresh current data if we have an order loaded
       if (moNoSearch) {
         handleSearch(null, moNoSearch);
       }
@@ -330,10 +504,7 @@ const MeasurementSpecsShared = ({
       );
       setShowFixModal(false);
       setPreviewIssues(null);
-
-      // Refresh current data
       handleSearch(null, moNoSearch);
-
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err) {
       console.error("Fix order error:", err);
@@ -362,8 +533,6 @@ const MeasurementSpecsShared = ({
       grouped[k].push(item);
     });
 
-    // Natural sort for K values (K1, K2, K10...)
-    // Put "NA" or "Unknown" at the end
     const sortedKeys = Object.keys(grouped).sort((a, b) => {
       if (a === "NA" || a === "Unknown") return 1;
       if (b === "NA" || b === "Unknown") return -1;
@@ -393,7 +562,7 @@ const MeasurementSpecsShared = ({
     try {
       const payload = {
         moNo: moNoSearch.trim(),
-        selectedPointNames: selectedPointNames, // Send only names to match against AW data
+        selectedPointNames: selectedPointNames,
       };
 
       const response = await axios.post(
@@ -434,7 +603,7 @@ const MeasurementSpecsShared = ({
         </div>
 
         {/* Search Input Container */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="relative w-full md:w-80" ref={searchContainerRef}>
             <form onSubmit={(e) => handleSearch(e)} className="flex gap-2">
               <div className="relative flex-1">
@@ -494,6 +663,35 @@ const MeasurementSpecsShared = ({
             <Wrench className="w-4 h-4" />
             <span className="hidden sm:inline">Fix TOL</span>
           </button>
+
+          {/* ========================================================= */}
+          {/* Repair Specs Button */}
+          {/* ========================================================= */}
+          {moNoSearch && hasSavedConfig && (
+            <button
+              onClick={() => setShowRepairModal(true)}
+              disabled={isRepairing}
+              className="px-4 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2 disabled:opacity-50"
+              title="Repair Corrupted Specs (removes invalid size names like 'index')"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span className="hidden sm:inline">Repair</span>
+            </button>
+          )}
+
+          {/* ========================================================= */}
+          {/* Repair Names Button (Only for BW - isAw = false) */}
+          {/* ========================================================= */}
+          {!isAw && moNoSearch && hasSavedConfig && (
+            <button
+              onClick={() => setShowRepairNamesModal(true)}
+              className="px-4 py-2.5 bg-violet-500 hover:bg-violet-600 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2"
+              title="Repair Swapped Names (swap English/Chinese names if mistakenly reversed)"
+            >
+              <Languages className="w-4 h-4" />
+              <span className="hidden sm:inline">Repair Names</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -508,6 +706,88 @@ const MeasurementSpecsShared = ({
         <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-3 text-green-700 dark:text-green-300 animate-fadeIn">
           <CheckCircle className="w-5 h-5 flex-shrink-0" />
           <span className="font-medium">{successMsg}</span>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* Repair Specs Confirmation Modal */}
+      {/* ================================================================= */}
+      {showRepairModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-rose-50 dark:bg-rose-900/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-rose-100 dark:bg-rose-900/30 rounded-lg">
+                  <RotateCcw className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
+                    Repair Corrupted Specs
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Order: {moNoSearch}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              <div className="space-y-4">
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <p className="text-sm text-amber-800 dark:text-amber-200 font-medium mb-2">
+                    ⚠️ This will:
+                  </p>
+                  <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-1 ml-4 list-disc">
+                    <li>
+                      Remove specs with invalid size names (e.g., "index",
+                      "fraction")
+                    </li>
+                    <li>
+                      Restore missing valid specs from Master Data (dt_orders)
+                    </li>
+                    <li>Keep all existing valid specs unchanged</li>
+                  </ul>
+                </div>
+
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    <strong>Use this if:</strong> You see strange size names
+                    like "index" or missing size specifications in your data.
+                  </p>
+                </div>
+
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  This operation is safe and will not delete valid data. Do you
+                  want to proceed?
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex gap-3 justify-end">
+              <button
+                onClick={() => setShowRepairModal(false)}
+                disabled={isRepairing}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-semibold rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRepairSpecs}
+                disabled={isRepairing}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {isRepairing ? (
+                  <Loader className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-4 h-4" />
+                )}
+                Repair Now
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -561,24 +841,6 @@ const MeasurementSpecsShared = ({
                       the fix operation.
                     </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                        ?
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Documents to check
-                      </p>
-                    </div>
-                    <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                      <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                        ?
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Issues to fix
-                      </p>
-                    </div>
-                  </div>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -620,35 +882,8 @@ const MeasurementSpecsShared = ({
                             <p className="text-sm text-gray-500 dark:text-gray-400">
                               {issue.problems?.length || 0} issue(s) found
                             </p>
-                            {issue.problems &&
-                              issue.problems.slice(0, 2).map((prob, pIdx) => (
-                                <div
-                                  key={pIdx}
-                                  className="text-xs text-gray-600 dark:text-gray-400 mt-1 ml-2"
-                                >
-                                  • {prob.point}: {prob.type}
-                                  {prob.original?.fraction && (
-                                    <span className="text-red-500">
-                                      {" "}
-                                      "{prob.original.fraction}"
-                                    </span>
-                                  )}
-                                  {prob.corrected?.fraction && (
-                                    <span className="text-green-500">
-                                      {" "}
-                                      → "{prob.corrected.fraction}"
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
                           </div>
                         ))}
-                        {previewIssues.issues.length > 10 && (
-                          <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
-                            ... and {previewIssues.issues.length - 10} more
-                            orders
-                          </p>
-                        )}
                       </div>
                     </div>
                   ) : (
@@ -656,9 +891,6 @@ const MeasurementSpecsShared = ({
                       <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
                       <p className="text-lg font-medium text-gray-700 dark:text-gray-300">
                         No tolerance issues found!
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        All tolerance values are properly formatted.
                       </p>
                     </div>
                   )}
@@ -679,7 +911,7 @@ const MeasurementSpecsShared = ({
                   ) : (
                     <RefreshCw className="w-4 h-4" />
                   )}
-                  Fix Current Order ({moNoSearch})
+                  Fix Current Order
                 </button>
               )}
               <button
@@ -693,11 +925,6 @@ const MeasurementSpecsShared = ({
                   <Wrench className="w-4 h-4" />
                 )}
                 Fix All Documents
-                {previewIssues && previewIssues.totalProblems > 0 && (
-                  <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                    {previewIssues.totalProblems} issues
-                  </span>
-                )}
               </button>
               <button
                 onClick={() => {
@@ -713,10 +940,209 @@ const MeasurementSpecsShared = ({
         </div>
       )}
 
-      {/* --- Main Content Area --- */}
+      {/* Update Specs Modal - keeping your existing code */}
+      {showUpdateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-cyan-50 dark:bg-cyan-900/20 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg">
+                  <Download className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
+                    Update Specs from Master Data
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Sync missing specs and shrinkage values from dt_orders
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowUpdateModal(false);
+                  setUpdatePreview(null);
+                }}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[50vh]">
+              {isLoadingUpdatePreview ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader className="w-8 h-8 animate-spin text-cyan-500 mb-3" />
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Analyzing differences with Master Data...
+                  </p>
+                </div>
+              ) : !updatePreview ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Loading preview data...
+                  </p>
+                </div>
+              ) : updatePreview.error ? (
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                  <p className="text-red-600 dark:text-red-400 text-sm">
+                    {updatePreview.error}
+                  </p>
+                </div>
+              ) : updatePreview.hasConfig === false ? (
+                <div className="p-6 text-center">
+                  <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+                  <p className="text-lg font-medium text-gray-700 dark:text-gray-300">
+                    No Saved Configuration Found
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                    Please save your configuration first using the "Save
+                    Configuration" button before updating specs.
+                  </p>
+                </div>
+              ) : !updatePreview.hasUpdates ? (
+                <div className="p-6 text-center">
+                  <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                  <p className="text-lg font-medium text-gray-700 dark:text-gray-300">
+                    All Specs Are Up to Date!
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                    No missing specs or shrinkage values found. Your
+                    configuration is synchronized with Master Data.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {updatePreview.summary?.totalPointsToUpdate || 0}
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Points to Update
+                      </p>
+                    </div>
+                    <div className="p-4 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg text-center">
+                      <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
+                        {updatePreview.summary?.totalMissingSpecs || 0}
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Missing Size Specs
+                      </p>
+                    </div>
+                    {!isAw && (
+                      <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg text-center">
+                        <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                          {updatePreview.summary?.totalShrinkageUpdates || 0}
+                        </p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          Shrinkage Updates
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-start gap-3">
+                    <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-blue-700 dark:text-blue-300">
+                      <p className="font-medium">What will be updated:</p>
+                      <ul className="list-disc list-inside mt-1 space-y-1">
+                        <li>Missing size specifications will be added</li>
+                        {!isAw && (
+                          <li>
+                            Shrinkage values will be synced from Master Data
+                          </li>
+                        )}
+                        <li>
+                          <strong>Existing data will NOT be overwritten</strong>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  {updatePreview.pendingUpdates &&
+                    updatePreview.pendingUpdates.length > 0 && (
+                      <div className="space-y-3">
+                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Pending Updates (showing first 10):
+                        </p>
+                        <div className="max-h-48 overflow-y-auto space-y-2 border border-gray-200 dark:border-gray-700 rounded-lg p-2 scrollbar-thin">
+                          {updatePreview.pendingUpdates
+                            .slice(0, 10)
+                            .map((update, idx) => (
+                              <div
+                                key={idx}
+                                className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                              >
+                                <p className="font-medium text-gray-800 dark:text-gray-200">
+                                  {update.pointName}
+                                </p>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                  {update.missingSizes.length > 0 && (
+                                    <span className="text-xs px-2 py-1 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 rounded">
+                                      +{update.missingSizes.length} sizes:{" "}
+                                      {update.missingSizes.join(", ")}
+                                    </span>
+                                  )}
+                                  {update.shrinkageNeedsUpdate && (
+                                    <span className="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
+                                      Shrinkage: {update.currentShrinkage} →{" "}
+                                      {update.masterShrinkage}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          {updatePreview.pendingUpdates.length > 10 && (
+                            <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+                              ... and {updatePreview.pendingUpdates.length - 10}{" "}
+                              more points
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-3 justify-end bg-gray-50 dark:bg-gray-800/50 shrink-0">
+              {updatePreview?.hasUpdates && (
+                <button
+                  onClick={handleUpdateSpecs}
+                  disabled={isUpdating}
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isUpdating ? (
+                    <Loader className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                  Update Specs Now
+                  {updatePreview?.summary?.totalMissingSpecs > 0 && (
+                    <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                      +{updatePreview.summary.totalMissingSpecs} specs
+                    </span>
+                  )}
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setShowUpdateModal(false);
+                  setUpdatePreview(null);
+                }}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-semibold rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area - keeping your existing code for selection and preview */}
       {allSpecs.length > 0 && (
         <div className="space-y-6 animate-fadeIn">
-          {/* View Mode: Selection */}
           {!isPreviewMode && (
             <>
               <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-700/30 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
@@ -792,7 +1218,6 @@ const MeasurementSpecsShared = ({
             </>
           )}
 
-          {/* View Mode: Preview */}
           {isPreviewMode && (
             <div className="space-y-8 animate-fadeIn">
               {Object.entries(previewDataByKValue).map(([kValue, rows]) => (
@@ -819,7 +1244,6 @@ const MeasurementSpecsShared = ({
                           <th className="px-4 py-3 text-center border-r border-gray-100 dark:border-gray-700">
                             Tol (+)
                           </th>
-                          {/* Shrinkage Column */}
                           <th className="px-4 py-3 text-center border-r border-gray-100 dark:border-gray-700 bg-yellow-50 dark:bg-yellow-900/20">
                             Shrinkage
                           </th>
@@ -848,7 +1272,6 @@ const MeasurementSpecsShared = ({
                             <td className="px-4 py-3 text-center text-green-600 dark:text-green-400 font-bold border-r border-gray-100 dark:border-gray-700">
                               {row.TolPlus?.fraction || "+"}
                             </td>
-                            {/* Shrinkage Data */}
                             <td className="px-4 py-3 text-center text-blue-600 dark:text-blue-400 font-bold border-r border-gray-100 dark:border-gray-700 bg-yellow-50/30 dark:bg-yellow-900/10">
                               {row.Shrinkage?.fraction || "0"}
                             </td>
@@ -883,7 +1306,6 @@ const MeasurementSpecsShared = ({
                 : `Preview Selected (${selectedPointNames.length})`}
             </button>
 
-            {/* NEW: Apply to AW Button (Only visible on Before Wash tab) */}
             {!isAw && (
               <button
                 onClick={handleApplyToAW}
@@ -915,9 +1337,29 @@ const MeasurementSpecsShared = ({
               )}
               Save Configuration
             </button>
+
+            <button
+              onClick={handlePreviewUpdate}
+              disabled={!moNoSearch || isUpdating || isSaving || isApplyingAW}
+              className="w-full sm:w-auto px-6 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all transform active:scale-95"
+              title="Update specs from Master Data (dt_orders) - Adds missing sizes and syncs shrinkage values"
+            >
+              {isUpdating ? (
+                <Loader className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Update Specs
+            </button>
           </div>
         </div>
       )}
+      <RepairNamesModal
+        isOpen={showRepairNamesModal}
+        onClose={() => setShowRepairNamesModal(false)}
+        moNo={moNoSearch}
+        onSuccess={handleRepairNamesSuccess}
+      />
     </div>
   );
 };

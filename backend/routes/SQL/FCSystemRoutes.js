@@ -8,6 +8,8 @@ import {
   getDensitySearchList,
   getDensityFieldValues,
   getSeperationColorListData,
+  getSeperationColorSearchList,
+  getSeperationColorFieldValues,
   getCrockingTestData,
   getSupplierEvaluationData,
 } from "../../controller/SQL/FCSystemController.js";
@@ -25,6 +27,15 @@ router.get("/api/fc-system/density-test/search", getDensitySearchList); // Summa
 router.get("/api/fc-system/density-test/dropdown", getDensityFieldValues); // Dropdown
 
 router.get("/api/fc-system/seperation-color-list", getSeperationColorListData);
+router.get(
+  "/api/fc-system/seperation-color-list/search",
+  getSeperationColorSearchList,
+);
+router.get(
+  "/api/fc-system/seperation-color-list/dropdown",
+  getSeperationColorFieldValues,
+);
+
 router.get("/api/fc-system/crocking-test", getCrockingTestData);
 router.get("/api/fc-system/supplier-evaluation", getSupplierEvaluationData);
 
