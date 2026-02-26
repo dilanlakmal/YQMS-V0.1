@@ -4,7 +4,7 @@ import { DatePicker as AntDatePicker } from "antd";
 import dayjs from "dayjs";
 import { Calendar } from "lucide-react";
 import MultiSelectDropdown from "./MultiSelectDropdown";
-import { useOrderDataStore } from "../../../../stores/washing";
+import { useOrderDataStore } from "../stores";
 
 const EditReportModal = ({
   isOpen,

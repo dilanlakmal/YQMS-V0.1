@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import {
   ReportWashing,
   ReportHomeWash,
@@ -234,6 +235,11 @@ export const saveReportWashing = async (req, res) => {
     const savedData = await newReport.save();
     console.log("Data Saved Successfully to ID:", savedData._id);
 
+    // Store QR ID used in scan URL (?scan=qrId) for data collection
+    const qrId = savedData._id.toString();
+    await ReportModel.findByIdAndUpdate(savedData._id, { $set: { qrId } });
+    savedData.qrId = qrId;
+
     // Emit socket event for real-time updates
     io.emit("washing-report-created", savedData);
 
@@ -261,7 +267,7 @@ export const saveReportWashing = async (req, res) => {
 // Get all Report Washing data
 export const getReportWashing = async (req, res) => {
   try {
-    const { ymStyle, factory, startDate, endDate, limit = 10, page = 1, reportType, status } = req.query;
+    const { ymStyle, factory, startDate, endDate, limit = 10, page = 1, reportType, status, excludeStatus, idOrQr } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     let query = {};
@@ -278,8 +284,19 @@ export const getReportWashing = async (req, res) => {
       query.color = { $regex: req.query.color, $options: "i" };
     }
 
-    if (status) {
+    if (excludeStatus) {
+      query.status = { $ne: excludeStatus };
+    } else if (status) {
       query.status = status;
+    }
+
+    if (idOrQr && String(idOrQr).trim()) {
+      const idVal = String(idOrQr).trim();
+      const orConditions = [{ qrId: idVal }];
+      if (mongoose.Types.ObjectId.isValid(idVal) && String(new mongoose.Types.ObjectId(idVal)) === idVal) {
+        orConditions.push({ _id: new mongoose.Types.ObjectId(idVal) });
+      }
+      query.$or = orConditions;
     }
 
 
@@ -408,27 +425,58 @@ export const updateReportWashing = async (req, res) => {
       }
     }
 
-    // Detect color change and whether editor is warehouse (for submitter notification)
+    // Detect color change and whether editor is warehouse (for submitter notification).
+    // Only run this when the request sent a color field (e.g. Edit form). When the client
+    // does not send color (e.g. saving Received status), do not treat as color change or add admin-edit icon.
+    const colorWasSent = req.body.color != null;
     const prevColor = Array.isArray(existingReport.color) ? existingReport.color : [];
     const newColor = Array.isArray(updateData.color) ? updateData.color : [];
-    const colorChanged = prevColor.length !== newColor.length ||
+    const colorChanged = colorWasSent && (
+      prevColor.length !== newColor.length ||
       prevColor.some((c, i) => newColor[i] !== c) ||
-      newColor.some((c, i) => prevColor[i] !== c);
+      newColor.some((c, i) => prevColor[i] !== c)
+    );
     const editedByWarehouse = req.body.editedByWarehouse === true || req.body.editedByWarehouse === "true";
 
+    // When warehouse edits colors, append to notificationHistory so history is never lost (notification modal shows full history)
+    let notificationHistoryEntry = null;
     if (editedByWarehouse && colorChanged) {
-      updateData.colorEditedByWarehouseAt = new Date();
+      const now = new Date();
+      const rejectedColors = prevColor.filter((c) => !newColor.includes(c));
+      updateData.colorEditedByWarehouseAt = now;
       updateData.colorEditedByWarehouseBy = req.body.editorUserId || req.body.editorEmpId || "";
       updateData.colorEditedByWarehouseName = req.body.editorUserName || req.body.editorName || "";
-      // Colors that were in original but warehouse removed (submitter sees this in Report notification modal on the report card)
-      updateData.colorUncheckedByWarehouse = prevColor.filter((c) => !newColor.includes(c));
+      updateData.colorUncheckedByWarehouse = rejectedColors;
+      notificationHistoryEntry = {
+        type: "COLOR_UPDATE",
+        at: now,
+        userId: req.body.editorUserId || req.body.editorEmpId || "",
+        userName: req.body.editorUserName || req.body.editorName || "",
+        previousColorCount: prevColor.length,
+        newColorCount: newColor.length,
+        rejectedColors
+      };
     }
-    // When a non-warehouse user updates the report (e.g. submitter or admin), clear the warehouse color-edit notification
+    // When a non-warehouse user (e.g. admin) updates the report, set admin-edit notification and clear warehouse notification
     if (!editedByWarehouse && colorChanged) {
       updateData.colorEditedByWarehouseAt = null;
       updateData.colorEditedByWarehouseBy = "";
       updateData.colorEditedByWarehouseName = "";
       updateData.colorUncheckedByWarehouse = [];
+      const now = new Date();
+      const rejectedColors = prevColor.filter((c) => !newColor.includes(c));
+      updateData.editedByAdminAt = now;
+      updateData.editedByAdminBy = req.body.editorUserId || req.body.editorEmpId || "";
+      updateData.editedByAdminName = req.body.editorUserName || req.body.editorName || "";
+      notificationHistoryEntry = {
+        type: "ADMIN_EDIT",
+        at: now,
+        userId: req.body.editorUserId || req.body.editorEmpId || "",
+        userName: req.body.editorUserName || req.body.editorName || "",
+        previousColorCount: prevColor.length,
+        newColorCount: newColor.length,
+        rejectedColors
+      };
     }
 
     // Helper to safely parse JSON fields (duplicate of logic in save, consider hoisting if refactoring)
@@ -824,11 +872,16 @@ export const updateReportWashing = async (req, res) => {
     delete updateData.editorUserName;
     delete updateData.editorEmpId;
     delete updateData.editorName;
+    delete updateData.notificationHistory;
 
     // Find and update the report using the correct model
+    const updateOp = { $set: updateData };
+    if (notificationHistoryEntry) {
+      updateOp.$push = { notificationHistory: notificationHistoryEntry };
+    }
     const updatedReport = await ReportModel.findByIdAndUpdate(
       id,
-      { $set: updateData },
+      updateOp,
       { new: true, runValidators: true }
     );
 

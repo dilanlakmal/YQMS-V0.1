@@ -2,8 +2,8 @@ import { useCallback } from "react";
 import { API_BASE_URL } from "../../../../../config.js";
 import showToast from "../../../../utils/toast.js";
 import { PRINT_WASH_TEST_DEFAULTS, EMB_PRINT_WASH_TEST_DEFAULTS } from "../constants/reportTypes.js";
-import { useFormStore } from "../../../../stores/washing/index.js";
-import { useModalStore } from "../../../../stores/washing/index.js";
+import { useFormStore } from "../stores/useFormStore.js";
+import { useModalStore } from "../stores/useModalStore.js";
 
 /**
  * Custom hook for report submission and status updates.
@@ -12,7 +12,7 @@ import { useModalStore } from "../../../../stores/washing/index.js";
  * without prop drilling.
  */
 export const useReportSubmission = (user, fetchReports) => {
-  const { setIsSubmitting }       = useFormStore();
+  const { setIsSubmitting } = useFormStore();
   const { setIsSavingReceived, setIsSavingCompletion } = useModalStore();
 
   // Submit new report
@@ -38,14 +38,14 @@ export const useReportSubmission = (user, fetchReports) => {
           : null;
       const dataToSubmit = defaultsMap
         ? {
-            ...formData,
-            ...Object.fromEntries(
-              Object.entries(defaultsMap).map(([k, v]) => [
-                k,
-                formData[k] != null && String(formData[k]).trim() !== "" ? formData[k] : v,
-              ])
-            ),
-          }
+          ...formData,
+          ...Object.fromEntries(
+            Object.entries(defaultsMap).map(([k, v]) => [
+              k,
+              formData[k] != null && String(formData[k]).trim() !== "" ? formData[k] : v,
+            ])
+          ),
+        }
         : formData;
 
       const formDataToSubmit = new FormData();

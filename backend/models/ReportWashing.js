@@ -45,6 +45,27 @@ const reportWashingSchema = new mongoose.Schema(
     colorEditedByWarehouseBy: { type: String, default: "" },
     colorEditedByWarehouseName: { type: String, default: "" },
     colorUncheckedByWarehouse: { type: [String], default: [] }, // Colors warehouse removed (submitter sent more, warehouse kept fewer)
+    // Admin edit notification (non-warehouse user edited report – different icon from warehouse edit)
+    editedByAdminAt: { type: Date, default: null },
+    editedByAdminBy: { type: String, default: "" },
+    editedByAdminName: { type: String, default: "" },
+    // Persistent history of updates (e.g. color edits when status is received) – so notification modal can show full history
+    notificationHistory: {
+      type: [
+        {
+          type: { type: String, default: "COLOR_UPDATE" }, // e.g. "COLOR_UPDATE"
+          at: { type: Date, required: true },
+          userId: { type: String, default: "" },
+          userName: { type: String, default: "" },
+          previousColorCount: { type: Number, default: 0 },
+          newColorCount: { type: Number, default: 0 },
+          rejectedColors: { type: [String], default: [] }, // Colors warehouse removed
+        }
+      ],
+      default: []
+    },
+    // QR ID stored at creation – same value used in QR code scan URL (?scan=qrId)
+    qrId: { type: String, default: "" },
   },
   {
     strict: false,

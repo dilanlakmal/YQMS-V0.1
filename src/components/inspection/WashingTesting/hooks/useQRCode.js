@@ -3,7 +3,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import { QRCodeCanvas } from "qrcode.react";
 import { API_BASE_URL } from "../../../../../config.js";
 import showToast from "../../../../utils/toast.js";
-import { useModalStore } from "../../../../stores/washing/index.js";
+import { useModalStore } from "../stores/useModalStore.js";
 
 /**
  * Custom hook for QR code operations (scanning, generation).

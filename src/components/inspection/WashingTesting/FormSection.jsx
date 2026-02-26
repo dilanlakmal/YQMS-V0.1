@@ -4,9 +4,9 @@ import EMBTestingForm from "./forms/EMBTestingForm";
 import HomeWashForm from "./forms/HomeWashForm";
 import GarmentWashForm from "./forms/GarmentWashForm";
 import PullingTestForm from "./forms/PullingTestForm";
-import { useFormStore } from "../../../stores/washing/useFormStore";
-import { useOrderDataStore } from "../../../stores/washing/useOrderDataStore";
-import { useAssignControlStore } from "../../../stores/washing/useAssignControlStore";
+import { useFormStore } from "./stores/useFormStore";
+import { useOrderDataStore } from "./stores/useOrderDataStore";
+import { useAssignControlStore } from "./stores/useAssignControlStore";
 
 /**
  * FormSection reads all data (formData, order data, assign control, factories)

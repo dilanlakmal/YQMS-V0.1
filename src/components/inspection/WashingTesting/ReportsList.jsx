@@ -1,11 +1,14 @@
 import React from "react";
-import { RotateCw, RefreshCw, Search, Calendar, X, ChevronLeft, ChevronRight, ClipboardList, Bell, CheckCircle } from "lucide-react";
+import { RotateCw, RefreshCw, Search, Calendar, X, ChevronLeft, ChevronRight, ClipboardList, Bell, CheckCircle, Copy } from "lucide-react";
 import Select from "react-select";
 import { DatePicker as AntDatePicker } from "antd";
 import dayjs from "dayjs";
-import { API_BASE_URL } from "../../../../config.js";
+import { QRCodeCanvas } from "qrcode.react";
+import { API_BASE_URL, QR_CODE_BASE_URL } from "../../../../config.js";
 import ReportCard from "./ReportCard";
 import { getReportTypeOptions } from "./constants/reportTypes";
+import { getQRCodeBaseURL } from "./helpers/qrHelpers";
+import showToast from "../../../utils/toast.js";
 import { useAuth } from "../../authentication/AuthContext";
 import {
   useWashingFilterStore,
@@ -14,7 +17,7 @@ import {
   useAssignControlStore,
   computeUserRoles,
   useFormStore,
-} from "../../../stores/washing";
+} from "./stores";
 
 const ReportsList = ({
   tab, // "standard" | "warehouse"
@@ -51,6 +54,7 @@ const ReportsList = ({
   const filterPage = filters.page;
   const filterLimit = filters.limit;
   const filterReportType = filters.reportType;
+  const filterIdOrQr = filters.idOrQr ?? "";
   const setFilterStartDate = (v) => setFilter(tab, "startDate", v);
   const setFilterEndDate = (v) => setFilter(tab, "endDate", v);
   const setFilterSearch = (v) => setFilter(tab, "search", v);
@@ -60,6 +64,7 @@ const ReportsList = ({
   const setFilterPage = (v) => setPage(tab, v);
   const setFilterLimit = (v) => setFilter(tab, "limit", v);
   const setFilterReportType = (v) => setFilter(tab, "reportType", v);
+  const setFilterIdOrQr = (v) => setFilter(tab, "idOrQr", v);
 
   // Read report data directly from store
   const {
@@ -71,6 +76,7 @@ const ReportsList = ({
   const onRefresh = React.useCallback(() => _fetchReports(tab, filters), [_fetchReports, tab, filters]);
   const onToggleReport = React.useCallback((id) => _toggleReport(tab, id), [_toggleReport, tab]);
   const [notificationReport, setNotificationReport] = React.useState(null);
+  const [easyScanQRPopupId, setEasyScanQRPopupId] = React.useState(null);
 
   const storageKey = React.useMemo(
     () => (user?.emp_id || user?.id ? `yqms_washing_notification_read_${user.emp_id || user.id}` : null),
@@ -156,7 +162,7 @@ const ReportsList = ({
         }
       }
     } catch (error) {
-      console.error("Error fetching color suggestions:", error);cur
+      console.error("Error fetching color suggestions:", error); cur
     } finally {
       setIsLoadingColors(false);
     }
@@ -249,7 +255,11 @@ const ReportsList = ({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h2 className="text-xl font-semibold text-gray-800 dark:text-white flex items-center gap-2">
           {/* <ClipboardList className="w-6 h-6 text-blue-600" /> */}
-          {activeTab === "warehouse_reports" ? "Warehouse Report" : "Reports"}
+          {tab === "easy_scan"
+            ? "Userwarehouse Easy Scan"
+            : activeTab === "warehouse_reports"
+              ? "Warehouse Report"
+              : "Reports"}
           {isLoadingReports && <RotateCw className="w-5 h-5 animate-spin text-blue-600" />}
         </h2>
 
@@ -347,6 +357,38 @@ const ReportsList = ({
       </div>
 
       {/* Filters */}
+      {tab === "easy_scan" ? (
+        <div className="mb-6 flex flex-col sm:flex-row gap-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-4 rounded-xl border border-amber-200/60 dark:border-amber-700/40">
+          
+          <div className="flex-1 flex flex-col sm:flex-row gap-3">
+            <div className="flex-1 min-w-0">
+              <label className="block text-xs font-semibold text-amber-700 dark:text-amber-300 mb-1">ID / QR</label>
+              <input
+                type="text"
+                value={filterIdOrQr}
+                onChange={(e) => setFilterIdOrQr(e.target.value)}
+                placeholder="Scan or enter report ID / QR..."
+                className="w-full px-4 py-2.5 rounded-lg border-2 border-amber-300 dark:border-amber-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-amber-400 focus:border-amber-400"
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <label className="block text-xs font-semibold text-amber-700 dark:text-amber-300 mb-1">Style</label>
+              <Select
+                value={filterSearch ? { value: filterSearch, label: filterSearch } : null}
+                onChange={(option) => setFilterSearch && setFilterSearch(option ? option.value : "")}
+                onInputChange={handleStyleInputChange}
+                options={styleSuggestions}
+                placeholder="Search Style..."
+                isClearable
+                isLoading={isLoadingStyles}
+                styles={customStyles}
+                className="text-sm"
+                noOptionsMessage={() => "Type to search..."}
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg">
         {/* Style Search with Autocomplete */}
         <div className="relative">
@@ -528,13 +570,94 @@ const ReportsList = ({
           <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none z-10" />
         </div>
       </div>
+      )}
 
       {reports.length === 0 ? (
         <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-          <p>No reports submitted yet.</p>
-          <p className="text-sm mt-2">
+          <p>{tab === "easy_scan" ? "No non-completed reports." : "No reports submitted yet."}</p>
+          {/* <p className="text-sm mt-2">
             Go to the <button onClick={() => setActiveTab("form")} className="text-blue-600 dark:text-blue-400 hover:underline font-medium">New Report</button> tab to submit a report.
-          </p>
+          </p> */}
+        </div>
+      ) : tab === "easy_scan" ? (
+        <div className="overflow-hidden rounded-lg border border-amber-200/60 dark:border-amber-700/40 bg-white dark:bg-gray-800">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+            <thead className="bg-amber-50 dark:bg-amber-900/20">
+              <tr>
+                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wider w-0">
+                  Scan
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wider">
+                  ID (QR)
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wider">
+                  Style
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wider">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+              {reports.map((report) => {
+                const reportId = report._id || report.id;
+                const idQr = report.qrId || reportId;
+                const style = report.ymStyle || report.buyerStyle || "—";
+                const status = report.status || "pending";
+                const scanUrl = `${getQRCodeBaseURL(QR_CODE_BASE_URL)}/Launch-washing-machine-test?scan=${reportId}`;
+                const statusClass =
+                  status === "completed"
+                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                    : status === "received"
+                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                      : status === "rejected"
+                        ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                        : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
+                return (
+                  <tr key={reportId} className="hover:bg-amber-50/50 dark:hover:bg-amber-900/10 transition-colors">
+                    <td className="px-3 py-2 align-middle">
+                      <button
+                        type="button"
+                        onClick={() => setEasyScanQRPopupId(reportId)}
+                        className="inline-flex items-center justify-center rounded border border-gray-200 dark:border-gray-600 bg-white p-1 cursor-pointer hover:border-amber-400 hover:ring-2 hover:ring-amber-200 dark:hover:ring-amber-800 transition-all focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        title="Click to show large QR for scanning"
+                      >
+                        <QRCodeCanvas value={scanUrl} size={56} level="M" />
+                      </button>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-mono font-semibold text-gray-900 dark:text-white">
+                      <span className="inline-flex items-center gap-2">
+                        <span>{String(idQr)}</span>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(String(idQr));
+                              showToast.success("ID copied to clipboard");
+                            } catch {
+                              showToast.error("Could not copy ID");
+                            }
+                          }}
+                          className="p-1 rounded text-gray-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 dark:text-gray-400 dark:hover:text-amber-400 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400"
+                          title="Copy ID"
+                        >
+                          <Copy size={16} />
+                        </button>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-gray-200">
+                      {style}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${statusClass}`}>
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       ) : (
         <div className="space-y-4">
@@ -544,8 +667,10 @@ const ReportsList = ({
             const isReporter = empId && (String(report.reporter_emp_id) === String(empId));
             const notYetAssignedReport = !report.receiver_emp_id && (report.status === "pending" || report.status === "" || !report.status);
             const reportHasColorEdit = !!(report.colorEditedByWarehouseAt && report.colorEditedByWarehouseBy);
-            // Reporter or admin can see alert when warehouse edited colors
-            const hasNotification = reportHasColorEdit && (isReporter || isAdminUser);
+            const reportHasAdminEdit = !!report.editedByAdminAt || !!(report.notificationHistory?.length && report.notificationHistory.some((e) => e.type === "ADMIN_EDIT"));
+            const hasWarehouseNotification = reportHasColorEdit && (isReporter || isAdminUser);
+            const hasAdminNotification = reportHasAdminEdit && (isReporter || isAdminUser || isWarehouseUser);
+            const hasNotification = hasWarehouseNotification || hasAdminNotification;
             const notificationParts = [];
             if (notYetAssignedReport) {
               if (isReporter) notificationParts.push("Not yet assigned by warehouse.");
@@ -561,6 +686,10 @@ const ReportsList = ({
                 ? `${name} edited colors: you sent ${totalPrev} color(s), now ${currentN}.${removed}`
                 : `${name} edited colors: sent ${totalPrev} → now ${currentN}.${removed}`;
               notificationParts.push(msg);
+            }
+            if (reportHasAdminEdit) {
+              const name = report.editedByAdminName || report.editedByAdminBy || "Admin";
+              notificationParts.push(`Admin edit by ${name}.`);
             }
             const notificationTitle = hasNotification ? notificationParts.join(" ") : "Notification";
 
@@ -592,6 +721,8 @@ const ReportsList = ({
                 restrictEditStatuses={restrictEditStatuses}
                 enableRoleLocking={enableRoleLocking}
                 hasNotification={hasNotification}
+                hasWarehouseNotification={hasWarehouseNotification}
+                hasAdminNotification={hasAdminNotification}
                 notificationRead={readNotificationReportIds.has(reportId)}
                 showNotificationButton={showNotificationButton}
                 notificationTitle={notificationTitle}
@@ -625,31 +756,66 @@ const ReportsList = ({
               <span className="font-semibold uppercase tracking-wide text-gray-800 dark:text-white">{notificationReport.ymStyle || "—"}</span>
             </p>
 
-            {notificationReport.colorEditedByWarehouseAt ? (
+            {(notificationReport.notificationHistory?.length > 0 || notificationReport.colorEditedByWarehouseAt || notificationReport.editedByAdminAt) ? (
               <div className="space-y-3 text-sm">
-                <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 p-3 space-y-2">
-                  <p className="font-semibold text-amber-800 dark:text-amber-200 text-xs uppercase tracking-wide">Color update</p>
-                  <div className="grid gap-1.5">
-                    <p className="text-gray-700 dark:text-gray-300">
-                      <span className="text-gray-500 dark:text-gray-400 font-medium">User:</span>{" "}
-                      {notificationReport.colorEditedByWarehouseName || notificationReport.colorEditedByWarehouseBy || "Warehouse"}
-                    </p>
-                    <p className="text-gray-700 dark:text-gray-300">
-                      <span className="text-gray-500 dark:text-gray-400 font-medium">When:</span>{" "}
-                      {new Date(notificationReport.colorEditedByWarehouseAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", hour12: true })}
-                    </p>
-                    <p className="text-gray-700 dark:text-gray-300">
-                      <span className="text-gray-500 dark:text-gray-400 font-medium">Colors:</span>{" "}
-                      You sent {(notificationReport.colorUncheckedByWarehouse?.length || 0) + (notificationReport.color?.length || 0)} → now {notificationReport.color?.length || 0}
-                    </p>
-                    {notificationReport.colorUncheckedByWarehouse?.length > 0 && (
-                      <p className="text-gray-700 dark:text-gray-300">
-                        <span className="text-gray-500 dark:text-gray-400 font-medium">RejectColor:</span>{" "}
-                        <span className="text-amber-700 dark:text-amber-300 font-medium">{notificationReport.colorUncheckedByWarehouse.join(", ")}</span>
+                {/* Show full history (newest first); fallback to single latest for older reports */}
+                {(notificationReport.notificationHistory?.length > 0
+                  ? [...notificationReport.notificationHistory].reverse()
+                  : notificationReport.editedByAdminAt
+                    ? [{
+                        type: "ADMIN_EDIT",
+                        at: notificationReport.editedByAdminAt,
+                        userName: notificationReport.editedByAdminName,
+                        userId: notificationReport.editedByAdminBy,
+                        previousColorCount: notificationReport.color?.length || 0,
+                        newColorCount: notificationReport.color?.length || 0,
+                        rejectedColors: [],
+                      }]
+                    : [{
+                        type: "COLOR_UPDATE",
+                        at: notificationReport.colorEditedByWarehouseAt,
+                        userName: notificationReport.colorEditedByWarehouseName,
+                        userId: notificationReport.colorEditedByWarehouseBy,
+                        previousColorCount: (notificationReport.colorUncheckedByWarehouse?.length || 0) + (notificationReport.color?.length || 0),
+                        newColorCount: notificationReport.color?.length || 0,
+                        rejectedColors: notificationReport.colorUncheckedByWarehouse || [],
+                      }]
+                ).map((entry, idx) => {
+                  const isAdminEdit = entry.type === "ADMIN_EDIT";
+                  const boxClass = isAdminEdit
+                    ? "rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/50 p-3 space-y-2"
+                    : "rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 p-3 space-y-2";
+                  const titleClass = isAdminEdit
+                    ? "font-semibold text-violet-800 dark:text-violet-200 text-xs uppercase tracking-wide"
+                    : "font-semibold text-amber-800 dark:text-amber-200 text-xs uppercase tracking-wide";
+                  return (
+                    <div key={entry.at ? new Date(entry.at).getTime() : idx} className={boxClass}>
+                      <p className={titleClass}>
+                        {entry.type === "COLOR_UPDATE" ? "Color update" : entry.type === "ADMIN_EDIT" ? "Admin edit" : entry.type || "Update"}
                       </p>
-                    )}
-                  </div>
-                </div>
+                      <div className="grid gap-1.5">
+                        <p className="text-gray-700 dark:text-gray-300">
+                          <span className="text-gray-500 dark:text-gray-400 font-medium">User:</span>{" "}
+                          {entry.userName || entry.userId || (isAdminEdit ? "Admin" : "Warehouse")}
+                        </p>
+                        <p className="text-gray-700 dark:text-gray-300">
+                          <span className="text-gray-500 dark:text-gray-400 font-medium">When:</span>{" "}
+                          {entry.at ? new Date(entry.at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", hour12: true }) : "—"}
+                        </p>
+                        <p className="text-gray-700 dark:text-gray-300">
+                          <span className="text-gray-500 dark:text-gray-400 font-medium">Colors:</span>{" "}
+                          You sent {entry.previousColorCount ?? ((notificationReport.colorUncheckedByWarehouse?.length || 0) + (notificationReport.color?.length || 0))} → now {entry.newColorCount ?? (notificationReport.color?.length || 0)}
+                        </p>
+                        {(entry.rejectedColors?.length > 0) && (
+                          <p className="text-gray-700 dark:text-gray-300">
+                            <span className="text-gray-500 dark:text-gray-400 font-medium">RejectColor:</span>{" "}
+                            <span className="text-amber-700 dark:text-amber-300 font-medium">{entry.rejectedColors.join(", ")}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 p-4 text-center">
@@ -673,6 +839,54 @@ const ReportsList = ({
           </div>
         </div>
       )}
+
+      {/* Easy Scan: large QR popup for scanning */}
+      {tab === "easy_scan" && easyScanQRPopupId && (() => {
+        const report = reports.find((r) => (r._id || r.id) === easyScanQRPopupId);
+        const scanUrl = report ? `${getQRCodeBaseURL(QR_CODE_BASE_URL)}/Launch-washing-machine-test?scan=${easyScanQRPopupId}` : "";
+        const styleLabel = report ? (report.ymStyle || report.buyerStyle || "—") : "";
+        const status = report ? (report.status || "pending") : "";
+        const statusClass =
+          status === "completed"
+            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+            : status === "received"
+              ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+              : status === "rejected"
+                ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
+        return (
+          <div
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60"
+            onClick={() => setEasyScanQRPopupId(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Scan QR code"
+          >
+            <div
+              className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full border-2 border-amber-200 dark:border-amber-700"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-1">Scan this QR code</h3>
+              {(styleLabel || status) && (
+                <div className="mb-4 space-y-1 ">
+                  <div className="flex items-center justify-between">
+                  {styleLabel && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Style: <span className="font-medium text-gray-900 dark:text-white">{styleLabel}</span></p>
+                  )}
+                  {status && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Status: <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${statusClass}`}>{status.charAt(0).toUpperCase() + status.slice(1)}</span></p>
+                  )}
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-center rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-white p-4">
+                {scanUrl && <QRCodeCanvas value={scanUrl} size={280} level="M" />}
+              </div>
+             
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

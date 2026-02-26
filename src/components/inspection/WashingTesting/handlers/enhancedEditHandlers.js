@@ -40,9 +40,9 @@ export const handleEditFormSubmit = async (
     try {
         const formDataToSubmit = new FormData();
 
-        // Warehouse edit context: so backend can set colorEditedByWarehouseAt and create notification for submitter
-        if (warehouseEditContext && warehouseEditContext.editedByWarehouse === true) {
-            formDataToSubmit.append("editedByWarehouse", "true");
+        // Editor context: so backend can set warehouse vs admin notification (who edited, when, for which icon to show)
+        if (warehouseEditContext) {
+            formDataToSubmit.append("editedByWarehouse", warehouseEditContext.editedByWarehouse === true ? "true" : "false");
             if (warehouseEditContext.editorUserId != null) formDataToSubmit.append("editorUserId", String(warehouseEditContext.editorUserId));
             if (warehouseEditContext.editorEmpId != null) formDataToSubmit.append("editorEmpId", String(warehouseEditContext.editorEmpId));
             if (warehouseEditContext.editorUserName != null) formDataToSubmit.append("editorUserName", String(warehouseEditContext.editorUserName));

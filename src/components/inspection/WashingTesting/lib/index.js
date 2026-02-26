@@ -36,16 +36,23 @@ export { default as RejectReportModal } from '../washing-modal/RejectReportModal
 export { default as EditImagesModal } from '../washing-modal/EditImagesModal';
 
 // =============================================================================
-// HOOKS - Custom React Hooks
+// HOOKS - Custom React Hooks (legacy — kept for backward compatibility)
 // =============================================================================
 
 export { useFormState } from '../hooks/useFormState';
+export { useReports } from '../hooks/useReports';
+
+// Legacy hook re-exports — these now delegate to Zustand stores.
+// Prefer importing stores directly from '../stores' (i.e. WashingTesting/stores/index.js).
 export { useImageHandling } from '../hooks/useImageHandling';
 export { useImageViewer } from '../hooks/useImageViewer';
 export { useOrderData } from '../hooks/useOrderData';
 export { useQRCode } from '../hooks/useQRCode';
-export { useReports } from '../hooks/useReports';
 export { useReportSubmission } from '../hooks/useReportSubmission';
+export { useQRScanner } from '../hooks/useQRScanner';
+export { useReportActions } from '../hooks/useReportActions';
+export { useReportExport } from '../hooks/useReportExport';
+export { useFormActions } from '../hooks/useFormActions';
 
 // =============================================================================
 // SERVICES - API Layer

@@ -1,6 +1,6 @@
 import React from "react";
 import { XCircle } from "lucide-react";
-import { useModalStore } from "../../../../stores/washing";
+import { useModalStore } from "../stores";
 
 const RejectReportModal = ({ onConfirm }) => {
   const {
@@ -27,7 +27,7 @@ const RejectReportModal = ({ onConfirm }) => {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center mb-2">
             Reject Report
           </h3>
-         
+
           {report?.ymStyle && (
             <p className="text-xs text-gray-500 dark:text-gray-500 text-center mb-3">
               Style: <span className="font-medium text-gray-700 dark:text-gray-300">{report.ymStyle}</span>

@@ -1,6 +1,6 @@
 import React from "react";
 import ImageUploadModal from "./ImageUploadModal";
-import { useModalStore } from "../../../../stores/washing/index.js";
+import { useModalStore } from "../stores";
 
 const ReceivedModal = ({
   isOpen,

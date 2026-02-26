@@ -1,7 +1,7 @@
 import React from "react";
 import { useAuth } from "../../authentication/AuthContext";
-import { ChevronDown, ChevronUp, Printer, FileText, FileSpreadsheet, Pencil, Trash2, QrCode, CheckCircle, XCircle, Bell, BellRing } from "lucide-react";
-import { useAssignControlStore, computeUserRoles, useModalStore } from "../../../stores/washing";
+import { ChevronDown, ChevronUp, Printer, FileText, FileSpreadsheet, Pencil, Trash2, QrCode, CheckCircle, XCircle, Bell, BellRing, Shield } from "lucide-react";
+import { useAssignControlStore, computeUserRoles, useModalStore } from "./stores";
 import ReportTimeline from "./ReportTimeline";
 
 const DEFAULT_SCALE = 'scale-125';
@@ -102,6 +102,10 @@ const ReportCard = ({
   enableRoleLocking = false,
   /** When true, show notification icon on this record (e.g. user submitted / record finished). You control this in the parent. */
   hasNotification = false,
+  /** When true, show warehouse-edit notification (bell icon, amber). */
+  hasWarehouseNotification = false,
+  /** When true, show admin-edit notification (shield icon, blue). */
+  hasAdminNotification = false,
   /** When true, user has opened notification (mark read) – dot is hidden, ring icon kept. */
   notificationRead = false,
   /** When true, always show the notification button so user can open status modal (default true in Reports list). */
@@ -198,35 +202,58 @@ const ReportCard = ({
                   {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
                 </span>
               )}
-              {/* Has new: BellRing + amber + dot. No new: Bell, muted & smaller – clearly different */}
+              {/* Warehouse edit: BellRing (amber). Admin edit: Shield (violet – distinct from amber and blue buttons). No notification: Bell muted. */}
               {showNotificationButton && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onNotificationClick?.(report);
-                  }}
-                  className={`relative flex-shrink-0 rounded transition-all duration-200 ${
-                    hasNotification
-                      ? "p-1 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300"
-                      : "p-1 text-gray-300 dark:text-gray-600 hover:text-gray-400 dark:hover:text-gray-500 opacity-70 hover:opacity-100"
-                  }`}
-                  title={hasNotification ? notificationTitle : "View report status"}
-                >
-                  {hasNotification ? (
-                    <BellRing size={18} strokeWidth={2.25} />
-                  ) : (
-                    <Bell size={16} strokeWidth={1.5} />
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  {hasWarehouseNotification && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onNotificationClick?.(report);
+                      }}
+                      className="relative rounded transition-all duration-200 p-1 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300"
+                      title={notificationTitle || "Warehouse edited this report"}
+                    >
+                      <BellRing size={18} strokeWidth={2.25} />
+                      {!notificationRead && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500 dark:bg-amber-400 ring-2 ring-white dark:ring-gray-800" aria-hidden />
+                      )}
+                    </button>
                   )}
-                  {/* Dot only when has notification and not yet read (click once = mark read, remove point, keep ring) */}
-                  {hasNotification && !notificationRead && (
-                    <span
-                      className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500 dark:bg-amber-400 ring-2 ring-white dark:ring-gray-800"
-                      aria-hidden
-                    />
+                  {hasAdminNotification && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onNotificationClick?.(report);
+                      }}
+                      className="relative rounded transition-all duration-200 p-1 text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300"
+                      title={notificationTitle || "Admin edited this report"}
+                    >
+                      <Shield size={18} strokeWidth={2.25} />
+                      {!notificationRead && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-violet-500 dark:bg-violet-400 ring-2 ring-white dark:ring-gray-800" aria-hidden />
+                      )}
+                    </button>
                   )}
-                </button>
+                  {!hasNotification && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onNotificationClick?.(report);
+                      }}
+                      className="rounded transition-all duration-200 p-1 text-gray-300 dark:text-gray-600 hover:text-gray-400 dark:hover:text-gray-500 opacity-70 hover:opacity-100"
+                      title="View report status"
+                    >
+                      <Bell size={16} strokeWidth={1.5} />
+                    </button>
+                  )}
+                </div>
               )}
             </div>
             <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -284,7 +311,7 @@ const ReportCard = ({
               </button>
             )}
 
-           
+
             {shouldShowRejectButton && (
               <button
                 type="button"
@@ -311,7 +338,7 @@ const ReportCard = ({
                 <span className="sm:hidden">Del</span>
               </button>
             )}
-            
+
           </div>
           {/* QR Code Button */}
           {report.status === "completed" ? (
@@ -342,21 +369,21 @@ const ReportCard = ({
               <QrCode size={16} />
             </button>
           )}
-           {shouldShowAcceptReceivedButton && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onAcceptReceived(report);
-                }}
-                className="px-2 md:px-3 py-1.5 text-xs md:text-sm bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-md hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors flex items-center gap-1"
-                title="Accept as received (no images or notes)"
-              >
-                <CheckCircle size={14} />
-                <span className="hidden sm:inline">Accept Received</span>
-              </button>
-            )}
+          {shouldShowAcceptReceivedButton && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onAcceptReceived(report);
+              }}
+              className="px-2 md:px-3 py-1.5 text-xs md:text-sm bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-md hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors flex items-center gap-1"
+              title="Accept as received (no images or notes)"
+            >
+              <CheckCircle size={14} />
+              <span className="hidden sm:inline">Accept Received</span>
+            </button>
+          )}
         </div>
       </div>
 
