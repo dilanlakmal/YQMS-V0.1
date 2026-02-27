@@ -1173,7 +1173,7 @@ function Home() {
             roles: ["WIP"],
             image: "assets/Home/wip-dashboard.png",
             title: t("home.wip-dashboard"),
-            description: "WORK IN PROGRESS",
+            description: "WIP-Sewing Output",
           },
         ],
       },
