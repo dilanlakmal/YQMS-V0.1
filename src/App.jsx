@@ -106,6 +106,9 @@ import HumidityReportPage from "./pages/HumidityReport.jsx";
 //FC Direct SQL
 import FCSystem from "./pages/FCSystem";
 
+// Real-Time Sunrise System
+import WIP from "./pages/WIP.jsx";
+
 export const BluetoothContext = createContext(null);
 
 function AppContent() {
@@ -515,6 +518,7 @@ function AppContent() {
               <Route path="/production-Sheet" element={<CoverPage />} />
               <Route path="/humidity-report" element={<HumidityReportPage />} />
               <Route path="/fc-system" element={<FCSystem />} />
+              <Route path="/wip-dashboard" element={<WIP />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

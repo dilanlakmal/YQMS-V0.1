@@ -31,7 +31,8 @@
     "systemadmin": "System Administration",
     "yqms": "YQMS",
     "b-grade_defects": "B-grade defects",
-    "fc": "FC System"
+    "fc": "FC System",
+    "wip-dashboard": "WIP Dashboard"
   },
 
   "nav": {

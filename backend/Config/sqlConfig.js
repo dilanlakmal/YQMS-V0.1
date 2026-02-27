@@ -53,3 +53,23 @@ export const sqlConfigFCSystem = {
     idleTimeoutMillis: 60000,
   },
 };
+
+export const sqlConfigRealTimeSunrise = {
+  user: process.env.RT_SUNRISE_USER,
+  password: process.env.RT_SUNRISE_PASSWORD,
+  server: process.env.RT_SUNRISE_SERVER,
+  database: process.env.RT_SUNRISE_DATABASE,
+  port: parseInt(process.env.RT_SUNRISE_PORT) || 1433,
+  options: {
+    encrypt: false,
+    trustServerCertificate: true,
+    enableArithAbort: true,
+  },
+  requestTimeout: 300000,
+  connectionTimeout: 30000,
+  pool: {
+    max: 10,
+    min: 0,
+    idleTimeoutMillis: 30000,
+  },
+};

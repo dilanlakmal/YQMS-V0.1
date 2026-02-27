@@ -1160,6 +1160,23 @@ function Home() {
           },
         ],
       },
+      {
+        id: "wip",
+        title: "WIP",
+        icon: <TrendingUp className="w-5 h-5" />,
+        bgColor: "bg-rose-50 dark:bg-rose-900/20",
+        gradientFrom: "from-green-500",
+        gradientTo: "to-red-500",
+        items: [
+          {
+            path: "/wip-dashboard",
+            roles: ["WIP"],
+            image: "assets/Home/wip-dashboard.png",
+            title: t("home.wip-dashboard"),
+            description: "WORK IN PROGRESS",
+          },
+        ],
+      },
     ],
     [t],
   );
