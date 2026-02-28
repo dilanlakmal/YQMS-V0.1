@@ -53,7 +53,8 @@
     "p88_Legacy": "P88 Legacy",
     "accessories": "Accessories",
     "fc": "FC System",
-    "wip-dashboard": "WIP Dashboard"
+    "wip-sewing_output": "WIP #1 | Sewing Output",
+    "wip-sewing_defects": "WIP #2 | Sewing Defects"
   },
 
   "nav": {

@@ -233,7 +233,7 @@ const WIP = () => {
                 <Activity className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight">
-                WIP Dashboard
+                WIP #1 | Daily Production Dashboard
                 <span className="ml-2 text-sm font-semibold text-gray-400 dark:text-gray-500 tracking-normal">
                   / Real-Time
                 </span>

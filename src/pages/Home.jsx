@@ -1169,11 +1169,18 @@ function Home() {
         gradientTo: "to-red-500",
         items: [
           {
-            path: "/wip-dashboard",
+            path: "/wip-sewing-output",
             roles: ["WIP"],
-            image: "assets/Home/wip-dashboard.png",
-            title: t("home.wip-dashboard"),
-            description: "WIP-Sewing Output",
+            image: "assets/Home/wip-sewing_output.png",
+            title: t("home.wip-sewing_output"),
+            description: "Real Time Daily Production",
+          },
+          {
+            path: "/wip-sewing-defects",
+            roles: ["WIP"],
+            image: "assets/Home/wip-sewing_defects.png",
+            title: t("home.wip-sewing_defects"),
+            description: "Real Time Daily QC1 Defect Analysis",
           },
         ],
       },

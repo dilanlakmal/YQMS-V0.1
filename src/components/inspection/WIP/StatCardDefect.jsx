@@ -1,12 +1,23 @@
 import React, { useState, useEffect } from "react";
-import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
 
 // ─────────────────────────────────────────────
 // CIRCULAR PROGRESS RING
 // ─────────────────────────────────────────────
-const CircularProgress = ({ value, total, glowColor, size = 58 }) => {
+const CircularProgress = ({
+  value,
+  maxValue = 100,
+  glowColor,
+  size = 58,
+  isPercentage = false,
+}) => {
   const [animated, setAnimated] = useState(0);
-  const pct = total > 0 ? value / total : 0;
+  const pct = maxValue > 0 ? Math.min(value / maxValue, 1) : 0;
   const r = (size - 8) / 2;
   const circ = 2 * Math.PI * r;
   const dash = circ * animated;
@@ -56,18 +67,20 @@ const CircularProgress = ({ value, total, glowColor, size = 58 }) => {
           style={{ filter: `drop-shadow(0 0 5px ${glowColor})` }}
         />
       </svg>
-      <div
-        style={{
-          position: "absolute",
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: glowColor,
-          boxShadow: `0 0 8px 3px ${glowColor}`,
-          top: dotY - 4,
-          left: dotX - 4,
-        }}
-      />
+      {animated > 0.02 && (
+        <div
+          style={{
+            position: "absolute",
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: glowColor,
+            boxShadow: `0 0 8px 3px ${glowColor}`,
+            top: dotY - 4,
+            left: dotX - 4,
+          }}
+        />
+      )}
       <div
         style={{
           position: "absolute",
@@ -79,14 +92,16 @@ const CircularProgress = ({ value, total, glowColor, size = 58 }) => {
       >
         <span
           style={{
-            fontSize: 11,
+            fontSize: isPercentage ? 10 : 11,
             fontWeight: 800,
             color: "#fff",
             fontFamily: "'DM Mono', monospace",
             lineHeight: 1,
           }}
         >
-          {Math.round(animated * 100)}%
+          {isPercentage
+            ? `${(animated * maxValue).toFixed(1)}%`
+            : Math.round(animated * 100)}
         </span>
       </div>
     </div>
@@ -94,26 +109,36 @@ const CircularProgress = ({ value, total, glowColor, size = 58 }) => {
 };
 
 // ─────────────────────────────────────────────
-// GRADIENT MAP — pass a Tailwind-like string and get CSS
+// GRADIENT MAP
 // ─────────────────────────────────────────────
 const GRADIENTS = {
-  // violet / purple
+  // Defect-specific gradients
+  "from-red-500 to-rose-600": {
+    bg: ["#EF4444", "#E11D48"],
+    ring: "#FB7185",
+    glow: "rgba(251,113,133,0.5)",
+  },
+  "from-orange-500 to-amber-600": {
+    bg: ["#F97316", "#D97706"],
+    ring: "#FBBF24",
+    glow: "rgba(251,191,36,0.5)",
+  },
+  "from-yellow-500 to-orange-600": {
+    bg: ["#EAB308", "#EA580C"],
+    ring: "#FB923C",
+    glow: "rgba(251,146,60,0.5)",
+  },
+  // Standard gradients
   "from-violet-500 to-purple-600": {
     bg: ["#7C3AED", "#9333EA"],
     ring: "#A855F7",
     glow: "rgba(168,85,247,0.5)",
-  },
-  "from-purple-500 to-indigo-600": {
-    bg: ["#A855F7", "#4F46E5"],
-    ring: "#818CF8",
-    glow: "rgba(129,140,248,0.5)",
   },
   "from-indigo-500 to-blue-600": {
     bg: ["#6366F1", "#2563EB"],
     ring: "#60A5FA",
     glow: "rgba(96,165,250,0.5)",
   },
-  // blue / cyan
   "from-blue-500 to-cyan-600": {
     bg: ["#3B82F6", "#0891B2"],
     ring: "#22D3EE",
@@ -124,7 +149,6 @@ const GRADIENTS = {
     ring: "#2DD4BF",
     glow: "rgba(45,212,191,0.5)",
   },
-  // emerald / green
   "from-emerald-500 to-teal-600": {
     bg: ["#10B981", "#0D9488"],
     ring: "#34D399",
@@ -135,18 +159,11 @@ const GRADIENTS = {
     ring: "#4ADE80",
     glow: "rgba(74,222,128,0.5)",
   },
-  // amber / orange
   "from-amber-500 to-orange-600": {
     bg: ["#F59E0B", "#EA580C"],
     ring: "#FB923C",
     glow: "rgba(251,146,60,0.5)",
   },
-  "from-orange-500 to-red-600": {
-    bg: ["#F97316", "#DC2626"],
-    ring: "#FCA5A5",
-    glow: "rgba(252,165,165,0.5)",
-  },
-  // rose / pink
   "from-rose-500 to-pink-600": {
     bg: ["#F43F5E", "#DB2777"],
     ring: "#F9A8D4",
@@ -157,17 +174,15 @@ const GRADIENTS = {
     ring: "#FB7185",
     glow: "rgba(251,113,133,0.5)",
   },
-  // sky
-  "from-sky-500 to-blue-600": {
-    bg: ["#0EA5E9", "#2563EB"],
-    ring: "#7DD3FC",
-    glow: "rgba(125,211,252,0.5)",
+  "from-fuchsia-500 to-pink-600": {
+    bg: ["#D946EF", "#DB2777"],
+    ring: "#F0ABFC",
+    glow: "rgba(240,171,252,0.5)",
   },
 };
 
 const resolveGradient = (gradient) => {
   if (GRADIENTS[gradient]) return GRADIENTS[gradient];
-  // fallback
   return {
     bg: ["#6366F1", "#4F46E5"],
     ring: "#818CF8",
@@ -176,9 +191,9 @@ const resolveGradient = (gradient) => {
 };
 
 // ─────────────────────────────────────────────
-// CARD SHELL — shared dark glassmorphic container
+// CARD SHELL
 // ─────────────────────────────────────────────
-const CardShell = ({ gradient, children }) => {
+const CardShell = ({ gradient, children, danger = false }) => {
   const { bg, glow } = resolveGradient(gradient);
   const bgCss = `linear-gradient(135deg, ${bg[0]} 0%, ${bg[1]} 100%)`;
   const [hovered, setHovered] = useState(false);
@@ -192,7 +207,9 @@ const CardShell = ({ gradient, children }) => {
         overflow: "hidden",
         borderRadius: 18,
         background: bgCss,
-        border: "1px solid rgba(255,255,255,0.12)",
+        border: danger
+          ? "1px solid rgba(239,68,68,0.3)"
+          : "1px solid rgba(255,255,255,0.12)",
         boxShadow: hovered
           ? `0 20px 50px ${glow}, inset 0 1px 0 rgba(255,255,255,0.18)`
           : `0 8px 28px ${glow}, inset 0 1px 0 rgba(255,255,255,0.10)`,
@@ -222,7 +239,9 @@ const CardShell = ({ gradient, children }) => {
           width: 90,
           height: 90,
           borderRadius: "50%",
-          background: "rgba(255,255,255,0.06)",
+          background: danger
+            ? "rgba(239,68,68,0.15)"
+            : "rgba(255,255,255,0.06)",
           filter: "blur(24px)",
           pointerEvents: "none",
         }}
@@ -237,16 +256,18 @@ const CardShell = ({ gradient, children }) => {
 // ─────────────────────────────────────────────
 // ICON BOX
 // ─────────────────────────────────────────────
-const IconBox = ({ Icon }) => (
+const IconBox = ({ Icon, danger = false }) => (
   <div
     style={{
       width: 36,
       height: 36,
       borderRadius: 10,
       flexShrink: 0,
-      background: "rgba(255,255,255,0.15)",
+      background: danger ? "rgba(239,68,68,0.3)" : "rgba(255,255,255,0.15)",
       backdropFilter: "blur(6px)",
-      border: "1px solid rgba(255,255,255,0.2)",
+      border: danger
+        ? "1px solid rgba(239,68,68,0.4)"
+        : "1px solid rgba(255,255,255,0.2)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -289,9 +310,9 @@ const Skeleton = ({ w = 120, h = 36 }) => (
 );
 
 // ─────────────────────────────────────────────
-// STANDARD STAT CARD
+// DEFECT STAT CARD
 // ─────────────────────────────────────────────
-const StatCard = ({
+export const DefectStatCard = ({
   title,
   value,
   icon: Icon,
@@ -300,15 +321,12 @@ const StatCard = ({
   subtitle,
   trend,
   trendUp,
-  total, // optional — enables circular ring
+  danger = false,
 }) => {
-  const { ring, glow } = resolveGradient(gradient);
-
-  const displayValue =
-    typeof value === "number" ? value.toLocaleString() : value || 0;
+  const { glow } = resolveGradient(gradient);
 
   return (
-    <CardShell gradient={gradient}>
+    <CardShell gradient={gradient} danger={danger}>
       {/* Header */}
       <div
         style={{
@@ -318,19 +336,8 @@ const StatCard = ({
           marginBottom: 16,
         }}
       >
-        <IconBox Icon={Icon} />
+        <IconBox Icon={Icon} danger={danger} />
         <Label>{title}</Label>
-        <div
-          style={{
-            marginLeft: "auto",
-            opacity: 0.4,
-            fontSize: 16,
-            color: "#fff",
-            lineHeight: 1,
-          }}
-        >
-          ⋮
-        </div>
       </div>
 
       {/* Body */}
@@ -361,9 +368,9 @@ const StatCard = ({
                   textShadow: `0 0 24px ${glow}`,
                 }}
               >
-                {String(typeof value === "number" ? value : 0).padStart(2, "0")}
+                {typeof value === "number" ? value.toLocaleString() : value}
               </div>
-              {(subtitle || trend) && (
+              {(subtitle || trend !== undefined) && (
                 <div
                   style={{
                     display: "flex",
@@ -376,15 +383,23 @@ const StatCard = ({
                   }}
                 >
                   {subtitle}
-                  {trend && (
+                  {trend !== undefined && (
                     <span
                       style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
                         fontSize: 10,
                         fontWeight: 800,
                         color: trendUp ? "#34D399" : "#F87171",
                       }}
                     >
-                      {trendUp ? "↑" : "↓"} {trend}
+                      {trendUp ? (
+                        <TrendingUp style={{ width: 12, height: 12 }} />
+                      ) : (
+                        <TrendingDown style={{ width: 12, height: 12 }} />
+                      )}
+                      {trend}
                     </span>
                   )}
                 </div>
@@ -392,32 +407,141 @@ const StatCard = ({
             </>
           )}
         </div>
+      </div>
+    </CardShell>
+  );
+};
 
-        {!loading && total != null && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 4,
-            }}
-          >
-            <CircularProgress
-              value={typeof value === "number" ? value : 0}
-              total={total}
-              glowColor={ring}
-              size={58}
-            />
-            <span
-              style={{
-                fontSize: 10,
-                color: "rgba(255,255,255,0.4)",
-                fontFamily: "'DM Sans', sans-serif",
-              }}
-            >
-              of {total} total
-            </span>
-          </div>
+// ─────────────────────────────────────────────
+// DEFECT RATE CARD (with circular progress)
+// ─────────────────────────────────────────────
+export const DefectRateCard = ({
+  title,
+  value,
+  icon: Icon,
+  gradient,
+  loading,
+  subtitle,
+  maxRate = 10, // max rate for the ring (e.g., 10%)
+  danger = false,
+}) => {
+  const { ring, glow } = resolveGradient(gradient);
+
+  // Determine color based on rate
+  const getRateColor = (rate) => {
+    if (rate <= 2) return "#34D399"; // Green - Good
+    if (rate <= 5) return "#FBBF24"; // Yellow - Warning
+    return "#F87171"; // Red - Critical
+  };
+
+  const rateColor = getRateColor(value);
+
+  return (
+    <CardShell gradient={gradient} danger={danger}>
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 14,
+        }}
+      >
+        <IconBox Icon={Icon} danger={danger} />
+        <Label>{title}</Label>
+      </div>
+
+      {/* Body */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+        }}
+      >
+        <div>
+          {loading ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <Skeleton w={80} h={40} />
+              <Skeleton w={100} h={12} />
+            </div>
+          ) : (
+            <>
+              <div
+                style={{
+                  fontSize: 38,
+                  fontWeight: 900,
+                  color: "#fff",
+                  lineHeight: 1,
+                  fontFamily: "'DM Mono', monospace",
+                  letterSpacing: "-1.5px",
+                  textShadow: `0 0 24px ${glow}`,
+                }}
+              >
+                {value.toFixed(2)}
+                <span style={{ fontSize: 18, marginLeft: 2, opacity: 0.7 }}>
+                  %
+                </span>
+              </div>
+              {subtitle && (
+                <p
+                  style={{
+                    margin: "4px 0 0",
+                    fontSize: 11,
+                    color: "rgba(255,255,255,0.5)",
+                    fontFamily: "'DM Sans', sans-serif",
+                  }}
+                >
+                  {subtitle}
+                </p>
+              )}
+              {/* Rate status badge */}
+              <div
+                style={{
+                  marginTop: 8,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "4px 10px",
+                  borderRadius: 20,
+                  background: `${rateColor}20`,
+                  border: `1px solid ${rateColor}40`,
+                }}
+              >
+                <div
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: rateColor,
+                    boxShadow: `0 0 6px ${rateColor}`,
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: rateColor,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  {value <= 2 ? "Good" : value <= 5 ? "Warning" : "Critical"}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {!loading && (
+          <CircularProgress
+            value={value}
+            maxValue={maxRate}
+            glowColor={rateColor}
+            size={70}
+            isPercentage={true}
+          />
         )}
       </div>
     </CardShell>
@@ -425,7 +549,7 @@ const StatCard = ({
 };
 
 // ─────────────────────────────────────────────
-// BREAKDOWN PILL (Inside / Outside)
+// OUTPUT CARD WITH INSIDE/OUTSIDE BREAKDOWN
 // ─────────────────────────────────────────────
 const BreakdownPill = ({
   label,
@@ -485,15 +609,12 @@ const BreakdownPill = ({
         textShadow: `0 0 12px ${pillText}`,
       }}
     >
-      {val}
+      {typeof val === "number" ? val.toLocaleString() : val}
     </p>
   </div>
 );
 
-// ─────────────────────────────────────────────
-// STAT CARD WITH INSIDE/OUTSIDE BREAKDOWN
-// ─────────────────────────────────────────────
-export const StatCardWithBreakdown = ({
+export const OutputWithBreakdownCard = ({
   title,
   value,
   icon: Icon,
@@ -502,23 +623,9 @@ export const StatCardWithBreakdown = ({
   subtitle,
   insideValue,
   outsideValue,
-  valueFormatter,
   unit,
 }) => {
   const { glow } = resolveGradient(gradient);
-
-  const formatValue = (val) => {
-    if (valueFormatter) return valueFormatter(val);
-    if (typeof val === "number") {
-      if (val % 1 !== 0)
-        return val.toLocaleString(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        });
-      return val.toLocaleString();
-    }
-    return val || 0;
-  };
 
   return (
     <CardShell gradient={gradient}>
@@ -533,17 +640,6 @@ export const StatCardWithBreakdown = ({
       >
         <IconBox Icon={Icon} />
         <Label>{title}</Label>
-        <div
-          style={{
-            marginLeft: "auto",
-            opacity: 0.4,
-            fontSize: 16,
-            color: "#fff",
-            lineHeight: 1,
-          }}
-        >
-          ⋮
-        </div>
       </div>
 
       {/* Main Value */}
@@ -570,7 +666,7 @@ export const StatCardWithBreakdown = ({
                 textShadow: `0 0 24px ${glow}`,
               }}
             >
-              {formatValue(value)}
+              {typeof value === "number" ? value.toLocaleString() : value}
             </span>
             {unit && (
               <span
@@ -609,7 +705,7 @@ export const StatCardWithBreakdown = ({
         <div style={{ display: "flex", gap: 10 }}>
           <BreakdownPill
             label="Inside"
-            val={formatValue(insideValue)}
+            val={insideValue}
             PillIcon={ArrowDownToLine}
             pillGradient="rgba(99,102,241,0.25)"
             pillText="#818CF8"
@@ -617,7 +713,7 @@ export const StatCardWithBreakdown = ({
           />
           <BreakdownPill
             label="Outside"
-            val={formatValue(outsideValue)}
+            val={outsideValue}
             PillIcon={ArrowUpFromLine}
             pillGradient="rgba(16,185,129,0.2)"
             pillText="#34D399"
@@ -629,4 +725,4 @@ export const StatCardWithBreakdown = ({
   );
 };
 
-export default StatCard;
+export default DefectStatCard;

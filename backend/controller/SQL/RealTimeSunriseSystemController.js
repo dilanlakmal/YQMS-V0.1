@@ -97,48 +97,6 @@ export const getWIPSummaryStats = async (req, res) => {
   }
 };
 
-// export const getWIPSummaryStats = async (req, res) => {
-//   try {
-//     await ensureRealTimeSunriseConnected();
-//     const pool = getRealTimeSunrisePool();
-//     const tableName = getTodayTableName();
-
-//     const query = `
-//       SELECT
-//         ISNULL(SUM(CASE WHEN SeqNo = 38 THEN Qty ELSE 0 END), 0) AS Task38Qty,
-//         ISNULL(SUM(CASE WHEN SeqNo = 39 THEN Qty ELSE 0 END), 0) AS Task39Qty,
-//         COUNT(DISTINCT MONo) AS TotalStyles
-//       FROM [YM-SUNRISE].[SunRiseGar].[dbo].[${tableName}]
-//     `;
-
-//     const result = await pool.request().query(query);
-//     const data = result.recordset[0] || {
-//       Task38Qty: 0,
-//       Task39Qty: 0,
-//       TotalStyles: 0,
-//     };
-
-//     // Calculate Total Output (max of Task38 and Task39)
-//     data.TotalOutput = Math.max(data.Task38Qty, data.Task39Qty);
-
-//     res.json(data);
-//   } catch (error) {
-//     console.error(`[RealTimeSunrise] Stats Error:`, error.message);
-//     if (error.message.includes("Invalid object name")) {
-//       return res.json({
-//         Task38Qty: 0,
-//         Task39Qty: 0,
-//         TotalStyles: 0,
-//         TotalOutput: 0,
-//       });
-//     }
-//     res.status(500).json({ error: "Failed to fetch stats" });
-//   }
-// };
-
-// --- Get Chart Data with MONo breakdown for Tooltip ---
-
-// --- Get Chart Data with MONo breakdown and Buyer info ---
 export const getWIPLineChartData = async (req, res) => {
   const { taskNo } = req.query;
 
