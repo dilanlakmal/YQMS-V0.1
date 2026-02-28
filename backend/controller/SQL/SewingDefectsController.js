@@ -133,8 +133,7 @@ export const getDefectsSummaryStats = async (req, res) => {
   }
 };
 
-// --- Get Defects by Line ---
-// --- Get Defects by Line with Output Data ---
+// --- Get Defects by Line with Output Data, MO Numbers, and Top Defects ---
 export const getDefectsByLine = async (req, res) => {
   try {
     await ensureRealTimeSunriseConnected();
@@ -142,15 +141,16 @@ export const getDefectsByLine = async (req, res) => {
     const tableName = getTodayTableName();
     const todayDate = getTodayDateString();
 
-    // Query 1: Get Output by Line from tWork table
+    // Query 1: Get Output by Line from tWork table with MO Numbers
     const outputQuery = `
       SELECT 
         WorkLine AS [LineNo],
+        MONo,
         ISNULL(SUM(CASE WHEN SeqNo = 38 THEN Qty ELSE 0 END), 0) AS Task38Qty,
         ISNULL(SUM(CASE WHEN SeqNo = 39 THEN Qty ELSE 0 END), 0) AS Task39Qty
       FROM [YM-SUNRISE].[SunRiseGar].[dbo].[${tableName}]
       WHERE SeqNo IN (38, 39)
-      GROUP BY WorkLine
+      GROUP BY WorkLine, MONo
     `;
 
     // Query 2: Get Defects by Line from tFailHis table
@@ -168,25 +168,73 @@ export const getDefectsByLine = async (req, res) => {
       GROUP BY f.WorkLine
     `;
 
-    const [outputResult, defectsResult] = await Promise.all([
+    // Query 3: Get Top Defects by Line with Defect Names
+    const topDefectsQuery = `
+      SELECT 
+        f.WorkLine AS [LineNo],
+        r.ReworkCode,
+        r.ReworkName,
+        COUNT(*) AS DefectQty
+      FROM [YM-SUNRISE].[SunRiseGar].[dbo].[tFailHis] f
+      INNER JOIN [YM-SUNRISE].[SunRiseGar].[dbo].[tReworkCode] r 
+        ON f.FailCode = r.ReworkCode
+      WHERE CAST(f.dDate AS DATE) = @TodayDate
+        AND f.RackQCFail = 1
+      GROUP BY f.WorkLine, r.ReworkCode, r.ReworkName
+      ORDER BY f.WorkLine, DefectQty DESC
+    `;
+
+    const [outputResult, defectsResult, topDefectsResult] = await Promise.all([
       pool.request().query(outputQuery),
       pool
         .request()
         .input("TodayDate", sql.Date, todayDate)
         .query(defectsQuery),
+      pool
+        .request()
+        .input("TodayDate", sql.Date, todayDate)
+        .query(topDefectsQuery),
     ]);
 
-    // Build output map
+    // Build output map with MO details per line
     const outputMap = {};
     outputResult.recordset.forEach((row) => {
       const lineNo = String(row.LineNo || "").trim();
+      const moNo = String(row.MONo || "").trim();
       const task38 = parseInt(row.Task38Qty) || 0;
       const task39 = parseInt(row.Task39Qty) || 0;
-      outputMap[lineNo] = {
-        Task38Qty: task38,
-        Task39Qty: task39,
-        OutputQty: Math.max(task38, task39),
-      };
+      const outputQty = Math.max(task38, task39);
+
+      if (!outputMap[lineNo]) {
+        outputMap[lineNo] = {
+          Task38Qty: 0,
+          Task39Qty: 0,
+          OutputQty: 0,
+          MONumbers: [],
+          MODetails: [],
+        };
+      }
+
+      outputMap[lineNo].Task38Qty += task38;
+      outputMap[lineNo].Task39Qty += task39;
+      outputMap[lineNo].OutputQty += outputQty;
+
+      if (moNo && !outputMap[lineNo].MONumbers.includes(moNo)) {
+        outputMap[lineNo].MONumbers.push(moNo);
+        outputMap[lineNo].MODetails.push({
+          MONo: moNo,
+          OutputQty: outputQty,
+          Buyer: getBuyerFromMoNumber(moNo),
+        });
+      }
+    });
+
+    // Recalculate OutputQty as max of total Task38 and Task39
+    Object.keys(outputMap).forEach((lineNo) => {
+      outputMap[lineNo].OutputQty = Math.max(
+        outputMap[lineNo].Task38Qty,
+        outputMap[lineNo].Task39Qty,
+      );
     });
 
     // Build defects map
@@ -198,6 +246,23 @@ export const getDefectsByLine = async (req, res) => {
         MOCount: parseInt(row.MOCount) || 0,
         InspectorCount: parseInt(row.InspectorCount) || 0,
       };
+    });
+
+    // Build top defects map per line (keep top 3)
+    const topDefectsMap = {};
+    topDefectsResult.recordset.forEach((row) => {
+      const lineNo = String(row.LineNo || "").trim();
+      if (!topDefectsMap[lineNo]) {
+        topDefectsMap[lineNo] = [];
+      }
+      // Only keep top 5 for each line
+      if (topDefectsMap[lineNo].length < 5) {
+        topDefectsMap[lineNo].push({
+          ReworkCode: row.ReworkCode,
+          ReworkName: row.ReworkName || `Code ${row.ReworkCode}`,
+          DefectQty: parseInt(row.DefectQty) || 0,
+        });
+      }
     });
 
     // Get all unique lines
@@ -213,12 +278,15 @@ export const getDefectsByLine = async (req, res) => {
           Task38Qty: 0,
           Task39Qty: 0,
           OutputQty: 0,
+          MONumbers: [],
+          MODetails: [],
         };
         const defects = defectsMap[lineNo] || {
           TotalDefects: 0,
           MOCount: 0,
           InspectorCount: 0,
         };
+        const topDefects = topDefectsMap[lineNo] || [];
 
         const defectRate =
           output.OutputQty > 0
@@ -227,6 +295,15 @@ export const getDefectsByLine = async (req, res) => {
               )
             : 0;
 
+        // Calculate defect rate for each top defect
+        const topDefectsWithRate = topDefects.map((d) => ({
+          ...d,
+          DefectRate:
+            output.OutputQty > 0
+              ? parseFloat(((d.DefectQty / output.OutputQty) * 100).toFixed(2))
+              : 0,
+        }));
+
         return {
           LineNo: lineNo,
           OutputQty: output.OutputQty,
@@ -234,12 +311,21 @@ export const getDefectsByLine = async (req, res) => {
           Task39Qty: output.Task39Qty,
           TotalDefects: defects.TotalDefects,
           DefectRate: defectRate,
-          MOCount: defects.MOCount,
+          MOCount: output.MONumbers.length,
+          MONumbers: output.MONumbers,
+          MODetails: output.MODetails,
           InspectorCount: defects.InspectorCount,
+          TopDefects: topDefectsWithRate.slice(0, 3), // Top 3 only
         };
       })
       .filter((item) => item.TotalDefects > 0 || item.OutputQty > 0)
-      .sort((a, b) => b.DefectRate - a.DefectRate); // Sort by defect rate descending
+      .sort((a, b) => {
+        // Sort by LineNo naturally
+        return a.LineNo.localeCompare(b.LineNo, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+      });
 
     res.json(data);
   } catch (error) {
@@ -248,40 +334,6 @@ export const getDefectsByLine = async (req, res) => {
   }
 };
 
-// export const getDefectsByLine = async (req, res) => {
-//   try {
-//     await ensureRealTimeSunriseConnected();
-//     const pool = getRealTimeSunrisePool();
-//     const todayDate = getTodayDateString();
-
-//     const query = `
-//   SELECT
-//     f.WorkLine AS [LineNo],
-//     COUNT(*) AS TotalDefects,
-//     COUNT(DISTINCT f.MONo) AS MOCount,
-//     COUNT(DISTINCT f.EmpIDQC) AS InspectorCount
-//   FROM [YM-SUNRISE].[SunRiseGar].[dbo].[tFailHis] f
-//   INNER JOIN [YM-SUNRISE].[SunRiseGar].[dbo].[tReworkCode] r
-//     ON f.FailCode = r.ReworkCode
-//   WHERE CAST(f.dDate AS DATE) = @TodayDate
-//     AND f.RackQCFail = 1
-//   GROUP BY f.WorkLine
-//   ORDER BY TotalDefects DESC
-// `;
-
-//     const result = await pool
-//       .request()
-//       .input("TodayDate", sql.Date, todayDate)
-//       .query(query);
-
-//     res.json(result.recordset || []);
-//   } catch (error) {
-//     console.error(`[SewingDefects] By Line Error:`, error.message);
-//     res.json([]);
-//   }
-// };
-
-// --- Get Defects by Rework Code (Defect Type) ---
 export const getDefectsByType = async (req, res) => {
   try {
     await ensureRealTimeSunriseConnected();
@@ -316,37 +368,182 @@ export const getDefectsByType = async (req, res) => {
   }
 };
 
-// --- Get Defects by MO Number ---
+// --- Get Defects by MONo with Full Details ---
 export const getDefectsByMONo = async (req, res) => {
   try {
     await ensureRealTimeSunriseConnected();
     const pool = getRealTimeSunrisePool();
+    const tableName = getTodayTableName();
     const todayDate = getTodayDateString();
-    const query = `
-  SELECT 
-    f.MONo,
-    COUNT(*) AS TotalDefects,
-    COUNT(DISTINCT f.WorkLine) AS LineCount,
-    COUNT(DISTINCT f.FailCode) AS DefectTypeCount,
-    COUNT(DISTINCT f.EmpID) AS WorkerCount
-  FROM [YM-SUNRISE].[SunRiseGar].[dbo].[tFailHis] f
-  INNER JOIN [YM-SUNRISE].[SunRiseGar].[dbo].[tReworkCode] r 
-    ON f.FailCode = r.ReworkCode
-  WHERE CAST(f.dDate AS DATE) = @TodayDate
-    AND f.RackQCFail = 1
-  GROUP BY f.MONo
-  ORDER BY TotalDefects DESC
-`;
 
-    const result = await pool
-      .request()
-      .input("TodayDate", sql.Date, todayDate)
-      .query(query);
+    // Query 1: Get Output by MONo from tWork table
+    const outputQuery = `
+      SELECT 
+        MONo,
+        ISNULL(SUM(CASE WHEN SeqNo = 38 THEN Qty ELSE 0 END), 0) AS Task38Qty,
+        ISNULL(SUM(CASE WHEN SeqNo = 39 THEN Qty ELSE 0 END), 0) AS Task39Qty
+      FROM [YM-SUNRISE].[SunRiseGar].[dbo].[${tableName}]
+      WHERE SeqNo IN (38, 39)
+      GROUP BY MONo
+    `;
 
-    const data = result.recordset.map((row) => ({
-      ...row,
-      Buyer: getBuyerFromMoNumber(row.MONo),
-    }));
+    // Query 2: Get Defects summary by MONo
+    const defectsSummaryQuery = `
+      SELECT 
+        f.MONo,
+        COUNT(*) AS TotalDefects,
+        COUNT(DISTINCT f.EmpID) AS WorkerCount,
+        COUNT(DISTINCT f.EmpIDQC) AS QCCount
+      FROM [YM-SUNRISE].[SunRiseGar].[dbo].[tFailHis] f
+      INNER JOIN [YM-SUNRISE].[SunRiseGar].[dbo].[tReworkCode] r 
+        ON f.FailCode = r.ReworkCode
+      WHERE CAST(f.dDate AS DATE) = @TodayDate
+        AND f.RackQCFail = 1
+      GROUP BY f.MONo
+    `;
+
+    // Query 3: Get Line numbers by MONo
+    const linesQuery = `
+      SELECT DISTINCT
+        f.MONo,
+        f.WorkLine AS [LineNo]
+      FROM [YM-SUNRISE].[SunRiseGar].[dbo].[tFailHis] f
+      INNER JOIN [YM-SUNRISE].[SunRiseGar].[dbo].[tReworkCode] r 
+        ON f.FailCode = r.ReworkCode
+      WHERE CAST(f.dDate AS DATE) = @TodayDate
+        AND f.RackQCFail = 1
+      ORDER BY f.MONo, f.WorkLine
+    `;
+
+    // Query 4: Get Top defects by MONo with defect names
+    const topDefectsQuery = `
+      SELECT 
+        f.MONo,
+        r.ReworkCode,
+        r.ReworkName,
+        COUNT(*) AS DefectQty
+      FROM [YM-SUNRISE].[SunRiseGar].[dbo].[tFailHis] f
+      INNER JOIN [YM-SUNRISE].[SunRiseGar].[dbo].[tReworkCode] r 
+        ON f.FailCode = r.ReworkCode
+      WHERE CAST(f.dDate AS DATE) = @TodayDate
+        AND f.RackQCFail = 1
+      GROUP BY f.MONo, r.ReworkCode, r.ReworkName
+      ORDER BY f.MONo, DefectQty DESC
+    `;
+
+    const [outputResult, defectsSummaryResult, linesResult, topDefectsResult] =
+      await Promise.all([
+        pool.request().query(outputQuery),
+        pool
+          .request()
+          .input("TodayDate", sql.Date, todayDate)
+          .query(defectsSummaryQuery),
+        pool
+          .request()
+          .input("TodayDate", sql.Date, todayDate)
+          .query(linesQuery),
+        pool
+          .request()
+          .input("TodayDate", sql.Date, todayDate)
+          .query(topDefectsQuery),
+      ]);
+
+    // Build output map
+    const outputMap = {};
+    outputResult.recordset.forEach((row) => {
+      const moNo = String(row.MONo || "").trim();
+      const task38 = parseInt(row.Task38Qty) || 0;
+      const task39 = parseInt(row.Task39Qty) || 0;
+      outputMap[moNo] = {
+        Task38Qty: task38,
+        Task39Qty: task39,
+        OutputQty: Math.max(task38, task39),
+      };
+    });
+
+    // Build lines map: MONo -> [LineNo1, LineNo2, ...]
+    const linesMap = {};
+    linesResult.recordset.forEach((row) => {
+      const moNo = String(row.MONo || "").trim();
+      const lineNo = String(row.LineNo || "").trim();
+      if (!linesMap[moNo]) {
+        linesMap[moNo] = [];
+      }
+      if (lineNo && !linesMap[moNo].includes(lineNo)) {
+        linesMap[moNo].push(lineNo);
+      }
+    });
+
+    // Sort line numbers naturally
+    Object.keys(linesMap).forEach((moNo) => {
+      linesMap[moNo].sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+      );
+    });
+
+    // Build top defects map: MONo -> [{ReworkCode, ReworkName, DefectQty}, ...]
+    const topDefectsMap = {};
+    topDefectsResult.recordset.forEach((row) => {
+      const moNo = String(row.MONo || "").trim();
+      if (!topDefectsMap[moNo]) {
+        topDefectsMap[moNo] = [];
+      }
+      // Keep top 5 only
+      if (topDefectsMap[moNo].length < 5) {
+        topDefectsMap[moNo].push({
+          ReworkCode: row.ReworkCode,
+          ReworkName: row.ReworkName || `Code ${row.ReworkCode}`,
+          DefectQty: parseInt(row.DefectQty) || 0,
+        });
+      }
+    });
+
+    // Build final data
+    const data = defectsSummaryResult.recordset.map((row) => {
+      const moNo = String(row.MONo || "").trim();
+      const output = outputMap[moNo] || {
+        Task38Qty: 0,
+        Task39Qty: 0,
+        OutputQty: 0,
+      };
+      const lines = linesMap[moNo] || [];
+      const topDefects = topDefectsMap[moNo] || [];
+      const totalDefects = parseInt(row.TotalDefects) || 0;
+
+      // Calculate defect rate
+      const defectRate =
+        output.OutputQty > 0
+          ? parseFloat(((totalDefects / output.OutputQty) * 100).toFixed(2))
+          : 0;
+
+      // Calculate individual defect rates for top defects
+      const topDefectsWithRate = topDefects.map((d) => ({
+        ...d,
+        DefectRate:
+          output.OutputQty > 0
+            ? parseFloat(((d.DefectQty / output.OutputQty) * 100).toFixed(2))
+            : 0,
+      }));
+
+      return {
+        MONo: moNo,
+        Buyer: getBuyerFromMoNumber(moNo),
+        OutputQty: output.OutputQty,
+        Task38Qty: output.Task38Qty,
+        Task39Qty: output.Task39Qty,
+        TotalDefects: totalDefects,
+        DefectRate: defectRate,
+        LineCount: lines.length,
+        Lines: lines,
+        WorkerCount: parseInt(row.WorkerCount) || 0,
+        QCCount: parseInt(row.QCCount) || 0,
+        TopDefects: topDefectsWithRate,
+        DefectTypeCount: topDefects.length,
+      };
+    });
+
+    // Sort by TotalDefects descending
+    data.sort((a, b) => b.TotalDefects - a.TotalDefects);
 
     res.json(data);
   } catch (error) {

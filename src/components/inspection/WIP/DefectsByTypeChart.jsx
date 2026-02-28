@@ -1,13 +1,23 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { PieChart, Pie, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import {
   Tag,
-  ChevronDown,
-  ChevronUp,
   AlertCircle,
   TrendingUp,
   Percent,
+  ChevronLeft,
+  ChevronRight,
+  Pause,
+  Play,
+  Factory,
+  Package,
 } from "lucide-react";
+
+// ─────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────
+const ITEMS_PER_PAGE = 7;
+const AUTO_ADVANCE_INTERVAL = 10000; // 10 seconds
 
 // ─────────────────────────────────────────────
 // COLORS FOR DEFECT TYPES
@@ -71,13 +81,12 @@ const CustomTooltip = ({ active, payload, totalOutput }) => {
             className="w-3 h-3 rounded-sm flex-shrink-0"
             style={{ backgroundColor: data.color || "#EF4444" }}
           />
-          <p className="text-sm font-bold text-gray-800 dark:text-white truncate">
+          <p className="text-sm font-bold text-gray-800 dark:text-white break-words">
             {data.ReworkName || `Code: ${data.ReworkCode}`}
           </p>
         </div>
 
         <div className="space-y-2">
-          {/* Defect Count */}
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-500 dark:text-gray-400">
               Defects:
@@ -87,7 +96,6 @@ const CustomTooltip = ({ active, payload, totalOutput }) => {
             </span>
           </div>
 
-          {/* Defect Rate */}
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-500 dark:text-gray-400">
               Rate:
@@ -99,7 +107,6 @@ const CustomTooltip = ({ active, payload, totalOutput }) => {
             </span>
           </div>
 
-          {/* Additional Info */}
           <div className="flex gap-4 pt-2 border-t border-gray-100 dark:border-gray-700 text-xs">
             <div>
               <span className="text-gray-400 dark:text-gray-500">Lines: </span>
@@ -152,7 +159,7 @@ const PieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
 // ─────────────────────────────────────────────
 const ChartSkeleton = () => (
   <div className="flex flex-col gap-3 p-5 animate-pulse">
-    {[80, 65, 50, 40, 30].map((w, i) => (
+    {[80, 65, 50, 40, 30, 25, 20].map((w, i) => (
       <div key={i} className="flex items-center gap-3">
         <div className="w-24 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
         <div
@@ -179,11 +186,12 @@ const EmptyChart = () => (
 );
 
 // ─────────────────────────────────────────────
-// DEFECT TYPE ROW (List View)
+// DEFECT TYPE ROW (Enhanced with highlighted cards)
 // ─────────────────────────────────────────────
 const DefectTypeRow = ({
   item,
   index,
+  globalIndex,
   maxDefects,
   totalDefects,
   totalOutput,
@@ -199,68 +207,236 @@ const DefectTypeRow = ({
   const rateInfo = getRateColor(defectRate);
 
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-gray-100 dark:border-gray-700/50 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors rounded-lg px-2 -mx-2">
+    <div className="flex items-center gap-3 py-3 border-b border-gray-100 dark:border-gray-700/50 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors rounded-lg px-3 -mx-1">
       {/* Rank Badge */}
       <div
-        className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0 shadow-sm"
+        className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0 shadow-md"
         style={{ backgroundColor: color }}
       >
-        {index + 1}
+        {globalIndex + 1}
       </div>
 
       {/* Name & Details */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">
-          {item.ReworkName || `Defect Code ${item.ReworkCode}`}
-        </p>
-        <div className="flex items-center gap-3 mt-1">
-          <span className="text-[10px] text-gray-400 dark:text-gray-500">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm font-bold text-gray-800 dark:text-white break-words leading-tight">
+            {item.ReworkName || `Defect Code ${item.ReworkCode}`}
+          </p>
+
+          {/* Highlighted Lines/MOs Card */}
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800/50">
+              <Factory className="w-3 h-3 text-blue-500 dark:text-blue-400" />
+              <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                {item.LineCount} Lines
+              </span>
+            </div>
+            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-violet-50 dark:bg-violet-900/30 border border-violet-100 dark:border-violet-800/50">
+              <Package className="w-3 h-3 text-violet-500 dark:text-violet-400" />
+              <span className="text-[10px] font-bold text-violet-700 dark:text-violet-300">
+                {item.MOCount} MOs
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Progress Bar & Code */}
+        <div className="flex items-center gap-3 mt-2">
+          <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">
             Code: {item.ReworkCode}
           </span>
+          <div className="flex-1 max-w-[150px]">
+            <div className="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${barWidth}%`, backgroundColor: color }}
+              />
+            </div>
+          </div>
           <span className="text-[10px] text-gray-400 dark:text-gray-500">
-            {item.LineCount} lines
-          </span>
-          <span className="text-[10px] text-gray-400 dark:text-gray-500">
-            {item.MOCount} MOs
+            {percentage}% of total
           </span>
         </div>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="w-24 flex-shrink-0 hidden sm:block">
-        <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${barWidth}%`, backgroundColor: color }}
-          />
-        </div>
-        <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 text-right">
-          {percentage}%
-        </p>
       </div>
 
       {/* Defect Rate Badge */}
       <div
-        className={`px-2.5 py-1.5 rounded-lg text-center flex-shrink-0 min-w-[70px] ${rateInfo.bg}`}
+        className={`px-3 py-2 rounded-xl text-center flex-shrink-0 min-w-[80px] ${rateInfo.bg} border ${
+          rateInfo.color === "#EF4444"
+            ? "border-red-200 dark:border-red-800/50"
+            : rateInfo.color === "#F59E0B"
+              ? "border-amber-200 dark:border-amber-800/50"
+              : "border-emerald-200 dark:border-emerald-800/50"
+        }`}
       >
         <div className="flex items-center justify-center gap-1">
-          <Percent className={`w-3 h-3 ${rateInfo.text}`} />
-          <span className={`text-sm font-black tabular-nums ${rateInfo.text}`}>
+          <Percent className={`w-3.5 h-3.5 ${rateInfo.text}`} />
+          <span
+            className={`text-base font-black tabular-nums ${rateInfo.text}`}
+          >
             {defectRate.toFixed(2)}
           </span>
         </div>
-        <p className="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5">
-          Rate
+        <p className="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5 font-medium">
+          Defect Rate
         </p>
       </div>
 
       {/* Count */}
-      <div className="text-right min-w-[55px] flex-shrink-0">
-        <p className="text-base font-black text-gray-800 dark:text-white tabular-nums">
+      <div className="text-right min-w-[65px] flex-shrink-0">
+        <p className="text-xl font-black text-gray-800 dark:text-white tabular-nums">
           {item.TotalDefects.toLocaleString()}
         </p>
         <p className="text-[10px] text-gray-400 dark:text-gray-500">defects</p>
       </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// PAGINATED LIST VIEW
+// ─────────────────────────────────────────────
+const PaginatedListView = ({ data, totalOutput, totalDefects, maxDefects }) => {
+  const [currentPage, setCurrentPage] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const containerRef = useRef(null);
+  const intervalRef = useRef(null);
+
+  // Calculate total pages
+  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
+
+  // Get current page data
+  const currentPageData = useMemo(() => {
+    const startIndex = currentPage * ITEMS_PER_PAGE;
+    return data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [data, currentPage]);
+
+  // Auto-advance
+  useEffect(() => {
+    if (!isPaused && totalPages > 1) {
+      intervalRef.current = setInterval(() => {
+        setCurrentPage((prev) => (prev + 1) % totalPages);
+      }, AUTO_ADVANCE_INTERVAL);
+    }
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [isPaused, totalPages]);
+
+  const goToPrev = () => {
+    setCurrentPage((prev) => (prev === 0 ? totalPages - 1 : prev - 1));
+  };
+
+  const goToNext = () => {
+    setCurrentPage((prev) => (prev + 1) % totalPages);
+  };
+
+  const goToPage = (pageIndex) => {
+    setCurrentPage(pageIndex);
+  };
+
+  return (
+    <div className="relative">
+      {/* Navigation Header */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-gray-700">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+              Page {currentPage + 1} of {totalPages}
+            </span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              ({data.length} types)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Play/Pause Button */}
+            <button
+              onClick={() => setIsPaused(!isPaused)}
+              className={`p-1.5 rounded-lg transition-colors ${
+                isPaused
+                  ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+              }`}
+              title={isPaused ? "Resume auto-play" : "Pause auto-play"}
+            >
+              {isPaused ? (
+                <Play className="w-3.5 h-3.5" />
+              ) : (
+                <Pause className="w-3.5 h-3.5" />
+              )}
+            </button>
+
+            {/* Navigation Arrows */}
+            <button
+              onClick={goToPrev}
+              className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={goToNext}
+              className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Content Container with Horizontal Scroll Animation */}
+      <div ref={containerRef} className="overflow-hidden">
+        <div
+          className="transition-transform duration-500 ease-out"
+          style={{ transform: `translateX(0)` }}
+        >
+          {currentPageData.map((item, index) => {
+            const globalIndex = currentPage * ITEMS_PER_PAGE + index;
+            return (
+              <DefectTypeRow
+                key={item.ReworkCode}
+                item={item}
+                index={index}
+                globalIndex={globalIndex}
+                maxDefects={maxDefects}
+                totalDefects={totalDefects}
+                totalOutput={totalOutput}
+                color={DEFECT_COLORS[globalIndex % DEFECT_COLORS.length]}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Pagination Dots */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-1.5 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+          {Array.from({ length: totalPages }).map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => goToPage(idx)}
+              className={`h-2 rounded-full transition-all duration-300 ${
+                currentPage === idx
+                  ? "w-8 bg-gradient-to-r from-amber-500 to-orange-500"
+                  : "w-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+              }`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Auto-play indicator */}
+      {totalPages > 1 && !isPaused && (
+        <div className="flex items-center justify-center mt-3">
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700/50">
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-[10px] text-gray-500 dark:text-gray-400">
+              Auto-advancing every 10s
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -285,23 +461,34 @@ const Top5Legend = ({ data, totalOutput }) => {
           return (
             <div
               key={item.ReworkCode}
-              className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-700/40 border border-gray-100 dark:border-gray-600/50"
+              className="flex items-center gap-3 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-700/40 border border-gray-100 dark:border-gray-600/50 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors"
             >
               {/* Color & Rank */}
               <div
-                className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold text-white shadow-sm"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold text-white shadow-md"
                 style={{ backgroundColor: item.color }}
               >
                 {index + 1}
               </div>
 
-              {/* Name */}
+              {/* Name & Info Cards */}
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">
+                <p className="text-xs font-bold text-gray-700 dark:text-gray-200 break-words leading-tight mb-1">
                   {item.ReworkName || `Code ${item.ReworkCode}`}
                 </p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  {/* Rate Badge */}
+                <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30">
+                    <Factory className="w-2.5 h-2.5 text-blue-500" />
+                    <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400">
+                      {item.LineCount}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-violet-50 dark:bg-violet-900/30">
+                    <Package className="w-2.5 h-2.5 text-violet-500" />
+                    <span className="text-[9px] font-bold text-violet-600 dark:text-violet-400">
+                      {item.MOCount}
+                    </span>
+                  </div>
                   <span
                     className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${rateInfo.bg} ${rateInfo.text}`}
                   >
@@ -313,7 +500,7 @@ const Top5Legend = ({ data, totalOutput }) => {
               {/* Count */}
               <div className="text-right flex-shrink-0">
                 <p
-                  className="text-sm font-black tabular-nums"
+                  className="text-base font-black tabular-nums"
                   style={{ color: item.color }}
                 >
                   {item.TotalDefects.toLocaleString()}
@@ -331,11 +518,8 @@ const Top5Legend = ({ data, totalOutput }) => {
 // MAIN COMPONENT
 // ─────────────────────────────────────────────
 const DefectsByTypeChart = ({ data, loading, totalOutput = 0 }) => {
-  const [expanded, setExpanded] = useState(false);
   const [viewMode, setViewMode] = useState("list"); // "list" or "pie"
 
-  const displayData = expanded ? data : data.slice(0, 8);
-  const hasMore = data.length > 8;
   const totalDefects = data.reduce((sum, d) => sum + (d.TotalDefects || 0), 0);
   const maxDefects = Math.max(...data.map((d) => d.TotalDefects || 0), 1);
 
@@ -417,17 +601,17 @@ const DefectsByTypeChart = ({ data, loading, totalOutput = 0 }) => {
           /* ═══════════════════════════════════════
              PIE CHART VIEW WITH TOP 5 LEGEND
              ═══════════════════════════════════════ */
-          <div className="flex flex-col lg:flex-row items-center gap-6 min-h-[320px]">
+          <div className="flex flex-col lg:flex-row items-center gap-6 min-h-[380px]">
             {/* Pie Chart */}
-            <div className="w-full lg:w-1/2 h-[300px]">
+            <div className="w-full lg:w-1/2 h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={pieData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={55}
-                    outerRadius={100}
+                    innerRadius={60}
+                    outerRadius={110}
                     dataKey="value"
                     labelLine={false}
                     label={PieLabel}
@@ -449,15 +633,15 @@ const DefectsByTypeChart = ({ data, loading, totalOutput = 0 }) => {
                 </PieChart>
               </ResponsiveContainer>
               {/* Center Label */}
-              <div className="relative -mt-[180px] flex flex-col items-center justify-center pointer-events-none">
-                <p className="text-2xl font-black text-gray-800 dark:text-white tabular-nums">
+              <div className="relative -mt-[195px] flex flex-col items-center justify-center pointer-events-none">
+                <p className="text-3xl font-black text-gray-800 dark:text-white tabular-nums">
                   {totalDefects.toLocaleString()}
                 </p>
                 <p className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                  Total
+                  Total Defects
                 </p>
               </div>
-              <div className="h-[70px]" /> {/* Spacer to push content down */}
+              <div className="h-[85px]" />
             </div>
 
             {/* Top 5 Legend */}
@@ -465,40 +649,16 @@ const DefectsByTypeChart = ({ data, loading, totalOutput = 0 }) => {
           </div>
         ) : (
           /* ═══════════════════════════════════════
-             LIST VIEW
+             PAGINATED LIST VIEW
              ═══════════════════════════════════════ */
-          <div>
-            {displayData.map((item, index) => (
-              <DefectTypeRow
-                key={item.ReworkCode}
-                item={item}
-                index={index}
-                maxDefects={maxDefects}
-                totalDefects={totalDefects}
-                totalOutput={totalOutput}
-                color={DEFECT_COLORS[index % DEFECT_COLORS.length]}
-              />
-            ))}
-          </div>
+          <PaginatedListView
+            data={coloredData}
+            totalOutput={totalOutput}
+            totalDefects={totalDefects}
+            maxDefects={maxDefects}
+          />
         )}
       </div>
-
-      {/* Show More Button (List View Only) */}
-      {hasMore && viewMode === "list" && !loading && (
-        <div className="px-5 pb-4">
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="w-full py-2.5 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-2 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
-          >
-            {expanded ? (
-              <ChevronUp className="w-4 h-4" />
-            ) : (
-              <ChevronDown className="w-4 h-4" />
-            )}
-            {expanded ? "Show Less" : `Show All ${data.length} Types`}
-          </button>
-        </div>
-      )}
 
       {/* Footer */}
       {!loading && data.length > 0 && (
@@ -511,11 +671,18 @@ const DefectsByTypeChart = ({ data, loading, totalOutput = 0 }) => {
             </span>
           </div>
           <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-            <span>{data[0]?.TotalDefects} defects</span>
+            <span className="font-bold text-red-600 dark:text-red-400">
+              {data[0]?.TotalDefects} defects
+            </span>
             <span className="text-gray-300 dark:text-gray-600">·</span>
             <span>
               {((data[0]?.TotalDefects / totalDefects) * 100).toFixed(1)}% of
               total
+            </span>
+            <span className="text-gray-300 dark:text-gray-600">·</span>
+            <span className="flex items-center gap-1">
+              <Factory className="w-3 h-3" />
+              {data[0]?.LineCount} Lines
             </span>
           </div>
         </div>

@@ -1,373 +1,4 @@
-// import React, { useState } from "react";
-// import {
-//   BarChart,
-//   Bar,
-//   XAxis,
-//   YAxis,
-//   CartesianGrid,
-//   Tooltip,
-//   ResponsiveContainer,
-//   Cell,
-//   LabelList,
-// } from "recharts";
-// import { Factory, TrendingUp, AlertTriangle } from "lucide-react";
-
-// // ─────────────────────────────────────────────
-// // CUSTOM TOOLTIP
-// // ─────────────────────────────────────────────
-// const CustomTooltip = ({ active, payload, label }) => {
-//   if (active && payload && payload.length) {
-//     const data = payload[0].payload;
-//     return (
-//       <div
-//         style={{
-//           background: "rgba(15, 23, 42, 0.95)",
-//           padding: "14px 18px",
-//           borderRadius: 14,
-//           border: "1px solid rgba(239, 68, 68, 0.3)",
-//           boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
-//           backdropFilter: "blur(10px)",
-//         }}
-//       >
-//         <p
-//           style={{
-//             fontSize: 11,
-//             fontWeight: 700,
-//             color: "rgba(255,255,255,0.5)",
-//             textTransform: "uppercase",
-//             letterSpacing: "0.1em",
-//             marginBottom: 8,
-//           }}
-//         >
-//           Line {label}
-//         </p>
-//         <div
-//           style={{
-//             display: "flex",
-//             alignItems: "baseline",
-//             gap: 6,
-//             marginBottom: 10,
-//           }}
-//         >
-//           <span
-//             style={{
-//               fontSize: 28,
-//               fontWeight: 900,
-//               color: "#F87171",
-//               fontFamily: "'DM Mono', monospace",
-//             }}
-//           >
-//             {data.TotalDefects?.toLocaleString()}
-//           </span>
-//           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
-//             defects
-//           </span>
-//         </div>
-//         <div style={{ display: "flex", gap: 16, fontSize: 11 }}>
-//           <div>
-//             <span style={{ color: "rgba(255,255,255,0.4)" }}>MOs: </span>
-//             <span style={{ color: "#fff", fontWeight: 600 }}>
-//               {data.MOCount}
-//             </span>
-//           </div>
-//           <div>
-//             <span style={{ color: "rgba(255,255,255,0.4)" }}>QCs: </span>
-//             <span style={{ color: "#fff", fontWeight: 600 }}>
-//               {data.InspectorCount}
-//             </span>
-//           </div>
-//         </div>
-//       </div>
-//     );
-//   }
-//   return null;
-// };
-
-// // ─────────────────────────────────────────────
-// // BAR LABEL
-// // ─────────────────────────────────────────────
-// const BarLabel = (props) => {
-//   const { x, y, width, value } = props;
-//   if (!value || width < 30) return null;
-//   return (
-//     <text
-//       x={x + width / 2}
-//       y={y - 8}
-//       fill="rgba(255,255,255,0.7)"
-//       textAnchor="middle"
-//       fontSize={11}
-//       fontWeight={700}
-//       fontFamily="'DM Mono', monospace"
-//     >
-//       {value}
-//     </text>
-//   );
-// };
-
-// // ─────────────────────────────────────────────
-// // SKELETON
-// // ─────────────────────────────────────────────
-// const ChartSkeleton = () => (
-//   <div
-//     style={{
-//       height: "100%",
-//       display: "flex",
-//       alignItems: "flex-end",
-//       gap: 8,
-//       padding: "0 20px",
-//     }}
-//   >
-//     {[60, 80, 45, 90, 70, 55, 85, 40, 75, 65].map((h, i) => (
-//       <div
-//         key={i}
-//         style={{
-//           flex: 1,
-//           height: `${h}%`,
-//           background: "rgba(255,255,255,0.08)",
-//           borderRadius: "6px 6px 0 0",
-//           animation: "pulse 1.4s ease-in-out infinite",
-//         }}
-//       />
-//     ))}
-//   </div>
-// );
-
-// // ─────────────────────────────────────────────
-// // EMPTY STATE
-// // ─────────────────────────────────────────────
-// const EmptyChart = () => (
-//   <div
-//     style={{
-//       height: "100%",
-//       display: "flex",
-//       flexDirection: "column",
-//       alignItems: "center",
-//       justifyContent: "center",
-//       gap: 12,
-//     }}
-//   >
-//     <div
-//       style={{
-//         width: 56,
-//         height: 56,
-//         borderRadius: 16,
-//         background: "rgba(255,255,255,0.05)",
-//         display: "flex",
-//         alignItems: "center",
-//         justifyContent: "center",
-//       }}
-//     >
-//       <Factory
-//         style={{ width: 28, height: 28, color: "rgba(255,255,255,0.2)" }}
-//       />
-//     </div>
-//     <p
-//       style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}
-//     >
-//       No defects by line data
-//     </p>
-//   </div>
-// );
-
-// // ─────────────────────────────────────────────
-// // MAIN COMPONENT
-// // ─────────────────────────────────────────────
-// const DefectsByLineChart = ({ data, loading }) => {
-//   const [hoveredBar, setHoveredBar] = useState(null);
-
-//   const totalDefects = data.reduce((sum, d) => sum + (d.TotalDefects || 0), 0);
-//   const maxDefects = Math.max(...data.map((d) => d.TotalDefects || 0), 1);
-//   const topLine = data[0];
-
-//   // Color based on defect severity
-//   const getBarColor = (defects, index) => {
-//     const ratio = defects / maxDefects;
-//     if (ratio > 0.7) return "#EF4444"; // Red - High
-//     if (ratio > 0.4) return "#F59E0B"; // Orange - Medium
-//     return "#10B981"; // Green - Low
-//   };
-
-//   return (
-//     <div
-//       style={{
-//         background: "rgba(255,255,255,0.03)",
-//         borderRadius: 18,
-//         border: "1px solid rgba(255,255,255,0.08)",
-//         overflow: "hidden",
-//       }}
-//     >
-//       {/* Header */}
-//       <div
-//         style={{
-//           padding: "18px 22px",
-//           borderBottom: "1px solid rgba(255,255,255,0.06)",
-//           display: "flex",
-//           alignItems: "center",
-//           justifyContent: "space-between",
-//         }}
-//       >
-//         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-//           <div
-//             style={{
-//               padding: 10,
-//               borderRadius: 12,
-//               background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)",
-//               boxShadow: "0 4px 16px rgba(239,68,68,0.3)",
-//             }}
-//           >
-//             <Factory style={{ width: 18, height: 18, color: "#fff" }} />
-//           </div>
-//           <div>
-//             <h3
-//               style={{
-//                 fontSize: 14,
-//                 fontWeight: 700,
-//                 color: "#fff",
-//                 margin: 0,
-//               }}
-//             >
-//               Defects by Production Line
-//             </h3>
-//             <p
-//               style={{
-//                 fontSize: 11,
-//                 color: "rgba(255,255,255,0.4)",
-//                 margin: "2px 0 0",
-//               }}
-//             >
-//               {data.length > 0
-//                 ? `${data.length} lines · ${totalDefects.toLocaleString()} total defects`
-//                 : "Today's line breakdown"}
-//             </p>
-//           </div>
-//         </div>
-
-//         {/* Severity Legend */}
-//         <div style={{ display: "flex", gap: 12 }}>
-//           {[
-//             { color: "#EF4444", label: "High" },
-//             { color: "#F59E0B", label: "Medium" },
-//             { color: "#10B981", label: "Low" },
-//           ].map((item) => (
-//             <div
-//               key={item.label}
-//               style={{ display: "flex", alignItems: "center", gap: 5 }}
-//             >
-//               <div
-//                 style={{
-//                   width: 8,
-//                   height: 8,
-//                   borderRadius: 4,
-//                   background: item.color,
-//                 }}
-//               />
-//               <span style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>
-//                 {item.label}
-//               </span>
-//             </div>
-//           ))}
-//         </div>
-//       </div>
-
-//       {/* Chart */}
-//       <div style={{ padding: 20 }}>
-//         <div style={{ height: 350 }}>
-//           {loading && data.length === 0 ? (
-//             <ChartSkeleton />
-//           ) : data.length === 0 ? (
-//             <EmptyChart />
-//           ) : (
-//             <ResponsiveContainer width="100%" height="100%">
-//               <BarChart
-//                 data={data}
-//                 margin={{ top: 30, right: 10, left: -10, bottom: 5 }}
-//                 barSize={Math.max(20, Math.min(48, 350 / data.length - 8))}
-//               >
-//                 <CartesianGrid
-//                   strokeDasharray="3 3"
-//                   stroke="rgba(255,255,255,0.06)"
-//                   vertical={false}
-//                 />
-//                 <XAxis
-//                   dataKey="LineNo"
-//                   axisLine={false}
-//                   tickLine={false}
-//                   tick={{
-//                     fill: "rgba(255,255,255,0.5)",
-//                     fontSize: 11,
-//                     fontWeight: 600,
-//                   }}
-//                   dy={8}
-//                 />
-//                 <YAxis
-//                   axisLine={false}
-//                   tickLine={false}
-//                   tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
-//                 />
-//                 <Tooltip
-//                   content={<CustomTooltip />}
-//                   cursor={{ fill: "rgba(255,255,255,0.03)" }}
-//                 />
-//                 <Bar
-//                   dataKey="TotalDefects"
-//                   radius={[6, 6, 0, 0]}
-//                   animationDuration={800}
-//                   onMouseEnter={(_, index) => setHoveredBar(index)}
-//                   onMouseLeave={() => setHoveredBar(null)}
-//                 >
-//                   <LabelList content={<BarLabel />} />
-//                   {data.map((entry, index) => (
-//                     <Cell
-//                       key={`cell-${index}`}
-//                       fill={getBarColor(entry.TotalDefects, index)}
-//                       opacity={
-//                         hoveredBar === null || hoveredBar === index ? 1 : 0.4
-//                       }
-//                       style={{ transition: "opacity 0.2s" }}
-//                     />
-//                   ))}
-//                 </Bar>
-//               </BarChart>
-//             </ResponsiveContainer>
-//           )}
-//         </div>
-//       </div>
-
-//       {/* Footer */}
-//       {!loading && data.length > 0 && (
-//         <div
-//           style={{
-//             padding: "12px 22px",
-//             background: "rgba(239,68,68,0.08)",
-//             borderTop: "1px solid rgba(239,68,68,0.15)",
-//             display: "flex",
-//             alignItems: "center",
-//             justifyContent: "space-between",
-//           }}
-//         >
-//           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-//             <AlertTriangle
-//               style={{ width: 14, height: 14, color: "#F87171" }}
-//             />
-//             <span style={{ fontSize: 12, color: "#F87171", fontWeight: 600 }}>
-//               Highest: Line {topLine?.LineNo}
-//             </span>
-//             <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
-//               — {topLine?.TotalDefects} defects
-//             </span>
-//           </div>
-//           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>
-//             Avg: {Math.round(totalDefects / data.length)} per line
-//           </span>
-//         </div>
-//       )}
-//     </div>
-//   );
-// };
-
-// export default DefectsByLineChart;
-
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   BarChart,
   Bar,
@@ -381,10 +12,15 @@ import {
 } from "recharts";
 import {
   Factory,
-  TrendingUp,
   AlertTriangle,
   Package,
   Percent,
+  ChevronLeft,
+  ChevronRight,
+  Pause,
+  Play,
+  Zap,
+  Tag,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────
@@ -423,21 +59,43 @@ const getColorByRate = (rate) => {
   return "#EF4444"; // Red - Critical
 };
 
+const getRateInfo = (rate) => {
+  if (rate < 3)
+    return {
+      color: "#22C55E",
+      bg: "bg-emerald-100 dark:bg-emerald-900/40",
+      text: "text-emerald-700 dark:text-emerald-300",
+      label: "Good",
+    };
+  if (rate <= 5)
+    return {
+      color: "#F59E0B",
+      bg: "bg-amber-100 dark:bg-amber-900/40",
+      text: "text-amber-700 dark:text-amber-300",
+      label: "Warning",
+    };
+  return {
+    color: "#EF4444",
+    bg: "bg-red-100 dark:bg-red-900/40",
+    text: "text-red-700 dark:text-red-300",
+    label: "Critical",
+  };
+};
+
 // ─────────────────────────────────────────────
 // CUSTOM TOOLTIP
 // ─────────────────────────────────────────────
-const CustomTooltip = ({ active, payload, label, viewMode }) => {
+const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     const rateColor = getColorByRate(data.DefectRate);
 
     return (
-      <div className="bg-white dark:bg-slate-800 px-4 py-3 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 min-w-[200px]">
+      <div className="bg-white dark:bg-gray-800 px-4 py-3 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 min-w-[220px]">
         <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
           Line {label}
         </p>
 
-        {/* Rate with status */}
         <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100 dark:border-gray-700">
           <span className="text-xs text-gray-500 dark:text-gray-400">
             Defect Rate:
@@ -448,19 +106,6 @@ const CustomTooltip = ({ active, payload, label, viewMode }) => {
               style={{ color: rateColor }}
             >
               {data.DefectRate?.toFixed(2)}%
-            </span>
-            <span
-              className="text-[9px] font-bold px-1.5 py-0.5 rounded"
-              style={{
-                backgroundColor: `${rateColor}20`,
-                color: rateColor,
-              }}
-            >
-              {data.DefectRate < 3
-                ? "GOOD"
-                : data.DefectRate <= 5
-                  ? "WARN"
-                  : "HIGH"}
             </span>
           </div>
         </div>
@@ -498,24 +143,51 @@ const CustomTooltip = ({ active, payload, label, viewMode }) => {
 };
 
 // ─────────────────────────────────────────────
-// CUSTOM BAR LABEL
+// CUSTOM BAR LABEL (Vertical on top)
 // ─────────────────────────────────────────────
-const CustomBarLabel = ({ x, y, width, value, viewMode, data }) => {
-  if (!value || width < 25) return null;
+const CustomBarLabel = ({ x, y, width, height, value, viewMode, index }) => {
+  if (value === undefined || value === null) return null;
 
-  const config = VIEW_MODES[viewMode];
   const displayValue =
     viewMode === "rate" ? `${value.toFixed(2)}%` : value.toLocaleString();
 
-  // Get color based on rate for all views
-  const rate = data?.DefectRate || 0;
-  const color = getColorByRate(rate);
+  // Calculate position - rotate text if bars are narrow
+  const isNarrow = width < 35;
+
+  if (isNarrow) {
+    return (
+      <text
+        x={x + width / 2}
+        y={y - 5}
+        fill={
+          viewMode === "output"
+            ? "#10B981"
+            : viewMode === "defects"
+              ? "#EF4444"
+              : "#F59E0B"
+        }
+        textAnchor="middle"
+        fontSize={9}
+        fontWeight={700}
+        fontFamily="'DM Mono', monospace"
+        transform={`rotate(-45, ${x + width / 2}, ${y - 5})`}
+      >
+        {displayValue}
+      </text>
+    );
+  }
 
   return (
     <text
       x={x + width / 2}
       y={y - 8}
-      fill={viewMode === "output" ? "#10B981" : color}
+      fill={
+        viewMode === "output"
+          ? "#10B981"
+          : viewMode === "defects"
+            ? "#EF4444"
+            : "#F59E0B"
+      }
       textAnchor="middle"
       fontSize={10}
       fontWeight={700}
@@ -556,6 +228,330 @@ const EmptyChart = () => (
 );
 
 // ─────────────────────────────────────────────
+// TOP DEFECT CARD
+// ─────────────────────────────────────────────
+const TopDefectCard = ({ defect, rank }) => {
+  const rateInfo = getRateInfo(defect.DefectRate);
+
+  return (
+    <div className="bg-gray-50 dark:bg-gray-700/40 rounded-xl p-3 border border-gray-100 dark:border-gray-600/50">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span
+            className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold text-white ${
+              rank === 1
+                ? "bg-red-500"
+                : rank === 2
+                  ? "bg-orange-500"
+                  : "bg-amber-500"
+            }`}
+          >
+            {rank}
+          </span>
+          <p className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">
+            {defect.ReworkName}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-lg font-black text-red-600 dark:text-red-400 tabular-nums">
+            {defect.DefectQty}
+          </span>
+          <span className="text-[10px] text-gray-400 dark:text-gray-500">
+            defects
+          </span>
+        </div>
+        <span
+          className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${rateInfo.bg} ${rateInfo.text}`}
+        >
+          {defect.DefectRate.toFixed(2)}%
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// LINE SUMMARY CARD
+// ─────────────────────────────────────────────
+const LineSummaryCard = ({ line }) => {
+  const rateInfo = getRateInfo(line.DefectRate);
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden min-w-[320px] w-[320px] flex-shrink-0">
+      {/* Header */}
+      <div
+        className={`px-4 py-3 flex items-center justify-between ${
+          line.DefectRate >= 5
+            ? "bg-gradient-to-r from-red-500 to-rose-600"
+            : line.DefectRate >= 3
+              ? "bg-gradient-to-r from-amber-500 to-orange-600"
+              : "bg-gradient-to-r from-emerald-500 to-teal-600"
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
+            <Factory className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h4 className="text-lg font-black text-white">
+              Line {line.LineNo}
+            </h4>
+            <p className="text-[10px] text-white/70 font-medium">
+              {line.MOCount} MO{line.MOCount > 1 ? "s" : ""} Running
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-black text-white tabular-nums">
+            {line.DefectRate.toFixed(2)}%
+          </p>
+          <p className="text-[10px] text-white/70 font-medium uppercase tracking-wider">
+            Defect Rate
+          </p>
+        </div>
+      </div>
+
+      {/* MO Numbers */}
+      <div className="px-4 py-2 bg-gray-50 dark:bg-gray-700/30 border-b border-gray-100 dark:border-gray-700">
+        <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">
+          Running MOs
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {line.MONumbers?.slice(0, 4).map((mo, idx) => (
+            <span
+              key={idx}
+              className="px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-[10px] font-mono font-semibold text-gray-700 dark:text-gray-300"
+            >
+              {mo}
+            </span>
+          ))}
+          {line.MONumbers?.length > 4 && (
+            <span className="px-2 py-0.5 text-[10px] text-gray-400 dark:text-gray-500">
+              +{line.MONumbers.length - 4} more
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="px-4 py-3 grid grid-cols-3 gap-3 border-b border-gray-100 dark:border-gray-700">
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-1 mb-1">
+            <Zap className="w-3 h-3 text-emerald-500" />
+            <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase">
+              Output
+            </span>
+          </div>
+          <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
+            {line.OutputQty?.toLocaleString()}
+          </p>
+        </div>
+        <div className="text-center border-x border-gray-100 dark:border-gray-700">
+          <div className="flex items-center justify-center gap-1 mb-1">
+            <AlertTriangle className="w-3 h-3 text-red-500" />
+            <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase">
+              Defects
+            </span>
+          </div>
+          <p className="text-lg font-black text-red-600 dark:text-red-400 tabular-nums">
+            {line.TotalDefects?.toLocaleString()}
+          </p>
+        </div>
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-1 mb-1">
+            <Percent className="w-3 h-3" style={{ color: rateInfo.color }} />
+            <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase">
+              Rate
+            </span>
+          </div>
+          <p className={`text-lg font-black tabular-nums ${rateInfo.text}`}>
+            {line.DefectRate.toFixed(2)}%
+          </p>
+        </div>
+      </div>
+
+      {/* Top 3 Defects */}
+      <div className="px-4 py-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Tag className="w-3.5 h-3.5 text-gray-400" />
+          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+            Top 3 Defects
+          </span>
+        </div>
+        {line.TopDefects && line.TopDefects.length > 0 ? (
+          <div className="space-y-2">
+            {line.TopDefects.slice(0, 3).map((defect, idx) => (
+              <TopDefectCard
+                key={defect.ReworkCode}
+                defect={defect}
+                rank={idx + 1}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-4">
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              No defects found
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// LINE SUMMARY CAROUSEL
+// ─────────────────────────────────────────────
+const LineSummaryCarousel = ({ data }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const scrollContainerRef = useRef(null);
+  const intervalRef = useRef(null);
+
+  const sortedData = useMemo(() => {
+    return [...data].sort((a, b) =>
+      a.LineNo.localeCompare(b.LineNo, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
+    );
+  }, [data]);
+
+  // Auto-advance every 10 seconds
+  useEffect(() => {
+    if (!isPaused && sortedData.length > 0) {
+      intervalRef.current = setInterval(() => {
+        setCurrentIndex((prev) => (prev + 1) % sortedData.length);
+      }, 10000);
+    }
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [isPaused, sortedData.length]);
+
+  // Scroll to current card
+  useEffect(() => {
+    if (scrollContainerRef.current && sortedData.length > 0) {
+      const cardWidth = 336; // 320px card + 16px gap
+      scrollContainerRef.current.scrollTo({
+        left: currentIndex * cardWidth,
+        behavior: "smooth",
+      });
+    }
+  }, [currentIndex, sortedData.length]);
+
+  const goToPrev = () => {
+    setCurrentIndex((prev) => (prev === 0 ? sortedData.length - 1 : prev - 1));
+  };
+
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % sortedData.length);
+  };
+
+  if (sortedData.length === 0) return null;
+
+  return (
+    <div className="mt-5 pt-5 border-t border-gray-100 dark:border-gray-700">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Factory className="w-4 h-4 text-gray-400" />
+          <h4 className="text-sm font-bold text-gray-700 dark:text-gray-200">
+            Line Summary
+          </h4>
+          <span className="text-xs text-gray-400 dark:text-gray-500">
+            ({currentIndex + 1} of {sortedData.length})
+          </span>
+        </div>
+
+        {/* Controls */}
+        <div className="flex items-center gap-2">
+          {/* Play/Pause */}
+          <button
+            onClick={() => setIsPaused(!isPaused)}
+            className={`p-2 rounded-lg transition-colors ${
+              isPaused
+                ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+                : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+            }`}
+            title={isPaused ? "Resume auto-play" : "Pause auto-play"}
+          >
+            {isPaused ? (
+              <Play className="w-4 h-4" />
+            ) : (
+              <Pause className="w-4 h-4" />
+            )}
+          </button>
+
+          {/* Navigation */}
+          <button
+            onClick={goToPrev}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={goToNext}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Cards Container */}
+      <div
+        ref={scrollContainerRef}
+        className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        {sortedData.map((line, idx) => (
+          <div key={line.LineNo} className="snap-start">
+            <LineSummaryCard line={line} />
+          </div>
+        ))}
+      </div>
+
+      {/* Progress Dots */}
+      <div className="flex items-center justify-center gap-1.5 mt-4">
+        {sortedData.slice(0, 20).map((_, idx) => (
+          <button
+            key={idx}
+            onClick={() => setCurrentIndex(idx)}
+            className={`h-1.5 rounded-full transition-all duration-300 ${
+              currentIndex === idx
+                ? "w-6 bg-gradient-to-r from-red-500 to-orange-500"
+                : "w-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+            }`}
+          />
+        ))}
+        {sortedData.length > 20 && (
+          <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-2">
+            +{sortedData.length - 20} more
+          </span>
+        )}
+      </div>
+
+      {/* Auto-play indicator */}
+      {!isPaused && (
+        <div className="flex items-center justify-center mt-3">
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700/50">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[10px] text-gray-500 dark:text-gray-400">
+              Auto-advancing every 10s
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────
 const DefectsByLineChart = ({ data, loading }) => {
@@ -564,7 +560,7 @@ const DefectsByLineChart = ({ data, loading }) => {
 
   const config = VIEW_MODES[viewMode];
 
-  // Sort data based on view mode
+  // Sort data based on view mode for chart
   const sortedData = useMemo(() => {
     const sorted = [...data].sort((a, b) => {
       if (viewMode === "rate") return b.DefectRate - a.DefectRate;
@@ -579,8 +575,9 @@ const DefectsByLineChart = ({ data, loading }) => {
   const totalDefects = data.reduce((sum, d) => sum + (d.TotalDefects || 0), 0);
   const avgRate =
     totalOutput > 0 ? ((totalDefects / totalOutput) * 100).toFixed(2) : 0;
-  const maxValue = Math.max(...data.map((d) => d[config.key] || 0), 1);
-  const worstLine = sortedData[0];
+  const worstLine = useMemo(() => {
+    return [...data].sort((a, b) => b.DefectRate - a.DefectRate)[0];
+  }, [data]);
 
   // Get bar color
   const getBarColor = (item, index) => {
@@ -658,7 +655,7 @@ const DefectsByLineChart = ({ data, loading }) => {
 
       {/* Chart */}
       <div className="p-5">
-        <div className="h-[380px]">
+        <div className="h-[350px]">
           {loading && data.length === 0 ? (
             <ChartSkeleton />
           ) : data.length === 0 ? (
@@ -667,10 +664,10 @@ const DefectsByLineChart = ({ data, loading }) => {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={sortedData}
-                margin={{ top: 30, right: 10, left: -10, bottom: 5 }}
+                margin={{ top: 35, right: 10, left: -10, bottom: 5 }}
                 barSize={Math.max(
-                  20,
-                  Math.min(50, 380 / sortedData.length - 8),
+                  18,
+                  Math.min(45, 320 / sortedData.length - 6),
                 )}
               >
                 <CartesianGrid
@@ -683,35 +680,40 @@ const DefectsByLineChart = ({ data, loading }) => {
                   dataKey="LineNo"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: "#9ca3af", fontSize: 11, fontWeight: 600 }}
+                  tick={{ fill: "#9ca3af", fontSize: 10, fontWeight: 600 }}
                   dy={8}
+                  interval={0}
+                  angle={sortedData.length > 15 ? -45 : 0}
+                  textAnchor={sortedData.length > 15 ? "end" : "middle"}
+                  height={sortedData.length > 15 ? 50 : 30}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: "#9ca3af", fontSize: 11 }}
+                  tick={{ fill: "#9ca3af", fontSize: 10 }}
                   tickFormatter={(v) =>
-                    viewMode === "rate" ? `${v}%` : v.toLocaleString()
+                    viewMode === "rate"
+                      ? `${v}%`
+                      : v >= 1000
+                        ? `${(v / 1000).toFixed(1)}k`
+                        : v
                   }
                 />
                 <Tooltip
-                  content={<CustomTooltip viewMode={viewMode} />}
+                  content={<CustomTooltip />}
                   cursor={{ fill: "rgba(0,0,0,0.04)" }}
                 />
                 <Bar
                   dataKey={config.key}
-                  radius={[6, 6, 0, 0]}
+                  radius={[4, 4, 0, 0]}
                   animationDuration={600}
                   onMouseEnter={(_, index) => setHoveredBar(index)}
                   onMouseLeave={() => setHoveredBar(null)}
                 >
                   <LabelList
+                    dataKey={config.key}
                     content={(props) => (
-                      <CustomBarLabel
-                        {...props}
-                        viewMode={viewMode}
-                        data={sortedData[props.index]}
-                      />
+                      <CustomBarLabel {...props} viewMode={viewMode} />
                     )}
                   />
                   {sortedData.map((entry, index) => (
@@ -728,7 +730,7 @@ const DefectsByLineChart = ({ data, loading }) => {
         </div>
       </div>
 
-      {/* Footer */}
+      {/* Footer Stats */}
       {!loading && data.length > 0 && (
         <div className="px-5 py-3 bg-gray-50 dark:bg-gray-700/30 border-t border-gray-100 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
@@ -764,6 +766,13 @@ const DefectsByLineChart = ({ data, loading }) => {
               </span>
             </span>
           </div>
+        </div>
+      )}
+
+      {/* Line Summary Carousel */}
+      {!loading && data.length > 0 && (
+        <div className="px-5 pb-5">
+          <LineSummaryCarousel data={data} />
         </div>
       )}
     </div>
