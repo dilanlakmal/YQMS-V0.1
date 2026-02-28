@@ -1,135 +1,383 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   User,
-  ChevronDown,
-  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   AlertTriangle,
   MapPin,
-  Tag,
+  Pause,
+  Play,
+  Package,
+  Wrench,
+  Crown,
+  Medal,
+  Trophy,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────
-// SKELETON
+// CONSTANTS
 // ─────────────────────────────────────────────
-const TableSkeleton = () => (
-  <div className="p-5 space-y-3">
-    {[1, 2, 3, 4, 5].map((i) => (
+const ITEMS_PER_PAGE = 6; // 3x2 grid
+const AUTO_ROTATE_INTERVAL = 10000; // 10 seconds
+
+const RANK_CONFIG = {
+  1: {
+    icon: Crown,
+    gradient: "from-red-500 via-rose-500 to-red-600",
+    shadow: "shadow-red-500/40",
+    ring: "ring-red-400/60",
+  },
+  2: {
+    icon: Medal,
+    gradient: "from-orange-400 via-amber-500 to-orange-600",
+    shadow: "shadow-orange-500/30",
+    ring: "ring-orange-400/50",
+  },
+  3: {
+    icon: Trophy,
+    gradient: "from-amber-400 via-yellow-500 to-amber-600",
+    shadow: "shadow-amber-500/30",
+    ring: "ring-amber-400/50",
+  },
+};
+
+// ─────────────────────────────────────────────
+// RANK BADGE COMPONENT
+// ─────────────────────────────────────────────
+const RankBadge = ({ rank }) => {
+  const config = RANK_CONFIG[rank];
+
+  if (config) {
+    const IconComponent = config.icon;
+    return (
       <div
-        key={i}
-        className="h-14 bg-gray-100 dark:bg-gray-700 rounded-xl animate-pulse"
-      />
-    ))}
+        className={`w-8 h-8 rounded-full bg-gradient-to-br ${config.gradient} ${config.shadow} shadow-lg flex items-center justify-center ring-2 ${config.ring} z-20`}
+      >
+        <IconComponent className="w-4 h-4 text-white" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-gray-500 to-gray-600 shadow-md flex items-center justify-center text-[10px] font-bold text-white z-20">
+      {rank}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// DEFECT ITEM ROW
+// ─────────────────────────────────────────────
+const DefectItem = ({ defect, maxQty, index }) => {
+  const barWidth = maxQty > 0 ? (defect.DefectQty / maxQty) * 100 : 0;
+  const isTop = index === 0;
+
+  return (
+    <div className="flex items-center gap-2 group">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-0.5">
+          <span
+            className={`text-[10px] font-medium break-words leading-tight ${
+              isTop
+                ? "text-red-700 dark:text-red-300"
+                : "text-gray-600 dark:text-gray-400"
+            }`}
+            title={defect.ReworkName}
+          >
+            {defect.ReworkName}
+          </span>
+          <span
+            className={`text-[10px] font-bold tabular-nums ml-2 ${
+              isTop
+                ? "text-red-600 dark:text-red-400"
+                : "text-red-700 dark:text-red-300"
+            }`}
+          >
+            {defect.DefectQty}
+          </span>
+        </div>
+        <div className="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${
+              isTop
+                ? "bg-gradient-to-r from-red-500 to-rose-500"
+                : "bg-gradient-to-r from-gray-400 to-gray-500"
+            }`}
+            style={{ width: `${barWidth}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// WORKER CARD COMPONENT
+// ─────────────────────────────────────────────
+const WorkerCard = ({ worker, isHighRisk }) => {
+  const [imageError, setImageError] = useState(false);
+
+  const maxDefectQty = Math.max(
+    ...(worker.Defects?.map((d) => d.DefectQty) || [1]),
+    1,
+  );
+
+  const displayDefects = worker.Defects?.slice(0, 5) || [];
+  const hasMoreDefects = (worker.Defects?.length || 0) > 5;
+
+  return (
+    <div
+      className={`relative bg-white dark:bg-gray-800 rounded-2xl border overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group ${
+        isHighRisk
+          ? "border-red-200 dark:border-red-700/50 shadow-lg shadow-red-500/10"
+          : "border-gray-100 dark:border-gray-700 shadow-sm hover:border-gray-200 dark:hover:border-gray-600"
+      }`}
+    >
+      {/* High Risk Glow */}
+      {isHighRisk && (
+        <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 via-transparent to-rose-500/5 pointer-events-none" />
+      )}
+
+      {/* Card Content */}
+      <div className="p-4 pt-5">
+        {/* Header: Photo + Employee Info */}
+        <div className="flex items-start gap-3 mb-3">
+          {/* Profile Photo */}
+          <div className="relative flex-shrink-0">
+            <div
+              className={`w-14 h-14 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-700 ${
+                isHighRisk ? "ring-2 ring-red-400/50" : ""
+              }`}
+            >
+              {worker.FacePhoto && !imageError ? (
+                <img
+                  src={worker.FacePhoto}
+                  alt={worker.EmpName || worker.EmpID}
+                  className="w-full h-full object-cover"
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700">
+                  <User className="w-7 h-7 text-gray-400 dark:text-gray-500" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Employee Info */}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-bold text-gray-800 dark:text-white truncate">
+              {worker.EmpName || "Unknown Worker"}
+            </h3>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">
+              ID: {worker.EmpID}
+            </p>
+            {worker.KhName && (
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate">
+                {worker.KhName}
+              </p>
+            )}
+          </div>
+
+          {/* Total Defects Badge */}
+          <div className="flex-shrink-0">
+            <p className="text-[9px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">
+              Defects#
+            </p>
+            <div
+              className={`inline-flex items-center justify-center px-3 py-1.5 rounded-xl ${
+                isHighRisk
+                  ? "bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-500/25"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white"
+              }`}
+            >
+              <span className="text-lg font-black tabular-nums">
+                {worker.TotalDefects}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Highlighted Line & Station Box */}
+        <div className="mb-3 p-3 rounded-xl bg-gradient-to-r from-indigo-50 via-blue-50 to-purple-50 dark:from-indigo-900/30 dark:via-blue-900/30 dark:to-purple-900/30 border border-indigo-100 dark:border-indigo-800/50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {/* Line No */}
+              <div className="text-center">
+                <p className="text-[9px] font-semibold text-indigo-500 dark:text-indigo-400 uppercase tracking-wider mb-0.5">
+                  Line
+                </p>
+                <div className="px-3 py-1 rounded-lg bg-gradient-to-r from-indigo-500 to-blue-600 shadow-md shadow-indigo-500/25">
+                  <span className="text-lg font-black text-white">
+                    [{worker.LineNo}]
+                  </span>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="h-10 w-px bg-indigo-200 dark:bg-indigo-700" />
+
+              {/* Station ID */}
+              <div className="text-center">
+                <p className="text-[9px] font-semibold text-purple-500 dark:text-purple-400 uppercase tracking-wider mb-0.5">
+                  Station
+                </p>
+                <div className="px-3 py-1 rounded-lg bg-gradient-to-r from-purple-500 to-pink-600 shadow-md shadow-purple-500/25">
+                  <span className="text-lg font-black text-white">
+                    {worker.StationID}
+                  </span>
+                </div>
+              </div>
+              <RankBadge rank={worker.Rank} />
+            </div>
+
+            {/* Defect Types Count */}
+            <div className="text-right">
+              <p className="text-[9px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                Types
+              </p>
+              <p className="text-xl font-black text-gray-700 dark:text-gray-200">
+                {worker.DefectTypeCount}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* MO Numbers */}
+        {worker.MONumbers?.length > 0 && (
+          <div className="mb-3">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Package className="w-3 h-3 text-gray-400" />
+              <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                MO Numbers
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {worker.MONumbers.slice(0, 3).map((mo, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700 text-[10px] font-medium text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600"
+                >
+                  {mo}
+                </span>
+              ))}
+              {worker.MONumbers.length > 3 && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-50 dark:bg-gray-800 text-[10px] font-medium text-gray-400 dark:text-gray-500">
+                  +{worker.MONumbers.length - 3} more
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Defects Breakdown */}
+        <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <Wrench className="w-3 h-3 text-gray-400" />
+              <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                Defect Breakdown
+              </span>
+            </div>
+            {hasMoreDefects && (
+              <span className="text-[9px] text-gray-400">
+                +{worker.Defects.length - 5} more
+              </span>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            {displayDefects.map((defect, idx) => (
+              <DefectItem
+                key={defect.ReworkCode}
+                defect={defect}
+                maxQty={maxDefectQty}
+                index={idx}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// SKELETON CARD
+// ─────────────────────────────────────────────
+const SkeletonCard = () => (
+  <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 animate-pulse">
+    <div className="flex items-start gap-3 mb-3">
+      <div className="w-14 h-14 rounded-xl bg-gray-200 dark:bg-gray-700" />
+      <div className="flex-1 space-y-2">
+        <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
+      </div>
+      <div className="h-10 w-14 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+    </div>
+    <div className="h-16 bg-gray-100 dark:bg-gray-700 rounded-xl mb-3" />
+    <div className="space-y-2">
+      <div className="h-6 bg-gray-100 dark:bg-gray-700 rounded" />
+      <div className="h-6 bg-gray-100 dark:bg-gray-700 rounded" />
+      <div className="h-6 bg-gray-100 dark:bg-gray-700 rounded" />
+    </div>
   </div>
 );
 
 // ─────────────────────────────────────────────
 // EMPTY STATE
 // ─────────────────────────────────────────────
-const EmptyTable = () => (
-  <div className="py-12 flex flex-col items-center justify-center gap-3">
-    <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-700/50 flex items-center justify-center">
-      <User className="w-7 h-7 text-gray-300 dark:text-gray-500" />
+const EmptyState = () => (
+  <div className="col-span-full py-16 flex flex-col items-center justify-center gap-3">
+    <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-700/50 flex items-center justify-center">
+      <User className="w-8 h-8 text-gray-300 dark:text-gray-600" />
     </div>
-    <p className="text-sm font-semibold text-gray-400 dark:text-gray-500">
-      No worker defects data
-    </p>
+    <div className="text-center">
+      <p className="text-sm font-semibold text-gray-400 dark:text-gray-500">
+        No worker defects data available
+      </p>
+      <p className="text-xs text-gray-300 dark:text-gray-600 mt-1">
+        Defect data will appear once QC identifies issues
+      </p>
+    </div>
   </div>
 );
 
 // ─────────────────────────────────────────────
-// WORKER ROW
+// PAGINATION DOTS
 // ─────────────────────────────────────────────
-const WorkerRow = ({ item, index, maxDefects }) => {
-  const barWidth = maxDefects > 0 ? (item.TotalDefects / maxDefects) * 100 : 0;
-  const isHighRisk = item.TotalDefects >= maxDefects * 0.7;
+const PaginationDots = ({ currentPage, totalPages, onPageChange }) => {
+  if (totalPages <= 1) return null;
 
   return (
-    <div
-      className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/40 ${
-        isHighRisk
-          ? "bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/30"
-          : index % 2 === 0
-            ? "bg-gray-50/50 dark:bg-gray-700/20"
-            : ""
-      }`}
-    >
-      {/* Rank */}
-      <div
-        className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0 shadow-sm ${
-          index < 3
-            ? index === 0
-              ? "bg-gradient-to-br from-red-500 to-rose-600"
-              : index === 1
-                ? "bg-gradient-to-br from-orange-500 to-amber-600"
-                : "bg-gradient-to-br from-amber-500 to-yellow-600"
-            : "bg-gray-400 dark:bg-gray-600"
-        }`}
-      >
-        {index + 1}
-      </div>
-
-      {/* Worker Info */}
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
-          <User className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-        </div>
-        <div className="min-w-0">
-          <span className="text-sm font-bold text-gray-800 dark:text-white font-mono block">
-            {item.EmpID}
-          </span>
-          <div className="flex items-center gap-3 mt-0.5">
-            <span className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-1">
-              <MapPin className="w-3 h-3" /> [{item.LineNo}]
-            </span>
-            <span className="text-[10px] text-gray-400 dark:text-gray-500">
-              St: {item.StationID}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="hidden sm:flex items-center gap-4">
-        <div className="text-center">
-          <p className="text-[10px] text-gray-400 dark:text-gray-500">Types</p>
-          <p className="text-xs font-bold text-gray-700 dark:text-gray-200">
-            {item.DefectTypeCount}
-          </p>
-        </div>
-        <div className="text-center">
-          <p className="text-[10px] text-gray-400 dark:text-gray-500">MOs</p>
-          <p className="text-xs font-bold text-gray-700 dark:text-gray-200">
-            {item.MOCount}
-          </p>
-        </div>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="w-20 flex-shrink-0 hidden md:block">
-        <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              isHighRisk
-                ? "bg-gradient-to-r from-red-500 to-rose-600"
-                : "bg-gradient-to-r from-amber-500 to-orange-500"
-            }`}
-            style={{ width: `${barWidth}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Defect Count */}
-      <div className="text-right min-w-[50px] flex-shrink-0">
-        <span
-          className={`text-lg font-black tabular-nums ${
-            isHighRisk
-              ? "text-red-600 dark:text-red-400"
-              : "text-amber-600 dark:text-amber-400"
+    <div className="flex items-center justify-center gap-2 mt-4">
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+        <button
+          key={page}
+          onClick={() => onPageChange(page)}
+          className={`transition-all duration-300 ${
+            currentPage === page
+              ? "w-8 h-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500"
+              : "w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500"
           }`}
-        >
-          {item.TotalDefects}
-        </span>
-      </div>
+          aria-label={`Go to page ${page}`}
+        />
+      ))}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// PROGRESS BAR FOR AUTO-ROTATION
+// ─────────────────────────────────────────────
+const AutoRotateProgress = ({ progress, isPaused }) => {
+  if (isPaused) return null;
+
+  return (
+    <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-100 dark:bg-gray-700 overflow-hidden rounded-b-2xl">
+      <div
+        className="h-full bg-gradient-to-r from-pink-500 to-rose-500 transition-all duration-100 ease-linear"
+        style={{ width: `${progress}%` }}
+      />
     </div>
   );
 };
@@ -138,85 +386,211 @@ const WorkerRow = ({ item, index, maxDefects }) => {
 // MAIN COMPONENT
 // ─────────────────────────────────────────────
 const DefectsByWorkerTable = ({ data, loading }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isPaused, setIsPaused] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-  const displayData = expanded ? data : data.slice(0, 10);
-  const hasMore = data.length > 10;
-  const totalDefects = data.reduce((sum, d) => sum + (d.TotalDefects || 0), 0);
-  const maxDefects = Math.max(...data.map((d) => d.TotalDefects || 0), 1);
+  // Calculate pagination
+  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  // Auto-rotation effect
+  useEffect(() => {
+    if (isPaused || totalPages <= 1 || loading) {
+      setProgress(0);
+      return;
+    }
+
+    const progressInterval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          return 0;
+        }
+        return prev + 100 / (AUTO_ROTATE_INTERVAL / 100);
+      });
+    }, 100);
+
+    const rotateInterval = setInterval(() => {
+      setCurrentPage((prev) => (prev >= totalPages ? 1 : prev + 1));
+      setProgress(0);
+    }, AUTO_ROTATE_INTERVAL);
+
+    return () => {
+      clearInterval(progressInterval);
+      clearInterval(rotateInterval);
+    };
+  }, [isPaused, totalPages, loading]);
+
+  // Reset to page 1 when data changes
+  useEffect(() => {
+    setCurrentPage(1);
+    setProgress(0);
+  }, [data.length]);
+
+  // Navigation handlers
+  const handlePrevPage = useCallback(() => {
+    setCurrentPage((prev) => (prev <= 1 ? totalPages : prev - 1));
+    setProgress(0);
+  }, [totalPages]);
+
+  const handleNextPage = useCallback(() => {
+    setCurrentPage((prev) => (prev >= totalPages ? 1 : prev + 1));
+    setProgress(0);
+  }, [totalPages]);
+
+  const handlePageChange = useCallback((page) => {
+    setCurrentPage(page);
+    setProgress(0);
+  }, []);
+
+  // Stats
+  const totalDefects = useMemo(
+    () => data.reduce((sum, d) => sum + (d.TotalDefects || 0), 0),
+    [data],
+  );
+  const maxDefects = useMemo(
+    () => Math.max(...data.map((d) => d.TotalDefects || 0), 1),
+    [data],
+  );
+  const highRiskThreshold = maxDefects * 0.7;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+    <div className="relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
-        <div className="p-2.5 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 shadow-lg shadow-pink-500/25">
-          <User className="w-4 h-4 text-white" />
-        </div>
-        <div>
-          <h3 className="text-sm font-bold text-gray-800 dark:text-white">
-            Defects by Responsible Worker
-          </h3>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-            {data.length > 0
-              ? `${data.length} workers · ${totalDefects.toLocaleString()} total defects`
-              : "Worker defects breakdown"}
-          </p>
+      <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 shadow-lg shadow-pink-500/25">
+              <User className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-gray-800 dark:text-white">
+                Defects by Responsible Worker
+              </h3>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                {data.length > 0
+                  ? `${data.length} workers · ${totalDefects.toLocaleString()} total defects`
+                  : "Worker defects breakdown"}
+              </p>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center gap-2">
+            {/* Page Info */}
+            {totalPages > 1 && (
+              <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">
+                {currentPage} / {totalPages}
+              </span>
+            )}
+
+            {/* Pause/Play Button */}
+            {totalPages > 1 && (
+              <button
+                onClick={() => setIsPaused(!isPaused)}
+                className={`p-2 rounded-lg transition-all ${
+                  isPaused
+                    ? "bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400"
+                    : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
+                }`}
+                title={
+                  isPaused ? "Resume auto-rotation" : "Pause auto-rotation"
+                }
+              >
+                {isPaused ? (
+                  <Play className="w-4 h-4" />
+                ) : (
+                  <Pause className="w-4 h-4" />
+                )}
+              </button>
+            )}
+
+            {/* Navigation Buttons */}
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handlePrevPage}
+                  className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleNextPage}
+                  className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="p-3 max-h-[500px] overflow-y-auto">
+      <div className="p-5">
         {loading && data.length === 0 ? (
-          <TableSkeleton />
-        ) : data.length === 0 ? (
-          <EmptyTable />
-        ) : (
-          <div className="space-y-1">
-            {displayData.map((item, index) => (
-              <WorkerRow
-                key={`${item.EmpID}-${item.StationID}-${item.LineNo}`}
-                item={item}
-                index={index}
-                maxDefects={maxDefects}
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(9)].map((_, i) => (
+              <SkeletonCard key={i} />
             ))}
           </div>
+        ) : data.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <>
+            {/* Cards Grid - 3x3 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {paginatedData.map((worker) => (
+                <WorkerCard
+                  key={`${worker.EmpID}-${worker.StationID}-${worker.LineNo}`}
+                  worker={worker}
+                  isHighRisk={worker.TotalDefects >= highRiskThreshold}
+                />
+              ))}
+            </div>
+
+            {/* Pagination Dots */}
+            <PaginationDots
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          </>
         )}
       </div>
 
-      {/* Show More */}
-      {hasMore && !loading && (
-        <div className="px-5 pb-4">
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="w-full py-2.5 rounded-xl border border-pink-200 dark:border-pink-800/50 bg-pink-50 dark:bg-pink-900/20 text-pink-700 dark:text-pink-400 text-xs font-bold flex items-center justify-center gap-2 hover:bg-pink-100 dark:hover:bg-pink-900/30 transition-colors"
-          >
-            {expanded ? (
-              <ChevronUp className="w-4 h-4" />
-            ) : (
-              <ChevronDown className="w-4 h-4" />
-            )}
-            {expanded ? "Show Less" : `Show All ${data.length} Workers`}
-          </button>
+      {/* Footer Summary */}
+      {!loading && data.length > 0 && (
+        <div className="px-5 py-3 bg-gradient-to-r from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20 border-t border-pink-100 dark:border-pink-800/30">
+          <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-pink-500" />
+              <span className="text-pink-700 dark:text-pink-300">
+                <span className="font-bold">Top Offender:</span>{" "}
+                {data[0]?.EmpName || data[0]?.EmpID} @{" "}
+                <span className="font-mono">[{data[0]?.LineNo}]</span> St:
+                {data[0]?.StationID}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-pink-500 dark:text-pink-400/70">
+              <span className="font-semibold">
+                {data[0]?.TotalDefects} defects (
+                {((data[0]?.TotalDefects / totalDefects) * 100).toFixed(1)}%)
+              </span>
+              {totalPages > 1 && (
+                <>
+                  <span className="text-pink-300 dark:text-pink-700">|</span>
+                  <span>Auto-rotate: {isPaused ? "Paused" : "Every 10s"}</span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Footer */}
-      {!loading && data.length > 0 && (
-        <div className="px-5 py-3 bg-gray-50 dark:bg-gray-700/30 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-pink-500" />
-            <span className="text-xs text-gray-600 dark:text-gray-300">
-              <span className="font-bold">Highest:</span> {data[0]?.EmpID} @ [
-              {data[0]?.LineNo}]
-            </span>
-          </div>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {data[0]?.TotalDefects} defects (
-            {((data[0]?.TotalDefects / totalDefects) * 100).toFixed(1)}%)
-          </span>
-        </div>
-      )}
+      {/* Auto-rotate Progress Bar */}
+      <AutoRotateProgress progress={progress} isPaused={isPaused} />
     </div>
   );
 };

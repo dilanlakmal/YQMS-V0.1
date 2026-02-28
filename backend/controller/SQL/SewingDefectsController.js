@@ -3,6 +3,7 @@ import {
   getRealTimeSunrisePool,
   ensureRealTimeSunriseConnected,
 } from "./RealTimeSunriseConnectionManager.js";
+import { UserMain } from "../MongoDB/dbConnectionController.js";
 
 // Helper: Get dynamic table name for tWork (Adjusted for Cambodia Time GMT+7)
 const getTodayTableName = () => {
@@ -587,36 +588,151 @@ export const getDefectsByQCInspector = async (req, res) => {
   }
 };
 
-// --- Get Defects by Responsible Worker ---
+// --- Get Defects by Responsible Worker (Enhanced with Photos & Details) ---
 export const getDefectsByWorker = async (req, res) => {
   try {
     await ensureRealTimeSunriseConnected();
     const pool = getRealTimeSunrisePool();
     const todayDate = getTodayDateString();
 
-    const query = `
-  SELECT 
-    f.EmpID,
-    f.StationID,
-    f.WorkLine AS [LineNo],
-    COUNT(*) AS TotalDefects,
-    COUNT(DISTINCT f.FailCode) AS DefectTypeCount,
-    COUNT(DISTINCT f.MONo) AS MOCount
-  FROM [YM-SUNRISE].[SunRiseGar].[dbo].[tFailHis] f
-  INNER JOIN [YM-SUNRISE].[SunRiseGar].[dbo].[tReworkCode] r 
-    ON f.FailCode = r.ReworkCode
-  WHERE CAST(f.dDate AS DATE) = @TodayDate
-    AND f.RackQCFail = 1
-  GROUP BY f.EmpID, f.StationID, f.WorkLine
-  ORDER BY TotalDefects DESC
-`;
+    // Query 1: Get worker summary (grouped by EmpID, StationID, LineNo)
+    const summaryQuery = `
+      SELECT 
+        f.EmpID,
+        f.StationID,
+        f.WorkLine AS [LineNo],
+        COUNT(*) AS TotalDefects,
+        COUNT(DISTINCT f.FailCode) AS DefectTypeCount,
+        COUNT(DISTINCT f.MONo) AS MOCount
+      FROM [YM-SUNRISE].[SunRiseGar].[dbo].[tFailHis] f
+      INNER JOIN [YM-SUNRISE].[SunRiseGar].[dbo].[tReworkCode] r 
+        ON f.FailCode = r.ReworkCode
+      WHERE CAST(f.dDate AS DATE) = @TodayDate
+        AND f.RackQCFail = 1
+      GROUP BY f.EmpID, f.StationID, f.WorkLine
+      ORDER BY TotalDefects DESC
+    `;
 
-    const result = await pool
-      .request()
-      .input("TodayDate", sql.Date, todayDate)
-      .query(query);
+    // Query 2: Get MO numbers per worker combination
+    const moQuery = `
+      SELECT DISTINCT
+        f.EmpID,
+        f.StationID,
+        f.WorkLine AS [LineNo],
+        f.MONo
+      FROM [YM-SUNRISE].[SunRiseGar].[dbo].[tFailHis] f
+      INNER JOIN [YM-SUNRISE].[SunRiseGar].[dbo].[tReworkCode] r 
+        ON f.FailCode = r.ReworkCode
+      WHERE CAST(f.dDate AS DATE) = @TodayDate
+        AND f.RackQCFail = 1
+    `;
 
-    res.json(result.recordset || []);
+    // Query 3: Get defects breakdown per worker with defect names
+    const defectsDetailQuery = `
+      SELECT 
+        f.EmpID,
+        f.StationID,
+        f.WorkLine AS [LineNo],
+        r.ReworkCode,
+        r.ReworkName,
+        COUNT(*) AS DefectQty
+      FROM [YM-SUNRISE].[SunRiseGar].[dbo].[tFailHis] f
+      INNER JOIN [YM-SUNRISE].[SunRiseGar].[dbo].[tReworkCode] r 
+        ON f.FailCode = r.ReworkCode
+      WHERE CAST(f.dDate AS DATE) = @TodayDate
+        AND f.RackQCFail = 1
+      GROUP BY f.EmpID, f.StationID, f.WorkLine, r.ReworkCode, r.ReworkName
+      ORDER BY f.EmpID, f.StationID, f.WorkLine, DefectQty DESC
+    `;
+
+    const [summaryResult, moResult, defectsDetailResult] = await Promise.all([
+      pool
+        .request()
+        .input("TodayDate", sql.Date, todayDate)
+        .query(summaryQuery),
+      pool.request().input("TodayDate", sql.Date, todayDate).query(moQuery),
+      pool
+        .request()
+        .input("TodayDate", sql.Date, todayDate)
+        .query(defectsDetailQuery),
+    ]);
+
+    // Build MO map: "EmpID-StationID-LineNo" -> [MONo1, MONo2, ...]
+    const moMap = {};
+    moResult.recordset.forEach((row) => {
+      const key = `${row.EmpID}-${row.StationID}-${row.LineNo}`;
+      if (!moMap[key]) {
+        moMap[key] = [];
+      }
+      if (row.MONo && !moMap[key].includes(row.MONo)) {
+        moMap[key].push(row.MONo);
+      }
+    });
+
+    // Build defects map: "EmpID-StationID-LineNo" -> [{ReworkCode, ReworkName, DefectQty}, ...]
+    const defectsMap = {};
+    defectsDetailResult.recordset.forEach((row) => {
+      const key = `${row.EmpID}-${row.StationID}-${row.LineNo}`;
+      if (!defectsMap[key]) {
+        defectsMap[key] = [];
+      }
+      defectsMap[key].push({
+        ReworkCode: row.ReworkCode,
+        ReworkName: row.ReworkName || `Code ${row.ReworkCode}`,
+        DefectQty: parseInt(row.DefectQty) || 0,
+      });
+    });
+
+    // Get unique emp IDs for MongoDB lookup
+    const empIds = [...new Set(summaryResult.recordset.map((r) => r.EmpID))];
+
+    // Fetch user photos and names from MongoDB
+    let userMap = {};
+    try {
+      const users = await UserMain.find(
+        { emp_id: { $in: empIds } },
+        { emp_id: 1, face_photo: 1, eng_name: 1, kh_name: 1, profile: 1 },
+      ).lean();
+
+      users.forEach((u) => {
+        userMap[u.emp_id] = {
+          facePhoto: u.face_photo || u.profile || null,
+          engName: u.eng_name || null,
+          khName: u.kh_name || null,
+        };
+      });
+    } catch (mongoErr) {
+      console.error("[MongoDB] Error fetching user photos:", mongoErr.message);
+      // Continue without photos if MongoDB fails
+    }
+
+    // Build final response data
+    const data = summaryResult.recordset.map((row, index) => {
+      const key = `${row.EmpID}-${row.StationID}-${row.LineNo}`;
+      const userData = userMap[row.EmpID] || {};
+      const moList = moMap[key] || [];
+      const defectsList = defectsMap[key] || [];
+
+      // Sort defects by quantity descending
+      defectsList.sort((a, b) => b.DefectQty - a.DefectQty);
+
+      return {
+        Rank: index + 1,
+        EmpID: row.EmpID,
+        EmpName: userData.engName || null,
+        KhName: userData.khName || null,
+        FacePhoto: userData.facePhoto || null,
+        LineNo: row.LineNo,
+        StationID: row.StationID,
+        TotalDefects: parseInt(row.TotalDefects) || 0,
+        DefectTypeCount: parseInt(row.DefectTypeCount) || 0,
+        MOCount: parseInt(row.MOCount) || 0,
+        MONumbers: moList,
+        Defects: defectsList,
+      };
+    });
+
+    res.json(data);
   } catch (error) {
     console.error(`[SewingDefects] By Worker Error:`, error.message);
     res.json([]);
