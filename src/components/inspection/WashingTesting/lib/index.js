@@ -34,6 +34,7 @@ export { default as QRScannerModal } from '../washing-modal/QRScannerModal';
 export { default as DeleteConfirmationModal } from '../washing-modal/DeleteConfirmationModal';
 export { default as RejectReportModal } from '../washing-modal/RejectReportModal';
 export { default as EditImagesModal } from '../washing-modal/EditImagesModal';
+export { default as SizeFollowUpModal } from '../washing-modal/SizeFollowUpModal';
 
 // =============================================================================
 // HOOKS - Custom React Hooks (legacy — kept for backward compatibility)

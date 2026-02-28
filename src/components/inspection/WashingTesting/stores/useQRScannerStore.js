@@ -29,15 +29,6 @@ const _getReportById = (reportId) => {
 const _drawQRReportImage = (qrDataURL, report, idQr) => {
     return new Promise((resolve, reject) => {
         const width = 600;
-        const height = 920;
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-            reject(new Error("Canvas not supported"));
-            return;
-        }
 
         const formatDate = (report) => {
             const raw = report?.createdAt || report?.submittedAt || report?.reportDate;
@@ -55,6 +46,58 @@ const _drawQRReportImage = (qrDataURL, report, idQr) => {
             const q = report?.qty ?? report?.quantity ?? report?.qtyTotal;
             return q != null && q !== "" ? String(q) : "N/A";
         };
+
+        const maxW = width - 40 - 220;
+        const dummyCanvas = document.createElement("canvas");
+        const dummyCtx = dummyCanvas.getContext("2d");
+        if (dummyCtx) dummyCtx.font = "bold 18px sans-serif";
+
+        const getLines = (text) => {
+            if (!dummyCtx) return [String(text).substring(0, 30)];
+            const words = String(text || "").split(" ");
+            let lines = [];
+            let currentLine = "";
+            for (const word of words) {
+                const test = currentLine ? currentLine + " " + word : word;
+                if (dummyCtx.measureText(test).width > maxW && currentLine) {
+                    lines.push(currentLine);
+                    currentLine = word;
+                } else {
+                    currentLine = test;
+                }
+            }
+            if (currentLine) lines.push(currentLine);
+            return lines.length > 0 ? lines : [""];
+        };
+
+        const rowsData = [
+            { label: "Date:", value: formatDate(report) },
+            { label: "Style:", value: report?.ymStyle || "N/A" },
+            { label: "Color:", value: formatColor(report) },
+            { label: "Size:", value: formatSize(report) },
+            { label: "Qty:", value: formatQty(report) },
+            { label: "Buyer Style:", value: report?.buyerStyle || "N/A" },
+            { label: "Report Type:", value: report?.reportType || "N/A" },
+        ];
+
+        let contentHeight = 0;
+        rowsData.forEach(r => {
+            r.lines = getLines(r.value);
+            r.rowSpacing = 20 + r.lines.length * 24;
+            contentHeight += r.rowSpacing;
+        });
+
+        const startY = 560;
+        const height = Math.max(920, startY + contentHeight + 80);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+            reject(new Error("Canvas not supported"));
+            return;
+        }
 
         // White background
         ctx.fillStyle = "#FFFFFF";
@@ -78,22 +121,22 @@ const _drawQRReportImage = (qrDataURL, report, idQr) => {
         ctx.fillStyle = "#6B7280";
         ctx.fillText("REPORT ID", width / 2, 258);
 
-        const drawRow = (label, value, y, valueColor = "#1F2937") => {
+        const drawRowAuto = (label, lines, y, valueColor = "#1F2937") => {
             ctx.textAlign = "left";
             ctx.font = "bold 18px sans-serif";
             ctx.fillStyle = "#6B7280";
             ctx.fillText(label, 40, y);
             ctx.fillStyle = valueColor;
-            let text = value;
-            const maxW = width - 40 - 220;
-            if (ctx.measureText(text).width > maxW) {
-                while (text.length > 0 && ctx.measureText(text + "...").width > maxW) text = text.slice(0, -1);
-                text = text + "...";
+
+            for (let i = 0; i < lines.length; i++) {
+                ctx.fillText(lines[i], 220, y + i * 24);
             }
-            ctx.fillText(text, 220, y);
+
+            const bottomY = y + (lines.length - 1) * 24;
+
             ctx.beginPath();
-            ctx.moveTo(40, y + 14);
-            ctx.lineTo(width - 40, y + 14);
+            ctx.moveTo(40, bottomY + 14);
+            ctx.lineTo(width - 40, bottomY + 14);
             ctx.strokeStyle = "#E5E7EB";
             ctx.lineWidth = 1;
             ctx.stroke();
@@ -106,15 +149,11 @@ const _drawQRReportImage = (qrDataURL, report, idQr) => {
             const qrY = 290;
             ctx.drawImage(img, (width - qrSize) / 2, qrY, qrSize, qrSize);
 
-            const startY = 560;
-            const rowHeight = 44;
-            drawRow("Date:", formatDate(report), startY);
-            drawRow("Style:", report?.ymStyle || "N/A", startY + rowHeight);
-            drawRow("Color:", formatColor(report), startY + rowHeight * 2);
-            drawRow("Size:", formatSize(report), startY + rowHeight * 3);
-            drawRow("Qty:", formatQty(report), startY + rowHeight * 4);
-            drawRow("Buyer Style:", report?.buyerStyle || "N/A", startY + rowHeight * 5);
-            drawRow("Report Type:", report?.reportType || "N/A", startY + rowHeight * 6);
+            let currentY = startY;
+            for (const r of rowsData) {
+                drawRowAuto(r.label, r.lines, currentY);
+                currentY += r.rowSpacing;
+            }
 
             ctx.textAlign = "center";
             ctx.font = "italic 14px sans-serif";
@@ -283,7 +322,7 @@ export const useQRScannerStore = create((set, get) => ({
             });
     },
 
-    // ─── Print QR code as stamp (same URL with meta as download) ───────
+    // ─── Print QR code as full Quality Report (same layout as download) ───────
     printQRCode: (reportId) => {
         const baseURL = _getBaseURL();
         const report = _getReportById(reportId);
@@ -296,45 +335,40 @@ export const useQRScannerStore = create((set, get) => ({
                     showToast.error("Failed to generate QR code for printing.");
                     return;
                 }
-                const printWindow = window.open("", "_blank", "width=600,height=600");
-                if (!printWindow) {
-                    showToast.error("Pop-up blocked! Please allow pop-ups to print the stamp.");
-                    return;
-                }
-                printWindow.document.write(`
+                const renderPrintContent = (imageDataURL) => {
+                    const printWindow = window.open("", "_blank", "width=700,height=1000");
+                    if (!printWindow) {
+                        showToast.error("Pop-up blocked! Please allow pop-ups to print the stamp.");
+                        return;
+                    }
+                    printWindow.document.write(`
       <html>
         <head>
-          <title>QR Stamp - ${idQr}</title>
+          <title>Washing Machine Test - ${idQr}</title>
           <style>
-            @page { size: 5cm 4cm; margin: 0; }
-            body { margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: hidden; }
-            .stamp-container { border: 1.2px solid #000; padding: 1mm 2mm 2mm 2mm; display: flex; flex-direction: row; align-items: center; justify-content: center; box-sizing: border-box; gap: 2.2mm; border-radius: 4px; }
-            .qr-side { flex: 0 0 20mm; display: flex; align-items: center; justify-content: center; }
-            .info-side { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; height: 100%; overflow: hidden; }
-            .label { font-size: 7pt; font-weight: 800; color: #000; text-transform: uppercase; line-height: 1.05; margin-bottom: 1.4mm; border-bottom: 1.4px solid #000; padding-bottom: 0.6mm; width: 100%; }
-            .report-id-container { width: 100%; }
-            .id-label { font-size: 6.5pt; font-weight: 700; color: #4b5563; display: block; margin-bottom: 0.8mm; }
-            .report-id { font-size: 6pt; color: #000; font-family: 'Courier New', monospace; word-break: break-all; line-height: 1.2; font-weight: 700; }
+            @page { size: A4; margin: 12mm; }
+            body { margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .report-image { max-width: 100%; height: auto; display: block; }
           </style>
         </head>
         <body>
-          <div class="stamp-container">
-            <div class="qr-side">
-              <img src="${qrDataURL}" alt="QR Code" style="width:22mm;height:22mm;background:#fff;padding:2px;object-fit:contain;border-radius:3px;" />
-            </div>
-            <div class="info-side">
-              <div class="label">Washing<br>Test Stamp</div>
-              <div class="report-id-container">
-                <span class="id-label">REPORT ID:</span>
-                <div class="report-id">#${idQr}</div>
-              </div>
-            </div>
-          </div>
+          <img src="${imageDataURL}" alt="Washing Machine Test Quality Report" class="report-image" />
           <script>window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); };<\/script>
         </body>
       </html>
     `);
-                printWindow.document.close();
+                    printWindow.document.close();
+                };
+                if (report) {
+                    _drawQRReportImage(qrDataURL, report, idQr)
+                        .then(renderPrintContent)
+                        .catch((err) => {
+                            console.error("Failed to build report image for print:", err);
+                            renderPrintContent(qrDataURL);
+                        });
+                } else {
+                    renderPrintContent(qrDataURL);
+                }
             });
     },
 
@@ -370,10 +404,17 @@ export const useQRScannerStore = create((set, get) => ({
     },
 
     // Shared handler for processing a scanned/uploaded QR result against a report
-    _processQRResult: async (targetReportId, reportId) => {
+    _processQRResult: async (targetReportId, reportId, qrBounds = null) => {
         const modalStore = useModalStore.getState();
         const formStore = useFormStore.getState();
         const orderStore = useOrderDataStore.getState();
+
+        // Trigger success animation FIRST (frame tracking + popup) - user sees before processing
+        const triggerSuccessAnimation = () => {
+            window.dispatchEvent(new CustomEvent('qr-scan-success', {
+                detail: { qrBounds }
+            }));
+        };
 
         try {
             const id = targetReportId != null ? String(targetReportId) : "";
@@ -388,6 +429,12 @@ export const useQRScannerStore = create((set, get) => ({
             const reportResult = await reportResponse.json();
             const currentReport = reportResult.data || reportResult;
             const currentStatus = currentReport.status || "pending";
+
+            // 1. Trigger success animation (frame tracks QR, popup shows) - user views first
+            triggerSuccessAnimation();
+
+            // 2. Wait: Processing... (2.5s) + Success popup (~0.8s) then go to form
+            await new Promise(resolve => setTimeout(resolve, 3300));
 
             if (currentStatus === "pending" || !currentStatus) {
                 get().stopScanner();
@@ -467,19 +514,22 @@ export const useQRScannerStore = create((set, get) => ({
                 );
                 const cameraId = backCamera ? backCamera.id : cameras[0].id;
 
+                let hasScannedOnce = false;
+
                 await instance.start(
                     cameraId,
                     {
                         fps: 20,
                         qrbox: (vw, vh) => {
                             const min = Math.min(vw, vh);
-                            const s = Math.floor(min * 0.7);
+                            const s = Math.floor(min * 0.55);
                             return { width: s, height: s };
                         },
                         aspectRatio: 1.0,
                         experimentalFeatures: { useBarCodeDetectorIfSupported: true },
                     },
-                    async (decodedText) => {
+                    async (decodedText, decodedResult) => {
+                        if (hasScannedOnce) return;
                         if (!isAdminUser && !isWarehouseUser) {
                             showToast.warning(
                                 "You are not assigned to scan reports. Only assigned users can complete this action.",
@@ -511,7 +561,14 @@ export const useQRScannerStore = create((set, get) => ({
                             return;
                         }
 
-                        await get()._processQRResult(targetReportId, reportId);
+                        hasScannedOnce = true;
+                        const qrBounds = decodedResult?.result?.bounds || null;
+
+                        try {
+                            await instance.stop();
+                        } catch (_) { /* already stopped */ }
+
+                        await get()._processQRResult(targetReportId, reportId, qrBounds);
                     },
                     () => {
                         /* Ignore continuous scan errors */
@@ -552,11 +609,16 @@ export const useQRScannerStore = create((set, get) => ({
                 else showToast.warning("Invalid QR code format.");
                 return;
             }
-            if (result.reportId !== reportId) {
-                showToast.error("This QR code is from a different report. Please upload the QR code that is displayed in the current modal window.");
-                return;
+
+            const targetId = result.reportId;
+            if (targetId && targetId !== reportId) {
+                // Align behaviour with live camera scanner: allow a valid QR
+                // from another report and simply process that report instead
+                // of blocking with an error.
+                showToast.info("Detected QR from a different report. Opening that report.");
             }
-            await get()._processQRResult(result.reportId, reportId);
+
+            await get()._processQRResult(targetId, targetId);
         };
 
         try {
@@ -564,7 +626,6 @@ export const useQRScannerStore = create((set, get) => ({
             tempContainer.id = "temp-qr-file-scanner";
             tempContainer.style.display = "none";
             document.body.appendChild(tempContainer);
-
             const html5QrCode = new Html5Qrcode("temp-qr-file-scanner");
             try {
                 const decodedText = await html5QrCode.scanFile(file, false);
@@ -574,7 +635,10 @@ export const useQRScannerStore = create((set, get) => ({
                 return;
             } catch (scanError) {
                 document.body.removeChild(tempContainer);
-                console.warn("Html5Qrcode failed, trying fallback...", scanError);
+                // Primary decoder found no QR code — this is expected, jsQR fallback will try next
+                if (process.env.NODE_ENV === "development") {
+                    console.debug("[QR] Primary decoder found no QR code, trying jsQR fallback...");
+                }
             }
 
             try {
@@ -603,6 +667,33 @@ export const useQRScannerStore = create((set, get) => ({
                 }
             } catch (fallbackError) {
                 console.error("Fallback scan failed:", fallbackError);
+            }
+
+            // ─────────────────────────────────────────────────────────────
+            // Final fallback: if both decoders fail BUT the file name
+            // clearly matches our own downloaded QR-report image pattern
+            // for this report, trust it and process using the known URL.
+            //
+            // This fixes cases where certain viewers/exporters degrade
+            // the QR contrast so decoders can't read it, while the user
+            // is still using the correct downloaded QR for the same report.
+            // ─────────────────────────────────────────────────────────────
+            try {
+                const fileName = (file.name || "").toLowerCase();
+                const idStr = String(reportId || "").toLowerCase();
+                const looksLikeOurDownloadedQR =
+                    fileName.includes("qr-code-report-") && (idStr && fileName.includes(idStr));
+
+                if (looksLikeOurDownloadedQR) {
+                    const baseURL = _getBaseURL();
+                    const report = _getReportById(reportId);
+                    const value = buildQRCodeURLWithMeta(baseURL, reportId, report);
+                    await processResult(value);
+                    event.target.value = "";
+                    return;
+                }
+            } catch (nameFallbackError) {
+                console.error("Name-based QR fallback failed:", nameFallbackError);
             }
 
             showToast.error("Failed to scan QR code. The image may be corrupted or the QR code is not readable.");

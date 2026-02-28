@@ -192,6 +192,13 @@ export const useWashingReportsStore = create((set, get) => ({
             return false;
         }
         if (
+            (formData.reportType === "Garment Wash Report" || formData.reportType === "Home Wash Test") &&
+            (!formData.size || String(formData.size).trim() === "")
+        ) {
+            showToast.warning("Please select at least one size");
+            return false;
+        }
+        if (
             formData.reportType === "HT Testing" &&
             Array.isArray(formData.fabricColor) &&
             formData.fabricColor.length === 0
@@ -292,6 +299,23 @@ export const useWashingReportsStore = create((set, get) => ({
             if (response.ok && result.success) {
                 showToast.success("Report submitted successfully!");
                 await get().refreshAllReports();
+
+                // ── Size follow-up: show dialog if 2+ sizes were submitted ──
+                const sizeField = formData.size || formData.range || "";
+                if (sizeField) {
+                    const submittedSizes = sizeField.split(",").map((s) => s.trim()).filter(Boolean);
+                    if (submittedSizes.length >= 2) {
+                        // Small delay so the success toast renders first
+                        setTimeout(() => {
+                            useModalStore.getState().openSizeFollowUpModal(
+                                submittedSizes,
+                                formData.ymStyle || formData.style || "",
+                                Array.isArray(formData.color) ? formData.color : (formData.color ? [formData.color] : []),
+                            );
+                        }, 600);
+                    }
+                }
+
                 if (onSuccess) onSuccess();
                 return true;
             }

@@ -97,6 +97,9 @@ export const useFormStore = create((set, get) => ({
             orderStore.resetOrderData,
             orderStore.fetchUsedColors,
         );
+
+        // Auto-fill care symbols from the last report for this style
+        orderStore.fetchLastCareSymbols(orderNo, setFormData);
     },
 
     handleInputChange: (field, value) => {

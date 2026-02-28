@@ -290,14 +290,14 @@ const CareSymbolsSelector = ({ value = {}, onChange, compact = false }) => {
 
             {/* Dropdown Content - The Grid */}
             {isOpen && (
-                <div className={`absolute z-50 mt-2 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 ${compact ? 'max-w-[520px]' : 'min-w-[600px] lg:min-w-[800px]'}`}>
-                    <div className={`overflow-x-auto overflow-y-auto ${compact ? 'p-2 max-h-[70vh]' : 'p-4'}`}>
-                        <div className={`grid grid-cols-6 ${compact ? 'gap-2' : 'gap-4'} ${compact ? '' : 'min-w-[700px]'}`}>
+                <div className={`absolute z-50 mt-2 left-0 right-0 sm:left-auto sm:right-auto w-full max-w-[min(100vw-1rem,800px)] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 ${compact ? 'sm:max-w-[520px]' : 'sm:min-w-[520px] lg:min-w-[800px]'}`}>
+                    <div className={`overflow-y-auto overflow-x-hidden ${compact ? 'p-2 max-h-[70vh]' : 'p-3 sm:p-4 max-h-[75vh] sm:max-h-[70vh]'}`}>
+                        <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 ${compact ? 'gap-2' : 'gap-3 sm:gap-4'}`}>
                             {CARE_CATEGORIES.map(cat => (
-                                <div key={cat.id} className={`flex flex-col ${compact ? 'gap-1' : 'gap-2'}`}>
+                                <div key={cat.id} className={`flex flex-col min-w-0 ${compact ? 'gap-1' : 'gap-2'}`}>
                                     {/* Header */}
                                     <div className={`text-center border-b dark:border-gray-700 ${compact ? 'pb-1' : 'pb-2'}`}>
-                                        <span className={`font-bold text-gray-500 uppercase tracking-wider ${compact ? 'text-[10px]' : 'text-xs'}`}>{cat.label}</span>
+                                        <span className={`font-bold text-gray-500 uppercase tracking-wider ${compact ? 'text-[10px]' : 'text-[10px] sm:text-xs'}`}>{cat.label}</span>
                                     </div>
 
                                     <div className={`flex flex-col items-center ${compact ? 'gap-1.5 py-1' : 'gap-3 py-2'}`}>
@@ -308,13 +308,13 @@ const CareSymbolsSelector = ({ value = {}, onChange, compact = false }) => {
                                                         key={itemIcon}
                                                         type="button"
                                                         onClick={() => handleSelect(cat.id, itemIcon)}
-                                                        className={`transition-all hover:bg-blue-50 dark:hover:bg-gray-700 border-2 ${value[cat.id] === itemIcon ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-transparent'} ${compact ? 'p-1 rounded-md' : 'p-2 rounded-lg'}`}
+                                                        className={`transition-all hover:bg-blue-50 dark:hover:bg-gray-700 active:bg-blue-100 border-2 ${value[cat.id] === itemIcon ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-transparent'} ${compact ? 'p-1 rounded-md' : 'p-1.5 sm:p-2 rounded-lg min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0'}`}
                                                         title={itemIcon}
                                                     >
                                                         <img
                                                             src={`${ASSET_PATH}${itemIcon}`}
                                                             alt={itemIcon}
-                                                            className={`object-contain block mx-auto transform ${getIconScale(itemIcon, compact)} origin-center transition-transform ${compact ? 'w-6 h-6 hover:scale-110' : 'w-8 h-8 md:w-10 md:h-10 hover:scale-[1.8]'}`}
+                                                            className={`object-contain block mx-auto transform ${getIconScale(itemIcon, compact)} origin-center transition-transform ${compact ? 'w-6 h-6 hover:scale-110' : 'w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 hover:scale-[1.8]'}`}
                                                         />
                                                     </button>
                                                 ))}
@@ -327,7 +327,7 @@ const CareSymbolsSelector = ({ value = {}, onChange, compact = false }) => {
                     </div>
 
                     {/* Footer / clear */}
-                    <div className={`bg-gray-50 dark:bg-gray-700/50 border-t flex justify-between items-center ${compact ? 'p-2' : 'p-3'}`}>
+                    <div className={`bg-gray-50 dark:bg-gray-700/50 border-t flex justify-between items-center gap-2 flex-wrap ${compact ? 'p-2' : 'p-2 sm:p-3'}`}>
                         <span className="text-xs text-gray-500">Select one symbol per column</span>
                         <button
                             type="button"

@@ -192,16 +192,16 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
   // Care symbols: use this report's recorded symbols (careSymbolsImages) when present
   const careSymbolsObj = report.careSymbols
     ? (typeof report.careSymbols === "string"
-        ? (() => { try { return JSON.parse(report.careSymbols); } catch (e) { return {}; } })()
-        : report.careSymbols)
+      ? (() => { try { return JSON.parse(report.careSymbols); } catch (e) { return {}; } })()
+      : report.careSymbols)
     : {};
   const careEntries =
     report.careSymbolsImages && Object.keys(careSymbolsObj).length > 0
       ? Object.entries(careSymbolsObj).filter(
-          ([key]) =>
-            report.careSymbolsImages[key] &&
-            String(report.careSymbolsImages[key]).startsWith("data:")
-        )
+        ([key]) =>
+          report.careSymbolsImages[key] &&
+          String(report.careSymbolsImages[key]).startsWith("data:")
+      )
       : [];
   const hasReportCareSymbols = careEntries.length > 0;
   const showCareSymbolsSection = hasReportCareSymbols || !!careSymbolsSrc;

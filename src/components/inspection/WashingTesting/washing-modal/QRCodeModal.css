@@ -23,6 +23,44 @@
     animation: scan-beam 4s linear infinite;
 }
 
+/* Enhanced horizontal scanning animations */
+@keyframes scan-focus-zoom {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.02);
+    }
+}
+
+@keyframes scan-beam-glow {
+    0%, 100% {
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 40px rgba(59, 130, 246, 0.8), 0 0 60px rgba(59, 130, 246, 0.4);
+    }
+}
+
+@keyframes corner-frame-pulse {
+    0%, 100% {
+        stroke-dashoffset: 0;
+        opacity: 1;
+    }
+    50% {
+        stroke-dashoffset: 10;
+        opacity: 0.7;
+    }
+}
+
+.animate-scan-focus {
+    animation: scan-focus-zoom 3s ease-in-out infinite;
+}
+
+.animate-beam-glow {
+    animation: scan-beam-glow 2s ease-in-out infinite;
+}
+
 @keyframes logo-pulse {
 
     0%,

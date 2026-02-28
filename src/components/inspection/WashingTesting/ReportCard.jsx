@@ -1,6 +1,6 @@
 import React from "react";
 import { useAuth } from "../../authentication/AuthContext";
-import { ChevronDown, ChevronUp, Printer, FileText, FileSpreadsheet, Pencil, Trash2, QrCode, CheckCircle, XCircle, Bell, BellRing, Shield } from "lucide-react";
+import { ChevronDown, ChevronUp, Printer, FileText, FileSpreadsheet, Pencil, Trash2, QrCode, CheckCircle, BadgeCheck, XCircle, Bell, BellRing, Shield } from "lucide-react";
 import { useAssignControlStore, computeUserRoles, useModalStore } from "./stores";
 import ReportTimeline from "./ReportTimeline";
 
@@ -343,17 +343,17 @@ const ReportCard = ({
           {/* QR Code Button */}
           {report.status === "completed" ? (
             <div
-              className="px-2 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-md flex items-center justify-center cursor-default flex-shrink-0"
+              className="px-1 flex items-center justify-center cursor-default flex-shrink-0 text-emerald-500 dark:text-emerald-400"
               title="Report Completed - QR Code no longer available"
             >
-              <CheckCircle size={16} />
+              <BadgeCheck size={24} strokeWidth={2} />
             </div>
           ) : report.status === "rejected" ? (
             <div
-              className="px-2 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-md flex items-center justify-center cursor-default flex-shrink-0"
+              className="px-1 flex items-center justify-center cursor-default flex-shrink-0 text-red-500 dark:text-red-400"
               title="Report Rejected"
             >
-              <XCircle size={16} />
+              <XCircle size={22} strokeWidth={2} />
             </div>
           ) : (
             <button
@@ -389,7 +389,7 @@ const ReportCard = ({
 
       {/* Summary View (Collapsed) */}
       {!isExpanded && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mt-2 text-xs md:text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 mt-2 text-xs md:text-sm">
           <div>
             <span className="text-gray-500 dark:text-gray-400">Type: </span>
             <span className="font-medium text-blue-600 dark:text-blue-400">{report.reportType || "Home Wash Test"}</span>
@@ -403,6 +403,14 @@ const ReportCard = ({
             <span className="text-gray-900 dark:text-white">
               {report.color && report.color.length > 0
                 ? `${report.color.length} color(s)`
+                : "N/A"}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-500 dark:text-gray-400">Size: </span>
+            <span className="text-gray-900 dark:text-white">
+              {report.size && String(report.size).trim()
+                ? String(report.size)
                 : "N/A"}
             </span>
           </div>
@@ -484,6 +492,17 @@ const ReportCard = ({
                   <span className="text-sm text-gray-500 dark:text-gray-400">N/A</span>
                 )}
               </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                Size
+              </p>
+              <p className="text-sm text-gray-900 dark:text-white">
+                {report.size && String(report.size).trim()
+                  ? String(report.size)
+                  : "N/A"}
+              </p>
             </div>
 
             <div>

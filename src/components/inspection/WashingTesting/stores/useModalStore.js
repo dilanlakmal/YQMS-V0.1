@@ -92,6 +92,13 @@ export const useModalStore = create((set, get) => ({
     setShowReportDateScanner: (id) => set({ showReportDateScanner: id }),
     setScanningReportId: (id) => set({ scanningReportId: id }),
 
+    // ─── Size Follow-Up Modal (shown after submit with 2+ sizes) ─────
+    sizeFollowUpModal: { isOpen: false, sizes: [], ymStyle: "", colors: [] },
+    openSizeFollowUpModal: (sizes, ymStyle, colors) =>
+        set({ sizeFollowUpModal: { isOpen: true, sizes, ymStyle, colors: colors || [] } }),
+    closeSizeFollowUpModal: () =>
+        set({ sizeFollowUpModal: { isOpen: false, sizes: [], ymStyle: "", colors: [] } }),
+
     // ─── Async saving flags ───────────────────────────────────────────
     isSavingReceived: false,
     setIsSavingReceived: (v) => set({ isSavingReceived: v }),

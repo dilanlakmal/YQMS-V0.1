@@ -408,18 +408,19 @@ export const useQRCode = (getQRCodeBaseURL) => {
               overflow: hidden; /* Critical for single-page printing */
             }
             .stamp-container {
-              border: 1.2px solid #000;
-              padding: 1mm 2mm 2mm 2mm;
+              border: 2.5px solid #000;
+              padding: 2mm 3mm;
               display: flex;
               flex-direction: row;
               align-items: center;
               justify-content: center;
               box-sizing: border-box;
-              gap: 2.2mm;
-              border-radius: 4px;
+              gap: 3mm;
+              border-radius: 6px;
+              background: #fff;
             }
             .qr-side {
-              flex: 0 0 20mm;
+              flex: 0 0 22mm;
               display: flex;
               align-items: center;
               justify-content: center;
@@ -435,33 +436,34 @@ export const useQRCode = (getQRCodeBaseURL) => {
               overflow: hidden;
             }
             .label {
-              font-size: 7pt; /* Reduced title size for compact stamp */
+              font-size: 8pt;
               font-weight: 800;
               color: #000;
               text-transform: uppercase;
-              line-height: 1.05;
-              margin-bottom: 1.4mm;
-              border-bottom: 1.4px solid #000;
-              padding-bottom: 0.6mm;
+              letter-spacing: 0.02em;
+              line-height: 1.2;
+              margin-bottom: 1.5mm;
+              border-bottom: 1.5px solid #000;
+              padding-bottom: 0.8mm;
               width: 100%;
             }
             .report-id-container {
               width: 100%;
             }
             .id-label {
-              font-size: 6.5pt; /* smaller label */
+              font-size: 6.5pt;
               font-weight: 700;
-              color: #4b5563;
+              color: #374151;
               display: block;
-              margin-bottom: 0.8mm;
+              margin-bottom: 0.6mm;
             }
             .report-id {
-              font-size: 6pt; /* smaller id text to fit neatly */
+              font-size: 6.5pt;
               color: #000;
               font-family: 'Courier New', monospace;
               word-break: break-all;
-              line-height: 1.2;
-              font-weight: 700;
+              line-height: 1.25;
+              font-weight: 400;
             }
           </style>
         </head>
@@ -471,7 +473,7 @@ export const useQRCode = (getQRCodeBaseURL) => {
               <img src="${qrDataURL}" id="qr-canvas-${reportId}" alt="QR Code" style="width:22mm;height:22mm;background:#fff;padding:2px;object-fit:contain;border-radius:3px;" />
             </div>
             <div class="info-side">
-              <div class="label">Washing<br>Test Stamp</div>
+              <div class="label">WASHING TEST STAMP</div>
               <div class="report-id-container">
                 <span class="id-label">REPORT ID:</span>
                 <div class="report-id">#${reportId}</div>

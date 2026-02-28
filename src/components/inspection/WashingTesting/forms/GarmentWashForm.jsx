@@ -534,6 +534,27 @@ const GarmentWashForm = ({
 
   // Helper function to get filtered available sizes based on actual measurement specs
   const getFilteredAvailableSizes = () => {
+    const hasCompletedShrinkage =
+      formData.sampleSize &&
+      Array.isArray(formData.shrinkageRows) &&
+      formData.shrinkageRows.length > 0;
+
+    const sizeFieldRaw = formData.size || formData.range || "";
+    const sizeField =
+      typeof sizeFieldRaw === "string" ? sizeFieldRaw.trim() : "";
+
+    // Case 1: OLD / SIZE-NOT-SELECTED RECORDS
+    // --------------------------------------
+    // If the submitter never selected explicit size(s) (size field is empty)
+    // but the completion form already has a saved sample size + shrinkage
+    // rows, then this record effectively used only one size in practice.
+    // In this case, lock the dropdown to that single saved size so the
+    // receiver sees only the actual tested size (e.g. "M") instead of
+    // the full style size range.
+    if (!sizeField && hasCompletedShrinkage) {
+      return [formData.sampleSize];
+    }
+
     const washType = formData.washType || "Before Wash";
     const isBeforeWash = washType === "Before Wash";
     const specsSource = isBeforeWash
@@ -563,10 +584,42 @@ const GarmentWashForm = ({
     });
 
     // If we have sizes from specs, use only those. Otherwise fall back to availableSizes prop
-    const sizesToUse =
+    let sizesToUse =
       sizesFromSpecs.size > 0
         ? Array.from(sizesFromSpecs)
         : availableSizes || [];
+
+    // If the user explicitly stored a size list on the report (e.g. "XS, S, M"
+    // or legacy formats like "M (52)"), further restrict the dropdown to those
+    // sizes when editing/completing. This prevents showing extra sizes that
+    // belong to the order but were not part of the actual test. When a size
+    // list exists we always keep ALL of those sizes visible (1, 2, or many) –
+    // even for completed records.
+    if (sizeField) {
+      const userSizes = sizeField
+        .split(",")
+        .map((s) => s.trim())
+        // Normalize tokens coming from DB (report_garment_wash.size), which
+        // might look like "M (52)" or "M(52)". We only care about the base
+        // size code ("M") for matching against measurement specs.
+        .map((s) => {
+          const beforeParen = s.split("(")[0].trim();
+          return beforeParen || s;
+        })
+        .filter(Boolean);
+
+      if (userSizes.length > 0) {
+        const userSizeSet = new Set(userSizes);
+        const intersected = sizesToUse.filter((s) => userSizeSet.has(s));
+        if (intersected.length > 0) {
+          sizesToUse = intersected;
+        } else if (hasCompletedShrinkage && formData.sampleSize) {
+          // Fallback: legacy records where stored size text does not match the
+          // spec sizes (e.g. "M (52)") – keep at least the actual tested size.
+          sizesToUse = [formData.sampleSize];
+        }
+      }
+    }
 
     // Sort sizes in a logical order
     const sizeOrder = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "4XL", "5XL"];
@@ -645,6 +698,11 @@ const GarmentWashForm = ({
     const orderNo = (formData.moNo || "").trim().toUpperCase();
 
     const timer = setTimeout(() => {
+      const hasExistingShrinkageSelection =
+        formData.sampleSize &&
+        Array.isArray(formData.shrinkageRows) &&
+        formData.shrinkageRows.length > 0;
+
       if (
         orderNo &&
         orderNo.length >= 3 &&
@@ -652,9 +710,14 @@ const GarmentWashForm = ({
       ) {
         lastFetchedOrderNoRef.current = orderNo;
         fetchMeasurementSpecs(orderNo);
-        // Reset sampleSize and shrinkageRows to default when style changes
-        handleInputChange("sampleSize", "");
-        handleInputChange("shrinkageRows", []);
+        // Reset sampleSize and shrinkageRows only for brand new styles.
+        // When editing/completing an existing report that already has a
+        // saved sample size and shrinkage rows, keep the user's current
+        // size selection so the completion form shows the same size.
+        if (!hasExistingShrinkageSelection) {
+          handleInputChange("sampleSize", "");
+          handleInputChange("shrinkageRows", []);
+        }
       } else if (!orderNo || orderNo.length < 3) {
         setMeasurementSpecs({
           beforeWash: [],
@@ -692,6 +755,17 @@ const GarmentWashForm = ({
       handleInputChange("washType", "Before Wash");
     }
   }, [measurementSpecs, isLoadingMeasurementSpecs]);
+
+  // 1.6. Auto-select sample size when there is exactly one valid option
+  useEffect(() => {
+    if (isLoadingMeasurementSpecs) return;
+    if (formData.sampleSize) return;
+
+    const sizes = getFilteredAvailableSizes();
+    if (Array.isArray(sizes) && sizes.length === 1) {
+      handleInputChange("sampleSize", sizes[0]);
+    }
+  }, [isLoadingMeasurementSpecs, measurementSpecs, formData.size, formData.range, formData.sampleSize, formData.washType]);
 
   // 2. Update shrinkageRows when measurement specs, size, or wash type change
   useEffect(() => {
@@ -2154,34 +2228,34 @@ const GarmentWashForm = ({
 
         {/* 6. Flat Measurements (Shrinkage) */}
         <div>
-          <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-4 gap-4">
-            <div className="flex items-center gap-4">
-              <div className="flex flex-col">
-                <h3 className="text-lg font-black text-gray-800 dark:text-white leading-tight">
+          <div className="flex flex-col gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex flex-col min-w-0">
+                <h3 className="text-base sm:text-lg font-black text-gray-800 dark:text-white leading-tight">
                   Flat Measurements & Shrinkage
                 </h3>
-                <p className="text-xs text-gray-400 font-medium">
+                <p className="text-[11px] sm:text-xs text-gray-400 font-medium">
                   Enter standard measurements to calculate shrinkage
                 </p>
               </div>
-            </div>
 
-            <div className="flex items-center gap-3">
-              {formData.sampleSize &&
-                (formData.shrinkageRows || []).length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setIsShrinkageSaved(!isShrinkageSaved)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl shadow-md transition-all hover:scale-105 active:scale-95 font-bold text-xs uppercase tracking-wider ${isShrinkageSaved ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
-                  >
-                    {isShrinkageSaved ? <Edit size={16} /> : <Save size={16} />}
-                    {isShrinkageSaved ? "Edit Selection" : "Save"}
-                  </button>
-                )}
+              {/* Controls: wrap on phone, row on larger screens */}
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                {formData.sampleSize &&
+                  (formData.shrinkageRows || []).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setIsShrinkageSaved(!isShrinkageSaved)}
+                      className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl shadow-md transition-all hover:scale-105 active:scale-95 font-bold text-[10px] sm:text-xs uppercase tracking-wider min-h-[44px] sm:min-h-0 ${isShrinkageSaved ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
+                    >
+                      {isShrinkageSaved ? <Edit size={14} className="flex-shrink-0" /> : <Save size={14} className="flex-shrink-0" />}
+                      {isShrinkageSaved ? "Edit" : "Save"}
+                    </button>
+                  )}
               {/* Wash Type Button Selector */}
               <div className="relative group">
                 <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-xl blur-sm group-hover:blur-md transition-all duration-300 opacity-50"></div>
-                <div className="relative flex items-center gap-3 px-4 py-1.5 bg-white dark:bg-gray-800 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm transition-all hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md">
+                <div className="relative flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-1.5 bg-white dark:bg-gray-800 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm transition-all hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md">
                   <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.1em]">
                     Wash Type
                   </span>
@@ -2201,7 +2275,7 @@ const GarmentWashForm = ({
                         handleInputChange("washType", "Before Wash")
                       }
                       disabled={isWashTypeLocked}
-                      className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${formData.washType === "Before Wash"
+                      className={`px-2 sm:px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 min-h-[40px] sm:min-h-0 ${formData.washType === "Before Wash"
                           ? isWashTypeLocked
                             ? "bg-gray-400 text-white"
                             : "bg-blue-600 text-white shadow-sm"
@@ -2217,7 +2291,7 @@ const GarmentWashForm = ({
                         handleInputChange("washType", "After Wash")
                       }
                       disabled={isWashTypeLocked}
-                      className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${formData.washType === "After Wash"
+                      className={`px-2 sm:px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 min-h-[40px] sm:min-h-0 ${formData.washType === "After Wash"
                           ? isWashTypeLocked
                             ? "bg-gray-400 text-white"
                             : "bg-blue-600 text-white shadow-sm"
@@ -2232,7 +2306,7 @@ const GarmentWashForm = ({
 
               <div className="relative group">
                 <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-xl blur-sm group-hover:blur-md transition-all duration-300 opacity-50"></div>
-                <div className="relative flex items-center gap-3 px-4 py-2 bg-white dark:bg-gray-800 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm transition-all hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md">
+                <div className="relative flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2 bg-white dark:bg-gray-800 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm transition-all hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md min-h-[44px] sm:min-h-0">
                   <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.1em]">
                     Size
                   </span>
@@ -2347,10 +2421,12 @@ const GarmentWashForm = ({
                     type="button"
                     onClick={() => setShowSizeComparisonModal(true)}
                     title="View all sizes comparison"
+                    className="flex items-center justify-center min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-xl border border-blue-100 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
                   >
-                    <Maximize2 size={16} className="" />
+                    <Maximize2 size={16} className="flex-shrink-0" />
                   </button>
                 )}
+              </div>
             </div>
           </div>
 

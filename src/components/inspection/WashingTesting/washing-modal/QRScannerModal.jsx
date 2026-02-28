@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { X, Flashlight, QrCode } from "lucide-react";
+import React, { useEffect, useState, useRef } from "react";
+import { X, Flashlight, QrCode, CheckCircle } from "lucide-react";
 import "./QRCodeModal.css";
 
 const QRScannerModal = ({
@@ -11,6 +11,64 @@ const QRScannerModal = ({
   onFlashToggle,
   flashOn = false,
 }) => {
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanSuccess, setScanSuccess] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [framePosition, setFramePosition] = useState(null);
+  const overlayRef = useRef(null);
+
+  // Reset states when modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      setIsScanning(false);
+      setScanSuccess(false);
+      setIsProcessing(false);
+      setFramePosition(null);
+      const timer = setTimeout(() => setIsScanning(true), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  // Listen for QR scan success - frame moves from center to catch QR position
+  useEffect(() => {
+    const handleScanSuccess = (e) => {
+      const qrBounds = e.detail?.qrBounds;
+      const overlay = overlayRef.current;
+      const scannerEl = scannerElementId ? document.getElementById(scannerElementId) : null;
+      const video = scannerEl?.querySelector?.('video');
+
+      if (qrBounds && overlay && (video || scannerEl)) {
+        const rect = overlay.getBoundingClientRect();
+        const frameSize = Math.min(rect.width * 0.5, rect.height * 0.5, 280);
+
+        // Scale bounds if library uses video intrinsic resolution
+        const scaleX = video?.videoWidth ? rect.width / video.videoWidth : 1;
+        const scaleY = video?.videoHeight ? rect.height / video.videoHeight : 1;
+        const x = qrBounds.x * scaleX;
+        const y = qrBounds.y * scaleY;
+        const w = (qrBounds.width || 80) * scaleX;
+        const h = (qrBounds.height || 80) * scaleY;
+        const centerX = x + w / 2;
+        const centerY = y + h / 2;
+
+        const left = Math.max(0, Math.min(rect.width - frameSize, centerX - frameSize / 2));
+        const top = Math.max(0, Math.min(rect.height - frameSize, centerY - frameSize / 2));
+        setFramePosition({ left, top, width: frameSize, height: frameSize });
+      }
+
+      setIsScanning(false);
+      setIsProcessing(true);
+      setScanSuccess(false);
+
+      setTimeout(() => {
+        setIsProcessing(false);
+        setScanSuccess(true);
+      }, 2500);
+    };
+
+    window.addEventListener('qr-scan-success', handleScanSuccess);
+    return () => window.removeEventListener('qr-scan-success', handleScanSuccess);
+  }, [scannerElementId]);
   // Clean up scanner element completely when modal closes
   useEffect(() => {
     if (!isOpen && scannerElementId) {
@@ -124,7 +182,7 @@ const QRScannerModal = ({
       className="fixed inset-0 flex flex-col z-50"
       role="dialog"
       aria-modal="true"
-      aria-label="ABA"
+      aria-label=""
       style={{ background: 'transparent' }}
     >
       {/* Header - dark semi-opaque so "Yorkmars Cambodia" is readable over any camera feed */}
@@ -156,45 +214,94 @@ const QRScannerModal = ({
           }}
         />
         
-        {/* Professional corner brackets overlay */}
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
+        {/* Scanning overlay with focused zoom box */}
+        <div ref={overlayRef} className="absolute inset-0 pointer-events-none z-10">
+          {/* Scanning box - centers by default, moves to track QR when detected */}
           <div 
-            className="relative" 
+            className={`absolute transition-all duration-500 ease-out ${
+              (isScanning || isProcessing || scanSuccess) ? 'scale-100 opacity-100' : 'scale-90 opacity-0'
+            } ${scanSuccess ? 'animate-scan-success' : ''}`}
             style={{ 
-              width: 'min(85vw, 85vh, 450px)', 
-              height: 'min(85vw, 85vh, 450px)'
+              width: framePosition ? framePosition.width : 'min(55vw, 55vh, 280px)',
+              height: framePosition ? framePosition.height : 'min(55vw, 55vh, 280px)',
+              ...(framePosition
+                ? { left: framePosition.left, top: framePosition.top, right: 'auto', bottom: 'auto', margin: 0 }
+                : {
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    margin: 'auto',
+                  }),
+              transition: 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
             }}
           >
-            {/* Top-left corner - enhanced */}
-            <svg className="absolute -top-1 -left-1 w-20 h-20 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" viewBox="0 0 80 80" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round">
-              <path d="M 5 25 L 5 5 L 25 5" />
+            {/* Glow effect behind the box */}
+            <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-2xl" />
+            
+            {/* Corner brackets with pulse animation */}
+            {/* Top-left corner */}
+            <svg className={`absolute -top-1 -left-1 w-16 h-16 text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.9)] transition-all ${isScanning ? 'animate-corner-pulse' : ''}`} viewBox="0 0 80 80" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round">
+              <path d="M 5 28 L 5 5 L 28 5" />
             </svg>
             
-            {/* Top-right corner - enhanced */}
-            <svg className="absolute -top-1 -right-1 w-20 h-20 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" viewBox="0 0 80 80" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round">
-              <path d="M 55 5 L 75 5 L 75 25" />
+            {/* Top-right corner */}
+            <svg className={`absolute -top-1 -right-1 w-16 h-16 text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.9)] transition-all ${isScanning ? 'animate-corner-pulse' : ''}`} viewBox="0 0 80 80" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" style={{ animationDelay: '0.1s' }}>
+              <path d="M 52 5 L 75 5 L 75 28" />
             </svg>
             
-            {/* Bottom-left corner - enhanced */}
-            <svg className="absolute -bottom-1 -left-1 w-20 h-20 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" viewBox="0 0 80 80" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round">
-              <path d="M 5 55 L 5 75 L 25 75" />
+            {/* Bottom-left corner */}
+            <svg className={`absolute -bottom-1 -left-1 w-16 h-16 text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.9)] transition-all ${isScanning ? 'animate-corner-pulse' : ''}`} viewBox="0 0 80 80" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" style={{ animationDelay: '0.2s' }}>
+              <path d="M 5 52 L 5 75 L 28 75" />
             </svg>
             
-            {/* Bottom-right corner - enhanced */}
-            <svg className="absolute -bottom-1 -right-1 w-20 h-20 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" viewBox="0 0 80 80" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round">
-              <path d="M 75 55 L 75 75 L 55 75" />
+            {/* Bottom-right corner */}
+            <svg className={`absolute -bottom-1 -right-1 w-16 h-16 text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.9)] transition-all ${isScanning ? 'animate-corner-pulse' : ''}`} viewBox="0 0 80 80" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" style={{ animationDelay: '0.3s' }}>
+              <path d="M 75 52 L 75 75 L 52 75" />
             </svg>
 
-            {/* Subtle scanning line animation */}
-            <div className="absolute inset-0 overflow-hidden rounded-lg">
-              <div 
-                className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-60"
-                style={{
-                  animation: 'scan-vertical 3s ease-in-out infinite',
-                  boxShadow: '0 0 20px rgba(59, 130, 246, 0.8)'
-                }}
-              />
-            </div>
+            {/* Scanning line - green horizontal sweep (like /Processing style) */}
+            {(isScanning || isProcessing) && !scanSuccess && (
+              <div className="absolute inset-0 overflow-hidden rounded-lg">
+                <div 
+                  className="absolute top-0 bottom-0 w-1 scan-beam-line-horizontal"
+                  style={{
+                    background: 'linear-gradient(to bottom, transparent, rgba(34, 197, 94, 0.9) 20%, rgba(34, 197, 94, 1) 50%, rgba(34, 197, 94, 0.9) 80%, transparent)',
+                    boxShadow: '0 0 20px rgba(34, 197, 94, 0.9), 0 0 40px rgba(34, 197, 94, 0.5)',
+                    animation: 'scan-sweep-horizontal 2s ease-in-out infinite',
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Processing... relay phase - no dark overlay, just text + green line */}
+            {isProcessing && (
+              <div className="absolute inset-0 flex flex-col items-center justify-end rounded-lg pb-6 pointer-events-none">
+                <p className="text-white text-lg font-medium drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                  Processing...
+                </p>
+              </div>
+            )}
+
+            {/* Success popup - tells user correct, then form opens */}
+            {scanSuccess && (
+              <div className="absolute inset-0 flex items-center justify-center z-20">
+                <div className="flex flex-col items-center gap-3 px-10 py-6 rounded-2xl bg-white/95 dark:bg-gray-900/95 border-2 border-green-500 shadow-2xl animate-modal-pop">
+                  <CheckCircle size={72} className="text-green-500 animate-success-check" strokeWidth={2.5} />
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">Success</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">Correct check</p>
+                </div>
+              </div>
+            )}
+
+            {/* Instructions text */}
+            {/* {isScanning && !scanSuccess && !isProcessing && (
+              <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 text-center">
+                <p className="text-white text-sm font-medium drop-shadow-lg animate-pulse-slow">
+                  Position QR code within the frame
+                </p>
+              </div>
+            )} */}
           </div>
         </div>
       </div>
@@ -235,12 +342,103 @@ const QRScannerModal = ({
       </footer>
 
       <style>{`
-        @keyframes scan-vertical {
-          0%, 100% { top: 0%; opacity: 0; }
-          10% { opacity: 0.6; }
-          90% { opacity: 0.6; }
-          100% { top: 100%; opacity: 0; }
+        @keyframes scan-sweep-horizontal {
+          0% { 
+            left: 0%; 
+            opacity: 0; 
+          }
+          5% { 
+            opacity: 1; 
+          }
+          95% { 
+            opacity: 1; 
+          }
+          100% { 
+            left: 100%; 
+            opacity: 0; 
+          }
         }
+
+        .scan-beam-line-horizontal {
+          position: absolute;
+          left: 0;
+        }
+
+        @keyframes corner-pulse {
+          0%, 100% { 
+            opacity: 1;
+            filter: drop-shadow(0 0 12px rgba(255,255,255,0.9));
+          }
+          50% { 
+            opacity: 0.6;
+            filter: drop-shadow(0 0 20px rgba(59, 130, 246, 1));
+          }
+        }
+
+        @keyframes scan-success {
+          0% { 
+            transform: scale(1); 
+          }
+          50% { 
+            transform: scale(1.1); 
+          }
+          100% { 
+            transform: scale(1); 
+          }
+        }
+
+        @keyframes success-flash {
+          0%, 100% { 
+            opacity: 0; 
+          }
+          50% { 
+            opacity: 1; 
+          }
+        }
+
+        @keyframes success-check {
+          0% { 
+            transform: scale(0) rotate(-45deg);
+            opacity: 0;
+          }
+          50% { 
+            transform: scale(1.2) rotate(0deg);
+          }
+          100% { 
+            transform: scale(1) rotate(0deg);
+            opacity: 1;
+          }
+        }
+
+        @keyframes pulse-slow {
+          0%, 100% { 
+            opacity: 1; 
+          }
+          50% { 
+            opacity: 0.6; 
+          }
+        }
+
+        .animate-corner-pulse {
+          animation: corner-pulse 2s ease-in-out infinite;
+        }
+
+        .animate-scan-success {
+          animation: scan-success 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .animate-success-flash {
+          animation: success-flash 0.8s ease-out;
+        }
+
+        .animate-success-check {
+          animation: success-check 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .animate-pulse-slow {
+          animation: pulse-slow 2s ease-in-out infinite;
+        }
+
       `}</style>
     </div>
   );

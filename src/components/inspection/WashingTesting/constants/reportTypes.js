@@ -136,11 +136,11 @@ const COMMON_FIELDS = {
         placeholder: 'Add any additional notes or comments about this report...',
         rows: 4,
     },
-    range: {
+    size: {
         type: FIELD_TYPES.TEXT,
-        label: 'Range',
-        required: false,
-        placeholder: 'Enter range (e.g., XS-XXL, 2-16)',
+        label: 'Size',
+        required: true,
+        placeholder: 'Size',
     },
 };
 
@@ -210,9 +210,9 @@ const HT_TESTING_FIELDS = {
         required: false,
         placeholder: 'Enter Time (e.g., 12:21PM)',
     },
-    range: {
+    size: {
         type: FIELD_TYPES.TEXT,
-        label: 'Range',
+        label: 'Size',
         required: false,
     },
     season: {
@@ -399,9 +399,9 @@ const EMB_TESTING_FIELDS = {
         required: false,
         placeholder: 'Enter Time (e.g., 9:42AM)',
     },
-    range: {
+    size: {
         type: FIELD_TYPES.TEXT,
-        label: 'Range',
+        label: 'Size',
         required: false,
     },
     season: {
@@ -612,7 +612,7 @@ export const REPORT_TYPE_CONFIGS = {
             'po',
             'exFtyDate',
             'factory',
-            'range',
+            'size',
             'sendToHomeWashingDate',
             'images',
             'notes',
@@ -639,7 +639,7 @@ export const REPORT_TYPE_CONFIGS = {
             'printPlacement',
             'fabrication',
             'time',
-            'range',
+            'size',
             'season',
             'testMethod',
             'detergents',
@@ -692,7 +692,7 @@ export const REPORT_TYPE_CONFIGS = {
             'embPlacement',
             'fabrication',
             'time',
-            'range',
+            'size',
             'season',
             'testMethod',
             'detergents',
@@ -883,7 +883,8 @@ export const getInitialFormData = (reportType) => {
                             { location: '', original: '', tolMinus: '-1/2', tolPlus: '1/2', beforeWash: '', afterWash: '', shrinkage: '', requirement: '±5%', passFail: 'PASS' }
                         ];
                     } else if (fieldName === 'sampleSize') {
-                        initialData[fieldName] = 'M';
+                        // Default to empty so user explicitly selects size.
+                        initialData[fieldName] = '';
                     } else {
                         initialData[fieldName] = '';
                     }

@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { Upload, Camera, X, Send, RotateCw, Calendar } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Upload, Camera, X, Send, RotateCw, Calendar, Check } from "lucide-react";
 import Select from "react-select";
 import { DatePicker as AntDatePicker } from "antd";
 import dayjs from "dayjs";
@@ -47,7 +47,49 @@ const HomeWashForm = ({
   season,
   styleDescription,
   custStyle,
+  // Sizes
+  availableSizes = [],
 }) => {
+  const [showSizeDropdown, setShowSizeDropdown] = useState(false);
+  const sizeDropdownRef = useRef(null);
+
+  // Sort sizes in logical order
+  const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "4XL", "5XL"];
+  const sortedSizes = [...availableSizes].sort((a, b) => {
+    const ia = SIZE_ORDER.indexOf(a.toUpperCase());
+    const ib = SIZE_ORDER.indexOf(b.toUpperCase());
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  // Parse currently selected sizes from formData.size (stored as comma-separated string)
+  const selectedSizes = formData.size
+    ? formData.size.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+
+  const toggleSize = (size) => {
+    const current = selectedSizes;
+    const next = current.includes(size)
+      ? current.filter((s) => s !== size)
+      : [...current, size];
+    handleInputChange("size", next.join(", "));
+  };
+
+  const selectAllSizes = () => handleInputChange("size", sortedSizes.join(", "));
+  const clearAllSizes = () => handleInputChange("size", "");
+
+  // Click-outside closes the size dropdown
+  useEffect(() => {
+    const handler = (e) => {
+      if (sizeDropdownRef.current && !sizeDropdownRef.current.contains(e.target)) {
+        setShowSizeDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
   const normalize = (s) => (s || "").toString().trim().toUpperCase();
   // Synchronization effects for derived metadata
   // These ensure that data fetched by the hook correctly enters the form's local state
@@ -233,175 +275,175 @@ const HomeWashForm = ({
                 </span>
               </div>
             ) : (
-            <>
-            <button
-              type="button"
-              onClick={() => setShowColorDropdown(!showColorDropdown)}
-              disabled={
-                isLoadingColors ||
-                !formData.ymStyle ||
-                (filteredColors.length === 0 && usedColors?.length === 0)
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="truncate">
-                {isLoadingColors
-                  ? "Loading colors..."
-                  : !formData.ymStyle
-                    ? "Select Order_No first"
-                    : formData.color?.length > 0
-                      ? Array.isArray(formData.color) &&
-                        formData.color.length === filteredColors.length &&
-                        filteredColors.length === availableColors.length
-                        ? "All colors selected"
-                        : Array.isArray(formData.color) &&
-                            formData.color.length === filteredColors.length
-                          ? "All available colors selected"
-                          : `${formData.color.length} color(s) selected`
-                      : filteredColors.length === 0 &&
-                          availableColors.length > 0
-                        ? "All colors already reported"
-                        : filteredColors.length === 0
-                          ? "No colors available"
-                          : "Select Color(s)"}
-              </span>
-              <svg
-                className={`w-4 h-4 transition-transform ${showColorDropdown ? "rotate-180" : ""}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowColorDropdown(!showColorDropdown)}
+                  disabled={
+                    isLoadingColors ||
+                    !formData.ymStyle ||
+                    (filteredColors.length === 0 && usedColors?.length === 0)
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="truncate">
+                    {isLoadingColors
+                      ? "Loading colors..."
+                      : !formData.ymStyle
+                        ? "Select Order_No first"
+                        : formData.color?.length > 0
+                          ? Array.isArray(formData.color) &&
+                            formData.color.length === filteredColors.length &&
+                            filteredColors.length === availableColors.length
+                            ? "All colors selected"
+                            : Array.isArray(formData.color) &&
+                              formData.color.length === filteredColors.length
+                              ? "All available colors selected"
+                              : `${formData.color.length} color(s) selected`
+                          : filteredColors.length === 0 &&
+                            availableColors.length > 0
+                            ? "All colors already reported"
+                            : filteredColors.length === 0
+                              ? "No colors available"
+                              : "Select Color(s)"}
+                  </span>
+                  <svg
+                    className={`w-4 h-4 transition-transform ${showColorDropdown ? "rotate-180" : ""}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
 
-            {showColorDropdown &&
-              (filteredColors.length > 0 || usedColors?.length > 0) && (
-                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                  {filteredColors.length > 0 && (
-                    <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleInputChange("color", [...filteredColors]);
-                        }}
-                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                      >
-                        Select All
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleInputChange("color", []);
-                        }}
-                        className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                      >
-                        Clear All
-                      </button>
+                {showColorDropdown &&
+                  (filteredColors.length > 0 || usedColors?.length > 0) && (
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {filteredColors.length > 0 && (
+                        <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleInputChange("color", [...filteredColors]);
+                            }}
+                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                          >
+                            Select All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleInputChange("color", []);
+                            }}
+                            className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                      )}
+                      <div className="p-2">
+                        <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Available Colors:
+                        </div>
+                        <div className="space-y-1">
+                          {filteredColors.map((color, index) => (
+                            <label
+                              key={index}
+                              className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={formData.color.includes(color)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    handleInputChange("color", [
+                                      ...formData.color,
+                                      color,
+                                    ]);
+                                  } else {
+                                    handleInputChange(
+                                      "color",
+                                      formData.color.filter((c) => c !== color),
+                                    );
+                                  }
+                                }}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                              />
+                              <span className="ml-2 text-sm text-gray-900 dark:text-white">
+                                {color}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                        {usedColors.filter((uc) => {
+                          const ucStr = String(uc).trim().toUpperCase();
+                          return !formData.color?.some(
+                            (c) => String(c).trim().toUpperCase() === ucStr,
+                          );
+                        }).length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                              <div className="text-[10px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider px-1">
+                                Already Reported:
+                              </div>
+                              <div className="flex flex-wrap gap-1 mt-1 px-1">
+                                {usedColors
+                                  .filter((uc) => {
+                                    const ucStr = String(uc).trim().toUpperCase();
+                                    return !formData.color?.some(
+                                      (c) => String(c).trim().toUpperCase() === ucStr,
+                                    );
+                                  })
+                                  .map((uc, i) => (
+                                    <div key={i} className="flex items-center gap-1">
+                                      <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px] rounded border border-gray-200 dark:border-gray-600 line-through">
+                                        {uc}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const currentColors = Array.isArray(
+                                            formData.color,
+                                          )
+                                            ? formData.color
+                                            : formData.color
+                                              ? [formData.color]
+                                              : [];
+                                          const ucStr = String(uc)
+                                            .trim()
+                                            .toUpperCase();
+                                          if (
+                                            !currentColors.some(
+                                              (c) =>
+                                                String(c).trim().toUpperCase() ===
+                                                ucStr,
+                                            )
+                                          ) {
+                                            handleInputChange("color", [
+                                              ...currentColors,
+                                              uc,
+                                            ]);
+                                          }
+                                        }}
+                                        className="p-1 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-500 rounded-full transition-colors"
+                                        title="Re-select this color"
+                                      >
+                                        <RotateCw className="w-2.5 h-2.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+                      </div>
                     </div>
                   )}
-                  <div className="p-2">
-                    <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Available Colors:
-                    </div>
-                    <div className="space-y-1">
-                      {filteredColors.map((color, index) => (
-                        <label
-                          key={index}
-                          className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.color.includes(color)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                handleInputChange("color", [
-                                  ...formData.color,
-                                  color,
-                                ]);
-                              } else {
-                                handleInputChange(
-                                  "color",
-                                  formData.color.filter((c) => c !== color),
-                                );
-                              }
-                            }}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                          />
-                          <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                            {color}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                    {usedColors.filter((uc) => {
-                      const ucStr = String(uc).trim().toUpperCase();
-                      return !formData.color?.some(
-                        (c) => String(c).trim().toUpperCase() === ucStr,
-                      );
-                    }).length > 0 && (
-                      <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-                        <div className="text-[10px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider px-1">
-                          Already Reported:
-                        </div>
-                        <div className="flex flex-wrap gap-1 mt-1 px-1">
-                          {usedColors
-                            .filter((uc) => {
-                              const ucStr = String(uc).trim().toUpperCase();
-                              return !formData.color?.some(
-                                (c) => String(c).trim().toUpperCase() === ucStr,
-                              );
-                            })
-                            .map((uc, i) => (
-                              <div key={i} className="flex items-center gap-1">
-                                <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px] rounded border border-gray-200 dark:border-gray-600 line-through">
-                                  {uc}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const currentColors = Array.isArray(
-                                      formData.color,
-                                    )
-                                      ? formData.color
-                                      : formData.color
-                                        ? [formData.color]
-                                        : [];
-                                    const ucStr = String(uc)
-                                      .trim()
-                                      .toUpperCase();
-                                    if (
-                                      !currentColors.some(
-                                        (c) =>
-                                          String(c).trim().toUpperCase() ===
-                                          ucStr,
-                                      )
-                                    ) {
-                                      handleInputChange("color", [
-                                        ...currentColors,
-                                        uc,
-                                      ]);
-                                    }
-                                  }}
-                                  className="p-1 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-500 rounded-full transition-colors"
-                                  title="Re-select this color"
-                                >
-                                  <RotateCw className="w-2.5 h-2.5" />
-                                </button>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </>
+              </>
             )}
           </div>
           {formData.ymStyle && filteredColors.length > 0 && (
@@ -764,18 +806,93 @@ const HomeWashForm = ({
           )}
         </div>
 
-        {/* Range - User Input */}
-        <div>
+        {/* Size - Multi-Select Dropdown */}
+        <div className="relative" ref={sizeDropdownRef}>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Range <span className="text-gray-400 text-xs">(Optional)</span>
+            Size
           </label>
-          <input
-            type="text"
-            value={formData.range || ""}
-            onChange={(e) => handleInputChange("range", e.target.value)}
-            placeholder="Enter range (e.g., XS-XXL, 2-16)"
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-          />
+
+          {/* Trigger button */}
+          <button
+            type="button"
+            onClick={() => setShowSizeDropdown((v) => !v)}
+            disabled={!formData.ymStyle || sortedSizes.length === 0}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span className="truncate">
+              {!formData.ymStyle
+                ? "Select YM Style first"
+                : sortedSizes.length === 0
+                  ? "No sizes available"
+                  : selectedSizes.length === 0
+                    ? "Select Size(s)"
+                    : selectedSizes.length === sortedSizes.length
+                      ? "All sizes selected"
+                      : selectedSizes.join(", ")}
+            </span>
+            <svg
+              className={`w-4 h-4 flex-shrink-0 transition-transform ${showSizeDropdown ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {/* Dropdown list */}
+          {showSizeDropdown && sortedSizes.length > 0 && (
+            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+              {/* Select All / Clear All */}
+              <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
+                <button
+                  type="button"
+                  onClick={selectAllSizes}
+                  className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                >
+                  Select All
+                </button>
+                <button
+                  type="button"
+                  onClick={clearAllSizes}
+                  className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                >
+                  Clear All
+                </button>
+              </div>
+
+              {/* Size list */}
+              <div className="p-2 space-y-1">
+                {sortedSizes.map((size) => {
+                  const isSelected = selectedSizes.includes(size);
+                  return (
+                    <label
+                      key={size}
+                      className="flex items-center justify-between p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSize(size)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                        />
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{size}</span>
+                      </div>
+                      {isSelected && <Check className="w-4 h-4 text-blue-600" />}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Helper hint */}
+          {formData.ymStyle && sortedSizes.length > 0 && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {sortedSizes.length} size(s) available
+            </p>
+          )}
         </div>
 
         <div>

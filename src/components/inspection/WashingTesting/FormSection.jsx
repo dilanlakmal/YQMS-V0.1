@@ -104,6 +104,7 @@ const FormSection = ({
     factories,
     isLoadingFactories,
     imageRotations,
+    availableSizes,
   };
 
   const renderForm = () => {

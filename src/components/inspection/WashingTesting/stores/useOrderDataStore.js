@@ -372,6 +372,46 @@ export const useOrderDataStore = create((set, get) => ({
         }
     },
 
+    // ─── Fetch last careSymbols used for a given style ────────────────
+    fetchLastCareSymbols: async (ymStyle, setFormData) => {
+        if (!ymStyle || !isValidStyleFormat(ymStyle)) return;
+        try {
+            const response = await fetch(
+                `${API_BASE_URL}/api/report-washing?ymStyle=${encodeURIComponent(ymStyle.trim())}&limit=1&page=1`,
+            );
+            if (!response.ok) return;
+            const result = await response.json();
+            if (!result.success || !Array.isArray(result.data) || result.data.length === 0) return;
+
+            const latestReport = result.data[0];
+            if (!latestReport.careSymbols) return;
+
+            // Parse careSymbols (may be stored as JSON string or plain object)
+            let careSymbols = {};
+            if (typeof latestReport.careSymbols === "string") {
+                try { careSymbols = JSON.parse(latestReport.careSymbols); } catch { return; }
+            } else if (typeof latestReport.careSymbols === "object") {
+                careSymbols = latestReport.careSymbols;
+            }
+
+            if (Object.keys(careSymbols).length === 0) return;
+
+            // Pre-fill form only if user hasn't already made a selection
+            if (setFormData) {
+                setFormData((prev) => ({
+                    ...prev,
+                    // Only auto-fill if careSymbols is currently empty
+                    careSymbols: (!prev.careSymbols || Object.keys(prev.careSymbols).length === 0)
+                        ? careSymbols
+                        : prev.careSymbols,
+                }));
+            }
+        } catch (error) {
+            // Silently ignore - this is a nice-to-have auto-fill feature
+            console.debug("Could not fetch last care symbols for style:", ymStyle, error);
+        }
+    },
+
     fetchAnfSpecs: async (moNo, size) => {
         if (!moNo || !size) {
             set({ anfSpecs: [] });

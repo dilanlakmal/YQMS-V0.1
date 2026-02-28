@@ -26,6 +26,7 @@ import {
   EditReportModal,
   QRCodeModal,
   QRScannerModal,
+  SizeFollowUpModal,
   REPORT_TYPES,
   getInitialFormData,
   getQRCodeBaseURL,
@@ -116,6 +117,7 @@ const LaundryWashingMachineTest = () => {
     handleCompletionImageUpload, handleCompletionSubmit,
     handleEditInitialImages, handleEditReceivedImages, handleEditCompletionImages,
     handleEditImageUpload, handleRemoveEditImage, handleUpdateImages,
+    sizeFollowUpModal, closeSizeFollowUpModal,
   } = useModalStore();
 
   const {
@@ -552,6 +554,15 @@ const LaundryWashingMachineTest = () => {
             onPanEnd={handleImageMouseUp}
             onToggleZoom={toggleZoom}
             onDownload={downloadImageViewer}
+          />
+
+          {/* Size follow-up dialog — shown after multi-size Home Wash submissions */}
+          <SizeFollowUpModal
+            isOpen={sizeFollowUpModal.isOpen}
+            sizes={sizeFollowUpModal.sizes}
+            ymStyle={sizeFollowUpModal.ymStyle}
+            colors={sizeFollowUpModal.colors}
+            onClose={closeSizeFollowUpModal}
           />
         </div>
       </div>

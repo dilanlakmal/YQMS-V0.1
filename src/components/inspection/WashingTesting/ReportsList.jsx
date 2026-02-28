@@ -359,7 +359,7 @@ const ReportsList = ({
       {/* Filters */}
       {tab === "easy_scan" ? (
         <div className="mb-6 flex flex-col sm:flex-row gap-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-4 rounded-xl border border-amber-200/60 dark:border-amber-700/40">
-          
+
           <div className="flex-1 flex flex-col sm:flex-row gap-3">
             <div className="flex-1 min-w-0">
               <label className="block text-xs font-semibold text-amber-700 dark:text-amber-300 mb-1">ID / QR</label>
@@ -389,187 +389,187 @@ const ReportsList = ({
           </div>
         </div>
       ) : (
-      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg">
-        {/* Style Search with Autocomplete */}
-        <div className="relative">
-          <Select
-            value={filterSearch ? { value: filterSearch, label: filterSearch } : null}
-            onChange={(option) => setFilterSearch && setFilterSearch(option ? option.value : "")}
-            onInputChange={handleStyleInputChange}
-            options={styleSuggestions}
-            placeholder="Search Style..."
-            isClearable
-            isLoading={isLoadingStyles}
-            styles={customStyles}
-            className="text-sm"
-            noOptionsMessage={() => "Type to search..."}
-          />
-        </div>
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg">
+          {/* Style Search with Autocomplete */}
+          <div className="relative">
+            <Select
+              value={filterSearch ? { value: filterSearch, label: filterSearch } : null}
+              onChange={(option) => setFilterSearch && setFilterSearch(option ? option.value : "")}
+              onInputChange={handleStyleInputChange}
+              options={styleSuggestions}
+              placeholder="Search Style..."
+              isClearable
+              isLoading={isLoadingStyles}
+              styles={customStyles}
+              className="text-sm"
+              noOptionsMessage={() => "Type to search..."}
+            />
+          </div>
 
-        {/* Color Search with Autocomplete */}
-        <div className="relative">
-          <Select
-            value={filterColor ? { value: filterColor, label: filterColor } : null}
-            onChange={(option) => setFilterColor && setFilterColor(option ? option.value : "")}
-            onInputChange={handleColorInputChange}
-            options={colorSuggestions}
-            placeholder="Filter Color..."
-            isClearable
-            isLoading={isLoadingColors}
-            styles={customStyles}
-            className="text-sm"
-            noOptionsMessage={() => "Type to search..."}
-          />
-        </div>
+          {/* Color Search with Autocomplete */}
+          <div className="relative">
+            <Select
+              value={filterColor ? { value: filterColor, label: filterColor } : null}
+              onChange={(option) => setFilterColor && setFilterColor(option ? option.value : "")}
+              onInputChange={handleColorInputChange}
+              options={colorSuggestions}
+              placeholder="Filter Color..."
+              isClearable
+              isLoading={isLoadingColors}
+              styles={customStyles}
+              className="text-sm"
+              noOptionsMessage={() => "Type to search..."}
+            />
+          </div>
 
-        {/* Report Type Filter */}
-        <div>
-          <Select
-            value={filterReportType ? { value: filterReportType, label: filterReportType } : null}
-            onChange={(option) => setFilterReportType && setFilterReportType(option ? option.value : "")}
-            options={[
-              { value: "", label: "All Report Types" },
-              ...getReportTypeOptions()
-            ]}
-            placeholder="Filter Report Type..."
-            isClearable
-            isSearchable={false}
-            styles={customStyles}
-            className="text-sm"
-          />
-        </div>
+          {/* Report Type Filter */}
+          <div>
+            <Select
+              value={filterReportType ? { value: filterReportType, label: filterReportType } : null}
+              onChange={(option) => setFilterReportType && setFilterReportType(option ? option.value : "")}
+              options={[
+                { value: "", label: "All Report Types" },
+                ...getReportTypeOptions()
+              ]}
+              placeholder="Filter Report Type..."
+              isClearable
+              isSearchable={false}
+              styles={customStyles}
+              className="text-sm"
+            />
+          </div>
 
-        {/* Factory */}
-        <div>
-          <Select
-            value={filterFactory ? { value: filterFactory, label: filterFactory } : null}
-            onChange={(selectedOption) => setFilterFactory && setFilterFactory(selectedOption ? selectedOption.value : "")}
-            options={[
-              { value: "", label: "All Factories" },
-              ...(factories && factories.length > 0
-                ? factories.map(f => ({ value: f.name || f.factory, label: f.name || f.factory }))
-                : [
-                  { value: "Newy", label: "Newy" },
-                  { value: "Newy2", label: "Newy2" },
-                  { value: "Vina", label: "Vina" },
-                  { value: "Vina2", label: "Vina2" },
-                  { value: "Bautex", label: "Bautex" },
-                  { value: "Bautex2", label: "Bautex2" },
-                  { value: "JC", label: "JC" }
-                ]
-              )
-            ]}
-            placeholder="Filter Factory..."
-            isSearchable={true}
-            isClearable={true}
-            className="react-select-container text-sm"
-            classNamePrefix="react-select"
-            styles={{
-              control: (baseStyles, state) => ({
-                ...baseStyles,
-                borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
-                boxShadow: state.isFocused ? '0 0 0 2px rgba(59, 130, 246, 0.2)' : 'none',
-                minHeight: '42px',
-                backgroundColor: '#ffffff',
-                cursor: 'pointer',
-                '&:hover': {
-                  borderColor: '#3b82f6',
+          {/* Factory */}
+          <div>
+            <Select
+              value={filterFactory ? { value: filterFactory, label: filterFactory } : null}
+              onChange={(selectedOption) => setFilterFactory && setFilterFactory(selectedOption ? selectedOption.value : "")}
+              options={[
+                { value: "", label: "All Factories" },
+                ...(factories && factories.length > 0
+                  ? factories.map(f => ({ value: f.name || f.factory, label: f.name || f.factory }))
+                  : [
+                    { value: "Newy", label: "Newy" },
+                    { value: "Newy2", label: "Newy2" },
+                    { value: "Vina", label: "Vina" },
+                    { value: "Vina2", label: "Vina2" },
+                    { value: "Bautex", label: "Bautex" },
+                    { value: "Bautex2", label: "Bautex2" },
+                    { value: "JC", label: "JC" }
+                  ]
+                )
+              ]}
+              placeholder="Filter Factory..."
+              isSearchable={true}
+              isClearable={true}
+              className="react-select-container text-sm"
+              classNamePrefix="react-select"
+              styles={{
+                control: (baseStyles, state) => ({
+                  ...baseStyles,
+                  borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
+                  boxShadow: state.isFocused ? '0 0 0 2px rgba(59, 130, 246, 0.2)' : 'none',
+                  minHeight: '42px',
+                  backgroundColor: '#ffffff',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    borderColor: '#3b82f6',
+                  },
+                }),
+                menu: (baseStyles) => ({
+                  ...baseStyles,
+                  zIndex: 9999,
+                }),
+                option: (baseStyles, state) => ({
+                  ...baseStyles,
+                  backgroundColor: state.isSelected
+                    ? '#3b82f6'
+                    : state.isFocused
+                      ? '#eff6ff'
+                      : '#ffffff',
+                  color: state.isSelected ? '#ffffff' : '#1f2937',
+                  cursor: 'pointer',
+                  '&:active': {
+                    backgroundColor: '#3b82f6',
+                    color: '#ffffff',
+                  },
+                }),
+                indicatorSeparator: () => ({
+                  display: 'none',
+                }),
+                dropdownIndicator: (baseStyles) => ({
+                  ...baseStyles,
+                  cursor: 'pointer',
+                }),
+                clearIndicator: (baseStyles) => ({
+                  ...baseStyles,
+                  cursor: 'pointer',
+                }),
+                input: (base) => ({
+                  ...base,
+                  color: '#1f2937'
+                }),
+                singleValue: (base) => ({
+                  ...base,
+                  color: '#1f2937'
+                })
+              }}
+              theme={(theme) => ({
+                ...theme,
+                colors: {
+                  ...theme.colors,
+                  primary: '#3b82f6',
+                  primary25: '#eff6ff',
+                  primary50: '#dbeafe',
+                  primary75: '#93c5fd',
                 },
-              }),
-              menu: (baseStyles) => ({
-                ...baseStyles,
-                zIndex: 9999,
-              }),
-              option: (baseStyles, state) => ({
-                ...baseStyles,
-                backgroundColor: state.isSelected
-                  ? '#3b82f6'
-                  : state.isFocused
-                    ? '#eff6ff'
-                    : '#ffffff',
-                color: state.isSelected ? '#ffffff' : '#1f2937',
-                cursor: 'pointer',
-                '&:active': {
-                  backgroundColor: '#3b82f6',
-                  color: '#ffffff',
-                },
-              }),
-              indicatorSeparator: () => ({
-                display: 'none',
-              }),
-              dropdownIndicator: (baseStyles) => ({
-                ...baseStyles,
-                cursor: 'pointer',
-              }),
-              clearIndicator: (baseStyles) => ({
-                ...baseStyles,
-                cursor: 'pointer',
-              }),
-              input: (base) => ({
-                ...base,
-                color: '#1f2937'
-              }),
-              singleValue: (base) => ({
-                ...base,
-                color: '#1f2937'
-              })
-            }}
-            theme={(theme) => ({
-              ...theme,
-              colors: {
-                ...theme.colors,
-                primary: '#3b82f6',
-                primary25: '#eff6ff',
-                primary50: '#dbeafe',
-                primary75: '#93c5fd',
-              },
-            })}
-          />
-        </div>
+              })}
+            />
+          </div>
 
-        {/* Status Filter */}
-        <div>
-          <Select
-            value={filterStatus ? { value: filterStatus, label: filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1) } : null}
-            onChange={(option) => setFilterStatus && setFilterStatus(option ? option.value : "")}
-            options={[
-              { value: "", label: "All Status" },
-              { value: "pending", label: "Pending" },
-              { value: "received", label: "Received" },
-              { value: "completed", label: "Completed" },
-              { value: "rejected", label: "Rejected" }
-            ]}
-            placeholder="Filter Status..."
-            isClearable
-            isSearchable={false}
-            styles={customStyles}
-            className="text-sm"
-          />
-        </div>
+          {/* Status Filter */}
+          <div>
+            <Select
+              value={filterStatus ? { value: filterStatus, label: filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1) } : null}
+              onChange={(option) => setFilterStatus && setFilterStatus(option ? option.value : "")}
+              options={[
+                { value: "", label: "All Status" },
+                { value: "pending", label: "Pending" },
+                { value: "received", label: "Received" },
+                { value: "completed", label: "Completed" },
+                { value: "rejected", label: "Rejected" }
+              ]}
+              placeholder="Filter Status..."
+              isClearable
+              isSearchable={false}
+              styles={customStyles}
+              className="text-sm"
+            />
+          </div>
 
-        {/* Date Range Picker */}
-        <div className="relative group sm:col-span-2 md:col-span-2 lg:col-span-2 ant-datepicker-container">
-          <AntDatePicker.RangePicker
-            value={filterStartDate && filterEndDate ? [dayjs(filterStartDate), dayjs(filterEndDate)] : null}
-            onChange={(dates, dateStrings) => {
-              if (dates && dates[0] && dates[1]) {
-                setFilterStartDate && setFilterStartDate(dates[0].format('YYYY-MM-DD'));
-                setFilterEndDate && setFilterEndDate(dates[1].format('YYYY-MM-DD'));
-              } else {
-                setFilterStartDate && setFilterStartDate('');
-                setFilterEndDate && setFilterEndDate('');
-              }
-            }}
-            format="MM/DD/YYYY"
-            placeholder={["Start Date", "End Date"]}
-            className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white h-[42px]"
-            suffixIcon={null}
-            allowClear
-            inputReadOnly={true}
-          />
-          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none z-10" />
+          {/* Date Range Picker */}
+          <div className="relative group sm:col-span-2 md:col-span-2 lg:col-span-2 ant-datepicker-container">
+            <AntDatePicker.RangePicker
+              value={filterStartDate && filterEndDate ? [dayjs(filterStartDate), dayjs(filterEndDate)] : null}
+              onChange={(dates, dateStrings) => {
+                if (dates && dates[0] && dates[1]) {
+                  setFilterStartDate && setFilterStartDate(dates[0].format('YYYY-MM-DD'));
+                  setFilterEndDate && setFilterEndDate(dates[1].format('YYYY-MM-DD'));
+                } else {
+                  setFilterStartDate && setFilterStartDate('');
+                  setFilterEndDate && setFilterEndDate('');
+                }
+              }}
+              format="MM/DD/YYYY"
+              placeholder={["Start Date", "End Date"]}
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white h-[42px]"
+              suffixIcon={null}
+              allowClear
+              inputReadOnly={true}
+            />
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none z-10" />
+          </div>
         </div>
-      </div>
       )}
 
       {reports.length === 0 ? (
@@ -580,54 +580,112 @@ const ReportsList = ({
           </p> */}
         </div>
       ) : tab === "easy_scan" ? (
-        <div className="overflow-hidden rounded-lg border border-amber-200/60 dark:border-amber-700/40 bg-white dark:bg-gray-800">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
-            <thead className="bg-amber-50 dark:bg-amber-900/20">
-              <tr>
-                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wider w-0">
-                  Scan
-                </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wider">
-                  ID (QR)
-                </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wider">
-                  Style
-                </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wider">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-              {reports.map((report) => {
-                const reportId = report._id || report.id;
-                const idQr = report.qrId || reportId;
-                const style = report.ymStyle || report.buyerStyle || "—";
-                const status = report.status || "pending";
-                const scanUrl = `${getQRCodeBaseURL(QR_CODE_BASE_URL)}/Launch-washing-machine-test?scan=${reportId}`;
-                const statusClass =
-                  status === "completed"
-                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                    : status === "received"
-                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-                      : status === "rejected"
-                        ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                        : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
-                return (
-                  <tr key={reportId} className="hover:bg-amber-50/50 dark:hover:bg-amber-900/10 transition-colors">
-                    <td className="px-3 py-2 align-middle">
-                      <button
-                        type="button"
-                        onClick={() => setEasyScanQRPopupId(reportId)}
-                        className="inline-flex items-center justify-center rounded border border-gray-200 dark:border-gray-600 bg-white p-1 cursor-pointer hover:border-amber-400 hover:ring-2 hover:ring-amber-200 dark:hover:ring-amber-800 transition-all focus:outline-none focus:ring-2 focus:ring-amber-400"
-                        title="Click to show large QR for scanning"
-                      >
-                        <QRCodeCanvas value={scanUrl} size={56} level="M" />
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 text-sm font-mono font-semibold text-gray-900 dark:text-white">
-                      <span className="inline-flex items-center gap-2">
-                        <span>{String(idQr)}</span>
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden sm:block overflow-x-auto rounded-lg border border-amber-200/60 dark:border-amber-700/40 bg-white dark:bg-gray-800 shadow-sm">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600 whitespace-nowrap">
+              <thead className="bg-amber-50 dark:bg-amber-900/20">
+                <tr>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wider w-0">
+                    Scan
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wider">
+                    ID (QR)
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wider">
+                    Style
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-200 uppercase tracking-wider">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                {reports.map((report) => {
+                  const reportId = report._id || report.id;
+                  const idQr = report.qrId || reportId;
+                  const style = report.ymStyle || report.buyerStyle || "—";
+                  const status = report.status || "pending";
+                  const scanUrl = `${getQRCodeBaseURL(QR_CODE_BASE_URL)}/Launch-washing-machine-test?scan=${reportId}`;
+                  const statusClass =
+                    status === "completed"
+                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                      : status === "received"
+                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                        : status === "rejected"
+                          ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                          : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
+                  return (
+                    <tr key={reportId} className="hover:bg-amber-50/50 dark:hover:bg-amber-900/10 transition-colors">
+                      <td className="px-3 py-2 align-middle">
+                        <button
+                          type="button"
+                          onClick={() => setEasyScanQRPopupId(reportId)}
+                          className="inline-flex items-center justify-center rounded border border-gray-200 dark:border-gray-600 bg-white p-1 cursor-pointer hover:border-amber-400 hover:ring-2 hover:ring-amber-200 dark:hover:ring-amber-800 transition-all focus:outline-none focus:ring-2 focus:ring-amber-400"
+                          title="Click to show large QR for scanning"
+                        >
+                          <QRCodeCanvas value={scanUrl} size={56} level="M" />
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-mono font-semibold text-gray-900 dark:text-white">
+                        <span className="inline-flex items-center gap-2">
+                          <span>{String(idQr)}</span>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(String(idQr));
+                                showToast.success("ID copied to clipboard");
+                              } catch {
+                                showToast.error("Could not copy ID");
+                              }
+                            }}
+                            className="p-1 rounded text-gray-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 dark:text-gray-400 dark:hover:text-amber-400 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400"
+                            title="Copy ID"
+                          >
+                            <Copy size={16} />
+                          </button>
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-gray-200">
+                        {style}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${statusClass}`}>
+                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="sm:hidden space-y-4">
+            {reports.map((report) => {
+              const reportId = report._id || report.id;
+              const idQr = report.qrId || reportId;
+              const style = report.ymStyle || report.buyerStyle || "—";
+              const status = report.status || "pending";
+              const scanUrl = `${getQRCodeBaseURL(QR_CODE_BASE_URL)}/Launch-washing-machine-test?scan=${reportId}`;
+              const statusClass =
+                status === "completed"
+                  ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                  : status === "received"
+                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                    : status === "rejected"
+                      ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                      : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
+
+              return (
+                <div key={reportId} className="bg-white dark:bg-gray-800 border border-amber-200/60 dark:border-amber-700/40 rounded-xl p-4 shadow-sm flex flex-col gap-3">
+                  <div className="flex justify-between items-start border-b border-gray-100 dark:border-gray-700 pb-3">
+                    <div className="flex flex-col flex-1 pr-3">
+                      <span className="text-[10px] font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider mb-1">ID (QR)</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-mono font-bold text-gray-900 dark:text-white break-all">{String(idQr)}</span>
                         <button
                           type="button"
                           onClick={async () => {
@@ -638,27 +696,36 @@ const ReportsList = ({
                               showToast.error("Could not copy ID");
                             }
                           }}
-                          className="p-1 rounded text-gray-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 dark:text-gray-400 dark:hover:text-amber-400 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400"
-                          title="Copy ID"
+                          className="p-1 rounded bg-gray-50 dark:bg-gray-700 text-gray-500 hover:text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors shrink-0"
                         >
-                          <Copy size={16} />
+                          <Copy size={13} />
                         </button>
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-gray-200">
-                      {style}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${statusClass}`}>
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </div>
+                    </div>
+                    <span className={`inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase rounded shrink-0 ${statusClass}`}>
+                      {status}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/30 rounded-lg p-1.5">
+                    <div className="flex flex-col pl-2">
+                      <span className="text-[10px] font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider mb-0.5">Style</span>
+                      <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{style}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEasyScanQRPopupId(reportId)}
+                      className="inline-flex items-center justify-center rounded border border-gray-200 dark:border-gray-600 bg-white p-1 shadow-sm cursor-pointer hover:border-amber-400 hover:ring-2 hover:ring-amber-200 transition-all ml-2"
+                      title="Click to show large QR for scanning"
+                    >
+                      <QRCodeCanvas value={scanUrl} size={50} level="M" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       ) : (
         <div className="space-y-4">
           {reports.map((report) => {
@@ -763,23 +830,23 @@ const ReportsList = ({
                   ? [...notificationReport.notificationHistory].reverse()
                   : notificationReport.editedByAdminAt
                     ? [{
-                        type: "ADMIN_EDIT",
-                        at: notificationReport.editedByAdminAt,
-                        userName: notificationReport.editedByAdminName,
-                        userId: notificationReport.editedByAdminBy,
-                        previousColorCount: notificationReport.color?.length || 0,
-                        newColorCount: notificationReport.color?.length || 0,
-                        rejectedColors: [],
-                      }]
+                      type: "ADMIN_EDIT",
+                      at: notificationReport.editedByAdminAt,
+                      userName: notificationReport.editedByAdminName,
+                      userId: notificationReport.editedByAdminBy,
+                      previousColorCount: notificationReport.color?.length || 0,
+                      newColorCount: notificationReport.color?.length || 0,
+                      rejectedColors: [],
+                    }]
                     : [{
-                        type: "COLOR_UPDATE",
-                        at: notificationReport.colorEditedByWarehouseAt,
-                        userName: notificationReport.colorEditedByWarehouseName,
-                        userId: notificationReport.colorEditedByWarehouseBy,
-                        previousColorCount: (notificationReport.colorUncheckedByWarehouse?.length || 0) + (notificationReport.color?.length || 0),
-                        newColorCount: notificationReport.color?.length || 0,
-                        rejectedColors: notificationReport.colorUncheckedByWarehouse || [],
-                      }]
+                      type: "COLOR_UPDATE",
+                      at: notificationReport.colorEditedByWarehouseAt,
+                      userName: notificationReport.colorEditedByWarehouseName,
+                      userId: notificationReport.colorEditedByWarehouseBy,
+                      previousColorCount: (notificationReport.colorUncheckedByWarehouse?.length || 0) + (notificationReport.color?.length || 0),
+                      newColorCount: notificationReport.color?.length || 0,
+                      rejectedColors: notificationReport.colorUncheckedByWarehouse || [],
+                    }]
                 ).map((entry, idx) => {
                   const isAdminEdit = entry.type === "ADMIN_EDIT";
                   const boxClass = isAdminEdit
@@ -843,46 +910,109 @@ const ReportsList = ({
       {/* Easy Scan: large QR popup for scanning */}
       {tab === "easy_scan" && easyScanQRPopupId && (() => {
         const report = reports.find((r) => (r._id || r.id) === easyScanQRPopupId);
-        const scanUrl = report ? `${getQRCodeBaseURL(QR_CODE_BASE_URL)}/Launch-washing-machine-test?scan=${easyScanQRPopupId}` : "";
-        const styleLabel = report ? (report.ymStyle || report.buyerStyle || "—") : "";
-        const status = report ? (report.status || "pending") : "";
-        const statusClass =
-          status === "completed"
-            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-            : status === "received"
-              ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-              : status === "rejected"
-                ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
+        if (!report) return null;
+
+        const reportId = report._id || report.id;
+        const scanUrl = `${getQRCodeBaseURL(QR_CODE_BASE_URL)}/Launch-washing-machine-test?scan=${reportId}`;
+
+        const dateStr = report.createdAt || report.reportDate
+          ? new Date(report.createdAt || report.reportDate).toLocaleDateString("en-GB")
+          : "N/A";
+        const styleStr = report.ymStyle || "N/A";
+        const colorStr = Array.isArray(report.color)
+          ? report.color.join(", ")
+          : (report.color || "N/A");
+        const sizeStr = Array.isArray(report.size) ? report.size.join(", ") : (report.size || "N/A");
+        const qtyStr = report.qty || "N/A";
+        const buyerStyleStr = report.buyerStyle || "N/A";
+        const reportTypeStr = report.reportType || "Garment Wash Report";
+
         return (
           <div
-            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60"
+            className="fixed inset-0 z-[110] flex items-center justify-center p-2 bg-black/60 overflow-y-auto"
             onClick={() => setEasyScanQRPopupId(null)}
             role="dialog"
             aria-modal="true"
             aria-label="Scan QR code"
           >
             <div
-              className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full border-2 border-amber-200 dark:border-amber-700"
+              className="bg-white dark:bg-gray-900 shadow-2xl relative overflow-hidden flex flex-col my-auto"
+              style={{ width: "100%", maxWidth: "340px", borderRadius: "8px" }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-1">Scan this QR code</h3>
-              {(styleLabel || status) && (
-                <div className="mb-4 space-y-1 ">
-                  <div className="flex items-center justify-between">
-                  {styleLabel && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Style: <span className="font-medium text-gray-900 dark:text-white">{styleLabel}</span></p>
-                  )}
-                  {status && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Status: <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${statusClass}`}>{status.charAt(0).toUpperCase() + status.slice(1)}</span></p>
-                  )}
+              <button
+                type="button"
+                onClick={() => setEasyScanQRPopupId(null)}
+                className="absolute top-1.5 right-1.5 z-10 p-1 text-white/80 hover:text-white hover:bg-white/20 rounded-full transition-colors"
+                title="Close"
+              >
+                <X size={16} />
+              </button>
+
+              {/* Blue Header */}
+              <div className="bg-[#2563eb] text-center pt-4 pb-3 px-3">
+                <h2 className="text-white text-base font-bold tracking-wide uppercase m-0 leading-tight">
+                  Washing Machine Test
+                </h2>
+                <h3 className="text-white/90 text-[11px] font-light mt-0.5 uppercase tracking-wider m-0">
+                  Quality Report
+                </h3>
+              </div>
+
+              {/* Content Body */}
+              <div className="px-5 py-3 flex-1 flex flex-col bg-white dark:bg-gray-900">
+
+                {/* ID Section */}
+                <div className="text-center mb-3">
+                  <h1 className="text-lg sm:text-xl font-extrabold text-[#111827] dark:text-white m-0 tracking-tight break-all">
+                    {reportId}
+                  </h1>
+                  <p className="text-[#6b7280] dark:text-gray-400 text-[10px] font-medium mt-0.5 uppercase tracking-[0.15em]">
+                    Report ID
+                  </p>
+                </div>
+
+                {/* QR Code */}
+                <div className="flex justify-center mb-4">
+                  <div className="bg-white p-1 rounded border border-gray-100 dark:border-gray-800">
+                    <QRCodeCanvas value={scanUrl} size={120} level="M" />
                   </div>
                 </div>
-              )}
-              <div className="flex justify-center rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-white p-4">
-                {scanUrl && <QRCodeCanvas value={scanUrl} size={280} level="M" />}
+
+                {/* Details List */}
+                <div className="flex flex-col text-xs border-t border-gray-100 dark:border-gray-800 mb-1">
+                  {[
+                    { label: "Date:", value: dateStr },
+                    { label: "Style:", value: styleStr },
+                    { label: "Color:", value: colorStr },
+                    { label: "Size:", value: sizeStr },
+                    { label: "Qty:", value: qtyStr },
+                    { label: "Buyer Style:", value: buyerStyleStr },
+                    { label: "Report Type:", value: reportTypeStr },
+                  ].map((row, i) => (
+                    <div
+                      key={i}
+                      className="flex border-b border-gray-100 dark:border-gray-800 py-1.5"
+                    >
+                      <div className="w-[35%] text-gray-500 dark:text-gray-400 font-bold">
+                        {row.label}
+                      </div>
+                      <div className="w-[65%] text-gray-900 dark:text-gray-100 font-bold break-words pr-1">
+                        {row.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
               </div>
-             
+
+              {/* Footer */}
+              <div className="bg-white dark:bg-gray-900 pb-3 pt-0 text-center border-t-0">
+                <p className="text-gray-400 dark:text-gray-500 italic text-[10px]">
+                  Generated by YQMS System
+                </p>
+              </div>
+
             </div>
           </div>
         );
