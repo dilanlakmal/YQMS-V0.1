@@ -141,7 +141,7 @@ const DashboardFilters = ({ filters, setFilters, filterOptions }) => {
   };
 
   return (
-    <section className="max-w-[1600px] mx-auto mb-8">
+    <section className="max-w-8xl mx-auto mb-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">

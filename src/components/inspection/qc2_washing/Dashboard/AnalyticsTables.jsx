@@ -33,7 +33,7 @@ const AnalyticsTables = ({ dbData, defectLimit, setDefectLimit }) => {
   const displayedDefects = dbData?.defectSummary?.slice(0, defectLimit) || [];
 
   return (
-    <div className="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8 items-stretch">
+    <div className="max-w-8xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8 items-stretch">
       {/* 1. LEFT SECTION: TOP DEFECTS (7 Columns) */}
       <div className="lg:col-span-12 xl:col-span-6 bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-gray-800">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">

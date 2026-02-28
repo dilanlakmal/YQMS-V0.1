@@ -2,7 +2,7 @@ import React from "react";
 import { Package, ClipboardList, TrendingUp } from "lucide-react";
 
 const QualityInsights = ({ dbData }) => (
-  <section className="max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+  <section className="max-w-8xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
     {/* Pass Rate by Order No */}
     <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-gray-800">
       <div className="flex items-center justify-between mb-6">

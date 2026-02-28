@@ -6,58 +6,46 @@ const FactoryDefectTable = ({ data = [] }) => {
   const [manualLimit, setManualLimit] = useState("");
 
   const tableData = useMemo(() => {
-    if (!data || data.length === 0) return { factories: [], rows: [], factoryTotals: {}, factoryPcsTotals: {}, totalAllDefects: 0 };
+    if (!data || data.length === 0) {
+      return { factories: [], rows: [], grandTotalPcs: 0 };
+    }
 
-    // 1. First pass: Group defects and calculate TOTAL QTY per factory + GRAND TOTAL
-    const factoryTotals = {};
+    const factoryGroups = {};
     const factoryPcsTotals = {};
-    let totalAllDefects = 0; // Grand total of all defects across all factories
-    
-    const factoryGroups = data.reduce((acc, item) => {
+    let grandTotalPcs = 0;
+
+    // 1. Group data and calculate total pieces for the whole dashboard
+    data.forEach((item) => {
       const fName = item?._id?.factory || "Unknown";
-      const qty = item?.totalQty || 0; // Numerator basis
-      const pcs = item?.totalPcs || 0;
+      const pcs = Number(item?.totalPcs) || 0;
+      const qty = Number(item?.totalQty) || 0;
+
+      if (!factoryGroups[fName]) factoryGroups[fName] = [];
       
-      if (!acc[fName]) acc[fName] = [];
-      
-      // SUMMING ALL DEFECTS for the specific factory
-      factoryTotals[fName] = (factoryTotals[fName] || 0) + qty;
       factoryPcsTotals[fName] = (factoryPcsTotals[fName] || 0) + pcs;
-      
-      // Add to grand total
-      totalAllDefects += qty;
+      grandTotalPcs += pcs;
 
-      acc[fName].push({
-        name: item?._id?.defect || "Unknown Defect",
-        qty: qty,             // Used for % Calc
-        pcs: pcs, // Display only (Ignored in % Calc)
+      factoryGroups[fName].push({
+        name: item?._id?.defect || "Unknown",
+        qty: qty,
+        pcs: pcs,
       });
-      return acc;
-    }, {});
+    });
 
-    // 2. Second pass: Calculate % share and sort
-    const factories = Object.keys(factoryGroups).sort();
-    
-    factories.forEach((f) => {
-      // Get the Total Defect Qty for this factory (calculated in pass 1)
-      const totalDefectsForFactory = factoryTotals[f] || 0;
-      
-      // Sort by Highest Qty first
-      factoryGroups[f].sort((a, b) => b.qty - a.qty);
+    // 2. Prepare Factory Metadata (the red badges)
+    const factoryNames = Object.keys(factoryGroups).sort();
+    const factories = factoryNames.map((fName) => {
+      // Sort defects within each factory by PCS descending
+      factoryGroups[fName].sort((a, b) => b.pcs - a.pcs);
 
-      // Add percentage calculation
-      factoryGroups[f] = factoryGroups[f].map(defect => {
-        // LOGIC: (Individual Defect Qty / Total Factory Defect Qty) * 100
-        // Pcs are NOT included in this formula.
-        const percent = totalDefectsForFactory > 0 
-          ? ((defect.qty / totalDefectsForFactory) * 100).toFixed(1) 
-          : "0.0";
-
-        return {
-          ...defect,
-          percentage: percent
-        };
-      });
+      return {
+        name: fName,
+        // Overall contribution: (This Factory Pcs / Total Dashboard Pcs)
+        share: grandTotalPcs > 0 
+          ? ((factoryPcsTotals[fName] / grandTotalPcs) * 100).toFixed(1) 
+          : "0.0",
+        totalPcs: factoryPcsTotals[fName]
+      };
     });
 
     // 3. Create rows based on Rank Limit
@@ -66,16 +54,28 @@ const FactoryDefectTable = ({ data = [] }) => {
     
     for (let i = 0; i < displayLimit; i++) {
       const row = { rank: i + 1 };
-      factories.forEach((f) => {
-        row[f] = factoryGroups[f][i] || null;
+      factories.forEach((factoryObj) => {
+        const fName = factoryObj.name;
+        const defectAtRank = factoryGroups[fName][i];
+        
+        if (defectAtRank) {
+          // Internal Row Percentage: (This Defect Pcs / Total Factory Pcs)
+          const internalPercent = factoryPcsTotals[fName] > 0
+            ? ((defectAtRank.pcs / factoryPcsTotals[fName]) * 100).toFixed(1)
+            : "0.0";
+            
+          row[fName] = { ...defectAtRank, percentage: internalPercent };
+        } else {
+          row[fName] = null;
+        }
       });
       rows.push(row);
     }
 
-    return { factories, rows, factoryTotals, factoryPcsTotals, totalAllDefects };
+    return { factories, rows, grandTotalPcs };
   }, [data, limit]);
 
-  const { factories, rows, factoryTotals, factoryPcsTotals, totalAllDefects } = tableData;
+  const { factories, rows, grandTotalPcs } = tableData;
 
   const handleManualChange = (e) => {
     const val = e.target.value;
@@ -86,7 +86,7 @@ const FactoryDefectTable = ({ data = [] }) => {
   };
 
   return (
-    <div className="max-w-[1600px] mx-auto mb-8 bg-white dark:bg-gray-900 rounded-3xl shadow-sm border border-slate-200 dark:border-gray-800 overflow-hidden">
+    <div className="max-w-8xl mx-auto mb-8 bg-white dark:bg-gray-900 rounded-3xl shadow-sm border border-slate-200 dark:border-gray-800 overflow-hidden">
       {/* Header */}
       <div className="p-6 border-b border-slate-100 dark:border-gray-800 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-50/50">
         <div className="flex items-center gap-3">
@@ -98,7 +98,7 @@ const FactoryDefectTable = ({ data = [] }) => {
               Factory Top N Defects
             </h2>
             <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">
-              % Based on Total Defect Qty
+              % Based on Total Defect Pieces (PCS)
             </p>
           </div>
         </div>
@@ -136,7 +136,6 @@ const FactoryDefectTable = ({ data = [] }) => {
         </div>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
@@ -144,37 +143,32 @@ const FactoryDefectTable = ({ data = [] }) => {
               <th className="px-4 py-4 text-center text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b w-20">
                 Rank
               </th>
-              {factories.map((factory) => {
-                const factoryDefectQty = factoryTotals?.[factory] || 0;
-                const overallDefectRate = totalAllDefects > 0 ? ((factoryDefectQty / totalAllDefects) * 100).toFixed(1) : "0.0";
-                
-                return (
-                  <th key={factory} className="px-4 py-4 border-b border-l border-slate-100 dark:border-gray-800 bg-slate-50/30 min-w-[220px]">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Factory size={14} className="text-blue-600" />
-                        <span className="text-sm font-black text-slate-800 dark:text-white uppercase">
-                          {factory}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-red-500 to-orange-500 rounded-full">
-                        <Percent size={10} className="text-white" />
-                        <span className="text-xs font-black text-white">
-                          {overallDefectRate}%
-                        </span>
-                      </div>
+              {factories.map((factory) => (
+                <th key={factory.name} className="px-4 py-4 border-b border-l border-slate-100 dark:border-gray-800 bg-slate-50/30 min-w-[220px]">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Factory size={14} className="text-blue-600" />
+                      <span className="text-sm font-black text-slate-800 dark:text-white uppercase">
+                        {factory.name}
+                      </span>
                     </div>
-                    
-                    {/* Sub-column headers */}
-                    <div className="grid grid-cols-4 gap-1 mt-3 text-[10px] font-bold text-slate-400 uppercase">
-                      <div className="text-center">Defect</div>
-                      <div className="text-center">Qty</div>
-                      <div className="text-center">Pcs</div>
-                      <div className="text-center">%</div>
+                    {/* Red Badge now uses the calculated share from grandTotalPcs */}
+                    <div className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-red-500 to-orange-500 rounded-full">
+                      <Percent size={10} className="text-white" />
+                      <span className="text-xs font-black text-white">
+                        {factory.share}%
+                      </span>
                     </div>
-                  </th>
-                );
-              })}
+                  </div>
+                  
+                  <div className="grid grid-cols-4 gap-1 mt-3 text-[10px] font-bold text-slate-400 uppercase">
+                    <div className="text-center">Defect</div>
+                    <div className="text-center">Qty</div>
+                    <div className="text-center font-black text-blue-500">Pcs</div>
+                    <div className="text-center">%</div>
+                  </div>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
@@ -185,27 +179,20 @@ const FactoryDefectTable = ({ data = [] }) => {
                 </td>
 
                 {factories.map((factory) => (
-                  <td key={factory} className="px-4 py-4 border-l border-slate-100 dark:border-gray-800">
-                    {row[factory] ? (
+                  <td key={factory.name} className="px-4 py-4 border-l border-slate-100 dark:border-gray-800">
+                    {row[factory.name] ? (
                       <div className="grid grid-cols-4 gap-1 items-center text-center">
-                        {/* Defect Name */}
-                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate" title={row[factory].name}>
-                          {row[factory].name}
+                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate" title={row[factory.name].name}>
+                          {row[factory.name].name}
                         </div>
-                        
-                        {/* Qty */}
-                        <div className="text-sm font-black text-blue-700 dark:text-blue-300">
-                          {row[factory].qty}
+                        <div className="text-xs font-medium text-slate-400">
+                          {row[factory.name].qty}
                         </div>
-                        
-                        {/* Pcs */}
                         <div className="text-sm font-black text-emerald-700 dark:text-emerald-300">
-                          {row[factory].pcs}
+                          {row[factory.name].pcs}
                         </div>
-                        
-                        {/* Percentage */}
                         <div className="text-sm font-black text-purple-700 dark:text-purple-300">
-                          {row[factory].percentage}%
+                          {row[factory.name].percentage}%
                         </div>
                       </div>
                     ) : (

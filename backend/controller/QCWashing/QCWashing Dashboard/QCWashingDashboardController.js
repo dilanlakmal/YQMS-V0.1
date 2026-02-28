@@ -20,51 +20,99 @@ export const getWashingDashboardData = async (req, res) => {
     if (factoryName) query.factoryName = factoryName; 
 
     // HELPER: Reusable stage to resolve the correct Wash Qty based on priority
-    const resolveWashQtyStage = {
+    // const resolveWashQtyStage = {
+    //   $addFields: {
+    //     resolvedWashQty: {
+    //       $ifNull: [
+    //         "$actualWashQty", 
+    //         { $ifNull: ["$editedActualWashQty", "$washQty"] }
+    //       ]
+    //     }
+    //   }
+    // };
+
+    const granularDefectTotal = await QCWashing.aggregate([
+  { $match: query },
+  { $unwind: "$defectDetails.defectsByPc" },
+  { $unwind: "$defectDetails.defectsByPc.pcDefects" },
+  {
+    $group: {
+      _id: null,
+      totalPcs: {
+        $sum: {
+          $cond: {
+            if: { $eq: ["$defectDetails.defectsByPc.pcDefects.isMulti", true] },
+            then: { $ifNull: ["$defectDetails.defectsByPc.pcDefects.pcCount", 0] },
+            else: 1 
+          }
+        }
+      },
+      totalCount: {
+        $sum: {
+          $cond: {
+            if: { $eq: ["$defectDetails.defectsByPc.pcDefects.isMulti", true] },
+            then: { $ifNull: ["$defectDetails.defectsByPc.pcDefects.pcCount", 0] },
+            else: { $ifNull: ["$defectDetails.defectsByPc.pcDefects.defectQty", 0] }
+          }
+        }
+      }
+    }
+  }
+]);
+
+const absoluteTotalPcs = granularDefectTotal[0]?.totalPcs || 0;
+const absoluteTotalCount = granularDefectTotal[0]?.totalCount || 0;
+
+    const resolveMetricsStage = {
       $addFields: {
+        // Priority 1: Sum actualAQLValue.sampleSize if array exists and not empty
+        // Priority 2: Use checkedQty if above is missing
+        reportSampleSize: {
+          $cond: {
+            if: { 
+              $and: [
+                { $isArray: "$actualAQLValue" }, 
+                { $gt: [{ $size: "$actualAQLValue" }, 0] }
+              ]
+            },
+            then: { $sum: "$actualAQLValue.sampleSize" },
+            else: { $ifNull: ["$checkedQty", 0] }
+          }
+        },
+        // Fix: Ensure rejectedDefectPcs is explicitly treated as a number to avoid sum errors
+        resolvedRejectedPcs: { $add: [{ $ifNull: ["$rejectedDefectPcs", 0] }, 0] },
+        
+        // Resolved Wash Qty
         resolvedWashQty: {
-          $ifNull: [
-            "$actualWashQty", 
-            { $ifNull: ["$editedActualWashQty", "$washQty"] }
-          ]
+          $ifNull: ["$actualWashQty", { $ifNull: ["$editedActualWashQty", "$washQty"] }]
         }
       }
     };
+    
 
     // 1. ADVANCED SUMMARY: Unique Order Tracking
     const summaryAgg = await QCWashing.aggregate([
-      { $match: query },
-      resolveWashQtyStage, // Use resolved qty
-      {
-        $group: {
-          _id: { order: "$orderNo", color: "$color" },
-          skuTotalWashed: { $sum: "$resolvedWashQty" },
-          skuPlanned: { $first: "$orderQty" }, 
-          skuBatches: { $sum: 1 },
-          skuPassReports: { $sum: { $cond: [{ $eq: ["$overallFinalResult", "Pass"] }, 1, 0] } },
-          skuFailReports: { $sum: { $cond: [{ $eq: ["$overallFinalResult", "Fail"] }, 1, 0] } },
-          skuPassRateSum: { $sum: "$passRate" },
-          skuDefectSum: { $sum: "$totalDefectCount" }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalPlannedQty: { $sum: "$skuPlanned" },
-          totalWashQty: { $sum: "$skuTotalWashed" },
-          numberOfWashings: { $sum: "$skuBatches" },
-          totalPassReports: { $sum: "$skuPassReports" },
-          totalFailReports: { $sum: "$skuFailReports" },
-          totalDefects: { $sum: "$skuDefectSum" },
-          avgPassRate: { $avg: { $divide: ["$skuPassRateSum", "$skuBatches"] } }
-        }
-      }
-    ]);
+  { $match: query },
+  resolveMetricsStage,
+  {
+    $group: {
+      _id: { order: "$orderNo", color: "$color" },
+      skuTotalWashed: { $sum: "$resolvedWashQty" },
+      skuPlanned: { $first: "$orderQty" }, 
+      skuSampleSize: { $sum: "$reportSampleSize" }
+    }
+  },
+  {
+    $group: {
+      _id: null,
+      totalPlannedQty: { $sum: "$skuPlanned" },
+      totalWashQty: { $sum: "$skuTotalWashed" },
+      totalSampleSize: { $sum: "$skuSampleSize" }
+    }
+  }
+]);
 
-    const summary = summaryAgg[0] || { 
-      totalPlannedQty: 0, totalWashQty: 0, numberOfWashings: 0, 
-      totalPassReports: 0, totalFailReports: 0, avgPassRate: 0, totalDefects: 0 
-    };
+const summary = summaryAgg[0] || { totalPlannedQty: 0, totalWashQty: 0, totalSampleSize: 0 };
 
     const remainingQty = Math.max(0, summary.totalPlannedQty - summary.totalWashQty);
 
@@ -108,7 +156,8 @@ export const getWashingDashboardData = async (req, res) => {
 
     const trendData = await QCWashing.aggregate([
       { $match: query },
-      resolveWashQtyStage, // Use resolved qty here
+      // resolveWashQtyStage, // Use resolved qty here
+      resolveMetricsStage,
       {
         $group: {
           _id: { $dateToString: { format: groupFormat, date: "$date" } },
@@ -175,7 +224,8 @@ export const getWashingDashboardData = async (req, res) => {
     // 9. Style & Color Defects (Fixed to use resolvedWashQty)
       const styleColorDefects = await QCWashing.aggregate([
         { $match: query },
-        resolveWashQtyStage, 
+        // resolveWashQtyStage,
+        resolveMetricsStage, 
         {
           $group: {
             _id: { orderNo: "$orderNo", color: "$color" },
@@ -346,7 +396,10 @@ const pointFailureSummary = await QCWashing.aggregate([
         totalPassReports: summary.totalPassReports, 
         totalFailReports: summary.totalFailReports, 
         avgPassRate: summary.avgPassRate,
-        totalDefects: summary.totalDefects
+        totalDefects: absoluteTotalPcs, 
+        totalSampleSize: summary.totalSampleSize,
+        defectRatio: summary.totalSampleSize > 0 ? (absoluteTotalPcs / summary.totalSampleSize) * 100 : 0,
+        defectRate: summary.totalSampleSize > 0 ? (absoluteTotalCount / summary.totalSampleSize) * 100 : 0
       },
       defectSummary,
       measurementSummary,

@@ -48,7 +48,7 @@ const SizeMeasurementTable = ({ data = [] }) => {
   const goToPrevPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
 
   return (
-    <div className="max-w-[1600px] mx-auto mt-8 bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-gray-800 transition-all">
+    <div className="max-w-8xl mx-auto mt-8 bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-gray-800 transition-all">
       
       {/* Header with Pagination Controls */}
       <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">

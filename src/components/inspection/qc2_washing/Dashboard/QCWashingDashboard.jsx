@@ -46,14 +46,14 @@ const QCWashingDashboard = ({ onBack }) => {
       const res = await axios.get(`${API_BASE_URL}/api/qc-washing/dashboard`, { params });
       setDbData(res.data);
     } catch (err) { console.error(err); }
-    finally { setLoading(false); }s
+    finally { setLoading(false); }
   }, [filters, granularity, defectLimit]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   return (
     <div className="min-h-screen bg-[#f1f5f9] dark:bg-gray-950 p-4 lg:p-8 font-sans transition-colors duration-300">
-      <header className="max-w-[1600px] mx-auto mb-8 flex flex-col md:flex-row justify-between items-center bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-slate-200 dark:border-gray-800">
+      <header className="max-w-8xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-center bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-slate-200 dark:border-gray-800">
         <div className="flex items-center gap-6">
           {/* <button onClick={onBack} className="p-3 bg-slate-100 dark:bg-gray-800 hover:bg-blue-600 hover:text-white rounded-2xl transition-all"><ArrowLeft size={20} /></button> */}
           <div>
@@ -82,7 +82,7 @@ const QCWashingDashboard = ({ onBack }) => {
       </div>
 
       {/* Main Content - Lower z-index */}
-      <div className="relative z-10">
+      <div className="max-w-8xl mx-auto relative z-10">
         <CardTiles reports={dbData?.reports || []} />
 
         <FactoryDefectTable data={dbData?.factoryDefectSummary || []} />
