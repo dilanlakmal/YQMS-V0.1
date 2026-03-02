@@ -11,6 +11,11 @@ import {
   Zap,
   Users,
   Tag,
+  Filter,
+  X,
+  ChevronDown,
+  Check,
+  Search,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────
@@ -73,6 +78,20 @@ const BUYER_COLORS = {
 };
 
 // ─────────────────────────────────────────────
+// BUYER OPTIONS FOR FILTER
+// ─────────────────────────────────────────────
+const BUYER_OPTIONS = [
+  "Aritzia",
+  "ANF",
+  "Costco",
+  "Reitmans",
+  "Elite",
+  "MWW",
+  "STORI",
+  "Other",
+];
+
+// ─────────────────────────────────────────────
 // GET RATE COLOR
 // ─────────────────────────────────────────────
 const getRateColor = (rate) => {
@@ -96,6 +115,183 @@ const getRateColor = (rate) => {
     text: "text-red-700 dark:text-red-300",
     label: "Critical",
   };
+};
+
+// ─────────────────────────────────────────────
+// MULTI-SELECT DROPDOWN WITH OPTIONAL SEARCH
+// ─────────────────────────────────────────────
+const MultiSelectDropdown = ({
+  label,
+  options,
+  selected,
+  onChange,
+  icon: Icon,
+  searchable = false,
+  colorMap = null,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const dropdownRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+        setSearchTerm("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (isOpen && searchable && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isOpen, searchable]);
+
+  // Filter options based on search term
+  const filteredOptions = useMemo(() => {
+    if (!searchTerm.trim()) return options;
+    return options.filter((option) =>
+      String(option).toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+  }, [options, searchTerm]);
+
+  const toggleOption = (option) => {
+    if (selected.includes(option)) {
+      onChange(selected.filter((s) => s !== option));
+    } else {
+      onChange([...selected, option]);
+    }
+  };
+
+  const selectAll = () => onChange([...filteredOptions]);
+  const clearAll = () => onChange([]);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
+          selected.length > 0
+            ? "bg-violet-50 dark:bg-violet-900/30 border-violet-200 dark:border-violet-700 text-violet-700 dark:text-violet-300"
+            : "bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500"
+        }`}
+      >
+        {Icon && <Icon className="w-3.5 h-3.5" />}
+        <span>{label}</span>
+        {selected.length > 0 && (
+          <span className="px-1.5 py-0.5 rounded-md bg-violet-500 text-white text-[10px]">
+            {selected.length}
+          </span>
+        )}
+        <ChevronDown
+          className={`w-3.5 h-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-64 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl z-50 overflow-hidden">
+          {/* Search Input (Only for searchable) */}
+          {searchable && (
+            <div className="p-2 border-b border-gray-100 dark:border-gray-700">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search MO No..."
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
+                  >
+                    <X className="w-3 h-3 text-gray-400" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Select All / Clear All */}
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+            <button
+              onClick={selectAll}
+              className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Select All {searchTerm && `(${filteredOptions.length})`}
+            </button>
+            <button
+              onClick={clearAll}
+              className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 hover:underline"
+            >
+              Clear All
+            </button>
+          </div>
+
+          {/* Options List */}
+          <div className="max-h-48 overflow-y-auto p-1">
+            {filteredOptions.length === 0 ? (
+              <div className="px-3 py-4 text-center text-xs text-gray-400 dark:text-gray-500">
+                No results found
+              </div>
+            ) : (
+              filteredOptions.map((option) => {
+                const colors = colorMap?.[option];
+                return (
+                  <button
+                    key={option}
+                    onClick={() => toggleOption(option)}
+                    className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                      selected.includes(option)
+                        ? "bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300"
+                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                        selected.includes(option)
+                          ? "bg-violet-500 border-violet-500"
+                          : "border-gray-300 dark:border-gray-600"
+                      }`}
+                    >
+                      {selected.includes(option) && (
+                        <Check className="w-3 h-3 text-white" />
+                      )}
+                    </div>
+                    {/* Show color indicator for buyers */}
+                    {colors && (
+                      <div
+                        className={`w-3 h-3 rounded-sm bg-gradient-to-r ${colors.gradient}`}
+                      />
+                    )}
+                    <span className="font-medium truncate">{option}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          {/* Selected Count Footer */}
+          {selected.length > 0 && (
+            <div className="px-3 py-2 border-t border-gray-100 dark:border-gray-700 bg-violet-50 dark:bg-violet-900/20">
+              <span className="text-[10px] font-medium text-violet-600 dark:text-violet-400">
+                {selected.length} selected
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 };
 
 // ─────────────────────────────────────────────
@@ -382,41 +578,95 @@ const DefectsByMONoTable = ({ data, loading }) => {
   const scrollContainerRef = useRef(null);
   const intervalRef = useRef(null);
 
+  // Filter States
+  const [selectedMOs, setSelectedMOs] = useState([]);
+  const [selectedBuyers, setSelectedBuyers] = useState([]);
+
+  // Get MO Options from data
+  const moOptions = useMemo(() => {
+    return [...new Set(data.map((d) => d.MONo))].sort();
+  }, [data]);
+
+  // Filtered Data
+  const filteredData = useMemo(() => {
+    return data.filter((item) => {
+      const moMatch =
+        selectedMOs.length === 0 || selectedMOs.includes(item.MONo);
+      const buyerMatch =
+        selectedBuyers.length === 0 || selectedBuyers.includes(item.Buyer);
+      return moMatch && buyerMatch;
+    });
+  }, [data, selectedMOs, selectedBuyers]);
+
+  // Check if any filter is active
+  const hasActiveFilters = selectedMOs.length > 0 || selectedBuyers.length > 0;
+
+  // Filter summary text for title (NO truncation)
+  const filterSummaryText = useMemo(() => {
+    const parts = [];
+
+    if (selectedMOs.length > 0) {
+      parts.push(`MO: ${selectedMOs.join(", ")}`);
+    }
+
+    if (selectedBuyers.length > 0) {
+      parts.push(`Buyer: ${selectedBuyers.join(", ")}`);
+    }
+
+    return parts.length > 0 ? parts.join(" | ") : "";
+  }, [selectedMOs, selectedBuyers]);
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setSelectedMOs([]);
+    setSelectedBuyers([]);
+    setCurrentIndex(0);
+  };
+
+  // Reset index when filters change
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [selectedMOs, selectedBuyers]);
+
+  //  Use filteredData for totalDefects
   const totalDefects = useMemo(
-    () => data.reduce((sum, d) => sum + (d.TotalDefects || 0), 0),
-    [data],
+    () => filteredData.reduce((sum, d) => sum + (d.TotalDefects || 0), 0),
+    [filteredData],
   );
 
-  // Auto-advance
+  //  Auto-advance - use filteredData.length
   useEffect(() => {
-    if (!isPaused && data.length > 1) {
+    if (!isPaused && filteredData.length > 1) {
       intervalRef.current = setInterval(() => {
-        setCurrentIndex((prev) => (prev + 1) % data.length);
+        setCurrentIndex((prev) => (prev + 1) % filteredData.length);
       }, AUTO_ADVANCE_INTERVAL);
     }
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPaused, data.length]);
+  }, [isPaused, filteredData.length]);
 
-  // Scroll to current card
+  //  Scroll - use filteredData.length
   useEffect(() => {
-    if (scrollContainerRef.current && data.length > 0) {
-      const cardWidth = 436; // 420px card + 16px gap
+    if (scrollContainerRef.current && filteredData.length > 0) {
+      const cardWidth = 436;
       scrollContainerRef.current.scrollTo({
         left: currentIndex * cardWidth,
         behavior: "smooth",
       });
     }
-  }, [currentIndex, data.length]);
+  }, [currentIndex, filteredData.length]);
 
+  //  Navigation - use filteredData.length
   const goToPrev = () => {
-    setCurrentIndex((prev) => (prev === 0 ? data.length - 1 : prev - 1));
+    setCurrentIndex((prev) =>
+      prev === 0 ? filteredData.length - 1 : prev - 1,
+    );
   };
 
   const goToNext = () => {
-    setCurrentIndex((prev) => (prev + 1) % data.length);
+    setCurrentIndex((prev) => (prev + 1) % filteredData.length);
   };
 
   const goToIndex = (idx) => {
@@ -432,6 +682,27 @@ const DefectsByMONoTable = ({ data, loading }) => {
             <Package className="w-4 h-4 text-white" />
           </div>
           <div>
+            {/* ✅ MODIFIED: Title with full filter summary */}
+            <h3 className="text-sm font-bold text-gray-800 dark:text-white">
+              Defects by MO Number
+              {hasActiveFilters && (
+                <span className="ml-2 text-xs font-semibold text-violet-500 dark:text-violet-400">
+                  ({filterSummaryText})
+                </span>
+              )}
+            </h3>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+              {filteredData.length > 0
+                ? `${filteredData.length} MOs · ${totalDefects.toLocaleString()} total defects`
+                : "MO defects breakdown"}
+              {hasActiveFilters && data.length !== filteredData.length && (
+                <span className="ml-1 text-violet-500">
+                  (showing {filteredData.length} of {data.length})
+                </span>
+              )}
+            </p>
+          </div>
+          {/* <div>
             <h3 className="text-sm font-bold text-gray-800 dark:text-white">
               Defects by MO Number
             </h3>
@@ -440,14 +711,14 @@ const DefectsByMONoTable = ({ data, loading }) => {
                 ? `${data.length} MOs · ${totalDefects.toLocaleString()} total defects`
                 : "MO defects breakdown"}
             </p>
-          </div>
+          </div> */}
         </div>
 
         {/* Navigation Controls */}
-        {data.length > 1 && !loading && (
+        {filteredData.length > 1 && !loading && (
           <div className="flex items-center gap-3">
             <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-              {currentIndex + 1} of {data.length}
+              {currentIndex + 1} of {filteredData.length}
             </span>
 
             <div className="flex items-center gap-2">
@@ -486,6 +757,46 @@ const DefectsByMONoTable = ({ data, loading }) => {
         )}
       </div>
 
+      {/* Filter Row */}
+      <div className="px-5 py-3 flex items-center gap-2 flex-wrap border-b border-gray-100 dark:border-gray-700">
+        <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+          <Filter className="w-3.5 h-3.5" />
+          <span className="font-medium">Filters:</span>
+        </div>
+
+        {/* MO No Filter - Searchable */}
+        <MultiSelectDropdown
+          label="MO No"
+          options={moOptions}
+          selected={selectedMOs}
+          onChange={setSelectedMOs}
+          icon={Package}
+          searchable={true}
+        />
+
+        {/* Buyer Filter */}
+        <MultiSelectDropdown
+          label="Buyer"
+          options={BUYER_OPTIONS}
+          selected={selectedBuyers}
+          onChange={setSelectedBuyers}
+          icon={Tag}
+          searchable={false}
+          colorMap={BUYER_COLORS}
+        />
+
+        {/* Clear Filters Button */}
+        {hasActiveFilters && (
+          <button
+            onClick={clearAllFilters}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 text-xs font-semibold hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+            Clear Filters
+          </button>
+        )}
+      </div>
+
       {/* Content */}
       <div className="p-5">
         {loading && data.length === 0 ? (
@@ -493,7 +804,7 @@ const DefectsByMONoTable = ({ data, loading }) => {
             <CardSkeleton />
             <CardSkeleton />
           </div>
-        ) : data.length === 0 ? (
+        ) : filteredData.length === 0 ? (
           <EmptyState />
         ) : (
           <>
@@ -503,7 +814,7 @@ const DefectsByMONoTable = ({ data, loading }) => {
               className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             >
-              {data.map((item, idx) => (
+              {filteredData.map((item, idx) => (
                 <div key={item.MONo} className="snap-start">
                   <MOCard item={item} rank={idx + 1} />
                 </div>
@@ -511,9 +822,9 @@ const DefectsByMONoTable = ({ data, loading }) => {
             </div>
 
             {/* Pagination Dots */}
-            {data.length > 1 && (
+            {filteredData.length > 1 && (
               <div className="flex items-center justify-center gap-1.5 mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                {data.slice(0, 15).map((_, idx) => (
+                {filteredData.slice(0, 15).map((_, idx) => (
                   <button
                     key={idx}
                     onClick={() => goToIndex(idx)}
@@ -524,16 +835,16 @@ const DefectsByMONoTable = ({ data, loading }) => {
                     }`}
                   />
                 ))}
-                {data.length > 15 && (
+                {filteredData.length > 15 && (
                   <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-2">
-                    +{data.length - 15} more
+                    +{filteredData.length - 15} more
                   </span>
                 )}
               </div>
             )}
 
             {/* Auto-play indicator */}
-            {data.length > 1 && !isPaused && (
+            {filteredData.length > 1 && !isPaused && (
               <div className="flex items-center justify-center mt-3">
                 <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700/50">
                   <div className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
@@ -548,27 +859,30 @@ const DefectsByMONoTable = ({ data, loading }) => {
       </div>
 
       {/* Footer */}
-      {!loading && data.length > 0 && (
+      {!loading && filteredData.length > 0 && (
         <div className="px-5 py-3 bg-gray-50 dark:bg-gray-700/30 border-t border-gray-100 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-violet-500" />
             <span className="text-xs text-gray-600 dark:text-gray-300">
-              <span className="font-bold">Worst MO:</span> {data[0]?.MONo}
+              <span className="font-bold">Worst MO:</span>{" "}
+              {filteredData[0]?.MONo}
             </span>
             <span
               className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                BUYER_COLORS[data[0]?.Buyer]?.bg || BUYER_COLORS["Other"].bg
+                BUYER_COLORS[filteredData[0]?.Buyer]?.bg ||
+                BUYER_COLORS["Other"].bg
               } ${
-                BUYER_COLORS[data[0]?.Buyer]?.text || BUYER_COLORS["Other"].text
+                BUYER_COLORS[filteredData[0]?.Buyer]?.text ||
+                BUYER_COLORS["Other"].text
               }`}
             >
-              {data[0]?.Buyer}
+              {filteredData[0]?.Buyer}
             </span>
           </div>
           <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
             <span>
               <span className="font-bold text-red-600 dark:text-red-400">
-                {data[0]?.TotalDefects}
+                {filteredData[0]?.TotalDefects}
               </span>{" "}
               defects
             </span>
@@ -577,15 +891,18 @@ const DefectsByMONoTable = ({ data, loading }) => {
               Rate:{" "}
               <span
                 className={`font-bold ${
-                  getRateColor(data[0]?.DefectRate || 0).text
+                  getRateColor(filteredData[0]?.DefectRate || 0).text
                 }`}
               >
-                {data[0]?.DefectRate?.toFixed(2)}%
+                {filteredData[0]?.DefectRate?.toFixed(2)}%
               </span>
             </span>
             <span className="text-gray-300 dark:text-gray-600">·</span>
             <span>
-              <span className="font-semibold">{data[0]?.LineCount}</span> lines
+              <span className="font-semibold">
+                {filteredData[0]?.LineCount}
+              </span>{" "}
+              lines
             </span>
           </div>
         </div>

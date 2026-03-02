@@ -21,6 +21,11 @@ import {
   Play,
   Zap,
   Tag,
+  Filter,
+  X,
+  ChevronDown,
+  Check,
+  MapPin,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────
@@ -161,16 +166,16 @@ const CustomBarLabel = ({ x, y, width, height, value, viewMode, index }) => {
         y={y - 5}
         fill={
           viewMode === "output"
-            ? "#10B981"
+            ? "#047857"
             : viewMode === "defects"
-              ? "#EF4444"
-              : "#F59E0B"
+              ? "#B91C1C"
+              : "#92400E"
         }
         textAnchor="middle"
-        fontSize={9}
+        fontSize={11}
         fontWeight={700}
         fontFamily="'DM Mono', monospace"
-        transform={`rotate(-45, ${x + width / 2}, ${y - 5})`}
+        transform={`rotate(-30, ${x + width / 2}, ${y - 5})`}
       >
         {displayValue}
       </text>
@@ -189,12 +194,129 @@ const CustomBarLabel = ({ x, y, width, height, value, viewMode, index }) => {
             : "#F59E0B"
       }
       textAnchor="middle"
-      fontSize={10}
+      fontSize={12}
       fontWeight={700}
       fontFamily="'DM Mono', monospace"
     >
       {displayValue}
     </text>
+  );
+};
+
+// ─────────────────────────────────────────────
+// MULTI-SELECT DROPDOWN COMPONENT
+// ─────────────────────────────────────────────
+const MultiSelectDropdown = ({
+  label,
+  options,
+  selected,
+  onChange,
+  icon: Icon,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleOption = (option) => {
+    if (selected.includes(option)) {
+      onChange(selected.filter((s) => s !== option));
+    } else {
+      onChange([...selected, option]);
+    }
+  };
+
+  const selectAll = () => onChange([...options]);
+  const clearAll = () => onChange([]);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
+          selected.length > 0
+            ? "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300"
+            : "bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500"
+        }`}
+      >
+        {Icon && <Icon className="w-3.5 h-3.5" />}
+        <span>{label}</span>
+        {selected.length > 0 && (
+          <span className="px-1.5 py-0.5 rounded-md bg-red-500 text-white text-[10px]">
+            {selected.length}
+          </span>
+        )}
+        <ChevronDown
+          className={`w-3.5 h-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl z-50 overflow-hidden">
+          {/* Select All / Clear All */}
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+            <button
+              onClick={selectAll}
+              className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Select All
+            </button>
+            <button
+              onClick={clearAll}
+              className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 hover:underline"
+            >
+              Clear All
+            </button>
+          </div>
+
+          {/* Options List */}
+          <div className="max-h-48 overflow-y-auto p-1">
+            {options.map((option) => (
+              <button
+                key={option}
+                onClick={() => toggleOption(option)}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                  selected.includes(option)
+                    ? "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                    selected.includes(option)
+                      ? "bg-red-500 border-red-500"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
+                >
+                  {selected.includes(option) && (
+                    <Check className="w-3 h-3 text-white" />
+                  )}
+                </div>
+                <span className="font-medium">Line {option}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Selected Count Footer */}
+          {selected.length > 0 && (
+            <div className="px-3 py-2 border-t border-gray-100 dark:border-gray-700 bg-red-50 dark:bg-red-900/20">
+              <span className="text-[10px] font-medium text-red-600 dark:text-red-400">
+                {selected.length} line{selected.length > 1 ? "s" : ""} selected
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -558,26 +680,67 @@ const DefectsByLineChart = ({ data, loading }) => {
   const [viewMode, setViewMode] = useState("rate");
   const [hoveredBar, setHoveredBar] = useState(null);
 
+  //  Filter State
+  const [selectedLines, setSelectedLines] = useState([]);
+
   const config = VIEW_MODES[viewMode];
 
-  // Sort data based on view mode for chart
+  //  Get Line Options from data (sorted naturally)
+  const lineOptions = useMemo(() => {
+    return [...new Set(data.map((d) => String(d.LineNo)))].sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+    );
+  }, [data]);
+
+  //  Filtered Data
+  const filteredData = useMemo(() => {
+    if (selectedLines.length === 0) return data;
+    return data.filter((item) => selectedLines.includes(String(item.LineNo)));
+  }, [data, selectedLines]);
+
+  //  Check if filter is active
+  const hasActiveFilter = selectedLines.length > 0;
+
+  //  Filter summary text for title
+  const filterSummaryText = useMemo(() => {
+    if (selectedLines.length === 0) return "";
+    if (selectedLines.length <= 20) {
+      return selectedLines.join(", ");
+    }
+    return `${selectedLines.slice(0, 4).join(", ")}... +${selectedLines.length - 4}`;
+  }, [selectedLines]);
+
+  //  Clear filter function
+  const clearFilter = () => {
+    setSelectedLines([]);
+  };
+
+  // Use filteredData instead of data
   const sortedData = useMemo(() => {
-    const sorted = [...data].sort((a, b) => {
+    const sorted = [...filteredData].sort((a, b) => {
       if (viewMode === "rate") return b.DefectRate - a.DefectRate;
       if (viewMode === "output") return b.OutputQty - a.OutputQty;
       return b.TotalDefects - a.TotalDefects;
     });
     return sorted;
-  }, [data, viewMode]);
+  }, [filteredData, viewMode]);
 
-  // Calculate stats
-  const totalOutput = data.reduce((sum, d) => sum + (d.OutputQty || 0), 0);
-  const totalDefects = data.reduce((sum, d) => sum + (d.TotalDefects || 0), 0);
+  // Calculate stats from filteredData
+  const totalOutput = filteredData.reduce(
+    (sum, d) => sum + (d.OutputQty || 0),
+    0,
+  );
+  const totalDefects = filteredData.reduce(
+    (sum, d) => sum + (d.TotalDefects || 0),
+    0,
+  );
   const avgRate =
     totalOutput > 0 ? ((totalDefects / totalOutput) * 100).toFixed(2) : 0;
+
+  // Use filteredData for worst line
   const worstLine = useMemo(() => {
-    return [...data].sort((a, b) => b.DefectRate - a.DefectRate)[0];
-  }, [data]);
+    return [...filteredData].sort((a, b) => b.DefectRate - a.DefectRate)[0];
+  }, [filteredData]);
 
   // Get bar color
   const getBarColor = (item, index) => {
@@ -599,13 +762,24 @@ const DefectsByLineChart = ({ data, loading }) => {
             <Factory className="w-4 h-4 text-white" />
           </div>
           <div>
+            {/* ✅ MODIFIED: Title with filter summary */}
             <h3 className="text-sm font-bold text-gray-800 dark:text-white">
               Production Line Analysis
+              {hasActiveFilter && (
+                <span className="ml-2 text-xs font-semibold text-red-500 dark:text-red-400">
+                  (Line: {filterSummaryText})
+                </span>
+              )}
             </h3>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-              {data.length > 0
-                ? `${data.length} lines · Avg Rate: ${avgRate}%`
+              {filteredData.length > 0
+                ? `${filteredData.length} lines · Avg Rate: ${avgRate}%`
                 : "Line breakdown"}
+              {hasActiveFilter && data.length !== filteredData.length && (
+                <span className="ml-1 text-red-500">
+                  (showing {filteredData.length} of {data.length})
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -630,6 +804,34 @@ const DefectsByLineChart = ({ data, loading }) => {
             );
           })}
         </div>
+      </div>
+
+      {/* ✅ ADD: Filter Row */}
+      <div className="px-5 py-3 flex items-center gap-2 flex-wrap border-b border-gray-100 dark:border-gray-700">
+        <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+          <Filter className="w-3.5 h-3.5" />
+          <span className="font-medium">Filter:</span>
+        </div>
+
+        {/* Line No Filter */}
+        <MultiSelectDropdown
+          label="Line No"
+          options={lineOptions}
+          selected={selectedLines}
+          onChange={setSelectedLines}
+          icon={MapPin}
+        />
+
+        {/* Clear Filter Button */}
+        {hasActiveFilter && (
+          <button
+            onClick={clearFilter}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 text-xs font-semibold hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+            Clear Filter
+          </button>
+        )}
       </div>
 
       {/* Legend */}
@@ -658,7 +860,7 @@ const DefectsByLineChart = ({ data, loading }) => {
         <div className="h-[350px]">
           {loading && data.length === 0 ? (
             <ChartSkeleton />
-          ) : data.length === 0 ? (
+          ) : filteredData.length === 0 ? (
             <EmptyChart />
           ) : (
             <ResponsiveContainer width="100%" height="100%">
@@ -680,12 +882,12 @@ const DefectsByLineChart = ({ data, loading }) => {
                   dataKey="LineNo"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: "#9ca3af", fontSize: 10, fontWeight: 600 }}
+                  tick={{ fill: "#6b7280", fontSize: 12, fontWeight: 600 }}
                   dy={8}
                   interval={0}
-                  angle={sortedData.length > 15 ? -45 : 0}
+                  angle={sortedData.length > 15 ? 0 : 0}
                   textAnchor={sortedData.length > 15 ? "end" : "middle"}
-                  height={sortedData.length > 15 ? 50 : 30}
+                  height={sortedData.length > 15 ? 55 : 45}
                 />
                 <YAxis
                   axisLine={false}
@@ -731,7 +933,7 @@ const DefectsByLineChart = ({ data, loading }) => {
       </div>
 
       {/* Footer Stats */}
-      {!loading && data.length > 0 && (
+      {!loading && filteredData.length > 0 && (
         <div className="px-5 py-3 bg-gray-50 dark:bg-gray-700/30 border-t border-gray-100 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
             <AlertTriangle
@@ -770,9 +972,9 @@ const DefectsByLineChart = ({ data, loading }) => {
       )}
 
       {/* Line Summary Carousel */}
-      {!loading && data.length > 0 && (
+      {!loading && filteredData.length > 0 && (
         <div className="px-5 pb-5">
-          <LineSummaryCarousel data={data} />
+          <LineSummaryCarousel data={filteredData} />
         </div>
       )}
     </div>

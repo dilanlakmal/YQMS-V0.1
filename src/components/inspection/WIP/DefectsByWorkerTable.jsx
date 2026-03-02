@@ -12,6 +12,11 @@ import {
   Crown,
   Medal,
   Trophy,
+  Filter,
+  X,
+  ChevronDown,
+  Check,
+  Search,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────
@@ -107,6 +112,177 @@ const DefectItem = ({ defect, maxQty, index }) => {
           />
         </div>
       </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// MULTI-SELECT DROPDOWN COMPONENT
+// ─────────────────────────────────────────────
+
+// ─────────────────────────────────────────────
+// MULTI-SELECT DROPDOWN WITH SEARCH
+// ─────────────────────────────────────────────
+const MultiSelectDropdown = ({
+  label,
+  options,
+  selected,
+  onChange,
+  icon: Icon,
+  searchable = false,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const dropdownRef = React.useRef(null);
+  const searchInputRef = React.useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+        setSearchTerm("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (isOpen && searchable && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isOpen, searchable]);
+
+  // Filter options based on search term
+  const filteredOptions = useMemo(() => {
+    if (!searchTerm.trim()) return options;
+    return options.filter((option) =>
+      String(option).toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+  }, [options, searchTerm]);
+
+  const toggleOption = (option) => {
+    if (selected.includes(option)) {
+      onChange(selected.filter((s) => s !== option));
+    } else {
+      onChange([...selected, option]);
+    }
+  };
+
+  const selectAll = () => onChange([...filteredOptions]);
+  const clearAll = () => onChange([]);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
+          selected.length > 0
+            ? "bg-pink-50 dark:bg-pink-900/30 border-pink-200 dark:border-pink-700 text-pink-700 dark:text-pink-300"
+            : "bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500"
+        }`}
+      >
+        {Icon && <Icon className="w-3.5 h-3.5" />}
+        <span>{label}</span>
+        {selected.length > 0 && (
+          <span className="px-1.5 py-0.5 rounded-md bg-pink-500 text-white text-[10px]">
+            {selected.length}
+          </span>
+        )}
+        <ChevronDown
+          className={`w-3.5 h-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-64 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl z-50 overflow-hidden">
+          {/* Search Input (Only for searchable) */}
+          {searchable && (
+            <div className="p-2 border-b border-gray-100 dark:border-gray-700">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search ID..."
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500/30 focus:border-pink-500"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
+                  >
+                    <X className="w-3 h-3 text-gray-400" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Select All / Clear All */}
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+            <button
+              onClick={selectAll}
+              className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Select All {searchTerm && `(${filteredOptions.length})`}
+            </button>
+            <button
+              onClick={clearAll}
+              className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 hover:underline"
+            >
+              Clear All
+            </button>
+          </div>
+
+          {/* Options List */}
+          <div className="max-h-48 overflow-y-auto p-1">
+            {filteredOptions.length === 0 ? (
+              <div className="px-3 py-4 text-center text-xs text-gray-400 dark:text-gray-500">
+                No results found for "{searchTerm}"
+              </div>
+            ) : (
+              filteredOptions.map((option) => (
+                <button
+                  key={option}
+                  onClick={() => toggleOption(option)}
+                  className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                    selected.includes(option)
+                      ? "bg-pink-50 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300"
+                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                      selected.includes(option)
+                        ? "bg-pink-500 border-pink-500"
+                        : "border-gray-300 dark:border-gray-600"
+                    }`}
+                  >
+                    {selected.includes(option) && (
+                      <Check className="w-3 h-3 text-white" />
+                    )}
+                  </div>
+                  <span className="font-medium font-mono">{option}</span>
+                </button>
+              ))
+            )}
+          </div>
+
+          {/* Selected Count Footer */}
+          {selected.length > 0 && (
+            <div className="px-3 py-2 border-t border-gray-100 dark:border-gray-700 bg-pink-50 dark:bg-pink-900/20">
+              <span className="text-[10px] font-medium text-pink-600 dark:text-pink-400">
+                {selected.length} selected
+              </span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -390,10 +566,76 @@ const DefectsByWorkerTable = ({ data, loading }) => {
   const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState(0);
 
+  // Filter States
+  const [selectedLines, setSelectedLines] = useState([]);
+  const [selectedWorkers, setSelectedWorkers] = useState([]);
+
+  // Generate Line Options (1-30)
+  const lineOptions = useMemo(
+    () => Array.from({ length: 30 }, (_, i) => String(i + 1)),
+    [],
+  );
+
+  // Get Distinct Worker IDs from data
+  const workerOptions = useMemo(
+    () => [...new Set(data.map((d) => d.EmpID))].sort(),
+    [data],
+  );
+
+  // Filter Data
+  const filteredData = useMemo(() => {
+    return data.filter((worker) => {
+      const lineMatch =
+        selectedLines.length === 0 ||
+        selectedLines.includes(String(worker.LineNo));
+      const workerMatch =
+        selectedWorkers.length === 0 || selectedWorkers.includes(worker.EmpID);
+      return lineMatch && workerMatch;
+    });
+  }, [data, selectedLines, selectedWorkers]);
+
+  // Generate filter summary text for title
+  const filterSummaryText = useMemo(() => {
+    const parts = [];
+
+    if (selectedLines.length > 0) {
+      const lineText =
+        selectedLines.length <= 3
+          ? selectedLines.join(", ")
+          : `${selectedLines.slice(0, 3).join(", ")}... +${selectedLines.length - 3}`;
+      parts.push(`Line: ${lineText}`);
+    }
+
+    if (selectedWorkers.length > 0) {
+      const workerText =
+        selectedWorkers.length <= 2
+          ? selectedWorkers.join(", ")
+          : `${selectedWorkers.slice(0, 2).join(", ")}... +${selectedWorkers.length - 2}`;
+      parts.push(`Worker: ${workerText}`);
+    }
+
+    return parts.length > 0 ? parts.join(" | ") : "";
+  }, [selectedLines, selectedWorkers]);
+
+  // Check if any filter is active
+  const hasActiveFilters =
+    selectedLines.length > 0 || selectedWorkers.length > 0;
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setSelectedLines([]);
+    setSelectedWorkers([]);
+    setCurrentPage(1);
+  };
+
   // Calculate pagination
-  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
+  // Use filteredData instead of data for pagination
+  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedData = data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const paginatedData = filteredData.slice(
+    startIndex,
+    startIndex + ITEMS_PER_PAGE,
+  );
 
   // Auto-rotation effect
   useEffect(() => {
@@ -428,6 +670,12 @@ const DefectsByWorkerTable = ({ data, loading }) => {
     setProgress(0);
   }, [data.length]);
 
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+    setProgress(0);
+  }, [selectedLines, selectedWorkers]);
+
   // Navigation handlers
   const handlePrevPage = useCallback(() => {
     setCurrentPage((prev) => (prev <= 1 ? totalPages : prev - 1));
@@ -444,84 +692,139 @@ const DefectsByWorkerTable = ({ data, loading }) => {
     setProgress(0);
   }, []);
 
-  // Stats
+  // Use filteredData for stats
   const totalDefects = useMemo(
-    () => data.reduce((sum, d) => sum + (d.TotalDefects || 0), 0),
-    [data],
+    () => filteredData.reduce((sum, d) => sum + (d.TotalDefects || 0), 0),
+    [filteredData],
   );
   const maxDefects = useMemo(
-    () => Math.max(...data.map((d) => d.TotalDefects || 0), 1),
-    [data],
+    () => Math.max(...filteredData.map((d) => d.TotalDefects || 0), 1),
+    [filteredData],
   );
+
   const highRiskThreshold = maxDefects * 0.7;
 
   return (
     <div className="relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
       {/* Header */}
       <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 shadow-lg shadow-pink-500/25">
-              <User className="w-4 h-4 text-white" />
+        <div className="flex flex-col gap-3">
+          {/* Title Row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 shadow-lg shadow-pink-500/25">
+                <User className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                {/* Title with filter summary */}
+                <h3 className="text-sm font-bold text-gray-800 dark:text-white">
+                  Defects by Responsible Worker
+                  {hasActiveFilters && (
+                    <span className="ml-2 text-xs font-semibold text-pink-500 dark:text-pink-400">
+                      ({filterSummaryText})
+                    </span>
+                  )}
+                </h3>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                  {filteredData.length > 0
+                    ? `${filteredData.length} workers · ${totalDefects.toLocaleString()} total defects`
+                    : "Worker defects breakdown"}
+                  {hasActiveFilters && data.length !== filteredData.length && (
+                    <span className="ml-1 text-pink-500">
+                      (showing {filteredData.length} of {data.length})
+                    </span>
+                  )}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-gray-800 dark:text-white">
-                Defects by Responsible Worker
-              </h3>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                {data.length > 0
-                  ? `${data.length} workers · ${totalDefects.toLocaleString()} total defects`
-                  : "Worker defects breakdown"}
-              </p>
+
+            {/* Controls */}
+            <div className="flex items-center gap-2">
+              {/* Page Info */}
+              {totalPages > 1 && (
+                <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">
+                  {currentPage} / {totalPages}
+                </span>
+              )}
+
+              {/* Pause/Play Button */}
+              {totalPages > 1 && (
+                <button
+                  onClick={() => setIsPaused(!isPaused)}
+                  className={`p-2 rounded-lg transition-all ${
+                    isPaused
+                      ? "bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
+                  }`}
+                  title={
+                    isPaused ? "Resume auto-rotation" : "Pause auto-rotation"
+                  }
+                >
+                  {isPaused ? (
+                    <Play className="w-4 h-4" />
+                  ) : (
+                    <Pause className="w-4 h-4" />
+                  )}
+                </button>
+              )}
+
+              {/* Navigation Buttons */}
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handlePrevPage}
+                    className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={handleNextPage}
+                    className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Controls */}
-          <div className="flex items-center gap-2">
-            {/* Page Info */}
-            {totalPages > 1 && (
-              <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">
-                {currentPage} / {totalPages}
-              </span>
-            )}
+          {/* Filter Row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+              <Filter className="w-3.5 h-3.5" />
+              <span className="font-medium">Filters:</span>
+            </div>
 
-            {/* Pause/Play Button */}
-            {totalPages > 1 && (
+            {/* Line No Filter */}
+            <MultiSelectDropdown
+              label="Line No"
+              options={lineOptions}
+              selected={selectedLines}
+              onChange={setSelectedLines}
+              placeholder="All Lines"
+              icon={MapPin}
+            />
+
+            {/* Worker ID Filter */}
+            <MultiSelectDropdown
+              label="Worker ID"
+              options={workerOptions}
+              selected={selectedWorkers}
+              onChange={setSelectedWorkers}
+              placeholder="All Workers"
+              icon={User}
+              searchable={true}
+            />
+
+            {/* Clear Filters Button */}
+            {hasActiveFilters && (
               <button
-                onClick={() => setIsPaused(!isPaused)}
-                className={`p-2 rounded-lg transition-all ${
-                  isPaused
-                    ? "bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400"
-                    : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
-                }`}
-                title={
-                  isPaused ? "Resume auto-rotation" : "Pause auto-rotation"
-                }
+                onClick={clearAllFilters}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 text-xs font-semibold hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
               >
-                {isPaused ? (
-                  <Play className="w-4 h-4" />
-                ) : (
-                  <Pause className="w-4 h-4" />
-                )}
+                <X className="w-3.5 h-3.5" />
+                Clear Filters
               </button>
-            )}
-
-            {/* Navigation Buttons */}
-            {totalPages > 1 && (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={handlePrevPage}
-                  className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handleNextPage}
-                  className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
             )}
           </div>
         </div>
@@ -561,22 +864,26 @@ const DefectsByWorkerTable = ({ data, loading }) => {
       </div>
 
       {/* Footer Summary */}
-      {!loading && data.length > 0 && (
+      {!loading && filteredData.length > 0 && (
         <div className="px-5 py-3 bg-gradient-to-r from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20 border-t border-pink-100 dark:border-pink-800/30">
           <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-pink-500" />
               <span className="text-pink-700 dark:text-pink-300">
                 <span className="font-bold">Top Offender:</span>{" "}
-                {data[0]?.EmpName || data[0]?.EmpID} @{" "}
-                <span className="font-mono">[{data[0]?.LineNo}]</span> St:
-                {data[0]?.StationID}
+                {filteredData[0]?.EmpName || filteredData[0]?.EmpID} @{" "}
+                <span className="font-mono">[{filteredData[0]?.LineNo}]</span>{" "}
+                St:
+                {filteredData[0]?.StationID}
               </span>
             </div>
             <div className="flex items-center gap-3 text-pink-500 dark:text-pink-400/70">
               <span className="font-semibold">
-                {data[0]?.TotalDefects} defects (
-                {((data[0]?.TotalDefects / totalDefects) * 100).toFixed(1)}%)
+                {filteredData[0]?.TotalDefects} defects (
+                {((filteredData[0]?.TotalDefects / totalDefects) * 100).toFixed(
+                  1,
+                )}
+                %)
               </span>
               {totalPages > 1 && (
                 <>
