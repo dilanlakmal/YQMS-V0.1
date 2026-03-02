@@ -13,6 +13,7 @@ import {
   //  __dirname, 
    __backendDir
   } from "../Config/appConfig.js";
+  import fs from 'fs';
 
 export const normalizeDateString = (dateStr) => {
    if (!dateStr) return null;
@@ -99,6 +100,10 @@ export const sanitize = (input) => {
 //   const v = n % 100;
 //   return n + (s[(v - 20) % 10] || s[v] || s[0] || "th");
 // }
+export const cleanup = (input) => {
+  if (typeof input !== "string") input = String(input);
+  return input;
+};
 
 export const formatDate = (date) => {
   const d = new Date(date);
@@ -123,7 +128,7 @@ export async function fetchOrderDetails(mono) {
     if (!colorMap.has(key)) {
       colorMap.set(key, {
         originalColor: c.Color.trim(),
-        sizes: new Map()
+        sizes: new Map(),
       });
     }
 
@@ -146,7 +151,7 @@ export async function fetchOrderDetails(mono) {
     colorSizeMap: Array.from(colorMap.values()).reduce((acc, curr) => {
       acc[curr.originalColor.toLowerCase()] = Array.from(curr.sizes.values());
       return acc;
-    }, {})
+    }, {}),
   };
 }
 
@@ -206,28 +211,28 @@ const getBuyerAggregationSwitch = () => {
       branches: [
         {
           case: { $regexMatch: { input: "$moNo", regex: "COM" } },
-          then: "MWW"
+          then: "MWW",
         },
         {
           case: { $regexMatch: { input: "$moNo", regex: "CO" } },
-          then: "Costco"
+          then: "Costco",
         },
         {
           case: { $regexMatch: { input: "$moNo", regex: "AR" } },
-          then: "Aritzia"
+          then: "Aritzia",
         },
         {
           case: { $regexMatch: { input: "$moNo", regex: "RT" } },
-          then: "Reitmans"
+          then: "Reitmans",
         },
         { case: { $regexMatch: { input: "$moNo", regex: "AF" } }, then: "ANF" },
         {
           case: { $regexMatch: { input: "$moNo", regex: "NT" } },
-          then: "STORI"
-        }
+          then: "STORI",
+        },
       ],
-      default: "Other"
-    }
+      default: "Other",
+    },
   };
 };
 
@@ -242,7 +247,7 @@ export const buildReportMatchPipeline = (filters) => {
     color,
     garmentType,
     spreadTable,
-    material
+    material,
   } = filters;
 
   const pipeline = [];
@@ -270,24 +275,24 @@ export const buildReportMatchPipeline = (filters) => {
         dateString: "$inspectionDate",
         format: "%m/%d/%Y",
         onError: new Date(0),
-        onNull: new Date(0)
-      }
+        onNull: new Date(0),
+      },
     };
 
     if (startDate) {
       match.$expr.$and.push({
         $gte: [
           dateFromStringExpr,
-          new Date(new Date(startDate).setHours(0, 0, 0, 0))
-        ]
+          new Date(new Date(startDate).setHours(0, 0, 0, 0)),
+        ],
       });
     }
     if (endDate) {
       match.$expr.$and.push({
         $lte: [
           dateFromStringExpr,
-          new Date(new Date(endDate).setHours(23, 59, 59, 999))
-        ]
+          new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+        ],
       });
     }
   }
@@ -314,7 +319,7 @@ export const uploadQc2Image = multer({
     } else {
       cb(new Error("Only JPEG, PNG, and GIF images are allowed"), false);
     }
-  }
+  },
 });
 
 
@@ -334,7 +339,7 @@ export const rovingUpload = multer({
       cb(null, true);
     } else {
       console.error(
-        `File rejected by filter: name='${file.originalname}', mime='${file.mimetype}', ext='${fileExt}'. IsMimeAllowed: ${isMimeAllowed}, IsExtAllowed: ${isExtAllowed}`
+        `File rejected by filter: name='${file.originalname}', mime='${file.mimetype}', ext='${fileExt}'. IsMimeAllowed: ${isMimeAllowed}, IsExtAllowed: ${isExtAllowed}`,
       );
       cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)"));
     }
@@ -356,6 +361,9 @@ export const getBuyerFromMoNumber = (moNo) => {
   if (moNo.includes("AF")) return "ANF";
   if (moNo.includes("NT")) return "STORI";
 
+  if (moNo.includes("YMCMH")) return "Elite";
+  if (moNo.includes("YMCMT")) return "Elite";
+
   // Default case if no other rules match
   return "Other";
 };
@@ -367,7 +375,7 @@ export const sccUploadPath = path.join(__backendDir, "public", "storage", "scc_i
 const sccMemoryStorage = multer.memoryStorage();
 export const sccUpload = multer({
   storage: sccMemoryStorage,
-  limits: { fileSize: 25 * 1024 * 1024 } // Optional: Add a limit (e.g., 25MB) to prevent very large files
+  limits: { fileSize: 25 * 1024 * 1024 }, // Optional: Add a limit (e.g., 25MB) to prevent very large files
 });
 
 export const getAqlLevelForBuyer = (buyer) => {
@@ -402,7 +410,7 @@ export const uploadQC2_washing_image = multer({
     } else {
       cb(new Error("Only JPEG, PNG, and GIF images are allowed"), false);
     }
-  }
+  },
 });
 
 const inspectionMemoryStorage = multer.memoryStorage();
@@ -417,7 +425,7 @@ export const uploadInspectionImage = multer({
     } else {
       cb(new Error("Only JPEG, PNG, and GIF images are allowed"), false);
     }
-  }
+  },
 });
 
 const defectMemoryStorage = multer.memoryStorage();
@@ -431,7 +439,7 @@ export const uploadDefectImage = multer({
     } else {
       cb(new Error("Only JPEG, PNG, and GIF images are allowed"), false);
     }
-  }
+  },
 });
 
 export const getMimeType = (filePath) => {
@@ -443,7 +451,7 @@ export const getMimeType = (filePath) => {
     ".gif": "image/gif",
     ".webp": "image/webp",
     ".bmp": "image/bmp",
-    ".svg": "image/svg+xml"
+    ".svg": "image/svg+xml",
   };
   return mimeTypes[ext] || "image/jpeg";
 };
@@ -476,7 +484,7 @@ export const generateSubconReportID = async () => {
 const qaImageStorage = multer.memoryStorage();
 export const qaImageUpload = multer({
   storage: qaImageStorage,
-  limits: { fileSize: 25 * 1024 * 1024 } // 25MB limit
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit
 });
 
 // Helper function to generate a unique Report ID for QA
@@ -517,14 +525,14 @@ export const uploadRovingImage = multer({
     } else {
       cb(new Error('Only JPEG, PNG, GIF, and WebP images are allowed'), false);
     }
-  }
+  },
 });
 
 // MODIFIED: Use memoryStorage to handle the file in memory for processing.
 const cuttingMemoryStorage = multer.memoryStorage();
  export const cutting_upload = multer({
   storage: cuttingMemoryStorage,
-  limits: { fileSize: 25 * 1024 * 1024 } // Increased limit to 25MB to handle uncompressed files from client
+  limits: { fileSize: 25 * 1024 * 1024 }, // Increased limit to 25MB to handle uncompressed files from client
 });
 
 
@@ -550,7 +558,7 @@ export const getConsolidatedDateFormats = (dateInput) => {
 
   // Format for schemas WITH leading zeros: 'MM/DD/YYYY'
   const paddedStringDate = `${String(month).padStart(2, "0")}/${String(
-    day
+    day,
   ).padStart(2, "0")}/${year}`;
 
   // Format for ISODate-based schemas (timestamp)
@@ -564,7 +572,7 @@ export const getConsolidatedDateFormats = (dateInput) => {
     stringDate,
     paddedStringDate,
     isoStartDate: startOfDay,
-    isoEndDate: endOfDay
+    isoEndDate: endOfDay,
   };
 };
 
@@ -574,7 +582,7 @@ const auditUploadPath = path.join(
   __backendDir,
   "public",
   "storage",
-  "audit_images"
+  "audit_images",
 );
 //fs.mkdirSync(auditUploadPath, { recursive: true }); // This is the correct way to ensure the directory exists
 
@@ -589,9 +597,9 @@ const audit_storage = multer.diskStorage({
     const requirementId = req.body.requirementId || "unknown";
     cb(
       null,
-      `audit-${requirementId}-${Date.now()}${path.extname(file.originalname)}`
+      `audit-${requirementId}-${Date.now()}${path.extname(file.originalname)}`,
     );
-  }
+  },
 });
 
 export const audit_image_upload = multer({
@@ -605,7 +613,7 @@ export const audit_image_upload = multer({
       cb(new Error("Only JPEG, PNG, GIF images are allowed"), false);
     }
   },
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 });
 
 
@@ -617,7 +625,7 @@ export const getProcessKeywordForPage = (pageIdentifier) => {
     opa: "opa",
     ironing: "ironing",
     packing: "packing", // The keyword remains the same
-    "qc2-inspection": "qc2"
+    "qc2-inspection": "qc2",
   };
   return keywordMap[pageIdentifier.toLowerCase()];
 };
@@ -626,7 +634,7 @@ export const getProcessKeywordForPage = (pageIdentifier) => {
 const qaAccuracyStorage = multer.memoryStorage();
 export const qaAccuracyUpload = multer({
   storage: qaAccuracyStorage,
-  limits: { fileSize: 25 * 1024 * 1024 }
+  limits: { fileSize: 25 * 1024 * 1024 },
 });
 
 
@@ -658,24 +666,197 @@ export const derivedBuyerLogic = {
       { case: { $regexMatch: { input: "$moNo", regex: "COM" } }, then: "MWW" },
       {
         case: { $regexMatch: { input: "$moNo", regex: "CO" } },
-        then: "Costco"
+        then: "Costco",
       },
       {
         case: { $regexMatch: { input: "$moNo", regex: "AR" } },
-        then: "Aritzia"
+        then: "Aritzia",
       },
       {
         case: { $regexMatch: { input: "$moNo", regex: "RT" } },
-        then: "Reitmans"
+        then: "Reitmans",
       },
       { case: { $regexMatch: { input: "$moNo", regex: "AF" } }, then: "ANF" },
-      { case: { $regexMatch: { input: "$moNo", regex: "NT" } }, then: "STORI" }
+      { case: { $regexMatch: { input: "$moNo", regex: "NT" } }, then: "STORI" },
     ],
-    default: "Other"
+    default: "Other",
+  },
+};
+
+//AfterIroning Overall summary card calculation
+export const calculateOverallSummary = (data) => {
+  const {
+    defectDetails = {},
+    measurementDetails = {},
+    checkedQty = 0,
+    ironingQty = 0,
+    washQty = 0,
+  } = data;
+
+  // 1. Calculate totalCheckedPcs from measurement data
+  let totalCheckedPcs = 0;
+  const measurementArray = measurementDetails.measurement || [];
+  
+  measurementArray.forEach((measurement) => {
+    if (typeof measurement.qty === "number" && measurement.qty > 0) {
+      totalCheckedPcs += measurement.qty;
+    }
+  });
+
+  // Fallback to checkedQty if no measurement data
+  if (totalCheckedPcs === 0) {
+    totalCheckedPcs = parseInt(checkedQty, 10) || 0;
+  }
+
+  // 2. Calculate measurement points and passes
+  let measurementPoints = 0;
+  let measurementPass = 0;
+
+  // Use measurementSizeSummary if available (most accurate)
+  if (measurementDetails.measurementSizeSummary?.length > 0) {
+    measurementDetails.measurementSizeSummary.forEach(sizeData => {
+      measurementPoints += (sizeData.checkedPoints || 0);
+      measurementPass += (sizeData.totalPass || 0);
+    });
+  } else {
+    // Fallback: Calculate from measurement array
+    measurementArray.forEach((data) => {
+      if (Array.isArray(data.pcs)) {
+        data.pcs.forEach((pc) => {
+          if (Array.isArray(pc.measurementPoints)) {
+            pc.measurementPoints.forEach((point) => {
+              if (point.result === "pass" || point.result === "fail") {
+                measurementPoints++;
+                if (point.result === "pass") measurementPass++;
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+
+  // 3. Calculate defect statistics
+  const rejectedDefectPcs = Array.isArray(defectDetails.defectsByPc)
+    ? defectDetails.defectsByPc.length
+    : 0;
+    
+  const totalDefectCount = defectDetails.defectsByPc
+    ? defectDetails.defectsByPc.reduce((sum, pc) => {
+        return sum + (Array.isArray(pc.pcDefects)
+          ? pc.pcDefects.reduce((defSum, defect) =>
+              defSum + (parseInt(defect.defectQty, 10) || 0), 0)
+          : 0);
+      }, 0)
+    : 0;
+
+  // 4. Calculate rates
+  const defectRate = totalCheckedPcs > 0
+    ? Number(((totalDefectCount / totalCheckedPcs) * 100).toFixed(1))
+    : 0;
+    
+  const defectRatio = totalCheckedPcs > 0
+    ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
+    : 0;
+
+  const passRate = measurementPoints > 0 
+    ? Math.round((measurementPass / measurementPoints) * 100) 
+    : 100;
+
+  // 5. SINGLE OVERALL RESULT CALCULATION
+  const defectResult = defectDetails.result || "Pass";
+  const overallFinalResult = (passRate >= 95 && defectResult === "Pass") ? "Pass" : "Fail";
+
+  return {
+    totalCheckedPcs,
+    rejectedDefectPcs,
+    totalDefectCount,
+    defectRate,
+    defectRatio,
+    totalCheckedPoint: measurementPoints,
+    totalPass: measurementPass,
+    totalFail: measurementPoints - measurementPass,
+    passRate,
+    overallFinalResult,
+    // For compatibility
+    overallResult: overallFinalResult,
+  };
+};
+
+//translator imagers
+export const tanslatorImage
+ = multer({ 
+  storage: multer.memoryStorage(), // Store in memory instead of disk
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  },
+});
+
+const coverPageStorage = multer.memoryStorage();
+
+export const uploadCoverPageImage = multer({
+  storage: coverPageStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG, PNG, GIF, and WebP images are allowed"), false);
+    }
+  },
+});
+
+export const processImageBuffer = async (buffer, filename, directory) => {
+  try {
+    // Create the full path to the storage directory
+    const uploadPath = path.join(__backendDir, "public", "storage", directory);
+    
+    // Create the full file path
+    const filePath = path.join(uploadPath, filename);
+    
+    // Ensure the directory exists. If not, create it.
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+
+    // Write the buffer to the file
+    fs.writeFileSync(filePath, buffer);
+    
+    // Return the relative path for API URL (this gets saved in DB)
+    return `/storage/${directory}/${filename}`;
+  } catch (error) {
+    console.error('Error in processImageBuffer:', error);
+    throw new Error(`Failed to process image: ${error.message}`);
   }
 };
 
-
-
-
-
+// Enhanced image validation
+export const validateImageBuffer = (buffer, maxSizeInMB = 5) => {
+  try {
+    if (!buffer) return { isValid: true };
+    
+    const sizeInMB = buffer.length / (1024 * 1024);
+    
+    if (sizeInMB > maxSizeInMB) {
+      return { 
+        isValid: false, 
+        error: `Image size exceeds ${maxSizeInMB}MB limit` 
+      };
+    }
+    
+    return { isValid: true };
+  } catch (error) {
+    return { 
+      isValid: false, 
+      error: 'Error validating image buffer' 
+    };
+  }
+};
