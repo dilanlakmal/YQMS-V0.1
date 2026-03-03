@@ -26,6 +26,7 @@ const defaultTabState = () => ({
         currentPage: 1,
         limit: 10,
     },
+    newRecordsCount: 0,
 });
 
 const getCompletionNotesField = (reportType) => {
@@ -99,7 +100,9 @@ export const useWashingReportsStore = create((set, get) => ({
                 showToast.error("Error loading reports. Please try again.");
             }
         } finally {
-            set((s) => ({ [tab]: { ...s[tab], isLoading: false } }));
+            set((s) => ({
+                [tab]: { ...s[tab], isLoading: false, newRecordsCount: 0 }
+            }));
         }
     },
 
@@ -114,6 +117,24 @@ export const useWashingReportsStore = create((set, get) => ({
         ];
         if (ymStyle || style) promises.push(useOrderDataStore.getState().fetchUsedColors(ymStyle || style));
         await Promise.all(promises);
+    },
+
+    incrementNewRecordsCount: (tab) => {
+        set((s) => ({
+            [tab]: {
+                ...s[tab],
+                newRecordsCount: (s[tab].newRecordsCount || 0) + 1
+            }
+        }));
+    },
+
+    resetNewRecordsCount: (tab) => {
+        set((s) => ({
+            [tab]: {
+                ...s[tab],
+                newRecordsCount: 0
+            }
+        }));
     },
 
     // ─── Reject ───────────────────────────────────────────────────────
@@ -191,9 +212,24 @@ export const useWashingReportsStore = create((set, get) => ({
             showToast.warning("Please select at least one color");
             return false;
         }
+        const getSampleSizeArr = (data) => {
+            if (!data) return [];
+            if (Array.isArray(data.sampleSize)) return data.sampleSize.filter(Boolean);
+            if (typeof data.sampleSize === "string" && data.sampleSize.trim()) {
+                try {
+                    const p = JSON.parse(data.sampleSize);
+                    return Array.isArray(p) ? p : [];
+                } catch (e) {
+                    return data.sampleSize.split(",").map((s) => s.trim()).filter(Boolean);
+                }
+            }
+            if (data.size && String(data.size).trim())
+                return String(data.size).split(",").map((s) => s.trim()).filter(Boolean);
+            return [];
+        };
         if (
             (formData.reportType === "Garment Wash Report" || formData.reportType === "Home Wash Test") &&
-            (!formData.size || String(formData.size).trim() === "")
+            getSampleSizeArr(formData).length === 0
         ) {
             showToast.warning("Please select at least one size");
             return false;
@@ -227,6 +263,27 @@ export const useWashingReportsStore = create((set, get) => ({
                 }
                 : formData;
 
+            // Build sampleSize array: backend stores only sampleSize (not size)
+            const toSampleSizeArray = (val) => {
+                if (!val) return [];
+                if (Array.isArray(val)) return val.map((s) => String(s).trim()).filter(Boolean);
+                if (typeof val === "string" && val.trim()) {
+                    if (val.startsWith("[") && val.endsWith("]")) {
+                        try {
+                            const p = JSON.parse(val);
+                            return Array.isArray(p) ? p.map((s) => String(s).trim()).filter(Boolean) : [];
+                        } catch (e) {
+                            return val.split(",").map((s) => s.trim()).filter(Boolean);
+                        }
+                    }
+                    return val.split(",").map((s) => s.trim()).filter(Boolean);
+                }
+                return [];
+            };
+            const sampleSize = toSampleSizeArray(dataToSubmit.sampleSize)?.length
+                ? toSampleSizeArray(dataToSubmit.sampleSize)
+                : toSampleSizeArray(dataToSubmit.size);
+
             const fd = new FormData();
             fd.append("reportType", dataToSubmit.reportType || "Garment Wash Report");
             fd.append("ymStyle", dataToSubmit.ymStyle || dataToSubmit.style || "");
@@ -234,6 +291,7 @@ export const useWashingReportsStore = create((set, get) => ({
             fd.append("color", JSON.stringify(dataToSubmit.color || []));
             fd.append("po", JSON.stringify(dataToSubmit.po || []));
             fd.append("exFtyDate", JSON.stringify(dataToSubmit.exFtyDate || []));
+            fd.append("sampleSize", JSON.stringify(sampleSize));
             fd.append("factory", dataToSubmit.factory || "");
             fd.append("sendToHomeWashingDate", dataToSubmit.sendToHomeWashingDate || "");
             fd.append("notes", dataToSubmit.notes || "");
@@ -242,7 +300,7 @@ export const useWashingReportsStore = create((set, get) => ({
 
             const skipFields = [
                 "reportType", "ymStyle", "buyerStyle", "color", "po", "exFtyDate",
-                "factory", "sendToHomeWashingDate", "notes", "images", "userId",
+                "size", "sampleSize", "factory", "sendToHomeWashingDate", "notes", "images", "userId",
                 "userName", "reporter_emp_id", "reporter_name", "careLabelImage",
             ];
             Object.keys(dataToSubmit).forEach((key) => {
@@ -301,19 +359,19 @@ export const useWashingReportsStore = create((set, get) => ({
                 await get().refreshAllReports();
 
                 // ── Size follow-up: show dialog if 2+ sizes were submitted ──
-                const sizeField = formData.size || formData.range || "";
-                if (sizeField) {
-                    const submittedSizes = sizeField.split(",").map((s) => s.trim()).filter(Boolean);
-                    if (submittedSizes.length >= 2) {
-                        // Small delay so the success toast renders first
-                        setTimeout(() => {
-                            useModalStore.getState().openSizeFollowUpModal(
-                                submittedSizes,
-                                formData.ymStyle || formData.style || "",
-                                Array.isArray(formData.color) ? formData.color : (formData.color ? [formData.color] : []),
-                            );
-                        }, 600);
-                    }
+                const submittedSizes = getSampleSizeArr(formData);
+                if (submittedSizes.length >= 2) {
+                    // Small delay so the success toast renders first
+                    setTimeout(() => {
+                        useModalStore.getState().openSizeFollowUpModal(
+                            submittedSizes,
+                            formData.ymStyle || formData.style || "",
+                            Array.isArray(formData.color) ? formData.color : (formData.color ? [formData.color] : []),
+                            formData.reportType || "Garment Wash Report",
+                            Array.isArray(formData.po) ? formData.po : (formData.po ? [formData.po] : []),
+                            Array.isArray(formData.exFtyDate) ? formData.exFtyDate : (formData.exFtyDate ? [formData.exFtyDate] : [])
+                        );
+                    }, 600);
                 }
 
                 if (onSuccess) onSuccess();
@@ -345,7 +403,6 @@ export const useWashingReportsStore = create((set, get) => ({
                 fd.append("receivedAt", now);
                 if (user?.emp_id) {
                     fd.append("receiver_emp_id", user.emp_id);
-                    fd.append("receiver_status", "received");
                 }
             }
 
@@ -390,7 +447,6 @@ export const useWashingReportsStore = create((set, get) => ({
             fd.append("completedAt", new Date().toISOString());
             if (user?.emp_id) {
                 fd.append("completer_emp_id", user.emp_id);
-                fd.append("receiver_status", "completed");
             }
             if (completionAssign) {
                 if (completionAssign.checkedBy != null && completionAssign.checkedBy !== "") fd.append("checkedBy", completionAssign.checkedBy);

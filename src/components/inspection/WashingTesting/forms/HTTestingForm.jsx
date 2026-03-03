@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Upload, Camera, X, Send, RotateCw, Calendar, CheckCircle2, XCircle } from "lucide-react";
+import { Upload, Camera, X, Send, RotateCw, Calendar, CheckCircle2, XCircle, Check } from "lucide-react";
 import { DatePicker as AntDatePicker, TimePicker, Select } from "antd";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -152,7 +152,7 @@ const HTTestingForm = ({
                         {/* Style No. with Search - Renamed to STYLE to match GarmentWashForm */}
                         <div className="relative">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                STYLE :
+                                STYLE <span className="text-red-500 font-bold">*</span> :
                             </label>
                             <input
                                 type="text"
@@ -209,7 +209,7 @@ const HTTestingForm = ({
                         {/* Cust.Style */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                CUST STYLE :
+                                CUST STYLE <span className="text-red-500 font-bold">*</span> :
                                 <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto-filled)</span>
                             </label>
                             <input
@@ -225,7 +225,7 @@ const HTTestingForm = ({
                         {/* Fabric Color - multi-select from order fabricContent (like COLOR dropdown) or type manually; disabled when form is completed */}
                         <div className="relative fabric-dropdown-container">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Fabric Color
+                                Fabric Color <span className="text-red-500 font-bold">*</span>
                                 {fabricOptions.length > 0 && (
                                     <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto-filled)</span>
                                 )}
@@ -279,26 +279,35 @@ const HTTestingForm = ({
                                                         Available Fabrics:
                                                     </div>
                                                     <div className="space-y-1">
-                                                        {fabricOptions.map((label, index) => (
-                                                            <label
-                                                                key={index}
-                                                                className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                                                            >
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={selectedFabricColors.includes(label)}
-                                                                    onChange={(e) => {
-                                                                        if (e.target.checked) {
-                                                                            handleInputChange("fabricColor", [...selectedFabricColors, label]);
-                                                                        } else {
-                                                                            handleInputChange("fabricColor", selectedFabricColors.filter((c) => c !== label));
-                                                                        }
-                                                                    }}
-                                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                                                                />
-                                                                <span className="ml-2 text-sm text-gray-900 dark:text-white">{label}</span>
-                                                            </label>
-                                                        ))}
+                                                        {fabricOptions.map((label, index) => {
+                                                            const isSelected = selectedFabricColors.includes(label);
+                                                            return (
+                                                                <label
+                                                                    key={index}
+                                                                    className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors duration-200 ${isSelected
+                                                                        ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                                                                        : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                                                                        }`}
+                                                                >
+                                                                    <div className="flex items-center gap-2">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isSelected}
+                                                                            onChange={(e) => {
+                                                                                if (e.target.checked) {
+                                                                                    handleInputChange("fabricColor", [...selectedFabricColors, label]);
+                                                                                } else {
+                                                                                    handleInputChange("fabricColor", selectedFabricColors.filter((c) => c !== label));
+                                                                                }
+                                                                            }}
+                                                                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                                                                        />
+                                                                        <span className="text-sm font-medium">{label}</span>
+                                                                    </div>
+                                                                    {isSelected && <Check className="w-4 h-4 text-blue-600" />}
+                                                                </label>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             </div>
@@ -376,7 +385,7 @@ const HTTestingForm = ({
                         {/* Report Date */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Report Date
+                                Report Date <span className="text-red-500 font-bold">*</span>
                             </label>
                             <div className="relative group ant-datepicker-container">
                                 <AntDatePicker

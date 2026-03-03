@@ -57,9 +57,14 @@ export const parseQRCodeScanResult = (decodedText, currentReportId) => {
         try {
             const url = new URL(decodedText);
             const scanParam = url.searchParams.get('scan');
+            const idQrParam = url.searchParams.get('idQr');
             if (scanParam) {
                 targetReportId = scanParam;
                 format = 'url';
+            } else if (idQrParam) {
+                // Fallback: some QRs use idQr instead of scan
+                targetReportId = idQrParam;
+                format = 'url_idQr';
             }
         } catch (error) {
             console.error('Error parsing QR URL:', error);

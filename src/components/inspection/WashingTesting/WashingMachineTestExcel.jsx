@@ -390,8 +390,8 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "", users = 
     // --- Care Instructions ---
     const careSymbolsObj = report.careSymbols
       ? (typeof report.careSymbols === "string"
-          ? (() => { try { return JSON.parse(report.careSymbols); } catch (e) { return {}; } })()
-          : report.careSymbols)
+        ? (() => { try { return JSON.parse(report.careSymbols); } catch (e) { return {}; } })()
+        : report.careSymbols)
       : {};
     const careEntries = report.careSymbolsImages && Object.keys(careSymbolsObj).length > 0
       ? Object.entries(careSymbolsObj).filter(([key]) => report.careSymbolsImages[key] && String(report.careSymbolsImages[key]).startsWith("data:"))

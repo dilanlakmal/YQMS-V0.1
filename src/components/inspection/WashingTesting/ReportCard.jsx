@@ -2,6 +2,7 @@ import React from "react";
 import { useAuth } from "../../authentication/AuthContext";
 import { ChevronDown, ChevronUp, Printer, FileText, FileSpreadsheet, Pencil, Trash2, QrCode, CheckCircle, BadgeCheck, XCircle, Bell, BellRing, Shield } from "lucide-react";
 import { useAssignControlStore, computeUserRoles, useModalStore } from "./stores";
+import { getReportSizeDisplay } from "./helpers";
 import ReportTimeline from "./ReportTimeline";
 
 const DEFAULT_SCALE = 'scale-125';
@@ -133,9 +134,9 @@ const ReportCard = ({
       return true;
     }
 
-    // Receiver Logic: Lock if receiver_status is 'received' or 'completed' (assuming 'completed' implies deeper lock)
+    // Receiver Logic: Lock if status is 'received' or 'completed' (receiver has taken action)
     // The user requirement: "receiverempid receiver status = pending edit still can click and if receiver status = received it will locked"
-    if (report.receiver_emp_id === empId && (report.receiver_status === 'received' || report.receiver_status === 'completed')) {
+    if (report.receiver_emp_id === empId && (report.status === 'received' || report.status === 'completed')) {
       return true;
     }
 
@@ -409,9 +410,7 @@ const ReportCard = ({
           <div>
             <span className="text-gray-500 dark:text-gray-400">Size: </span>
             <span className="text-gray-900 dark:text-white">
-              {report.size && String(report.size).trim()
-                ? String(report.size)
-                : "N/A"}
+              {getReportSizeDisplay(report)}
             </span>
           </div>
           <div>
@@ -499,9 +498,7 @@ const ReportCard = ({
                 Size
               </p>
               <p className="text-sm text-gray-900 dark:text-white">
-                {report.size && String(report.size).trim()
-                  ? String(report.size)
-                  : "N/A"}
+                {getReportSizeDisplay(report)}
               </p>
             </div>
 

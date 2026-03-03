@@ -6,7 +6,7 @@ import { CheckCircle2, Layers, X } from "lucide-react";
  * Shown after a Home Wash Test is submitted with 2 or more sizes selected.
  * Informs the submitter of every size included in that report.
  */
-const SizeFollowUpModal = ({ isOpen, sizes = [], ymStyle = "", colors = [], onClose }) => {
+const SizeFollowUpModal = ({ isOpen, sizes = [], ymStyle = "", colors = [], pos = [], etds = [], reportType = "", onClose }) => {
     if (!isOpen) return null;
 
     return (
@@ -45,10 +45,20 @@ const SizeFollowUpModal = ({ isOpen, sizes = [], ymStyle = "", colors = [], onCl
                         <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
                             Report submitted successfully!
                         </p>
-                        {ymStyle && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                Style: <span className="font-medium text-gray-700 dark:text-gray-200">{ymStyle}</span>
-                            </p>
+
+                        {(reportType || ymStyle) && (
+                            <div className="flex flex-col items-center">
+                                {reportType && (
+                                    <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-0.5">
+                                        {reportType}
+                                    </p>
+                                )}
+                                {ymStyle && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        Style: <span className="font-medium text-gray-700 dark:text-gray-200">{ymStyle}</span>
+                                    </p>
+                                )}
+                            </div>
                         )}
                     </div>
 
@@ -71,9 +81,47 @@ const SizeFollowUpModal = ({ isOpen, sizes = [], ymStyle = "", colors = [], onCl
                         </div>
                     )}
 
+                    {/* PO tags */}
+                    {pos.length > 0 && (
+                        <div>
+                            <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                                PO(s) submitted
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {pos.map((p, i) => (
+                                    <span
+                                        key={i}
+                                        className="px-2.5 py-0.5 text-xs font-semibold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700 rounded-full"
+                                    >
+                                        {p}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ETD tags */}
+                    {etds.length > 0 && (
+                        <div>
+                            <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                                Ex Fty Date(s)
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {etds.map((e, i) => (
+                                    <span
+                                        key={i}
+                                        className="px-2.5 py-0.5 text-xs font-semibold bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 rounded-full"
+                                    >
+                                        {e}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Size grid */}
                     <div>
-                        <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                        <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">
                             {sizes.length} size{sizes.length !== 1 ? "s" : ""} included in this report
                         </p>
                         <div className="grid grid-cols-3 gap-2">

@@ -568,10 +568,11 @@ const GARMENT_WASH_FIELDS = {
 
     // Material
     mainFabric: { type: FIELD_TYPES.TEXT, label: 'MATERIAL MAIN FABRIC', required: true },
-    liningInserts: { type: FIELD_TYPES.TEXT, label: 'MATERIAL LINING/INSERTS', required: false },
+    liningInserts: { type: FIELD_TYPES.TEXT, label: 'MATERIAL LINING/INSERTS', required: true },
     // careLabel: { type: FIELD_TYPES.IMAGE, label: 'CARE LABEL', required: false }, // Use generic 'images' or specific? Maybe separate.
-    detergent: { type: FIELD_TYPES.TEXT, label: 'DETERGENT', required: false },
+    detergent: { type: FIELD_TYPES.TEXT, label: 'DETERGENT', required: true },
     washingMethod: { type: FIELD_TYPES.TEXTAREA, label: 'Washing Method', required: true },
+    careSymbols: { type: FIELD_TYPES.CUSTOM, label: 'CARE INSTRUCTIONS', required: true },
 
     // Tables (Custom handled in form)
     colorFastnessRows: { type: FIELD_TYPES.CUSTOM, label: 'Color Fastness Data', required: false },
@@ -757,7 +758,7 @@ export const REPORT_TYPE_CONFIGS = {
         description: 'Detailed Garment Wash Test Report',
         fields: [
             'style', 'washType', 'moNo', 'custStyle', 'color', 'season', 'styleDescription',
-            'mainFabric', 'liningInserts', 'detergent', 'washingMethod',
+            'mainFabric', 'liningInserts', 'detergent', 'washingMethod', 'careSymbols',
             'colorFastnessRows', 'colorStainingRows', 'visualAssessmentRows', 'shrinkageRows',
             'beforeWashComments', 'afterWashComments',
             'finalResult', 'date', 'checkedBy', 'approvedBy',
@@ -877,6 +878,8 @@ export const getInitialFormData = (reportType) => {
                             { item: 'Trimmings / Accessories', accepted: true, rejected: false, comments: '' },
                             { item: 'Others / Care label', accepted: true, rejected: false, comments: '' },
                         ];
+                    } else if (fieldName === 'careSymbols') {
+                        initialData[fieldName] = {};
                     } else if (fieldName === 'shrinkageRows') {
                         // Initialize with one empty row by default
                         initialData[fieldName] = [

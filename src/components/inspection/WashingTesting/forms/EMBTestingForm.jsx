@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Upload, Camera, X, Send, RotateCw, Calendar, CheckCircle2, XCircle } from "lucide-react";
+import { Upload, Camera, X, Send, RotateCw, Calendar, CheckCircle2, XCircle, Check } from "lucide-react";
 import { DatePicker as AntDatePicker, TimePicker, Select } from "antd";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -140,7 +140,7 @@ const EMBTestingForm = ({
                         {/* Style No. with Search */}
                         <div className="relative">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Style No.
+                                Style No. <span className="text-red-500 font-bold">*</span>
                             </label>
                             <input
                                 type="text"
@@ -197,7 +197,7 @@ const EMBTestingForm = ({
                         {/* Cust.Style */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Cust.Style
+                                Cust.Style <span className="text-red-500 font-bold">*</span>
                                 {
                                     custStyle.length > 0 && (
                                         <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto-filled)</span>
@@ -218,7 +218,7 @@ const EMBTestingForm = ({
                         {/* Fabric Color - multi-select from order colors (e.g. 900 CASUAL BLACK) or type manually */}
                         <div className="relative fabric-dropdown-container">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Fabric Color
+                                Fabric Color <span className="text-red-500 font-bold">*</span>
                                 {colorOptions.length > 0 && (
                                     <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Auto-filled)</span>
                                 )}
@@ -236,82 +236,91 @@ const EMBTestingForm = ({
                                         </span>
                                     </div>
                                 ) : (
-                                <>
-                                    <div className="relative">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowFabricDropdown(!showFabricDropdown)}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between"
-                                        >
-                                            <span className="truncate">
-                                                {selectedFabricColors.length === 0
-                                                    ? "Select color(s)"
-                                                    : selectedFabricColors.length === colorOptions.length
-                                                        ? "All colors selected"
-                                                        : `${selectedFabricColors.length} color(s) selected`}
-                                            </span>
-                                            <svg
-                                                className={`w-4 h-4 transition-transform flex-shrink-0 ${showFabricDropdown ? "rotate-180" : ""}`}
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
+                                    <>
+                                        <div className="relative">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowFabricDropdown(!showFabricDropdown)}
+                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between"
                                             >
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                            </svg>
-                                        </button>
+                                                <span className="truncate">
+                                                    {selectedFabricColors.length === 0
+                                                        ? "Select color(s)"
+                                                        : selectedFabricColors.length === colorOptions.length
+                                                            ? "All colors selected"
+                                                            : `${selectedFabricColors.length} color(s) selected`}
+                                                </span>
+                                                <svg
+                                                    className={`w-4 h-4 transition-transform flex-shrink-0 ${showFabricDropdown ? "rotate-180" : ""}`}
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </button>
 
-                                        {showFabricDropdown && (
-                                            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                                                <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleInputChange("fabricColor", [...colorOptions])}
-                                                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                                                    >
-                                                        Select All
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleInputChange("fabricColor", [])}
-                                                        className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                                                    >
-                                                        Clear All
-                                                    </button>
-                                                </div>
-                                                <div className="p-2">
-                                                    <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                        Colors
+                                            {showFabricDropdown && (
+                                                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                                    <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleInputChange("fabricColor", [...colorOptions])}
+                                                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                                                        >
+                                                            Select All
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleInputChange("fabricColor", [])}
+                                                            className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                                                        >
+                                                            Clear All
+                                                        </button>
                                                     </div>
-                                                    <div className="space-y-1">
-                                                        {colorOptions.map((label, index) => (
-                                                            <label
-                                                                key={index}
-                                                                className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                                                            >
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={selectedFabricColors.includes(label)}
-                                                                    onChange={(e) => {
-                                                                        if (e.target.checked) {
-                                                                            handleInputChange("fabricColor", [...selectedFabricColors, label]);
-                                                                        } else {
-                                                                            handleInputChange("fabricColor", selectedFabricColors.filter((c) => c !== label));
-                                                                        }
-                                                                    }}
-                                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                                                                />
-                                                                <span className="ml-2 text-sm text-gray-900 dark:text-white">{label}</span>
-                                                            </label>
-                                                        ))}
+                                                    <div className="p-2">
+                                                        <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                            Colors
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            {colorOptions.map((label, index) => {
+                                                                const isSelected = selectedFabricColors.includes(label);
+                                                                return (
+                                                                    <label
+                                                                        key={index}
+                                                                        className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors duration-200 ${isSelected
+                                                                            ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                                                                            : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                                                                            }`}
+                                                                    >
+                                                                        <div className="flex items-center gap-2">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={isSelected}
+                                                                                onChange={(e) => {
+                                                                                    if (e.target.checked) {
+                                                                                        handleInputChange("fabricColor", [...selectedFabricColors, label]);
+                                                                                    } else {
+                                                                                        handleInputChange("fabricColor", selectedFabricColors.filter((c) => c !== label));
+                                                                                    }
+                                                                                }}
+                                                                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                                                                            />
+                                                                            <span className="text-sm font-medium">{label}</span>
+                                                                        </div>
+                                                                        {isSelected && <Check className="w-4 h-4 text-blue-600" />}
+                                                                    </label>
+                                                                );
+                                                            })}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            )}
+                                        </div>
+                                        {selectedFabricColors.length === 0 && (
+                                            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Select at least one color</p>
                                         )}
-                                    </div>
-                                    {selectedFabricColors.length === 0 && (
-                                        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Select at least one color</p>
-                                    )}
-                                </>
+                                    </>
                                 )
                             ) : (
                                 <input
@@ -365,7 +374,7 @@ const EMBTestingForm = ({
                                 placeholder="e.g., LADIES' T-SHIRT"
                             />
                         </div> */}
-                        
+
                     </div>
                 </div>
 
@@ -398,7 +407,7 @@ const EMBTestingForm = ({
                         {/* Received Date */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Received Date
+                                Received Date <span className="text-red-500 font-bold">*</span>
                             </label>
                             <div className="relative group ant-datepicker-container">
                                 <AntDatePicker
@@ -468,7 +477,7 @@ const EMBTestingForm = ({
 
                 {/* Section 3: Placement & Fabrication */}
                 <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
-                  
+
                     <div className="grid grid-cols-1 gap-4">
                         {/* EMB/Print Placement */}
                         <div>

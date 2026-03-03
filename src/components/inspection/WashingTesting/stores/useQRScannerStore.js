@@ -170,6 +170,7 @@ const _drawQRReportImage = (qrDataURL, report, idQr) => {
 export const useQRScannerStore = create((set, get) => ({
     html5QrCodeInstance: null,
     scannerFlashOn: false,
+    isProcessingScan: false,
 
     // ─── QR Code Generation (no logo - for download/print) ───────────
     generateQRCodeDataURLNoLogo: async (value, size = 1024) => {
@@ -322,7 +323,7 @@ export const useQRScannerStore = create((set, get) => ({
             });
     },
 
-    // ─── Print QR code as full Quality Report (same layout as download) ───────
+    // ─── Print QR code as stamp (same URL with meta as download) ───────
     printQRCode: (reportId) => {
         const baseURL = _getBaseURL();
         const report = _getReportById(reportId);
@@ -335,40 +336,45 @@ export const useQRScannerStore = create((set, get) => ({
                     showToast.error("Failed to generate QR code for printing.");
                     return;
                 }
-                const renderPrintContent = (imageDataURL) => {
-                    const printWindow = window.open("", "_blank", "width=700,height=1000");
-                    if (!printWindow) {
-                        showToast.error("Pop-up blocked! Please allow pop-ups to print the stamp.");
-                        return;
-                    }
-                    printWindow.document.write(`
+                const printWindow = window.open("", "_blank", "width=600,height=600");
+                if (!printWindow) {
+                    showToast.error("Pop-up blocked! Please allow pop-ups to print the stamp.");
+                    return;
+                }
+                printWindow.document.write(`
       <html>
         <head>
-          <title>Washing Machine Test - ${idQr}</title>
+          <title>QR Stamp - ${idQr}</title>
           <style>
-            @page { size: A4; margin: 12mm; }
-            body { margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .report-image { max-width: 100%; height: auto; display: block; }
+            @page { size: 5cm 4cm; margin: 0; }
+            body { margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: hidden; }
+            .stamp-container { border: 1.2px solid #000; padding: 1mm 2mm 2mm 2mm; display: flex; flex-direction: row; align-items: center; justify-content: center; box-sizing: border-box; gap: 2.2mm; border-radius: 4px; }
+            .qr-side { flex: 0 0 20mm; display: flex; align-items: center; justify-content: center; }
+            .info-side { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; height: 100%; overflow: hidden; }
+            .label { font-size: 7pt; font-weight: 800; color: #000; text-transform: uppercase; line-height: 1.05; margin-bottom: 1.4mm; border-bottom: 1.4px solid #000; padding-bottom: 0.6mm; width: 100%; }
+            .report-id-container { width: 100%; }
+            .id-label { font-size: 6.5pt; font-weight: 700; color: #4b5563; display: block; margin-bottom: 0.8mm; }
+            .report-id { font-size: 6pt; color: #000; font-family: 'Courier New', monospace; word-break: break-all; line-height: 1.2; font-weight: 700; }
           </style>
         </head>
         <body>
-          <img src="${imageDataURL}" alt="Washing Machine Test Quality Report" class="report-image" />
+          <div class="stamp-container">
+            <div class="qr-side">
+              <img src="${qrDataURL}" alt="QR Code" style="width:22mm;height:22mm;background:#fff;padding:2px;object-fit:contain;border-radius:3px;" />
+            </div>
+            <div class="info-side">
+              <div class="label">Washing<br>Test Stamp</div>
+              <div class="report-id-container">
+                <span class="id-label">REPORT ID:</span>
+                <div class="report-id">#${idQr}</div>
+              </div>
+            </div>
+          </div>
           <script>window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); };<\/script>
         </body>
       </html>
     `);
-                    printWindow.document.close();
-                };
-                if (report) {
-                    _drawQRReportImage(qrDataURL, report, idQr)
-                        .then(renderPrintContent)
-                        .catch((err) => {
-                            console.error("Failed to build report image for print:", err);
-                            renderPrintContent(qrDataURL);
-                        });
-                } else {
-                    renderPrintContent(qrDataURL);
-                }
+                printWindow.document.close();
             });
     },
 
@@ -382,7 +388,7 @@ export const useQRScannerStore = create((set, get) => ({
             } catch (error) {
                 console.error("Error stopping scanner:", error);
             } finally {
-                set({ html5QrCodeInstance: null, scannerFlashOn: false });
+                set({ html5QrCodeInstance: null, scannerFlashOn: false, isProcessingScan: false });
                 useModalStore.getState().setScanningReportId(null);
             }
         }
@@ -404,24 +410,18 @@ export const useQRScannerStore = create((set, get) => ({
     },
 
     // Shared handler for processing a scanned/uploaded QR result against a report
-    _processQRResult: async (targetReportId, reportId, qrBounds = null) => {
+    _processQRResult: async (targetReportId, reportId) => {
         const modalStore = useModalStore.getState();
         const formStore = useFormStore.getState();
         const orderStore = useOrderDataStore.getState();
 
-        // Trigger success animation FIRST (frame tracking + popup) - user sees before processing
-        const triggerSuccessAnimation = () => {
-            window.dispatchEvent(new CustomEvent('qr-scan-success', {
-                detail: { qrBounds }
-            }));
-        };
-
         try {
+            set({ isProcessingScan: true });
             const id = targetReportId != null ? String(targetReportId) : "";
             const reportResponse = await fetch(`${API_BASE_URL}/api/report-washing/${id}`);
             if (!reportResponse.ok) {
                 if (reportResponse.status === 404)
-                    showToast.error("This QR code is from an old or deleted report.");
+                    showToast.error("Report not found. The QR code may be from a deleted report or a different system.");
                 else showToast.error("Failed to fetch report details.");
                 return;
             }
@@ -430,13 +430,10 @@ export const useQRScannerStore = create((set, get) => ({
             const currentReport = reportResult.data || reportResult;
             const currentStatus = currentReport.status || "pending";
 
-            // 1. Trigger success animation (frame tracks QR, popup shows) - user views first
-            triggerSuccessAnimation();
-
-            // 2. Wait: Processing... (2.5s) + Success popup (~0.8s) then go to form
-            await new Promise(resolve => setTimeout(resolve, 3300));
-
             if (currentStatus === "pending" || !currentStatus) {
+                // Wait for success animation in QRScannerModal/QRCodeModal
+                await new Promise(resolve => setTimeout(resolve, 3500));
+
                 get().stopScanner();
                 modalStore.setShowReportDateScanner(null);
                 modalStore.setShowReportDateQR(null);
@@ -447,6 +444,9 @@ export const useQRScannerStore = create((set, get) => ({
                     "QR Scan success! Add images and notes, then save to set status to Received.",
                 );
             } else if (currentStatus === "received") {
+                // Wait for success animation
+                await new Promise(resolve => setTimeout(resolve, 3500));
+
                 get().stopScanner();
                 modalStore.setShowReportDateScanner(null);
                 modalStore.setShowReportDateQR(null);
@@ -466,7 +466,15 @@ export const useQRScannerStore = create((set, get) => ({
                 }
                 formStore.setActiveTab("form");
             } else if (currentStatus === "completed") {
+                // Signal success even if already completed
+                const event = new CustomEvent('qr-scan-success', { detail: { reportId: targetReportId } });
+                window.dispatchEvent(event);
+
                 showToast.info("This report is already completed.");
+
+                // Wait for animation
+                await new Promise(resolve => setTimeout(resolve, 3500));
+
                 get().stopScanner();
                 modalStore.setShowReportDateScanner(null);
                 modalStore.setShowReportDateQR(null);
@@ -487,6 +495,8 @@ export const useQRScannerStore = create((set, get) => ({
             showToast.error("Failed to process QR code scan. Please try again.");
             modalStore.setShowReportDateQR(null);
             modalStore.setShowReportDateScanner(null);
+        } finally {
+            set({ isProcessingScan: false });
         }
     },
 
@@ -504,7 +514,7 @@ export const useQRScannerStore = create((set, get) => ({
 
             const scannerId = `report-date-scanner-${reportId}`;
             const instance = new Html5Qrcode(scannerId, { verbose: false });
-            set({ html5QrCodeInstance: instance });
+            set({ html5QrCodeInstance: instance, isProcessingScan: false });
             modalStore.setScanningReportId(reportId);
 
             const cameras = await Html5Qrcode.getCameras();
@@ -514,22 +524,30 @@ export const useQRScannerStore = create((set, get) => ({
                 );
                 const cameraId = backCamera ? backCamera.id : cameras[0].id;
 
-                let hasScannedOnce = false;
-
                 await instance.start(
                     cameraId,
                     {
                         fps: 20,
                         qrbox: (vw, vh) => {
                             const min = Math.min(vw, vh);
-                            const s = Math.floor(min * 0.55);
+                            const s = Math.floor(min * 0.7);
                             return { width: s, height: s };
                         },
                         aspectRatio: 1.0,
                         experimentalFeatures: { useBarCodeDetectorIfSupported: true },
                     },
                     async (decodedText, decodedResult) => {
-                        if (hasScannedOnce) return;
+                        if (get().isProcessingScan) return;
+
+                        // Dispatch success event for UI animations
+                        const event = new CustomEvent('qr-scan-success', {
+                            detail: {
+                                decodedText,
+                                reportId: reportId,
+                                qrBounds: decodedResult?.region
+                            }
+                        });
+                        window.dispatchEvent(event);
                         if (!isAdminUser && !isWarehouseUser) {
                             showToast.warning(
                                 "You are not assigned to scan reports. Only assigned users can complete this action.",
@@ -561,14 +579,7 @@ export const useQRScannerStore = create((set, get) => ({
                             return;
                         }
 
-                        hasScannedOnce = true;
-                        const qrBounds = decodedResult?.result?.bounds || null;
-
-                        try {
-                            await instance.stop();
-                        } catch (_) { /* already stopped */ }
-
-                        await get()._processQRResult(targetReportId, reportId, qrBounds);
+                        await get()._processQRResult(targetReportId, reportId);
                     },
                     () => {
                         /* Ignore continuous scan errors */
@@ -617,6 +628,14 @@ export const useQRScannerStore = create((set, get) => ({
                 // of blocking with an error.
                 showToast.info("Detected QR from a different report. Opening that report.");
             }
+
+            if (get().isProcessingScan) return;
+
+            // Dispatch success event for file upload too
+            const event = new CustomEvent('qr-scan-success', {
+                detail: { reportId: targetId }
+            });
+            window.dispatchEvent(event);
 
             await get()._processQRResult(targetId, targetId);
         };
@@ -714,6 +733,13 @@ export const useQRScannerStore = create((set, get) => ({
             return;
         }
         showToast.info("Processing QR code...");
+
+        // Dispatch success event for UI animations
+        const event = new CustomEvent('qr-scan-success', {
+            detail: { reportId: targetReportId }
+        });
+        window.dispatchEvent(event);
+
         await get()._processQRResult(targetReportId, targetReportId);
     },
 

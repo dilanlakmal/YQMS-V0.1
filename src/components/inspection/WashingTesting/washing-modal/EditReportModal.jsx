@@ -2,7 +2,7 @@ import React from "react";
 import Select from "react-select";
 import { DatePicker as AntDatePicker } from "antd";
 import dayjs from "dayjs";
-import { Calendar } from "lucide-react";
+import { Calendar, Check } from "lucide-react";
 import MultiSelectDropdown from "./MultiSelectDropdown";
 import { useOrderDataStore } from "../stores";
 
@@ -14,12 +14,15 @@ const EditReportModal = ({
   editAvailableColors,
   editAvailablePOs,
   editAvailableETDs,
+  editAvailableSizes,
   showEditColorDropdown,
   setShowEditColorDropdown,
   showEditPODropdown,
   setShowEditPODropdown,
   showEditETDDropdown,
   setShowEditETDDropdown,
+  showEditSizeDropdown,
+  setShowEditSizeDropdown,
   onClose,
   onSubmit,
 }) => {
@@ -32,7 +35,7 @@ const EditReportModal = ({
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[calc(100vh-1.5rem)] my-6 flex flex-col overflow-hidden"
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] my-4 flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex-shrink-0 p-4 pb-0">
@@ -55,7 +58,7 @@ const EditReportModal = ({
                     reportType: e.target.value,
                   }))}
                   disabled
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
+                  className="w-full min-h-[42px] px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
                   required
                 >
                   <option value="Garment Wash Report">Garment Wash Report</option>
@@ -75,7 +78,7 @@ const EditReportModal = ({
                   type="text"
                   value={editingReport.ymStyle || editingReport.style || "N/A"}
                   readOnly
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
+                  className="w-full min-h-[42px] px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
                 />
               </div>
 
@@ -88,7 +91,7 @@ const EditReportModal = ({
                   type="text"
                   value={editFormData.buyerStyle}
                   readOnly
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
+                  className="w-full min-h-[42px] px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
                 />
               </div>
 
@@ -150,6 +153,22 @@ const EditReportModal = ({
                 readOnly={editingReport?.status === "completed"}
               />
 
+              {/* SIZE - Multi-Select */}
+              <MultiSelectDropdown
+                containerClass="size-dropdown-container"
+                label="SIZE (Optional)"
+                options={editAvailableSizes}
+                selected={editFormData.sampleSize}
+                onChange={(v) => setEditFormData((p) => ({ ...p, sampleSize: v }))}
+                isOpen={showEditSizeDropdown}
+                onToggle={setShowEditSizeDropdown}
+                emptyText="No sizes available (Optional)"
+                placeholder="Select Size(s) (Optional)"
+                allSelectedText="All sizes selected"
+                countLabel="size(s)"
+                readOnly={editingReport?.status === "completed"}
+              />
+
               {/* Factory */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -173,47 +192,78 @@ const EditReportModal = ({
                   isLoading={isLoadingFactories}
                   isDisabled={isLoadingFactories}
                   className="react-select-container"
-                  classNamePrefix="react-select"
+                  components={{
+                    Option: (props) => (
+                      <div
+                        {...props.innerProps}
+                        className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-colors duration-200 ${props.isSelected
+                          ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                          : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+                          }`}
+                      >
+                        <span className="text-sm font-medium">{props.label}</span>
+                        {props.isSelected && <Check className="w-4 h-4 text-blue-600" />}
+                      </div>
+                    ),
+                  }}
                   styles={{
                     control: (baseStyles, state) => ({
                       ...baseStyles,
-                      borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
-                      boxShadow: state.isFocused ? '0 0 0 2px rgba(59, 130, 246, 0.2)' : 'none',
-                      minHeight: '42px',
-                      backgroundColor: '#ffffff',
-                      cursor: 'pointer',
-                      '&:hover': {
-                        borderColor: '#3b82f6',
+                      borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+                      boxShadow: state.isFocused
+                        ? "0 0 0 2px rgba(59, 130, 246, 0.2)"
+                        : "none",
+                      minHeight: "42px",
+                      backgroundColor: "transparent",
+                      cursor: "pointer",
+                      "&:hover": {
+                        borderColor: "#3b82f6",
                       },
                     }),
                     menu: (baseStyles) => ({
                       ...baseStyles,
-                      zIndex: 9999,
+                      position: 'relative', // Consistent with Color/Size (pushed content)
+                      zIndex: 20,
+                      backgroundColor: "transparent",
+                      border: "none",
+                      boxShadow: "none",
+                      marginTop: "0.25rem",
+                      marginBottom: "0.5rem",
                     }),
-                    option: (baseStyles, state) => ({
+                    menuList: (baseStyles) => ({
                       ...baseStyles,
-                      backgroundColor: state.isSelected
-                        ? '#3b82f6'
-                        : state.isFocused
-                          ? '#eff6ff'
-                          : '#ffffff',
-                      color: state.isSelected ? '#ffffff' : '#1f2937',
-                      cursor: 'pointer',
-                      '&:active': {
-                        backgroundColor: '#3b82f6',
-                        color: '#ffffff',
+                      backgroundColor: "white",
+                      border: "1px solid #e5e7eb",
+                      "@media (prefers-color-scheme: dark)": {
+                        backgroundColor: "#1f2937",
+                        border: "1px solid #374151",
                       },
+                      borderRadius: "0.5rem",
+                      maxHeight: "250px",
+                      boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+                    }),
+                    option: (baseStyles) => ({
+                      ...baseStyles,
+                      padding: 0, // We handle padding in the custom component
                     }),
                     indicatorSeparator: () => ({
-                      display: 'none',
+                      display: "none",
                     }),
                     dropdownIndicator: (baseStyles) => ({
                       ...baseStyles,
-                      cursor: 'pointer',
+                      cursor: "pointer",
                     }),
                     clearIndicator: (baseStyles) => ({
                       ...baseStyles,
-                      cursor: 'pointer',
+                      cursor: "pointer",
+                    }),
+                    placeholder: (baseStyles) => ({
+                      ...baseStyles,
+                      color: "#9ca3af",
+                    }),
+                    singleValue: (baseStyles) => ({
+                      ...baseStyles,
+                      color: "inherit",
                     }),
                   }}
                   theme={(theme) => ({
@@ -252,6 +302,8 @@ const EditReportModal = ({
                 </div>
               </div>
             </div>
+
+
 
             {/* Modal Actions */}
             <div className="flex justify-end gap-3 mt-4">

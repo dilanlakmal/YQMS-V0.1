@@ -1394,7 +1394,7 @@ const GarmentWashForm = ({
           {/* STYLE Input - Matching HomeWashForm UI */}
           <div className="relative">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              STYLE :
+              STYLE <span className="text-red-500 font-bold">*</span> :
             </label>
             <input
               type="text"
@@ -1507,7 +1507,7 @@ const GarmentWashForm = ({
           {/* CUST. STYLE */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              CUST STYLE :
+              CUST STYLE <span className="text-red-500 font-bold">*</span> :
               <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">
                 (Auto-filled)
               </span>
@@ -1529,7 +1529,7 @@ const GarmentWashForm = ({
             ref={colorDropdownRef}
           >
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              COLOR :
+              COLOR <span className="text-red-500 font-bold">*</span> :
               <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">
                 (Auto-filled)
               </span>
@@ -1548,189 +1548,198 @@ const GarmentWashForm = ({
                 </div>
               ) : (
                 <>
-              <button
-                type="button"
-                onClick={() =>
-                  setShowColorDropdown &&
-                  setShowColorDropdown(!showColorDropdown)
-                }
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowColorDropdown &&
+                      setShowColorDropdown(!showColorDropdown)
+                    }
 
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span className="truncate">
-                  {isSearchingOrderNo
-                    ? "Loading colors..."
-                    : !formData.moNo
-                      ? "Select Style first"
-                      : formData.color?.length > 0
-                        ? Array.isArray(formData.color) &&
-                          formData.color.length === filteredColors.length &&
-                          filteredColors.length === availableColors.length
-                          ? "All colors selected"
-                          : Array.isArray(formData.color) &&
-                            formData.color.length === filteredColors.length
-                            ? "All available colors selected"
-                            : `${formData.color.length} color(s) selected`
-                        : filteredColors.length === 0 &&
-                          availableColors?.length > 0
-                          ? "All colors already reported"
-                          : filteredColors.length === 0
-                            ? "No colors available"
-                            : "Select Color(s)"}
-                </span>
-                <svg
-                  className={`w-4 h-4 transition-transform ${showColorDropdown ? "rotate-180" : ""}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </button>
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="truncate">
+                      {isSearchingOrderNo
+                        ? "Loading colors..."
+                        : !formData.moNo
+                          ? "Select Style first"
+                          : formData.color?.length > 0
+                            ? Array.isArray(formData.color) &&
+                              formData.color.length === filteredColors.length &&
+                              filteredColors.length === availableColors.length
+                              ? "All colors selected"
+                              : Array.isArray(formData.color) &&
+                                formData.color.length === filteredColors.length
+                                ? "All available colors selected"
+                                : `${formData.color.length} color(s) selected`
+                            : filteredColors.length === 0 &&
+                              availableColors?.length > 0
+                              ? "All colors already reported"
+                              : filteredColors.length === 0
+                                ? "No colors available"
+                                : "Select Color(s)"}
+                    </span>
+                    <svg
+                      className={`w-4 h-4 transition-transform ${showColorDropdown ? "rotate-180" : ""}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
 
-              {showColorDropdown &&
-                (filteredColors.length > 0 || usedColors?.length > 0) && (
-                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                    {filteredColors.length > 0 && (
-                      <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleInputChange("color", [...filteredColors]);
-                          }}
-                          className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                        >
-                          Select All
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleInputChange("color", []);
-                          }}
-                          className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                        >
-                          Clear All
-                        </button>
-                      </div>
-                    )}
-                    <div className="p-2">
-                      <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Available Colors:
-                      </div>
-                      <div className="space-y-1">
-                        {filteredColors.map((color, index) => {
-                          // Handle potential string vs array state.
-                          // If formData.color is string (legacy), treat as single item array or safely check
-                          const isSelected = Array.isArray(formData.color)
-                            ? formData.color.includes(color)
-                            : formData.color === color;
-
-                          return (
-                            <label
-                              key={index}
-                              className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
+                  {showColorDropdown &&
+                    (filteredColors.length > 0 || usedColors?.length > 0) && (
+                      <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        {filteredColors.length > 0 && (
+                          <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleInputChange("color", [...filteredColors]);
+                              }}
+                              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                             >
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={(e) => {
-                                  let newColors = Array.isArray(formData.color)
-                                    ? [...formData.color]
-                                    : formData.color
-                                      ? [formData.color]
-                                      : [];
+                              Select All
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleInputChange("color", []);
+                              }}
+                              className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                            >
+                              Clear All
+                            </button>
+                          </div>
+                        )}
+                        <div className="p-2">
+                          <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Available Colors:
+                          </div>
+                          <div className="space-y-1">
+                            {filteredColors.map((color, index) => {
+                              // Handle potential string vs array state.
+                              const isSelected = Array.isArray(formData.color)
+                                ? formData.color.includes(color)
+                                : formData.color === color;
 
-                                  if (e.target.checked) {
-                                    if (!newColors.includes(color)) {
-                                      newColors.push(color);
-                                    }
-                                  } else {
-                                    newColors = newColors.filter(
-                                      (c) => c !== color,
-                                    );
-                                  }
-                                  handleInputChange("color", newColors);
-                                }}
-                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                              />
-                              <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                                {color}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                      {usedColors.filter((uc) => {
-                        const ucStr = String(uc).trim().toUpperCase();
-                        return !formData.color?.some(
-                          (c) => String(c).trim().toUpperCase() === ucStr,
-                        );
-                      }).length > 0 && (
-                          <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-                            <div className="text-[10px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider px-1">
-                              Already Reported:
-                            </div>
-                            <div className="flex flex-wrap gap-1 mt-1 px-1">
-                              {usedColors
-                                .filter((uc) => {
-                                  const ucStr = String(uc).trim().toUpperCase();
-                                  return !formData.color?.some(
-                                    (c) =>
-                                      String(c).trim().toUpperCase() === ucStr,
-                                  );
-                                })
-                                .map((uc, i) => (
-                                  <div
-                                    key={i}
-                                    className="flex items-center gap-1"
-                                  >
-                                    <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px] rounded border border-gray-200 dark:border-gray-600 line-through">
-                                      {uc}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const currentColors = Array.isArray(
+                              return (
+                                <label
+                                  key={index}
+                                  className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors duration-200 ${isSelected
+                                    ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                                    : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                                    }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={(e) => {
+                                        let newColors = Array.isArray(
                                           formData.color,
                                         )
                                           ? [...formData.color]
                                           : formData.color
                                             ? [formData.color]
                                             : [];
-                                        const ucStr = String(uc)
-                                          .trim()
-                                          .toUpperCase();
-                                        if (
-                                          !currentColors.some(
-                                            (c) =>
-                                              String(c).trim().toUpperCase() ===
-                                              ucStr,
-                                          )
-                                        ) {
-                                          handleInputChange("color", [
-                                            ...currentColors,
-                                            uc,
-                                          ]);
+
+                                        if (e.target.checked) {
+                                          if (!newColors.includes(color)) {
+                                            newColors.push(color);
+                                          }
+                                        } else {
+                                          newColors = newColors.filter(
+                                            (c) => c !== color,
+                                          );
                                         }
+                                        handleInputChange("color", newColors);
                                       }}
-                                      className="p-1 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-500 rounded-full transition-colors"
-                                      title="Re-select this color"
-                                    >
-                                      <RotateCw className="w-2.5 h-2.5" />
-                                    </button>
+                                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                                    />
+                                    <span className="text-sm font-medium">
+                                      {color}
+                                    </span>
                                   </div>
-                                ))}
-                            </div>
+                                  {isSelected && (
+                                    <Check className="w-4 h-4 text-blue-600" />
+                                  )}
+                                </label>
+                              );
+                            })}
                           </div>
-                        )}
-                    </div>
-                  </div>
-                )}
+                          {usedColors.filter((uc) => {
+                            const ucStr = String(uc).trim().toUpperCase();
+                            return !formData.color?.some(
+                              (c) => String(c).trim().toUpperCase() === ucStr,
+                            );
+                          }).length > 0 && (
+                              <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                                <div className="text-[10px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider px-1">
+                                  Already Reported:
+                                </div>
+                                <div className="flex flex-wrap gap-1 mt-1 px-1">
+                                  {usedColors
+                                    .filter((uc) => {
+                                      const ucStr = String(uc).trim().toUpperCase();
+                                      return !formData.color?.some(
+                                        (c) =>
+                                          String(c).trim().toUpperCase() === ucStr,
+                                      );
+                                    })
+                                    .map((uc, i) => (
+                                      <div
+                                        key={i}
+                                        className="flex items-center gap-1"
+                                      >
+                                        <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px] rounded border border-gray-200 dark:border-gray-600 line-through">
+                                          {uc}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const currentColors = Array.isArray(
+                                              formData.color,
+                                            )
+                                              ? [...formData.color]
+                                              : formData.color
+                                                ? [formData.color]
+                                                : [];
+                                            const ucStr = String(uc)
+                                              .trim()
+                                              .toUpperCase();
+                                            if (
+                                              !currentColors.some(
+                                                (c) =>
+                                                  String(c).trim().toUpperCase() ===
+                                                  ucStr,
+                                              )
+                                            ) {
+                                              handleInputChange("color", [
+                                                ...currentColors,
+                                                uc,
+                                              ]);
+                                            }
+                                          }}
+                                          className="p-1 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-500 rounded-full transition-colors"
+                                          title="Re-select this color"
+                                        >
+                                          <RotateCw className="w-2.5 h-2.5" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    )}
                 </>
               )}
             </div>
@@ -1739,7 +1748,7 @@ const GarmentWashForm = ({
           {/* SEASON - Auto-filled from API */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              SEASON :
+              SEASON <span className="text-red-500 font-bold">*</span> :
               <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">
                 (Auto-filled)
               </span>
@@ -1756,7 +1765,7 @@ const GarmentWashForm = ({
           {/* STYLE DESCRIPTION - Auto-filled from API */}
           <div className="md:col-span-2 lg:col-span-2">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              STYLE DESCRIPTION :
+              STYLE DESCRIPTION <span className="text-red-500 font-bold">*</span> :
               <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">
                 (Auto-filled)
               </span>
@@ -1779,7 +1788,7 @@ const GarmentWashForm = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                MAIN FABRIC :
+                MAIN FABRIC <span className="text-red-500">*</span> :
               </label>
               <input
                 type="text"
@@ -1793,7 +1802,7 @@ const GarmentWashForm = ({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                LINING/INSERTS :
+                LINING/INSERTS <span className="text-red-500">*</span> :
               </label>
               <input
                 type="text"
@@ -1802,22 +1811,24 @@ const GarmentWashForm = ({
                   handleInputChange("liningInserts", e.target.value)
                 }
                 className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                required
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                DETERGENT :
+                DETERGENT <span className="text-red-500">*</span> :
               </label>
               <input
                 type="text"
                 value={formData.detergent || ""}
                 onChange={(e) => handleInputChange("detergent", e.target.value)}
                 className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                required
               />
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Washing Method :
+                Washing Method <span className="text-red-500">*</span> :
               </label>
               <textarea
                 value={formData.washingMethod || ""}
@@ -1831,12 +1842,24 @@ const GarmentWashForm = ({
             </div>
 
             {/* Care Symbols Selector */}
-            <div className="md:col-span-2 mt-2">
+            <div className="md:col-span-2 mt-2 relative">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                CARE INSTRUCTIONS <span className="text-red-500">*</span> :
+              </label>
+              {/* Hidden required input for CareSymbols validation */}
+              <input
+                type="text"
+                value={Object.keys(formData.careSymbols || {}).length > 0 ? "selected" : ""}
+                required
+                className="absolute opacity-0 pointer-events-none h-0 w-0 -bottom-1 left-1/2"
+                onChange={() => { }} // No-op to avoid warning
+              />
               <CareSymbolsSelector
                 value={formData.careSymbols || {}}
                 onChange={(newSymbols) =>
                   handleInputChange("careSymbols", newSymbols)
                 }
+                showNoLabel={true} // Injected prop to tell it not to show its own label
               />
             </div>
           </div>
@@ -2240,192 +2263,191 @@ const GarmentWashForm = ({
               </div>
 
               {/* Controls: wrap on phone, row on larger screens */}
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="flex flex-nowrap items-center gap-1 sm:gap-3 px-1">
                 {formData.sampleSize &&
                   (formData.shrinkageRows || []).length > 0 && (
                     <button
                       type="button"
                       onClick={() => setIsShrinkageSaved(!isShrinkageSaved)}
-                      className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl shadow-md transition-all hover:scale-105 active:scale-95 font-bold text-[10px] sm:text-xs uppercase tracking-wider min-h-[44px] sm:min-h-0 ${isShrinkageSaved ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
+                      className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl shadow-md transition-all hover:scale-105 active:scale-95 font-bold text-[10px] sm:text-xs uppercase tracking-wider min-h-[44px] sm:min-h-0 ${isShrinkageSaved ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
                     >
-                      {isShrinkageSaved ? <Edit size={14} className="flex-shrink-0" /> : <Save size={14} className="flex-shrink-0" />}
-                      {isShrinkageSaved ? "Edit" : "Save"}
+                      {isShrinkageSaved ? <Edit size={18} className="flex-shrink-0" /> : <Save size={18} className="flex-shrink-0" />}
+                      <span className="hidden sm:inline">{isShrinkageSaved ? "Edit" : "Save"}</span>
                     </button>
                   )}
-              {/* Wash Type Button Selector */}
-              <div className="relative group">
-                <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-xl blur-sm group-hover:blur-md transition-all duration-300 opacity-50"></div>
-                <div className="relative flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-1.5 bg-white dark:bg-gray-800 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm transition-all hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md">
-                  <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.1em]">
-                    Wash Type
-                  </span>
-                  <div className="h-4 w-[1px] bg-gray-100 dark:bg-gray-700"></div>
-                  <div
-                    className={`flex p-1 rounded-lg border transition-all duration-300 ${isWashTypeLocked ? "bg-gray-100 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 opacity-80" : "bg-gray-50 dark:bg-gray-900/50 border-gray-100 dark:border-gray-700"}`}
-                    title={
-                      isWashTypeLocked
-                        ? "Selection is locked because both Before & After specifications are available. The system automatically defaults to Before Wash as the baseline."
-                        : ""
-                    }
-                  >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        !isWashTypeLocked &&
-                        handleInputChange("washType", "Before Wash")
+                {/* Wash Type Button Selector */}
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-xl blur-sm group-hover:blur-md transition-all duration-300 opacity-50"></div>
+                  <div className="relative flex items-center gap-1.5 sm:gap-3 px-1.5 sm:px-4 py-1.5 bg-white dark:bg-gray-800 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm transition-all hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md">
+                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.1em]">
+                      Wash Type
+                    </span>
+                    <div className="h-4 w-[1px] bg-gray-100 dark:bg-gray-700"></div>
+                    <div
+                      className={`flex p-1 rounded-lg border transition-all duration-300 ${isWashTypeLocked ? "bg-gray-100 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 opacity-80" : "bg-gray-50 dark:bg-gray-900/50 border-gray-100 dark:border-gray-700"}`}
+                      title={
+                        isWashTypeLocked
+                          ? "Selection is locked because both Before & After specifications are available. The system automatically defaults to Before Wash as the baseline."
+                          : ""
                       }
-                      disabled={isWashTypeLocked}
-                      className={`px-2 sm:px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 min-h-[40px] sm:min-h-0 ${formData.washType === "Before Wash"
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          !isWashTypeLocked &&
+                          handleInputChange("washType", "Before Wash")
+                        }
+                        disabled={isWashTypeLocked}
+                        className={`px-1.5 sm:px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 min-h-[40px] sm:min-h-0 ${formData.washType === "Before Wash"
                           ? isWashTypeLocked
                             ? "bg-gray-400 text-white"
                             : "bg-blue-600 text-white shadow-sm"
                           : "text-gray-400 hover:text-blue-500 hover:bg-white"
-                        } ${isWashTypeLocked ? "cursor-not-allowed" : ""}`}
-                    >
-                      Before
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        !isWashTypeLocked &&
-                        handleInputChange("washType", "After Wash")
-                      }
-                      disabled={isWashTypeLocked}
-                      className={`px-2 sm:px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 min-h-[40px] sm:min-h-0 ${formData.washType === "After Wash"
-                          ? isWashTypeLocked
-                            ? "bg-gray-400 text-white"
-                            : "bg-blue-600 text-white shadow-sm"
-                          : "text-gray-400 hover:text-blue-500 hover:bg-white"
-                        } ${isWashTypeLocked ? "cursor-not-allowed" : ""}`}
-                    >
-                      After
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative group">
-                <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-xl blur-sm group-hover:blur-md transition-all duration-300 opacity-50"></div>
-                <div className="relative flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2 bg-white dark:bg-gray-800 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm transition-all hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md min-h-[44px] sm:min-h-0">
-                  <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.1em]">
-                    Size
-                  </span>
-                  <div className="h-4 w-[1px] bg-gray-100 dark:bg-gray-700"></div>
-                  <div className="relative" ref={sizeDropdownRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowSizeDropdown(!showSizeDropdown)}
-                      className="flex items-center gap-2 text-base font-black text-blue-600 dark:text-blue-400 focus:outline-none cursor-pointer min-w-[3rem] justify-center"
-                    >
-                      <span className="tabular-nums">
-                        {formData.sampleSize || "--"}
-                      </span>
-                      <svg
-                        className={`transition-transform duration-200 ${showSizeDropdown ? "rotate-180" : ""}`}
-                        width="10"
-                        height="6"
-                        viewBox="0 0 10 6"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
+                          } ${isWashTypeLocked ? "cursor-not-allowed" : ""}`}
                       >
-                        <path
-                          d="M1 1L5 5L9 1"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </button>
-
-                    {/* Dropdown Menu */}
-                    {showSizeDropdown &&
-                      (() => {
-                        const filteredSizes = getFilteredAvailableSizes();
-                        return (
-                          <div className="absolute top-full right-0 mt-3 min-w-[140px] bg-white dark:bg-gray-800 border border-blue-100 dark:border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ring-4 ring-blue-50/50 dark:ring-blue-900/20">
-                            <div className="max-h-64 overflow-y-auto p-1.5 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600">
-                              {filteredSizes.length === 0 ? (
-                                <div className="px-4 py-3 text-xs text-gray-400 text-center font-medium italic">
-                                  No sizes available
-                                </div>
-                              ) : (
-                                filteredSizes.map((s) => {
-                                  // Count how many specs are available for this size
-                                  const washType =
-                                    formData.washType || "Before Wash";
-                                  const isBeforeWash =
-                                    washType === "Before Wash";
-                                  const specsSource = isBeforeWash
-                                    ? measurementSpecs.beforeWash
-                                    : measurementSpecs.afterWash;
-
-                                  let specCount = 0;
-                                  if (Array.isArray(specsSource)) {
-                                    specCount = specsSource.filter((spec) => {
-                                      const specValue = getSizeSpecValue(
-                                        spec,
-                                        s,
-                                      );
-                                      return specValue && specValue !== "";
-                                    }).length;
-                                  }
-
-                                  return (
-                                    <button
-                                      key={s}
-                                      type="button"
-                                      onClick={() => {
-                                        handleInputChange("sampleSize", s);
-                                        setShowSizeDropdown(false);
-                                        setIsShrinkageSaved(false);
-                                      }}
-                                      className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold transition-all mb-0.5 last:mb-0 flex items-center justify-between group
-                                                                        ${formData.sampleSize ===
-                                          s
-                                          ? "bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400"
-                                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-300"
-                                        }`}
-                                    >
-                                      <span className="flex items-center gap-2">
-                                        {s}
-                                        <span
-                                          className={`text-[10px] px-1.5 py-0.5 rounded-md font-black tabular-nums ${specCount > 0}`}
-                                        >
-                                          ( {specCount} )
-                                        </span>
-                                      </span>
-                                      {formData.sampleSize === s && (
-                                        <Check
-                                          size={14}
-                                          strokeWidth={3}
-                                          className="opacity-100 transition-opacity"
-                                        />
-                                      )}
-                                    </button>
-                                  );
-                                })
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })()}
+                        Before
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          !isWashTypeLocked &&
+                          handleInputChange("washType", "After Wash")
+                        }
+                        disabled={isWashTypeLocked}
+                        className={`px-1.5 sm:px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 min-h-[40px] sm:min-h-0 ${formData.washType === "After Wash"
+                          ? isWashTypeLocked
+                            ? "bg-gray-400 text-white"
+                            : "bg-blue-600 text-white shadow-sm"
+                          : "text-gray-400 hover:text-blue-500 hover:bg-white"
+                          } ${isWashTypeLocked ? "cursor-not-allowed" : ""}`}
+                      >
+                        After
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* View All Sizes Button */}
-              {formData.sampleSize &&
-                (formData.shrinkageRows || []).length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowSizeComparisonModal(true)}
-                    title="View all sizes comparison"
-                    className="flex items-center justify-center min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-xl border border-blue-100 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
-                  >
-                    <Maximize2 size={16} className="flex-shrink-0" />
-                  </button>
-                )}
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-xl blur-sm group-hover:blur-md transition-all duration-300 opacity-50"></div>
+                  <div className="relative flex items-center gap-1.5 sm:gap-3 px-1.5 sm:px-4 py-2 bg-white dark:bg-gray-800 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm transition-all hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md min-h-[44px] sm:min-h-0">
+                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.1em]">
+                      Size
+                    </span>
+                    <div className="h-4 w-[1px] bg-gray-100 dark:bg-gray-700"></div>
+                    <div className="relative" ref={sizeDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowSizeDropdown(!showSizeDropdown)}
+                        className="flex items-center gap-2 text-base font-black text-blue-600 dark:text-blue-400 focus:outline-none cursor-pointer min-w-[3rem] justify-center"
+                      >
+                        <span className="tabular-nums">
+                          {formData.sampleSize || "--"}
+                        </span>
+                        <svg
+                          className={`transition-transform duration-200 ${showSizeDropdown ? "rotate-180" : ""}`}
+                          width="10"
+                          height="6"
+                          viewBox="0 0 10 6"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M1 1L5 5L9 1"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {showSizeDropdown &&
+                        (() => {
+                          const filteredSizes = getFilteredAvailableSizes();
+                          return (
+                            <div className="absolute top-full right-0 mt-3 min-w-[140px] bg-white dark:bg-gray-800 border border-blue-100 dark:border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ring-4 ring-blue-50/50 dark:ring-blue-900/20">
+                              <div className="max-h-64 overflow-y-auto p-1.5 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600">
+                                {filteredSizes.length === 0 ? (
+                                  <div className="px-4 py-3 text-xs text-gray-400 text-center font-medium italic">
+                                    No sizes available
+                                  </div>
+                                ) : (
+                                  filteredSizes.map((s) => {
+                                    // Count how many specs are available for this size
+                                    const washType =
+                                      formData.washType || "Before Wash";
+                                    const isBeforeWash =
+                                      washType === "Before Wash";
+                                    const specsSource = isBeforeWash
+                                      ? measurementSpecs.beforeWash
+                                      : measurementSpecs.afterWash;
+
+                                    let specCount = 0;
+                                    if (Array.isArray(specsSource)) {
+                                      specCount = specsSource.filter((spec) => {
+                                        const specValue = getSizeSpecValue(
+                                          spec,
+                                          s,
+                                        );
+                                        return specValue && specValue !== "";
+                                      }).length;
+                                    }
+
+                                    return (
+                                      <button
+                                        key={s}
+                                        type="button"
+                                        onClick={() => {
+                                          handleInputChange("sampleSize", s);
+                                          setShowSizeDropdown(false);
+                                          setIsShrinkageSaved(false);
+                                        }}
+                                        className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold transition-all mb-0.5 last:mb-0 flex items-center justify-between group
+                                                                        ${formData.sampleSize === s
+                                            ? "bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400"
+                                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-300"
+                                          }`}
+                                      >
+                                        <span className="flex items-center gap-2">
+                                          {s}
+                                          <span
+                                            className={`text-[10px] px-1.5 py-0.5 rounded-md font-black tabular-nums ${specCount > 0}`}
+                                          >
+                                            ( {specCount} )
+                                          </span>
+                                        </span>
+                                        {formData.sampleSize === s && (
+                                          <Check
+                                            size={14}
+                                            strokeWidth={3}
+                                            className="opacity-100 transition-opacity"
+                                          />
+                                        )}
+                                      </button>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* View All Sizes Button */}
+                {formData.sampleSize &&
+                  (formData.shrinkageRows || []).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowSizeComparisonModal(true)}
+                      title="View all sizes comparison"
+                      className="flex items-center justify-center min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-xl border border-blue-100 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
+                    >
+                      <Maximize2 size={16} className="flex-shrink-0" />
+                    </button>
+                  )}
               </div>
             </div>
           </div>
@@ -2900,7 +2922,7 @@ const GarmentWashForm = ({
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1 border-b pb-1">
-              BEFORE WASH COMMENTS:
+              BEFORE WASH COMMENTS :
             </label>
             <textarea
               value={formData.beforeWashComments || ""}
@@ -2913,7 +2935,7 @@ const GarmentWashForm = ({
           </div>
           <div>
             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1 border-b pb-1">
-              AFTER WASH COMMENTS:
+              AFTER WASH COMMENTS :
             </label>
             <textarea
               value={formData.afterWashComments || ""}
@@ -2932,7 +2954,7 @@ const GarmentWashForm = ({
             {/* Final Result */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-                Final Results
+                Final Results <span className="text-red-500 font-bold">*</span> :
               </label>
               <div className="flex space-x-2">
                 <button
@@ -2955,7 +2977,7 @@ const GarmentWashForm = ({
             {/* Checked By */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 uppercase">
-                CHECKED BY:
+                CHECKED BY <span className="text-red-500 font-bold">*</span> :
               </label>
               <Select
                 showSearch
@@ -2999,7 +3021,7 @@ const GarmentWashForm = ({
             {/* Date */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 uppercase">
-                DATE :
+                DATE <span className="text-red-500 font-bold">*</span> :
               </label>
 
               <div className="relative group ant-datepicker-container">
@@ -3206,8 +3228,8 @@ const GarmentWashForm = ({
                               <th
                                 key={size}
                                 className={`p-4 text-center font-black border-b-2 border-gray-300 dark:border-gray-600 min-w-[120px] ${size === formData.sampleSize
-                                    ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
-                                    : "text-gray-700 dark:text-gray-300"
+                                  ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
+                                  : "text-gray-700 dark:text-gray-300"
                                   }`}
                               >
                                 <div className="flex items-center justify-center gap-2">
@@ -3237,8 +3259,8 @@ const GarmentWashForm = ({
                                 <td
                                   key={size}
                                   className={`p-4 text-center border-l border-gray-100 dark:border-gray-700 ${size === formData.sampleSize
-                                      ? "bg-blue-50/50 dark:bg-blue-900/20 font-black text-blue-700 dark:text-blue-300"
-                                      : "text-gray-600 dark:text-gray-400"
+                                    ? "bg-blue-50/50 dark:bg-blue-900/20 font-black text-blue-700 dark:text-blue-300"
+                                    : "text-gray-600 dark:text-gray-400"
                                     }`}
                                 >
                                   {row.sizes[size] || "-"}

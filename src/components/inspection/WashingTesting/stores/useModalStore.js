@@ -67,22 +67,26 @@ export const useModalStore = create((set, get) => ({
     setIsUpdatingImages: (v) => set((s) => ({ editImagesModal: { ...s.editImagesModal, isUpdating: v } })),
 
     // ─── Edit Report Form Data ────────────────────────────────────────
-    editFormData: { color: [], buyerStyle: "", po: [], exFtyDate: [], factory: "", sendToHomeWashingDate: "" },
+    editFormData: { color: [], buyerStyle: "", po: [], exFtyDate: [], factory: "", sendToHomeWashingDate: "", sampleSize: [] },
     editAvailableColors: [],
     editAvailablePOs: [],
     editAvailableETDs: [],
+    editAvailableSizes: [],
     showEditColorDropdown: false,
     showEditPODropdown: false,
     showEditETDDropdown: false,
+    showEditSizeDropdown: false,
 
     setEditFormData: (data) =>
         set((s) => ({ editFormData: typeof data === "function" ? data(s.editFormData) : data })),
     setEditAvailableColors: (v) => set({ editAvailableColors: v }),
     setEditAvailablePOs: (v) => set({ editAvailablePOs: v }),
     setEditAvailableETDs: (v) => set({ editAvailableETDs: v }),
+    setEditAvailableSizes: (v) => set({ editAvailableSizes: v }),
     setShowEditColorDropdown: (v) => set({ showEditColorDropdown: v }),
     setShowEditPODropdown: (v) => set({ showEditPODropdown: v }),
     setShowEditETDDropdown: (v) => set({ showEditETDDropdown: v }),
+    setShowEditSizeDropdown: (v) => set({ showEditSizeDropdown: v }),
 
     // ─── QR Code display / scanner ────────────────────────────────────
     showReportDateQR: null,
@@ -93,11 +97,21 @@ export const useModalStore = create((set, get) => ({
     setScanningReportId: (id) => set({ scanningReportId: id }),
 
     // ─── Size Follow-Up Modal (shown after submit with 2+ sizes) ─────
-    sizeFollowUpModal: { isOpen: false, sizes: [], ymStyle: "", colors: [] },
-    openSizeFollowUpModal: (sizes, ymStyle, colors) =>
-        set({ sizeFollowUpModal: { isOpen: true, sizes, ymStyle, colors: colors || [] } }),
+    sizeFollowUpModal: { isOpen: false, sizes: [], ymStyle: "", colors: [], pos: [], etds: [], reportType: "" },
+    openSizeFollowUpModal: (sizes, ymStyle, colors, reportType, pos = [], etds = []) =>
+        set({
+            sizeFollowUpModal: {
+                isOpen: true,
+                sizes,
+                ymStyle,
+                colors: colors || [],
+                pos: pos || [],
+                etds: etds || [],
+                reportType: reportType || ""
+            }
+        }),
     closeSizeFollowUpModal: () =>
-        set({ sizeFollowUpModal: { isOpen: false, sizes: [], ymStyle: "", colors: [] } }),
+        set({ sizeFollowUpModal: { isOpen: false, sizes: [], ymStyle: "", colors: [], pos: [], etds: [], reportType: "" } }),
 
     // ─── Async saving flags ───────────────────────────────────────────
     isSavingReceived: false,
@@ -160,18 +174,23 @@ export const useModalStore = create((set, get) => ({
     },
 
     handleEditReport: async (report) => {
-        const { setEditFormData, setEditAvailableColors, setEditAvailablePOs, setEditAvailableETDs, openEditModal } = get();
-        await prepareEditFormData(report, setEditFormData, setEditAvailableColors, setEditAvailablePOs, setEditAvailableETDs);
+        const { setEditFormData, setEditAvailableColors, setEditAvailablePOs, setEditAvailableETDs, setEditAvailableSizes, openEditModal } = get();
+        await prepareEditFormData(report, setEditFormData, setEditAvailableColors, setEditAvailablePOs, setEditAvailableETDs, setEditAvailableSizes);
         openEditModal(report);
     },
 
     resetEditState: () => {
-        const { closeEditModal, setEditFormData, setEditAvailableColors, setEditAvailablePOs, setEditAvailableETDs } = get();
+        const { closeEditModal, setEditFormData, setEditAvailableColors, setEditAvailablePOs, setEditAvailableETDs, setEditAvailableSizes, setShowEditSizeDropdown, setShowEditColorDropdown, setShowEditPODropdown, setShowEditETDDropdown } = get();
         closeEditModal();
-        setEditFormData({ color: [], buyerStyle: "", po: [], exFtyDate: [], factory: "", sendToHomeWashingDate: "" });
+        setEditFormData({ color: [], buyerStyle: "", po: [], exFtyDate: [], factory: "", sendToHomeWashingDate: "", sampleSize: [] });
         setEditAvailableColors([]);
         setEditAvailablePOs([]);
         setEditAvailableETDs([]);
+        setEditAvailableSizes([]);
+        setShowEditSizeDropdown(false);
+        setShowEditColorDropdown(false);
+        setShowEditPODropdown(false);
+        setShowEditETDDropdown(false);
     },
 
     handleEditSubmit: (e) => {

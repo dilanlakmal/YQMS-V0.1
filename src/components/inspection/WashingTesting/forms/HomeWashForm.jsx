@@ -163,7 +163,7 @@ const HomeWashForm = ({
         {/* YM Style */}
         <div className="relative">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            YM Style
+            YM Style <span className="text-red-500 font-bold">*</span>
           </label>
           <input
             type="text"
@@ -260,7 +260,7 @@ const HomeWashForm = ({
         {/* COLOR - Multi-Select */}
         <div className="relative color-dropdown-container">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            COLOR
+            COLOR <span className="text-red-500 font-bold">*</span>
           </label>
           <div className="relative">
             {isCompleting ? (
@@ -352,34 +352,45 @@ const HomeWashForm = ({
                           Available Colors:
                         </div>
                         <div className="space-y-1">
-                          {filteredColors.map((color, index) => (
-                            <label
-                              key={index}
-                              className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={formData.color.includes(color)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    handleInputChange("color", [
-                                      ...formData.color,
-                                      color,
-                                    ]);
-                                  } else {
-                                    handleInputChange(
-                                      "color",
-                                      formData.color.filter((c) => c !== color),
-                                    );
-                                  }
-                                }}
-                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                              />
-                              <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                                {color}
-                              </span>
-                            </label>
-                          ))}
+                          {filteredColors.map((color, index) => {
+                            const isSelected = formData.color.includes(color);
+                            return (
+                              <label
+                                key={index}
+                                className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors duration-200 ${isSelected
+                                  ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                                  : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                                  }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        handleInputChange("color", [
+                                          ...formData.color,
+                                          color,
+                                        ]);
+                                      } else {
+                                        handleInputChange(
+                                          "color",
+                                          formData.color.filter((c) => c !== color),
+                                        );
+                                      }
+                                    }}
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                                  />
+                                  <span className="text-sm font-medium">
+                                    {color}
+                                  </span>
+                                </div>
+                                {isSelected && (
+                                  <Check className="w-4 h-4 text-blue-600" />
+                                )}
+                              </label>
+                            );
+                          })}
                         </div>
                         {usedColors.filter((uc) => {
                           const ucStr = String(uc).trim().toUpperCase();
@@ -535,31 +546,42 @@ const HomeWashForm = ({
                         Available PO(s):
                       </div>
                       <div className="space-y-1">
-                        {availablePOs.map((po, index) => (
-                          <label
-                            key={index}
-                            className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={formData.po.includes(po)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  handleInputChange("po", [...formData.po, po]);
-                                } else {
-                                  handleInputChange(
-                                    "po",
-                                    formData.po.filter((p) => p !== po),
-                                  );
-                                }
-                              }}
-                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                            />
-                            <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                              {po}
-                            </span>
-                          </label>
-                        ))}
+                        {availablePOs.map((po, index) => {
+                          const isSelected = formData.po.includes(po);
+                          return (
+                            <label
+                              key={index}
+                              className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors duration-200 ${isSelected
+                                ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                                : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                                }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      handleInputChange("po", [...formData.po, po]);
+                                    } else {
+                                      handleInputChange(
+                                        "po",
+                                        formData.po.filter((p) => p !== po),
+                                      );
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                                />
+                                <span className="text-sm font-medium">
+                                  {po}
+                                </span>
+                              </div>
+                              {isSelected && (
+                                <Check className="w-4 h-4 text-blue-600" />
+                              )}
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
                   </>
@@ -646,34 +668,45 @@ const HomeWashForm = ({
                         Available ETD Dates:
                       </div>
                       <div className="space-y-1">
-                        {availableETDs.map((etd, index) => (
-                          <label
-                            key={index}
-                            className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={formData.exFtyDate.includes(etd)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  handleInputChange("exFtyDate", [
-                                    ...formData.exFtyDate,
-                                    etd,
-                                  ]);
-                                } else {
-                                  handleInputChange(
-                                    "exFtyDate",
-                                    formData.exFtyDate.filter((d) => d !== etd),
-                                  );
-                                }
-                              }}
-                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                            />
-                            <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                              {etd}
-                            </span>
-                          </label>
-                        ))}
+                        {availableETDs.map((etd, index) => {
+                          const isSelected = formData.exFtyDate.includes(etd);
+                          return (
+                            <label
+                              key={index}
+                              className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors duration-200 ${isSelected
+                                ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                                : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                                }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      handleInputChange("exFtyDate", [
+                                        ...formData.exFtyDate,
+                                        etd,
+                                      ]);
+                                    } else {
+                                      handleInputChange(
+                                        "exFtyDate",
+                                        formData.exFtyDate.filter((d) => d !== etd),
+                                      );
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                                />
+                                <span className="text-sm font-medium">
+                                  {etd}
+                                </span>
+                              </div>
+                              {isSelected && (
+                                <Check className="w-4 h-4 text-blue-600" />
+                              )}
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
                   </>
@@ -695,7 +728,7 @@ const HomeWashForm = ({
         {/* Factory */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Factory
+            Factory <span className="text-red-500 font-bold">*</span>
           </label>
           <Select
             value={
@@ -720,6 +753,20 @@ const HomeWashForm = ({
             isDisabled={isLoadingFactories}
             className="react-select-container"
             classNamePrefix="react-select"
+            components={{
+              Option: (props) => (
+                <div
+                  {...props.innerProps}
+                  className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-colors duration-200 ${props.isSelected
+                    ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                    : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    }`}
+                >
+                  <span className="text-sm font-medium">{props.label}</span>
+                  {props.isSelected && <Check className="w-4 h-4 text-blue-600" />}
+                </div>
+              ),
+            }}
             styles={{
               control: (baseStyles, state) => ({
                 ...baseStyles,
@@ -728,7 +775,7 @@ const HomeWashForm = ({
                   ? "0 0 0 2px rgba(59, 130, 246, 0.2)"
                   : "none",
                 minHeight: "42px",
-                backgroundColor: "#ffffff",
+                backgroundColor: "transparent",
                 cursor: "pointer",
                 "&:hover": {
                   borderColor: "#3b82f6",
@@ -737,20 +784,19 @@ const HomeWashForm = ({
               menu: (baseStyles) => ({
                 ...baseStyles,
                 zIndex: 9999,
-              }),
-              option: (baseStyles, state) => ({
-                ...baseStyles,
-                backgroundColor: state.isSelected
-                  ? "#3b82f6"
-                  : state.isFocused
-                    ? "#eff6ff"
-                    : "#ffffff",
-                color: state.isSelected ? "#ffffff" : "#1f2937",
-                cursor: "pointer",
-                "&:active": {
-                  backgroundColor: "#3b82f6",
-                  color: "#ffffff",
+                backgroundColor: "white",
+                "@media (prefers-color-scheme: dark)": {
+                  backgroundColor: "#1f2937",
                 },
+              }),
+              option: (baseStyles) => ({
+                ...baseStyles,
+                padding: 0, // Handled by custom component
+                backgroundColor: "transparent",
+              }),
+              singleValue: (baseStyles) => ({
+                ...baseStyles,
+                color: "inherit",
               }),
               indicatorSeparator: () => ({
                 display: "none",
@@ -809,7 +855,7 @@ const HomeWashForm = ({
         {/* Size - Multi-Select Dropdown */}
         <div className="relative" ref={sizeDropdownRef}>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Size
+            Size <span className="text-red-500 font-bold">*</span>
           </label>
 
           {/* Trigger button */}
@@ -868,7 +914,10 @@ const HomeWashForm = ({
                   return (
                     <label
                       key={size}
-                      className="flex items-center justify-between p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
+                      className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors duration-200 ${isSelected
+                        ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                        }`}
                     >
                       <div className="flex items-center gap-2">
                         <input
@@ -877,7 +926,7 @@ const HomeWashForm = ({
                           onChange={() => toggleSize(size)}
                           className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
                         />
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{size}</span>
+                        <span className="text-sm font-medium">{size}</span>
                       </div>
                       {isSelected && <Check className="w-4 h-4 text-blue-600" />}
                     </label>
@@ -897,7 +946,7 @@ const HomeWashForm = ({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            SEND To Home Washing Date
+            SEND To Home Washing Date <span className="text-red-500 font-bold">*</span>
           </label>
           <div className="relative group ant-datepicker-container">
             <AntDatePicker

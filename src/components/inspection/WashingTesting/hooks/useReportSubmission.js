@@ -188,10 +188,9 @@ export const useReportSubmission = (user, fetchReports) => {
         formDataToSubmit.append("status", "received");
         formDataToSubmit.append("receivedDate", currentDateOnly);
         formDataToSubmit.append("receivedAt", currentDate);
-        // Add receiver_emp_id and update receiver_status
+        // Add receiver_emp_id (status is set to "received" above)
         if (user?.emp_id) {
           formDataToSubmit.append("receiver_emp_id", user.emp_id);
-          formDataToSubmit.append("receiver_status", "received");
         }
       }
 
@@ -273,10 +272,9 @@ export const useReportSubmission = (user, fetchReports) => {
       formDataToSubmit.append("completedDate", new Date().toISOString().split("T")[0]);
       formDataToSubmit.append("completedAt", new Date().toISOString());
 
-      // Add completer_emp_id and update receiver_status to completed
+      // Add completer_emp_id (status is set to "completed" above)
       if (user?.emp_id) {
         formDataToSubmit.append("completer_emp_id", user.emp_id);
-        formDataToSubmit.append("receiver_status", "completed");
       }
 
       // Store assignment checkedBy/approvedBy and names for view on completed report

@@ -33,13 +33,26 @@ const getModelByReportType = (reportType) => {
   }
 };
 
-// Helper to find document across all collections
+// Helper to find document across all collections (by _id or qrId)
 const findReportById = async (id) => {
+  if (!id || String(id).trim() === "") return { doc: null, model: null };
+  const idVal = String(id).trim();
   const models = [ReportHomeWash, ReportGarmentWash, ReportHTTesting, ReportEMBPrinting, ReportPullingTest, ReportWashing];
+
+  // Try findById first (for MongoDB ObjectId)
+  if (mongoose.Types.ObjectId.isValid(idVal) && String(new mongoose.Types.ObjectId(idVal)) === idVal) {
+    for (const model of models) {
+      const doc = await model.findById(idVal);
+      if (doc) return { doc, model };
+    }
+  }
+
+  // Fallback: search by qrId (handles old QRs, display IDs like PTAF0001)
   for (const model of models) {
-    const doc = await model.findById(id);
+    const doc = await model.findOne({ qrId: idVal });
     if (doc) return { doc, model };
   }
+
   return { doc: null, model: null };
 };
 
@@ -140,6 +153,20 @@ export const saveReportWashing = async (req, res) => {
     const parsedColor = typeof color === "string" ? JSON.parse(color) : color;
     const parsedPO = typeof po === "string" ? JSON.parse(po) : po;
     const parsedExFtyDate = typeof exFtyDate === "string" ? JSON.parse(exFtyDate) : exFtyDate;
+    const parsedSampleSize = (() => {
+      const raw = req.body.sampleSize;
+      if (!raw) return [];
+      if (Array.isArray(raw)) return raw.map((s) => String(s).trim()).filter(Boolean);
+      if (typeof raw === "string" && raw.trim()) {
+        try {
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed.map((s) => String(s).trim()).filter(Boolean) : [];
+        } catch (e) {
+          return raw.split(",").map((s) => s.trim()).filter(Boolean);
+        }
+      }
+      return [];
+    })();
 
     // Helper to safely parse JSON fields
     const safeParseJSON = (data, fallback = []) => {
@@ -197,6 +224,7 @@ export const saveReportWashing = async (req, res) => {
       color: Array.isArray(parsedColor) ? parsedColor : [parsedColor],
       po: Array.isArray(parsedPO) ? parsedPO : [parsedPO],
       exFtyDate: Array.isArray(parsedExFtyDate) ? parsedExFtyDate : [parsedExFtyDate],
+      sampleSize: parsedSampleSize,
       factory: factory ? factory.trim() : "",
       // reportDate is optional - will be set when user scans QR code in completed reports
       reportDate: reportDate ? new Date(reportDate) : null,
@@ -219,11 +247,12 @@ export const saveReportWashing = async (req, res) => {
       submittedAt: new Date()
     };
 
-    // Remove legacy/redundant fields from the final object
+    // Remove legacy/redundant fields from the final object (size is not stored; use sampleSize only)
     delete reportData.userId;
     delete reportData.userName;
     delete reportData.userSubmit;
     delete reportData.userSubmitName;
+    delete reportData.size;
 
     // Determine Model based on Report Type
     console.log("Saving Report - Type:", reportData.reportType);
@@ -515,6 +544,26 @@ export const updateReportWashing = async (req, res) => {
       } catch (error) {
         console.error("Error parsing exFtyDate:", error);
         // Keep original value if parsing fails
+      }
+    }
+
+    if (updateData.sampleSize != null) {
+      try {
+        const raw = updateData.sampleSize;
+        let parsed = [];
+        if (Array.isArray(raw)) {
+          parsed = raw.map((s) => String(s).trim()).filter(Boolean);
+        } else if (typeof raw === "string" && raw.trim()) {
+          try {
+            const p = JSON.parse(raw);
+            parsed = Array.isArray(p) ? p.map((s) => String(s).trim()).filter(Boolean) : [];
+          } catch (e) {
+            parsed = raw.split(",").map((s) => s.trim()).filter(Boolean);
+          }
+        }
+        updateData.sampleSize = parsed;
+      } catch (error) {
+        console.error("Error parsing sampleSize:", error);
       }
     }
 
@@ -867,6 +916,7 @@ export const updateReportWashing = async (req, res) => {
     // Clean up other obsolete fields if they leak in
     delete updateData.userSubmit;
     delete updateData.userSubmitName;
+    delete updateData.size; // Only sampleSize is stored
     delete updateData.editedByWarehouse;
     delete updateData.editorUserId;
     delete updateData.editorUserName;
@@ -964,7 +1014,7 @@ export const deleteReportWashing = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Report Washing and associated files deleted successfully",  
+      message: "Report Washing and associated files deleted successfully",
       data: deletedReport
     });
   } catch (error) {
@@ -1188,7 +1238,6 @@ export const rejectReport = async (req, res) => {
     const updateData = {
       status: "rejected",
       receiver_emp_id,
-      receiver_status: "rejected",
       rejectedAt: now,
       rejectedNotes: rejectedNotes || ""
     };

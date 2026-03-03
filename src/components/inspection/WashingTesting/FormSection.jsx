@@ -1,4 +1,5 @@
 import React from "react";
+import { Check } from "lucide-react";
 import HTTestingForm from "./forms/HTTestingForm";
 import EMBTestingForm from "./forms/EMBTestingForm";
 import HomeWashForm from "./forms/HomeWashForm";
@@ -207,24 +208,18 @@ const FormSection = ({
                         }}
                         className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group
                           ${formData.reportType === type.val
-                            ? "bg-blue-600 text-white shadow-md"
+                            ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 ring-1 ring-blue-100 dark:ring-blue-800"
                             : "hover:bg-blue-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                           }`}
                       >
-                        <span className={`text-lg ${formData.reportType === type.val ? "text-white" : "text-blue-500/70 group-hover:text-blue-600"}`}>
+                        <span className={`text-lg ${formData.reportType === type.val ? "text-blue-600 dark:text-blue-400" : "text-blue-500/70 group-hover:text-blue-600"}`}>
                           {type.icon}
                         </span>
-                        <span className={`flex-1 text-left font-semibold text-[11px] ${formData.reportType === type.val ? "text-white" : ""}`}>
+                        <span className="flex-1 text-left font-semibold text-[11px]">
                           {type.val}
                         </span>
                         {formData.reportType === type.val && (
-                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                              fillRule="evenodd"
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
+                          <Check className="w-4 h-4 text-blue-600" />
                         )}
                       </button>
                     ))}

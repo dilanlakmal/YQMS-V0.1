@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
-import { X, Upload, Printer, Camera, Download } from "lucide-react";
+import { X, Upload, Printer, Camera, Download, CheckCircle, RotateCw } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
+import { useQRScannerStore } from "../stores/useQRScannerStore";
 import "./QRCodeModal.css";
 
 const QRCodeModal = ({
@@ -17,9 +18,30 @@ const QRCodeModal = ({
 }) => {
   const qrCodeContainerRef = useRef(null);
   const [hideQR, setHideQR] = useState(false);
+  const [scanSuccess, setScanSuccess] = useState(false);
+  const { isProcessingScan: isProcessing } = useQRScannerStore();
+
+  // Listen for QR scan success events
+  useEffect(() => {
+    const handleScanSuccess = () => {
+      setScanSuccess(true);
+      // Success popup shows for a while, then will close naturally 
+      // as the app navigates or store state changes.
+      setTimeout(() => {
+        setScanSuccess(false);
+      }, 3500);
+    };
+
+    window.addEventListener('qr-scan-success', handleScanSuccess);
+    return () => window.removeEventListener('qr-scan-success', handleScanSuccess);
+  }, []);
+
   // Unassigned users (isLocked) can't scan — default to hiding QR; they use Print/Download only
   useEffect(() => {
-    if (isOpen && reportId) setHideQR(!!isLocked);
+    if (isOpen && reportId) {
+      setHideQR(!!isLocked);
+      setScanSuccess(false);
+    }
   }, [isOpen, reportId, isLocked]);
   // Animated Logo Component for the QR center
   const QRLogoAnimated = () => (
@@ -75,65 +97,65 @@ const QRCodeModal = ({
               <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
                 Set Report Date for ID: <span className="text-indigo-500 font-mono">#{reportId}</span>
               </p>
-              
+
             </div>
 
             {/* QR Code Container with Animations - can be hidden */}
             {!hideQR && (
-            <div className="relative group perspective-1000">
-              <div className="qr-glow group-hover:bg-blue-500/20 transition-all duration-500"></div>
+              <div className="relative group perspective-1000">
+                <div className="qr-glow group-hover:bg-blue-500/20 transition-all duration-500"></div>
 
-              {/* Animated Bubbles for Washing Theme */}
-              <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
-                <div className="bubble bubble-1"></div>
-                <div className="bubble bubble-2"></div>
-                <div className="bubble bubble-3"></div>
-                <div className="bubble bubble-4"></div>
-              </div>
-
-              <div
-                ref={qrCodeContainerRef}
-                id={`qr-code-${reportId}`}
-                className="relative bg-white p-6 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 cursor-pointer transform transition-all duration-500 group-hover:scale-[1.02] group-hover:shadow-indigo-500/10 active:scale-95"
-                onClick={handleClick}
-                role="button"
-                tabIndex="0"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    handleClick();
-                  }
-                }}
-                title="Click to download"
-              >
-                <div className="absolute inset-0 flex items-center justify-center p-6 pointer-events-none z-10">
-                  <QRLogoAnimated />
+                {/* Animated Bubbles for Washing Theme */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
+                  <div className="bubble bubble-1"></div>
+                  <div className="bubble bubble-2"></div>
+                  <div className="bubble bubble-3"></div>
+                  <div className="bubble bubble-4"></div>
                 </div>
 
-                {/* Scanning Beam Animation - Now on the topmost layer z-30 */}
-                <div className="absolute inset-0 z-30 pointer-events-none overflow-hidden rounded-2xl transition-opacity duration-500 opacity-100 group-hover:opacity-0">
-                  <div className="absolute left-0 right-0 h-1.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent shadow-[0_0_20px_rgba(59,130,246,1),0_0_40px_rgba(59,130,246,0.5)] animate-scan-beam"></div>
-                </div>
-
-                <QRCodeCanvas
-                  id={`qr-canvas-${reportId}`}
-                  value={`${getQRCodeBaseURL()}/Launch-washing-machine-test?scan=${reportId}`}
-                  size={1024}
-                  level="H"
-                  imageSettings={{
-                    src: "/assets/Home/YQMSLogoEdit.png",
-                    x: undefined,
-                    y: undefined,
-                    height: 90,  // Reduced from 120 for better scannability
-                    width: 90,   // Reduced from 120 for better scannability
-                    excavate: true,
+                <div
+                  ref={qrCodeContainerRef}
+                  id={`qr-code-${reportId}`}
+                  className="relative bg-white p-6 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 cursor-pointer transform transition-all duration-500 group-hover:scale-[1.02] group-hover:shadow-indigo-500/10 active:scale-95"
+                  onClick={handleClick}
+                  role="button"
+                  tabIndex="0"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      handleClick();
+                    }
                   }}
-                  style={{ height: "auto", maxWidth: "200px", width: "100%", pointerEvents: "none" }}
-                />
-              </div>
+                  title="Click to download"
+                >
+                  <div className="absolute inset-0 flex items-center justify-center p-6 pointer-events-none z-10">
+                    <QRLogoAnimated />
+                  </div>
 
-            </div>
+                  {/* Scanning Beam Animation - Now on the topmost layer z-30 */}
+                  <div className="absolute inset-0 z-30 pointer-events-none overflow-hidden rounded-2xl transition-opacity duration-500 opacity-100 group-hover:opacity-0">
+                    <div className="absolute left-0 right-0 h-1.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent shadow-[0_0_20px_rgba(59,130,246,1),0_0_40px_rgba(59,130,246,0.5)] animate-scan-beam"></div>
+                  </div>
+
+                  <QRCodeCanvas
+                    id={`qr-canvas-${reportId}`}
+                    value={`${getQRCodeBaseURL()}/Launch-washing-machine-test?scan=${reportId}`}
+                    size={1024}
+                    level="H"
+                    imageSettings={{
+                      src: "/assets/Home/YQMSLogoEdit.png",
+                      x: undefined,
+                      y: undefined,
+                      height: 90,  // Reduced from 120 for better scannability
+                      width: 90,   // Reduced from 120 for better scannability
+                      excavate: true,
+                    }}
+                    style={{ height: "auto", maxWidth: "200px", width: "100%", pointerEvents: "none" }}
+                  />
+                </div>
+
+              </div>
             )}
-           
+
 
             {!isLocked && (
               <div className="mt-0 flex justify-center">
@@ -209,6 +231,42 @@ const QRCodeModal = ({
             </div>
           </div>
         </div>
+
+        {/* Processing Overlay */}
+        {isProcessing && (
+          <div className="absolute inset-0 z-[60] bg-white/80 dark:bg-gray-900/80 backdrop-blur-[2px] flex flex-col items-center justify-center animate-fade-in">
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-blue-200 dark:border-blue-900 rounded-full"></div>
+              <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
+            </div>
+            <p className="mt-4 text-blue-600 dark:text-blue-400 font-bold text-lg animate-pulse">
+              Processing QR Code...
+            </p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+              Please wait a moment
+            </p>
+          </div>
+        )}
+
+        {/* Success Overlay */}
+        {scanSuccess && (
+          <div className="absolute inset-0 z-[70] bg-white/95 dark:bg-gray-900/95 flex flex-col items-center justify-center animate-modal-pop">
+            <div className="scale-125 md:scale-150">
+              <CheckCircle size={80} className="text-green-500 animate-success-check" strokeWidth={2.5} />
+            </div>
+            <h4 className="mt-8 text-2xl font-bold text-gray-900 dark:text-white">
+              Scan Success!
+            </h4>
+            <p className="mt-2 text-gray-600 dark:text-gray-400 font-medium">
+              Correct check
+            </p>
+            <div className="mt-6 flex gap-1">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+            </div>
+          </div>
+        )}
       </div>
     </div >
   );

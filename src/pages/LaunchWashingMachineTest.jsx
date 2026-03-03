@@ -75,6 +75,7 @@ const LaundryWashingMachineTest = () => {
     standard: { pagination, reports: standardReports },
     fetchReports: _fetchReports,
     refreshAllReports,
+    incrementNewRecordsCount,
     handlePrintPDF, handleDownloadPDF, handleExportExcel,
   } = useWashingReportsStore();
 
@@ -104,10 +105,11 @@ const LaundryWashingMachineTest = () => {
     editModal, editImagesModal, closeEditImagesModal,
     setEditImages, setEditNotes,
     editFormData, setEditFormData,
-    editAvailableColors, editAvailablePOs, editAvailableETDs,
+    editAvailableColors, editAvailablePOs, editAvailableETDs, editAvailableSizes,
     showEditColorDropdown, setShowEditColorDropdown,
     showEditPODropdown, setShowEditPODropdown,
     showEditETDDropdown, setShowEditETDDropdown,
+    showEditSizeDropdown, setShowEditSizeDropdown,
     showReportDateQR, setShowReportDateQR,
     showReportDateScanner, setShowReportDateScanner,
     handleDelete, confirmDelete, handleReject,
@@ -178,11 +180,32 @@ const LaundryWashingMachineTest = () => {
   // ─── Socket.IO: real-time refresh ─────────────────────────────────
   useEffect(() => {
     if (!API_BASE_URL) return;
-    const socket = io(API_BASE_URL, { path: "/socket.io", transports: ["websocket"], secure: API_BASE_URL.startsWith("https") });
+    const socket = io(API_BASE_URL, {
+      path: "/socket.io",
+      transports: ["websocket"],
+      secure: API_BASE_URL.startsWith("https")
+    });
+
     const onUpdated = () => refreshAllReports();
+    const onCreated = (newData) => {
+      // Increment count for all tabs to show notification badge
+      incrementNewRecordsCount("standard");
+      incrementNewRecordsCount("warehouse");
+      // For easy_scan, only if it's not completed
+      if (newData && newData.status !== "completed") {
+        incrementNewRecordsCount("easy_scan");
+      }
+    };
+
     socket.on("washing-report-updated", onUpdated);
-    return () => { socket.off("washing-report-updated", onUpdated); socket.disconnect(); };
-  }, [refreshAllReports]);
+    socket.on("washing-report-created", onCreated);
+
+    return () => {
+      socket.off("washing-report-updated", onUpdated);
+      socket.off("washing-report-created", onCreated);
+      socket.disconnect();
+    };
+  }, [refreshAllReports, incrementNewRecordsCount]);
 
   // ─── Factories on mount ───────────────────────────────────────────
   useEffect(() => { fetchFactories(); }, []); // eslint-disable-line
@@ -212,14 +235,6 @@ const LaundryWashingMachineTest = () => {
     processQRScanFromURL(scanReportId);
     setSearchParams({});
   }, [searchParams]); // eslint-disable-line
-
-  // ─── Close QR modal if report becomes completed ───────────────────
-  useEffect(() => {
-    if (showReportDateQR) {
-      const report = standardReports.find((r) => r._id === showReportDateQR || r.id === showReportDateQR);
-      if (report && report.status === "completed") setShowReportDateQR(null);
-    }
-  }, [standardReports, showReportDateQR]); // eslint-disable-line
 
   // ─── Close dropdowns on click outside ─────────────────────────────
   useEffect(() => {
@@ -468,12 +483,15 @@ const LaundryWashingMachineTest = () => {
             editAvailableColors={editAvailableColors}
             editAvailablePOs={editAvailablePOs}
             editAvailableETDs={editAvailableETDs}
+            editAvailableSizes={editAvailableSizes}
             showEditColorDropdown={showEditColorDropdown}
             setShowEditColorDropdown={setShowEditColorDropdown}
             showEditPODropdown={showEditPODropdown}
             setShowEditPODropdown={setShowEditPODropdown}
             showEditETDDropdown={showEditETDDropdown}
             setShowEditETDDropdown={setShowEditETDDropdown}
+            showEditSizeDropdown={showEditSizeDropdown}
+            setShowEditSizeDropdown={setShowEditSizeDropdown}
             onClose={resetEditState}
             onSubmit={handleEditSubmit}
           />
@@ -562,6 +580,9 @@ const LaundryWashingMachineTest = () => {
             sizes={sizeFollowUpModal.sizes}
             ymStyle={sizeFollowUpModal.ymStyle}
             colors={sizeFollowUpModal.colors}
+            pos={sizeFollowUpModal.pos}
+            etds={sizeFollowUpModal.etds}
+            reportType={sizeFollowUpModal.reportType}
             onClose={closeSizeFollowUpModal}
           />
         </div>

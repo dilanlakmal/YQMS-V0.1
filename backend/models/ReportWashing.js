@@ -7,6 +7,7 @@ const reportWashingSchema = new mongoose.Schema(
     color: { type: [String], default: [] }, // Array of selected colors
     po: { type: [String], default: [] }, // Array of selected POs
     exFtyDate: { type: [String], default: [] }, // Array of selected ETD dates
+    sampleSize: { type: [String], default: [] }, // Array of sizes e.g. ["XS", "S"]
     factory: { type: String, default: "" },
     reportDate: { type: Date, default: null }, // Will be set when user scans QR code
     sendToHomeWashingDate: { type: Date, default: Date.now },
@@ -30,7 +31,6 @@ const reportWashingSchema = new mongoose.Schema(
     receivedDate: { type: String, default: null }, // Date string when first scanned
     receivedAt: { type: Date, default: null }, // Full timestamp when first scanned
     receiver_emp_id: { type: String, default: null }, // Employee ID of user who scanned/received
-    receiver_status: { type: String, default: "pending" },
     receivedNotes: { type: String, default: "" }, // Notes added during received status
     receivedImages: { type: [String], default: [] }, // Images added during received status
     completedDate: { type: String, default: null }, // Date string when completed

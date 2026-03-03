@@ -8,6 +8,7 @@ import { API_BASE_URL, QR_CODE_BASE_URL } from "../../../../config.js";
 import ReportCard from "./ReportCard";
 import { getReportTypeOptions } from "./constants/reportTypes";
 import { getQRCodeBaseURL } from "./helpers/qrHelpers";
+import { getReportSizeDisplay } from "./helpers";
 import showToast from "../../../utils/toast.js";
 import { useAuth } from "../../authentication/AuthContext";
 import {
@@ -68,7 +69,7 @@ const ReportsList = ({
 
   // Read report data directly from store
   const {
-    [tab]: { reports, isLoading: isLoadingReports, expandedReports, printingReportId, pagination },
+    [tab]: { reports, isLoading: isLoadingReports, expandedReports, printingReportId, pagination, newRecordsCount },
     fetchReports: _fetchReports,
     toggleReport: _toggleReport,
   } = useWashingReportsStore();
@@ -328,10 +329,15 @@ const ReportsList = ({
             <button
               onClick={onRefresh}
               disabled={isLoadingReports}
-              className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-slate-500 dark:text-gray-400 disabled:opacity-30 transition-colors"
+              className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-slate-500 dark:text-gray-400 disabled:opacity-30 transition-colors relative"
               title="Refresh"
             >
               <RefreshCw className={`w-4 h-4 ${isLoadingReports ? "animate-spin" : ""}`} />
+              {newRecordsCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full border border-white dark:border-gray-800 animate-bounce">
+                  {newRecordsCount > 9 ? "9+" : newRecordsCount}
+                </span>
+              )}
             </button>
 
             {/* Pagination Controls */}
@@ -922,7 +928,7 @@ const ReportsList = ({
         const colorStr = Array.isArray(report.color)
           ? report.color.join(", ")
           : (report.color || "N/A");
-        const sizeStr = Array.isArray(report.size) ? report.size.join(", ") : (report.size || "N/A");
+        const sizeStr = getReportSizeDisplay(report);
         const qtyStr = report.qty || "N/A";
         const buyerStyleStr = report.buyerStyle || "N/A";
         const reportTypeStr = report.reportType || "Garment Wash Report";

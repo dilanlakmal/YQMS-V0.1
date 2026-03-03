@@ -226,7 +226,7 @@ const getIconScale = (iconName, compact) => {
     return map[iconName] || defaultScale;
 };
 
-const CareSymbolsSelector = ({ value = {}, onChange, compact = false }) => {
+const CareSymbolsSelector = ({ value = {}, onChange, compact = false, showNoLabel = false }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
 
@@ -261,7 +261,7 @@ const CareSymbolsSelector = ({ value = {}, onChange, compact = false }) => {
 
     return (
         <div className="relative w-full" ref={dropdownRef}>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">CARE INSTRUCTIONS :</label>
+            {!showNoLabel && <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">CARE INSTRUCTIONS :</label>}
 
             {/* Trigger Button */}
             <button
@@ -269,7 +269,7 @@ const CareSymbolsSelector = ({ value = {}, onChange, compact = false }) => {
                 onClick={() => setIsOpen(!isOpen)}
                 className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-left flex items-center justify-between hover:border-blue-400 transition-colors shadow-sm ${compact ? 'min-h-[42px]' : 'min-h-[50px]'}`}
             >
-                <div className="flex flex-wrap gap-2 items-center">
+                <div className="flex flex-wrap gap-2 md:gfap-1 lg:gap-2 items-center">
                     {selectedCount === 0 ? (
                         <span className="text-gray-400 italic">Select care symbols...</span>
                     ) : (
@@ -290,14 +290,14 @@ const CareSymbolsSelector = ({ value = {}, onChange, compact = false }) => {
 
             {/* Dropdown Content - The Grid */}
             {isOpen && (
-                <div className={`absolute z-50 mt-2 left-0 right-0 sm:left-auto sm:right-auto w-full max-w-[min(100vw-1rem,800px)] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 ${compact ? 'sm:max-w-[520px]' : 'sm:min-w-[520px] lg:min-w-[800px]'}`}>
-                    <div className={`overflow-y-auto overflow-x-hidden ${compact ? 'p-2 max-h-[70vh]' : 'p-3 sm:p-4 max-h-[75vh] sm:max-h-[70vh]'}`}>
-                        <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 ${compact ? 'gap-2' : 'gap-3 sm:gap-4'}`}>
+                <div className={`absolute z-50 mt-2 left-0 right-0 sm:left-auto sm:right-auto lg:left-0 lg:right-0 w-full max-w-[min(100vw-1rem,1200px)] lg:max-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 ${compact ? 'sm:max-w-[520px]' : 'sm:min-w-[520px] md:min-w-[700px] lg:min-w-[800px]'}`}>
+                    <div className={`overflow-y-auto overflow-x-hidden ${compact ? 'p-2 max-h-[70vh]' : 'p-3 sm:p-4 md:p-2 lg:p-4 max-h-[75vh] sm:max-h-[70vh]'}`}>
+                        <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 ${compact ? 'gap-2' : 'gap-3 sm:gap-4 md:gap-1.5 lg:gap-4'}`}>
                             {CARE_CATEGORIES.map(cat => (
                                 <div key={cat.id} className={`flex flex-col min-w-0 ${compact ? 'gap-1' : 'gap-2'}`}>
                                     {/* Header */}
                                     <div className={`text-center border-b dark:border-gray-700 ${compact ? 'pb-1' : 'pb-2'}`}>
-                                        <span className={`font-bold text-gray-500 uppercase tracking-wider ${compact ? 'text-[10px]' : 'text-[10px] sm:text-xs'}`}>{cat.label}</span>
+                                        <span className={`font-bold text-gray-500 uppercase tracking-wider ${compact ? 'text-[10px]' : 'text-[10px] sm:text-xs md:text-[9px] lg:text-xs'}`}>{cat.label}</span>
                                     </div>
 
                                     <div className={`flex flex-col items-center ${compact ? 'gap-1.5 py-1' : 'gap-3 py-2'}`}>
@@ -314,7 +314,7 @@ const CareSymbolsSelector = ({ value = {}, onChange, compact = false }) => {
                                                         <img
                                                             src={`${ASSET_PATH}${itemIcon}`}
                                                             alt={itemIcon}
-                                                            className={`object-contain block mx-auto transform ${getIconScale(itemIcon, compact)} origin-center transition-transform ${compact ? 'w-6 h-6 hover:scale-110' : 'w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 hover:scale-[1.8]'}`}
+                                                            className={`object-contain block mx-auto transform ${getIconScale(itemIcon, compact)} origin-center transition-transform ${compact ? 'w-6 h-6 hover:scale-110' : 'w-7 h-7 sm:w-8 sm:h-8 md:w-8 md:h-8 lg:w-10 lg:h-10 hover:scale-[1.8]'}`}
                                                         />
                                                     </button>
                                                 ))}

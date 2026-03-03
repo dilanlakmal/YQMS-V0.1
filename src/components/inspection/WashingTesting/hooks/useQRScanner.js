@@ -287,7 +287,7 @@ export const useQRScanner = ({
         if (!reportResponse.ok) {
           if (reportResponse.status === 404) {
             showToast.error(
-              "This QR code is from an old or deleted report. Please upload the QR code that is displayed in the current modal window.",
+              "Report not found. The QR code may be from a deleted report or a different system.",
             );
           } else {
             showToast.error("Unable to verify the report. Please try again.");
