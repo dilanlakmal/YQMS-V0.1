@@ -112,19 +112,16 @@ import HumidityReportPage from "./pages/HumidityReport.jsx";
 //FC Direct SQL
 import FCSystem from "./pages/FCSystem";
 
+// Real-Time Sunrise System
+import WIP from "./pages/WIP.jsx";
+import WIPSewingDefects from "./pages/WIPSewingDefects";
+
 export const BluetoothContext = createContext(null);
 
 function AppContent() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return !!localStorage.getItem("accessToken");
   });
-
-  // const [isAuthenticated, setIsAuthenticated] = useState(() => {
-  //   return !!(
-  //     localStorage.getItem("accessToken") ||
-  //     sessionStorage.getItem("accessToken")
-  //   );
-  // });
 
   const [detailsSubmitted, setDetailsSubmitted] = useState(false);
   const [sharedState, setSharedState] = useState({
@@ -189,17 +186,6 @@ function AppContent() {
     // Fire a specific 'logout' event for other tabs to notice.
     localStorage.setItem("authEvent", `logout-${Date.now()}`);
   };
-
-  // const handleLogout = () => {
-  //   localStorage.removeItem("accessToken");
-  //   localStorage.removeItem("refreshToken");
-  //   localStorage.removeItem("user");
-  //   sessionStorage.removeItem("accessToken");
-  //   sessionStorage.removeItem("refreshToken");
-  //   sessionStorage.removeItem("user");
-  //   setIsAuthenticated(false);
-  //   resetAllStates();
-  // };
 
   const resetAllStates = () => {
     setInspectionState(null);
@@ -532,6 +518,11 @@ function AppContent() {
               <Route path="/production-Sheet" element={<CoverPage />} />
               <Route path="/humidity-report" element={<HumidityReportPage />} />
               <Route path="/fc-system" element={<FCSystem />} />
+              <Route path="/wip-sewing-output" element={<WIP />} />
+              <Route
+                path="/wip-sewing-defects"
+                element={<WIPSewingDefects />}
+              />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

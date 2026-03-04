@@ -333,9 +333,16 @@ import FCSystemRoutes from "./routes/SQL/FCSystemRoutes.js";
 import { closeFCPool } from "./controller/SQL/fcConnectionManager.js";
 
 /* ------------------------------
-   FC System Routes
+   RealTime Sunrise Import (NEW)
+------------------------------ */
+import RealTimeSunriseRoutes from "./routes/SQL/RealTimeSunriseRoutes.js";
+import { closeRealTimeSunrisePool } from "./controller/SQL/RealTimeSunriseConnectionManager.js";
+
+/* ------------------------------
+   FC and Real Time Sunrise System Routes
 ------------------------------ */
 app.use(FCSystemRoutes);
+app.use(RealTimeSunriseRoutes);
 
 /* ------------------------------
    FC System Graceful Shutdown
@@ -343,6 +350,7 @@ app.use(FCSystemRoutes);
 process.on("SIGINT", async () => {
   try {
     await closeFCPool();
+    await closeRealTimeSunrisePool();
   } catch (err) {
     console.error("Error closing FC pool:", err);
   } finally {

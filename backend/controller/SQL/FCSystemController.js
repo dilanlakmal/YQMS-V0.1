@@ -762,6 +762,101 @@ export const getDensityTestData = async (req, res) => {
    Seperation Color List API
 ------------------------------ */
 
+// 1. Get Summary List based on filters
+export const getSeperationColorSearchList = async (req, res) => {
+  try {
+    await ensureFCConnected();
+    const pool = getFCPool();
+    const { startDate, endDate, txnNo, mpoNo, style, engColor } = req.query;
+
+    let query = `
+      SELECT DISTINCT [TxnNo], [Create_Date], [MPOCode], [MPONo], [Style], 
+             [Material], [EngColor], [Code], [Tone_Code]
+      FROM [FC_SYSTEM].[dbo].[ViewSeperation_ColorList]
+      WHERE 1=1
+    `;
+
+    const request = pool.request();
+
+    // Date Filter (Required) - Create_Date as Inspection Date
+    if (startDate && endDate) {
+      query += ` AND [Create_Date] BETWEEN @startDate AND @endDate`;
+      request.input("startDate", sql.DateTime, new Date(startDate));
+      request.input("endDate", sql.DateTime, new Date(endDate));
+    }
+
+    // Optional Filters
+    if (txnNo) {
+      query += ` AND [TxnNo] LIKE @txnNo`;
+      request.input("txnNo", sql.NVarChar, `%${txnNo}%`);
+    }
+    if (mpoNo) {
+      query += ` AND [MPONo] LIKE @mpoNo`;
+      request.input("mpoNo", sql.NVarChar, `%${mpoNo}%`);
+    }
+    if (style) {
+      query += ` AND [Style] LIKE @style`;
+      request.input("style", sql.NVarChar, `%${style}%`);
+    }
+    if (engColor) {
+      query += ` AND [EngColor] LIKE @engColor`;
+      request.input("engColor", sql.NVarChar, `%${engColor}%`);
+    }
+
+    // Order by latest
+    query += ` ORDER BY [Create_Date] DESC, [TxnNo] DESC`;
+
+    const result = await request.query(query);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+  } catch (err) {
+    console.error("Error fetching seperation color search list:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 2. Get Distinct Values for Dropdowns
+export const getSeperationColorFieldValues = async (req, res) => {
+  try {
+    await ensureFCConnected();
+    const pool = getFCPool();
+    const { field, startDate, endDate, search } = req.query;
+
+    const allowedFields = ["MPONo", "Style", "EngColor"];
+    if (!allowedFields.includes(field)) {
+      return res.status(400).json({ success: false, message: "Invalid field" });
+    }
+
+    let query = `
+      SELECT DISTINCT TOP (20) [${field}] as value
+      FROM [FC_SYSTEM].[dbo].[ViewSeperation_ColorList]
+      WHERE [Create_Date] BETWEEN @startDate AND @endDate
+    `;
+
+    const request = pool.request();
+    request.input("startDate", sql.DateTime, new Date(startDate));
+    request.input("endDate", sql.DateTime, new Date(endDate));
+
+    if (search) {
+      query += ` AND [${field}] LIKE @search`;
+      request.input("search", sql.NVarChar, `%${search}%`);
+    }
+
+    query += ` ORDER BY [${field}]`;
+
+    const result = await request.query(query);
+    res.json({ success: true, data: result.recordset.map((r) => r.value) });
+  } catch (err) {
+    console.error("Error fetching dropdown values:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 3. Get Detailed Seperation Color List Data by TxnNo
+
 export const getSeperationColorListData = async (req, res) => {
   try {
     await ensureFCConnected();
@@ -866,6 +961,102 @@ export const getSeperationColorListData = async (req, res) => {
    Crocking Test API
 ------------------------------ */
 
+// 1. Get Summary List based on filters
+export const getCrockingSearchList = async (req, res) => {
+  try {
+    await ensureFCConnected();
+    const pool = getFCPool();
+    const { startDate, endDate, txnNo, mpoNo, supplier, engColor } = req.query;
+
+    // We join Inv with Detail to get full info if needed, but for summary ViewCrocking_Test_Inv is usually sufficient
+    // unless you need specific lot info in the summary list. Assuming Inv view has header info.
+    let query = `
+      SELECT [TxnNo], [Create_Date], [Update_Date], [PreparedBy], [MPOCode], 
+             [MPONo], [Supplier], [Description], [EngColor], [Container], [Invoice], [BuyerStyle]
+      FROM [FC_SYSTEM].[dbo].[ViewCrocking_Test_Inv]
+      WHERE 1=1
+    `;
+
+    const request = pool.request();
+
+    // Date Filter (Required)
+    if (startDate && endDate) {
+      query += ` AND [Create_Date] BETWEEN @startDate AND @endDate`;
+      request.input("startDate", sql.DateTime, new Date(startDate));
+      request.input("endDate", sql.DateTime, new Date(endDate));
+    }
+
+    // Optional Filters
+    if (txnNo) {
+      query += ` AND [TxnNo] LIKE @txnNo`;
+      request.input("txnNo", sql.NVarChar, `%${txnNo}%`);
+    }
+    if (mpoNo) {
+      query += ` AND [MPONo] LIKE @mpoNo`;
+      request.input("mpoNo", sql.NVarChar, `%${mpoNo}%`);
+    }
+    if (supplier) {
+      query += ` AND [Supplier] LIKE @supplier`;
+      request.input("supplier", sql.NVarChar, `%${supplier}%`);
+    }
+    if (engColor) {
+      query += ` AND [EngColor] LIKE @engColor`;
+      request.input("engColor", sql.NVarChar, `%${engColor}%`);
+    }
+
+    // Order by latest
+    query += ` ORDER BY [Create_Date] DESC, [TxnNo] DESC`;
+
+    const result = await request.query(query);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+  } catch (err) {
+    console.error("Error fetching crocking search list:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 2. Get Distinct Values for Dropdowns
+export const getCrockingFieldValues = async (req, res) => {
+  try {
+    await ensureFCConnected();
+    const pool = getFCPool();
+    const { field, startDate, endDate, search } = req.query;
+
+    const allowedFields = ["MPONo", "Supplier", "EngColor"];
+    if (!allowedFields.includes(field)) {
+      return res.status(400).json({ success: false, message: "Invalid field" });
+    }
+
+    let query = `
+      SELECT DISTINCT TOP (20) [${field}] as value
+      FROM [FC_SYSTEM].[dbo].[ViewCrocking_Test_Inv]
+      WHERE [Create_Date] BETWEEN @startDate AND @endDate
+    `;
+
+    const request = pool.request();
+    request.input("startDate", sql.DateTime, new Date(startDate));
+    request.input("endDate", sql.DateTime, new Date(endDate));
+
+    if (search) {
+      query += ` AND [${field}] LIKE @search`;
+      request.input("search", sql.NVarChar, `%${search}%`);
+    }
+
+    query += ` ORDER BY [${field}]`;
+
+    const result = await request.query(query);
+    res.json({ success: true, data: result.recordset.map((r) => r.value) });
+  } catch (err) {
+    console.error("Error fetching dropdown values:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 3. Get Detailed Crocking Test Data by TxnNo
 export const getCrockingTestData = async (req, res) => {
   try {
     await ensureFCConnected();
@@ -978,6 +1169,55 @@ export const getCrockingTestData = async (req, res) => {
    Supplier Evaluation API
 ------------------------------ */
 
+// 1. Get Summary List (Inventory Header Only)
+export const getSupplierEvaluationList = async (req, res) => {
+  try {
+    await ensureFCConnected();
+    const pool = getFCPool();
+    const { year, month, txnNo } = req.query;
+
+    let query = `
+      SELECT [Id], [TxnNo], [TMonth], [PreparedBy], 
+             [Create_Date] as InspectionDate, 
+             [Update_Date] as SubmittedDate, 
+             [Remarks]
+      FROM [FC_SYSTEM].[dbo].[tbSupplier_Evaluation_Inv]
+      WHERE 1=1
+    `;
+
+    const request = pool.request();
+
+    // Filter by Year and Month from TMonth
+    if (year) {
+      query += ` AND YEAR([TMonth]) = @year`;
+      request.input("year", sql.Int, parseInt(year));
+    }
+    if (month) {
+      query += ` AND MONTH([TMonth]) = @month`;
+      request.input("month", sql.Int, parseInt(month));
+    }
+
+    // Filter by TxnNo
+    if (txnNo) {
+      query += ` AND [TxnNo] LIKE @txnNo`;
+      request.input("txnNo", sql.NVarChar, `%${txnNo}%`);
+    }
+
+    query += ` ORDER BY [Create_Date] DESC, [TxnNo] DESC`;
+
+    const result = await request.query(query);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+  } catch (err) {
+    console.error("Error fetching supplier evaluation list:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 2. Get Detailed Data for a specific TxnNo
 export const getSupplierEvaluationData = async (req, res) => {
   try {
     await ensureFCConnected();

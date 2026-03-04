@@ -10,6 +10,21 @@ import {
   applyBWSelectionToAW,
 } from "../../../controller/PivotY/QASections/QASections_Measurement_Specs_Controller.js";
 
+// Import update controller
+import {
+  updateBWSpecsFromMasterData,
+  updateAWSpecsFromMasterData,
+  previewSpecsUpdate,
+  repairCorruptedSpecs,
+} from "../../../controller/PivotY/QASections/QASections_Measurement_Specs_Update_Controller.js";
+
+// Import Name Swap Controller
+import {
+  previewNameSwap,
+  executeNameSwap,
+  validatePointNames,
+} from "../../../controller/PivotY/QASections/QASections_Measurement_Specs_Names_Controller.js";
+
 const router = express.Router();
 
 // Before Wash
@@ -48,6 +63,50 @@ router.get(
 router.post(
   "/api/qa-sections/measurement-specs/apply-to-aw",
   applyBWSelectionToAW,
+);
+
+// =========================================================================
+// Update Specs from Master Data Routes
+// =========================================================================
+
+// Update Before Wash Specs from Master Data
+router.post(
+  "/api/qa-sections/measurement-specs/update-from-master",
+  updateBWSpecsFromMasterData,
+);
+
+// Update After Wash Specs from Master Data
+router.post(
+  "/api/qa-sections/measurement-specs-aw/update-from-master",
+  updateAWSpecsFromMasterData,
+);
+
+// Preview what would be updated (works for both BW and AW)
+router.post(
+  "/api/qa-sections/measurement-specs/preview-update",
+  previewSpecsUpdate,
+);
+
+// Repair corrupted specs (removes size: "index" and restores from master)
+router.post(
+  "/api/qa-sections/measurement-specs/repair-corrupted",
+  repairCorruptedSpecs,
+);
+
+// =========================================================================
+// Name Swap Routes
+// =========================================================================
+router.post(
+  "/api/qa-sections/measurement-specs/preview-name-swap",
+  previewNameSwap,
+);
+router.post(
+  "/api/qa-sections/measurement-specs/execute-name-swap",
+  executeNameSwap,
+);
+router.post(
+  "/api/qa-sections/measurement-specs/validate-point-names",
+  validatePointNames,
 );
 
 export default router;
