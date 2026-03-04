@@ -7,7 +7,7 @@ const reportWashingSchema = new mongoose.Schema(
     color: { type: [String], default: [] }, // Array of selected colors
     po: { type: [String], default: [] }, // Array of selected POs
     exFtyDate: { type: [String], default: [] }, // Array of selected ETD dates
-    sampleSize: { type: [String], default: [] }, // Array of sizes e.g. ["XS", "S"]
+    reportSampleSizes: { type: [String], default: [] }, // Array of sizes e.g. ["XS", "S"]
     factory: { type: String, default: "" },
     reportDate: { type: Date, default: null }, // Will be set when user scans QR code
     sendToHomeWashingDate: { type: Date, default: Date.now },

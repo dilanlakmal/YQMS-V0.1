@@ -214,6 +214,7 @@ export const useWashingReportsStore = create((set, get) => ({
         }
         const getSampleSizeArr = (data) => {
             if (!data) return [];
+            if (Array.isArray(data.reportSampleSizes) && data.reportSampleSizes.length > 0) return data.reportSampleSizes.filter(Boolean);
             if (Array.isArray(data.sampleSize)) return data.sampleSize.filter(Boolean);
             if (typeof data.sampleSize === "string" && data.sampleSize.trim()) {
                 try {
@@ -263,7 +264,7 @@ export const useWashingReportsStore = create((set, get) => ({
                 }
                 : formData;
 
-            // Build sampleSize array: backend stores only sampleSize (not size)
+            // Build reportSampleSizes array: backend stores reportSampleSizes as array
             const toSampleSizeArray = (val) => {
                 if (!val) return [];
                 if (Array.isArray(val)) return val.map((s) => String(s).trim()).filter(Boolean);
@@ -280,9 +281,28 @@ export const useWashingReportsStore = create((set, get) => ({
                 }
                 return [];
             };
-            const sampleSize = toSampleSizeArray(dataToSubmit.sampleSize)?.length
-                ? toSampleSizeArray(dataToSubmit.sampleSize)
-                : toSampleSizeArray(dataToSubmit.size);
+            // Store ONLY the size(s) the user selected and saved data for — not all sizes
+            const shrinkageRows = dataToSubmit.shrinkageRows || [];
+            const hasShrinkageData = Array.isArray(shrinkageRows) && shrinkageRows.some(
+                (r) => r.selected !== false && (r.beforeWash || r.afterWash)
+            );
+            const currentSize = dataToSubmit.sampleSize != null
+                ? (Array.isArray(dataToSubmit.sampleSize)
+                    ? dataToSubmit.sampleSize[0]
+                    : String(dataToSubmit.sampleSize).trim())
+                : "";
+            let reportSampleSizes;
+            if (hasShrinkageData && currentSize) {
+                // User entered shrinkage data for current size — store only that size
+                reportSampleSizes = [currentSize];
+            } else {
+                // No shrinkage data: use reportSampleSizes, sampleSize, or size (e.g. initial submission)
+                reportSampleSizes = (Array.isArray(dataToSubmit.reportSampleSizes) && dataToSubmit.reportSampleSizes.length > 0)
+                    ? dataToSubmit.reportSampleSizes.map((s) => String(s).trim()).filter(Boolean)
+                    : (toSampleSizeArray(dataToSubmit.sampleSize)?.length
+                        ? toSampleSizeArray(dataToSubmit.sampleSize)
+                        : toSampleSizeArray(dataToSubmit.size));
+            }
 
             const fd = new FormData();
             fd.append("reportType", dataToSubmit.reportType || "Garment Wash Report");
@@ -291,7 +311,7 @@ export const useWashingReportsStore = create((set, get) => ({
             fd.append("color", JSON.stringify(dataToSubmit.color || []));
             fd.append("po", JSON.stringify(dataToSubmit.po || []));
             fd.append("exFtyDate", JSON.stringify(dataToSubmit.exFtyDate || []));
-            fd.append("sampleSize", JSON.stringify(sampleSize));
+            fd.append("reportSampleSizes", JSON.stringify(reportSampleSizes));
             fd.append("factory", dataToSubmit.factory || "");
             fd.append("sendToHomeWashingDate", dataToSubmit.sendToHomeWashingDate || "");
             fd.append("notes", dataToSubmit.notes || "");
@@ -300,8 +320,9 @@ export const useWashingReportsStore = create((set, get) => ({
 
             const skipFields = [
                 "reportType", "ymStyle", "buyerStyle", "color", "po", "exFtyDate",
-                "size", "sampleSize", "factory", "sendToHomeWashingDate", "notes", "images", "userId",
+                "size", "sampleSize", "reportSampleSizes", "factory", "sendToHomeWashingDate", "notes", "images", "userId",
                 "userName", "reporter_emp_id", "reporter_name", "careLabelImage",
+                "style", "styleNo", "moNo", "date", // Redundant — only ymStyle is stored
             ];
             Object.keys(dataToSubmit).forEach((key) => {
                 if (!skipFields.includes(key) && dataToSubmit[key] !== undefined && dataToSubmit[key] !== null) {
@@ -309,7 +330,7 @@ export const useWashingReportsStore = create((set, get) => ({
                         fd.append(key, dataToSubmit[key].join(", "));
                     else if (key === "shrinkageRows" && Array.isArray(dataToSubmit[key])) {
                         const rowsToStore = dataToSubmit[key].filter(
-                            (r) => r.selected || r.beforeWash || r.afterWash || r.location
+                            (r) => r.selected !== false && (r.beforeWash || r.afterWash)
                         );
                         fd.append(key, JSON.stringify(rowsToStore));
                     }
@@ -514,12 +535,13 @@ export const useWashingReportsStore = create((set, get) => ({
                 "reportType", "color", "buyerStyle", "po", "exFtyDate",
                 "factory", "sendToHomeWashingDate", "images", "receivedImages",
                 "completionImages", "completionNotes", "careLabelImage",
+                "style", "styleNo", "moNo", "date",
             ];
             Object.keys(editFormData).forEach((key) => {
                 if (!skipFields.includes(key) && editFormData[key] !== undefined && editFormData[key] !== null) {
                     if (key === "shrinkageRows" && Array.isArray(editFormData[key])) {
                         const rowsToStore = editFormData[key].filter(
-                            (r) => r.selected || r.beforeWash || r.afterWash || r.location
+                            (r) => r.selected !== false && (r.beforeWash || r.afterWash)
                         );
                         fd.append(key, JSON.stringify(rowsToStore));
                     }

@@ -799,10 +799,14 @@ const ReportsList = ({
             const empId = user?.emp_id || user?.id;
             const isReporter = empId && (String(report.reporter_emp_id) === String(empId));
             const notYetAssignedReport = !report.receiver_emp_id && (report.status === "pending" || report.status === "" || !report.status);
-            const reportHasColorEdit = !!(report.colorEditedByWarehouseAt && report.colorEditedByWarehouseBy);
+            // Consider color edit from top-level fields OR from notificationHistory (so icon shows when there is content inside)
+            const reportHasColorEdit =
+              !!(report.colorEditedByWarehouseAt && report.colorEditedByWarehouseBy) ||
+              !!(report.notificationHistory?.length && report.notificationHistory.some((e) => e.type === "COLOR_UPDATE"));
             const reportHasAdminEdit = !!report.editedByAdminAt || !!(report.notificationHistory?.length && report.notificationHistory.some((e) => e.type === "ADMIN_EDIT"));
-            const hasWarehouseNotification = reportHasColorEdit && (isReporter || isAdminUser);
-            const hasAdminNotification = reportHasAdminEdit && (isReporter || isAdminUser || isWarehouseUser);
+            // Show ringing bell whenever report has notification content (so both records show same icon when both have info)
+            const hasWarehouseNotification = reportHasColorEdit;
+            const hasAdminNotification = reportHasAdminEdit;
             const hasNotification = hasWarehouseNotification || hasAdminNotification;
             const notificationParts = [];
             if (notYetAssignedReport) {
@@ -810,14 +814,20 @@ const ReportsList = ({
               else if (isWarehouseUser || isAdminUser) notificationParts.push("Not yet assigned – scan QR to receive.");
             }
             if (reportHasColorEdit && (isReporter || isAdminUser)) {
-              const name = report.colorEditedByWarehouseName || report.colorEditedByWarehouseBy || "Warehouse user";
+              const lastColorEntry = report.notificationHistory?.filter((e) => e.type === "COLOR_UPDATE").pop();
+              const name = report.colorEditedByWarehouseName || report.colorEditedByWarehouseBy || lastColorEntry?.userName || lastColorEntry?.userId || "Warehouse user";
               const prevN = (report.colorUncheckedByWarehouse && report.colorUncheckedByWarehouse.length) || 0;
               const currentN = (report.color && report.color.length) || 0;
-              const totalPrev = prevN + currentN;
-              const removed = report.colorUncheckedByWarehouse?.length ? ` Removed: ${report.colorUncheckedByWarehouse.join(", ")}.` : "";
+              const totalPrev = lastColorEntry != null && lastColorEntry.previousColorCount != null
+                ? lastColorEntry.previousColorCount
+                : prevN + currentN;
+              const currentForMsg = lastColorEntry != null && lastColorEntry.newColorCount != null ? lastColorEntry.newColorCount : currentN;
+              const removed = (report.colorUncheckedByWarehouse?.length
+                ? ` Removed: ${report.colorUncheckedByWarehouse.join(", ")}.`
+                : (lastColorEntry?.rejectedColors?.length ? ` Removed: ${lastColorEntry.rejectedColors.join(", ")}.` : ""));
               const msg = isReporter
-                ? `${name} edited colors: you sent ${totalPrev} color(s), now ${currentN}.${removed}`
-                : `${name} edited colors: sent ${totalPrev} → now ${currentN}.${removed}`;
+                ? `${name} edited colors: you sent ${totalPrev} color(s), now ${currentForMsg}.${removed}`
+                : `${name} edited colors: sent ${totalPrev} → now ${currentForMsg}.${removed}`;
               notificationParts.push(msg);
             }
             if (reportHasAdminEdit) {

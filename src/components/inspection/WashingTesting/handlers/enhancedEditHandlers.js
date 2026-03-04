@@ -57,7 +57,7 @@ export const handleEditFormSubmit = async (
         formDataToSubmit.append("exFtyDate", JSON.stringify(editFormData.exFtyDate || []));
         formDataToSubmit.append("factory", editFormData.factory || "");
         formDataToSubmit.append("sendToHomeWashingDate", editFormData.sendToHomeWashingDate || "");
-        formDataToSubmit.append("sampleSize", JSON.stringify(editFormData.sampleSize || []));
+        formDataToSubmit.append("reportSampleSizes", JSON.stringify(editFormData.sampleSize || []));
 
         // Care Label Information (if applicable)
         if (editFormData.careSymbols) {

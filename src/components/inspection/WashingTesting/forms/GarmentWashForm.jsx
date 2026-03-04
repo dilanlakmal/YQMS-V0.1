@@ -533,6 +533,13 @@ const GarmentWashForm = ({
 
   // Helper function to get filtered available sizes based on actual measurement specs
   const getFilteredAvailableSizes = () => {
+    // Normalize a size token (strip " (52)" etc.) for matching — defined first so Case 1 can use it
+    const normalizeSizeToken = (s) => {
+      const t = typeof s === "string" ? s.trim() : String(s || "").trim();
+      const beforeParen = t.split("(")[0].trim();
+      return beforeParen || t;
+    };
+
     const hasCompletedShrinkage =
       formData.sampleSize &&
       Array.isArray(formData.shrinkageRows) &&
@@ -542,16 +549,28 @@ const GarmentWashForm = ({
     const sizeField =
       typeof sizeFieldRaw === "string" ? sizeFieldRaw.trim() : "";
 
-    // Case 1: OLD / SIZE-NOT-SELECTED RECORDS
-    // --------------------------------------
-    // If the submitter never selected explicit size(s) (size field is empty)
-    // but the completion form already has a saved sample size + shrinkage
-    // rows, then this record effectively used only one size in practice.
-    // In this case, lock the dropdown to that single saved size so the
-    // receiver sees only the actual tested size (e.g. "M") instead of
-    // the full style size range.
-    if (!sizeField && hasCompletedShrinkage) {
-      return [formData.sampleSize];
+    // Case 1: COMPLETED RECORDS (no size/range field) — show FULL list so user can change selection (XS, M, L)
+    // Use reportSampleSizes (full stored list) when set; else sampleSize if array; only then current selection alone.
+    if (!sizeField && hasCompletedShrinkage && formData.sampleSize != null) {
+      const fullList =
+        (Array.isArray(formData.reportSampleSizes) && formData.reportSampleSizes.length > 0)
+          ? formData.reportSampleSizes.map(normalizeSizeToken).filter(Boolean)
+          : Array.isArray(formData.sampleSize) && formData.sampleSize.length > 0
+            ? formData.sampleSize.map(normalizeSizeToken).filter(Boolean)
+            : typeof formData.sampleSize === "string" && formData.sampleSize.trim()
+              ? [normalizeSizeToken(formData.sampleSize)]
+              : [];
+      if (fullList.length > 0) {
+        const sizeOrder = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "4XL", "5XL"];
+        return fullList.sort((a, b) => {
+          const indexA = sizeOrder.indexOf(a);
+          const indexB = sizeOrder.indexOf(b);
+          if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+          if (indexA !== -1) return -1;
+          if (indexB !== -1) return 1;
+          return a.localeCompare(b);
+        });
+      }
     }
 
     const washType = formData.washType || "Before Wash";
@@ -588,35 +607,36 @@ const GarmentWashForm = ({
         ? Array.from(sizesFromSpecs)
         : availableSizes || [];
 
-    // If the user explicitly stored a size list on the report (e.g. "XS, S, M"
-    // or legacy formats like "M (52)"), further restrict the dropdown to those
-    // sizes when editing/completing. This prevents showing extra sizes that
-    // belong to the order but were not part of the actual test. When a size
-    // list exists we always keep ALL of those sizes visible (1, 2, or many) –
-    // even for completed records.
+    // Build the list of sizes that belong to this report (restrict dropdown to these)
+    let userSizes = [];
     if (sizeField) {
-      const userSizes = sizeField
+      userSizes = sizeField
         .split(",")
         .map((s) => s.trim())
-        // Normalize tokens coming from DB (report_garment_wash.size), which
-        // might look like "M (52)" or "M(52)". We only care about the base
-        // size code ("M") for matching against measurement specs.
-        .map((s) => {
-          const beforeParen = s.split("(")[0].trim();
-          return beforeParen || s;
-        })
+        .map(normalizeSizeToken)
         .filter(Boolean);
+    }
+    // Use reportSampleSizes (set when opening received report) so dropdown always shows all stored sizes (e.g. XS, M, XL)
+    if (userSizes.length === 0 && Array.isArray(formData.reportSampleSizes) && formData.reportSampleSizes.length > 0) {
+      userSizes = formData.reportSampleSizes.map(normalizeSizeToken).filter(Boolean);
+    }
+    // When sampleSize is still an array (report's stored list), use it for the dropdown list.
+    // Do NOT use sampleSize when it's a string — that is the "current selection" only; the list must stay full.
+    if (userSizes.length === 0 && formData.sampleSize != null && Array.isArray(formData.sampleSize) && formData.sampleSize.length > 0) {
+      userSizes = formData.sampleSize.map(normalizeSizeToken).filter(Boolean);
+    }
 
-      if (userSizes.length > 0) {
-        const userSizeSet = new Set(userSizes);
-        const intersected = sizesToUse.filter((s) => userSizeSet.has(s));
-        if (intersected.length > 0) {
-          sizesToUse = intersected;
-        } else if (hasCompletedShrinkage && formData.sampleSize) {
-          // Fallback: legacy records where stored size text does not match the
-          // spec sizes (e.g. "M (52)") – keep at least the actual tested size.
-          sizesToUse = [formData.sampleSize];
-        }
+    // Restrict dropdown to userSizes when we have a stored list (from size/range or sampleSize array)
+    if (userSizes.length > 0) {
+      const userSizeSet = new Set(userSizes);
+      const intersected = sizesToUse.filter((s) => userSizeSet.has(s));
+      if (intersected.length > 0) {
+        sizesToUse = intersected;
+      } else if (hasCompletedShrinkage && formData.sampleSize) {
+        // Fallback: legacy records where stored size text does not match the
+        // spec sizes (e.g. "M (52)") – keep at least the actual tested size.
+        const single = Array.isArray(formData.sampleSize) ? formData.sampleSize[0] : formData.sampleSize;
+        sizesToUse = [normalizeSizeToken(single)].filter(Boolean);
       }
     }
 
@@ -630,6 +650,29 @@ const GarmentWashForm = ({
       if (indexB !== -1) return 1;
       return a.localeCompare(b);
     });
+  };
+
+  // Display label for SIZE: default empty when none; when have sampleSize show it (string or "XS, M, XL")
+  const getDisplaySizeLabel = () => {
+    const s = formData.sampleSize;
+    if (s == null || s === "") return "--";
+    if (Array.isArray(s)) return s.length > 0 ? s.join(", ") : "--";
+    return String(s).trim() || "--";
+  };
+
+  // Whether this size option is selected (handles sampleSize as string or array from report)
+  const isSizeSelected = (sizeCode) =>
+    Array.isArray(formData.sampleSize)
+      ? formData.sampleSize.includes(sizeCode)
+      : formData.sampleSize === sizeCode;
+
+  // Effective size for loading specs: single string or first of array
+  const getEffectiveSampleSize = () => {
+    const s = formData.sampleSize;
+    if (s == null) return undefined;
+    if (typeof s === "string" && s.trim()) return s.trim();
+    if (Array.isArray(s) && s.length > 0) return typeof s[0] === "string" ? s[0].trim() : String(s[0]);
+    return undefined;
   };
 
   // Helper function to get all sizes with their specs for comparison
@@ -755,6 +798,22 @@ const GarmentWashForm = ({
     }
   }, [measurementSpecs, isLoadingMeasurementSpecs]);
 
+  // Preserve report's full size list so selecting one size doesn't collapse the dropdown — user can always change selection (XS, M, XL)
+  useEffect(() => {
+    const s = formData.sampleSize;
+    const reportSizes = formData.reportSampleSizes;
+    const hasReportSizes = Array.isArray(reportSizes) && reportSizes.length > 0;
+    let listToStore = null;
+    if (Array.isArray(s) && s.length > 0) {
+      listToStore = s;
+    } else if (typeof s === "string" && s.trim() && s.trim().includes(",")) {
+      listToStore = s.split(",").map((x) => x.trim()).filter(Boolean);
+    }
+    if (listToStore && listToStore.length > 0 && !hasReportSizes) {
+      handleInputChange("reportSampleSizes", listToStore);
+    }
+  }, [formData.sampleSize, formData.reportSampleSizes]);
+
   // 1.6. Auto-select sample size when there is exactly one valid option
   useEffect(() => {
     if (isLoadingMeasurementSpecs) return;
@@ -768,7 +827,7 @@ const GarmentWashForm = ({
 
   // 2. Update shrinkageRows when measurement specs, size, or wash type change
   useEffect(() => {
-    const size = formData.sampleSize;
+    const size = getEffectiveSampleSize();
     const washType = formData.washType || "Before Wash";
 
     if (!size || isLoadingMeasurementSpecs) {
@@ -2414,7 +2473,7 @@ const GarmentWashForm = ({
                         className="flex items-center gap-2 text-base font-black text-blue-600 dark:text-blue-400 focus:outline-none cursor-pointer min-w-[3rem] justify-center"
                       >
                         <span className="tabular-nums">
-                          {formData.sampleSize || "--"}
+                          {getDisplaySizeLabel()}
                         </span>
                         <svg
                           className={`transition-transform duration-200 ${showSizeDropdown ? "rotate-180" : ""}`}
@@ -2477,7 +2536,7 @@ const GarmentWashForm = ({
                                           setIsShrinkageSaved(false);
                                         }}
                                         className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold transition-all mb-0.5 last:mb-0 flex items-center justify-between group
-                                                                        ${formData.sampleSize === s
+                                                                        ${isSizeSelected(s)
                                             ? "bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400"
                                             : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-300"
                                           }`}
@@ -2490,7 +2549,7 @@ const GarmentWashForm = ({
                                             ( {specCount} )
                                           </span>
                                         </span>
-                                        {formData.sampleSize === s && (
+                                        {isSizeSelected(s) && (
                                           <Check
                                             size={14}
                                             strokeWidth={3}

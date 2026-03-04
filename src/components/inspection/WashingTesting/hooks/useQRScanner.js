@@ -197,6 +197,18 @@ export const useQRScanner = ({
                   images: [],
                   moNo:
                     currentReport.moNo || currentReport.ymStyle || "",
+                  reportSampleSizes: (() => {
+                    const s = currentReport.reportSampleSizes ?? currentReport.sampleSize;
+                    if (Array.isArray(s) && s.length > 0) return s.map((x) => String(x).trim()).filter(Boolean);
+                    if (typeof s === "string" && s.trim()) {
+                      try {
+                        const p = JSON.parse(s);
+                        if (Array.isArray(p) && p.length > 0) return p.map((x) => String(x).trim()).filter(Boolean);
+                      } catch (_) {}
+                      return s.split(",").map((x) => x.trim()).filter(Boolean);
+                    }
+                    return undefined;
+                  })(),
                 });
                 if (currentReport.ymStyle) {
                   fetchOrderColors(currentReport.ymStyle, setFormData);
@@ -325,6 +337,18 @@ export const useQRScanner = ({
           exFtyDate: currentReport.exFtyDate || [],
           images: [],
           moNo: currentReport.moNo || currentReport.ymStyle || "",
+          reportSampleSizes: (() => {
+            const s = currentReport.reportSampleSizes ?? currentReport.sampleSize;
+            if (Array.isArray(s) && s.length > 0) return s.map((x) => String(x).trim()).filter(Boolean);
+            if (typeof s === "string" && s.trim()) {
+              try {
+                const p = JSON.parse(s);
+                if (Array.isArray(p) && p.length > 0) return p.map((x) => String(x).trim()).filter(Boolean);
+              } catch (_) {}
+              return s.split(",").map((x) => x.trim()).filter(Boolean);
+            }
+            return undefined;
+          })(),
         });
         if (currentReport.ymStyle) {
           fetchOrderColors(currentReport.ymStyle, setFormData);
@@ -476,6 +500,18 @@ export const useQRScanner = ({
           exFtyDate: currentReport.exFtyDate || [],
           images: [],
           moNo: currentReport.moNo || currentReport.ymStyle || "",
+          reportSampleSizes: (() => {
+            const s = currentReport.reportSampleSizes ?? currentReport.sampleSize;
+            if (Array.isArray(s) && s.length > 0) return s.map((x) => String(x).trim()).filter(Boolean);
+            if (typeof s === "string" && s.trim()) {
+              try {
+                const p = JSON.parse(s);
+                if (Array.isArray(p) && p.length > 0) return p.map((x) => String(x).trim()).filter(Boolean);
+              } catch (_) {}
+              return s.split(",").map((x) => x.trim()).filter(Boolean);
+            }
+            return undefined;
+          })(),
         });
         if (currentReport.ymStyle) {
           fetchOrderColors(currentReport.ymStyle, setFormData);

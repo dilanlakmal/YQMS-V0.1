@@ -169,7 +169,8 @@ const EditReportModal = ({
                 label="SIZE (Optional)"
                 options={
                   (() => {
-                    const reportSizes = Array.isArray(editingReport.sampleSize) ? editingReport.sampleSize : editingReport.sampleSize ? [editingReport.sampleSize] : [];
+                    const raw = editingReport.reportSampleSizes ?? editingReport.sampleSize;
+                    const reportSizes = Array.isArray(raw) ? raw : raw ? [raw] : [];
                     return reportSizes.length > 0 ? reportSizes : editAvailableSizes || [];
                   })()
                 }

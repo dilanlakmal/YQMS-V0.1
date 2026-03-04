@@ -1,24 +1,22 @@
 /**
- * Get display string for report size (handles sampleSize array or legacy string, and size field).
- * Backend stores sampleSize as array ["XS", "S"] and size as "XS, S"; legacy data may have sampleSize as string.
+ * Get display string for report size (handles reportSampleSizes array or legacy sampleSize).
+ * Backend stores reportSampleSizes as array ["XS", "S"]; legacy data may have sampleSize.
  */
 export function getReportSizeDisplay(report) {
   if (!report) return "N/A";
-  const sampleSize = report.sampleSize;
-  if (sampleSize != null) {
-    if (Array.isArray(sampleSize) && sampleSize.length > 0) {
-      return sampleSize.join(", ");
-    }
-    if (typeof sampleSize === "string" && sampleSize.trim()) {
-      if (sampleSize.startsWith("[") && sampleSize.endsWith("]")) {
+  const sizes = report.reportSampleSizes ?? report.sampleSize;
+  if (sizes != null) {
+    if (Array.isArray(sizes) && sizes.length > 0) return sizes.join(", ");
+    if (typeof sizes === "string" && sizes.trim()) {
+      if (sizes.startsWith("[") && sizes.endsWith("]")) {
         try {
-          const parsed = JSON.parse(sampleSize);
+          const parsed = JSON.parse(sizes);
           if (Array.isArray(parsed) && parsed.length > 0) return parsed.join(", ");
         } catch (e) {
           // fall through
         }
       }
-      return sampleSize;
+      return sizes;
     }
   }
   const size = report.size;

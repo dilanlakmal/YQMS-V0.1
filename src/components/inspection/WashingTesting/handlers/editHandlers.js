@@ -48,7 +48,7 @@ export const prepareEditFormData = async (
         factory: report.factory || "",
         sendToHomeWashingDate: normalizeDateForInput(report.sendToHomeWashingDate),
         sampleSize: (() => {
-            const sizes = ensureArray(report.sampleSize);
+            const sizes = ensureArray(report.reportSampleSizes ?? report.sampleSize);
             if (sizes.length > 0) return sizes;
 
             return ensureArray(report.size || report.range);
@@ -70,7 +70,7 @@ export const prepareEditFormData = async (
 
             // 1. Get current report sizes (priority)
             const currentReportSizes = (() => {
-                const sizes = ensureArray(report.sampleSize);
+                const sizes = ensureArray(report.reportSampleSizes ?? report.sampleSize);
                 if (sizes.length > 0) return sizes;
                 return ensureArray(report.size || report.range);
             })();

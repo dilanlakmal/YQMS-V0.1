@@ -64,16 +64,16 @@ export const useReportSubmission = (user, fetchReports) => {
       formDataToSubmit.append("reporter_name", user?.name || user?.username || "");
 
       // Add all other fields dynamically (avoiding already added ones, images, and complex objects)
-      const skipFields = ["reportType", "ymStyle", "buyerStyle", "color", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "notes", "images", "userId", "userName", "reporter_emp_id", "reporter_name", "careLabelImage"];
+      const skipFields = ["reportType", "ymStyle", "buyerStyle", "color", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "notes", "images", "userId", "userName", "reporter_emp_id", "reporter_name", "careLabelImage", "style", "styleNo", "moNo", "date"];
       Object.keys(dataToSubmit).forEach(key => {
         if (!skipFields.includes(key) && dataToSubmit[key] !== undefined && dataToSubmit[key] !== null) {
           if (key === 'fabricColor' && Array.isArray(dataToSubmit[key])) {
             // Multi-select fabric: send as comma-separated string
             formDataToSubmit.append(key, dataToSubmit[key].join(', '));
           } else if (key === 'shrinkageRows' && Array.isArray(dataToSubmit[key])) {
-            // Include rows that are selected OR have measurement data (so record card & DB match form)
+            // Store only rows that are selected AND have measurement data (G1/G2)
             const rowsToStore = dataToSubmit[key].filter(
-              row => row.selected || row.beforeWash || row.afterWash || row.location
+              row => row.selected !== false && (row.beforeWash || row.afterWash)
             );
             formDataToSubmit.append(key, JSON.stringify(rowsToStore));
           } else if (Array.isArray(dataToSubmit[key])) {
@@ -362,13 +362,13 @@ export const useReportSubmission = (user, fetchReports) => {
       formDataToSubmit.append("sendToHomeWashingDate", editFormData.sendToHomeWashingDate || "");
 
       // Add all other fields dynamically
-      const skipFields = ["reportType", "color", "buyerStyle", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "images", "receivedImages", "completionImages", "completionNotes", "careLabelImage"];
+      const skipFields = ["reportType", "color", "buyerStyle", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "images", "receivedImages", "completionImages", "completionNotes", "careLabelImage", "style", "styleNo", "moNo", "date"];
       Object.keys(editFormData).forEach(key => {
         if (!skipFields.includes(key) && editFormData[key] !== undefined && editFormData[key] !== null) {
           if (key === 'shrinkageRows' && Array.isArray(editFormData[key])) {
-            // Include rows that are selected OR have measurement data (so record card & DB match form)
+            // Store only rows that are selected AND have measurement data (G1/G2)
             const rowsToStore = editFormData[key].filter(
-              row => row.selected || row.beforeWash || row.afterWash || row.location
+              row => row.selected !== false && (row.beforeWash || row.afterWash)
             );
             formDataToSubmit.append(key, JSON.stringify(rowsToStore));
           } else if (Array.isArray(editFormData[key])) {

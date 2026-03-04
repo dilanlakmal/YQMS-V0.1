@@ -153,8 +153,7 @@ export const saveReportWashing = async (req, res) => {
     const parsedColor = typeof color === "string" ? JSON.parse(color) : color;
     const parsedPO = typeof po === "string" ? JSON.parse(po) : po;
     const parsedExFtyDate = typeof exFtyDate === "string" ? JSON.parse(exFtyDate) : exFtyDate;
-    const parsedSampleSize = (() => {
-      const raw = req.body.sampleSize;
+    const parseReportSampleSizes = (raw) => {
       if (!raw) return [];
       if (Array.isArray(raw)) return raw.map((s) => String(s).trim()).filter(Boolean);
       if (typeof raw === "string" && raw.trim()) {
@@ -166,7 +165,8 @@ export const saveReportWashing = async (req, res) => {
         }
       }
       return [];
-    })();
+    };
+    const parsedReportSampleSizes = parseReportSampleSizes(req.body.reportSampleSizes ?? req.body.sampleSize);
 
     // Helper to safely parse JSON fields
     const safeParseJSON = (data, fallback = []) => {
@@ -215,44 +215,43 @@ export const saveReportWashing = async (req, res) => {
       }
     }
 
-    // Prepare data - Include all fields from req.body dynamically
+    // Build reportData from explicit req.body fields only — no spread, no delete
     const reportData = {
-      ...req.body,
-      reportType: reportType || "Home Wash Test", // Ensure reportType is saved
-      ymStyle: ymStyle.trim(),
-      buyerStyle: buyerStyle ? buyerStyle.trim() : "",
+      reportType: reportType || "Home Wash Test",
+      ymStyle: (req.body.ymStyle || req.body.style || "").trim(),
+      buyerStyle: (req.body.buyerStyle || "").trim(),
       color: Array.isArray(parsedColor) ? parsedColor : [parsedColor],
       po: Array.isArray(parsedPO) ? parsedPO : [parsedPO],
       exFtyDate: Array.isArray(parsedExFtyDate) ? parsedExFtyDate : [parsedExFtyDate],
-      sampleSize: parsedSampleSize,
-      factory: factory ? factory.trim() : "",
-      // reportDate is optional - will be set when user scans QR code in completed reports
-      reportDate: reportDate ? new Date(reportDate) : null,
+      reportSampleSizes: parsedReportSampleSizes,
+      factory: (req.body.factory || "").trim(),
       sendToHomeWashingDate: sendToHomeWashingDate ? new Date(sendToHomeWashingDate) : new Date(),
-      images: imagePaths, // Store file paths instead of base64
+      images: imagePaths,
       careLabelImage: careLabelImagePaths,
-      careSymbols: parsedCareSymbols, // Store as Object (filenames)
-      careSymbolsImages: careSymbolsImages, // Store Base64 images data
-
-      // Explicitly set parsed arrays to ensure they are stored as Arrays, not Strings
+      careSymbols: parsedCareSymbols,
+      careSymbolsImages: careSymbolsImages,
       colorFastnessRows: parsedColorFastnessRows,
       colorStainingRows: parsedColorStainingRows,
       shrinkageRows: parsedShrinkageRows,
       visualAssessmentRows: parsedVisualAssessmentRows,
-
-      notes: notes ? notes.trim() : "", // Notes field
-      reporter_emp_id: req.body.reporter_emp_id || userId || "", // Priority to new field
+      notes: (req.body.notes || "").trim(),
+      reporter_emp_id: req.body.reporter_emp_id || req.body.userId || "",
       reporter_status: "done",
-      reporter_name: req.body.reporter_name || userName || "",
+      reporter_name: req.body.reporter_name || req.body.userName || "",
       submittedAt: new Date()
     };
+    if (reportDate && String(reportDate).trim()) reportData.reportDate = new Date(reportDate);
 
-    // Remove legacy/redundant fields from the final object (size is not stored; use sampleSize only)
-    delete reportData.userId;
-    delete reportData.userName;
-    delete reportData.userSubmit;
-    delete reportData.userSubmitName;
-    delete reportData.size;
+    // Copy allowed report-type specific fields from req.body (explicit allowlist)
+    const ALLOWED_EXTRA = ["season", "styleDescription", "mainFabric", "liningInserts", "detergent", "washingMethod", "beforeWashComments", "afterWashComments", "finalResult", "checkedBy", "approvedBy", "washType", "custStyle", "fabricColor"];
+    for (const key of ALLOWED_EXTRA) {
+      const val = req.body[key];
+      if (val !== undefined && val !== null) {
+        if (key === "fabricColor") reportData[key] = Array.isArray(val) ? val : (typeof val === "string" ? val.split(",").map((s) => s.trim()).filter(Boolean) : []);
+        else if (typeof val === "string") reportData[key] = val.trim();
+        else reportData[key] = val;
+      }
+    }
 
     // Determine Model based on Report Type
     console.log("Saving Report - Type:", reportData.reportType);
@@ -431,11 +430,22 @@ export const getReportWashingById = async (req, res) => {
   }
 };
 
+// Allowed fields for update — only these are copied from req.body (no spread)
+const UPDATE_ALLOWED = ["reportType", "color", "buyerStyle", "po", "exFtyDate", "reportSampleSizes", "factory", "sendToHomeWashingDate", "status", "receivedDate", "receivedAt", "receiver_emp_id", "receivedNotes", "receivedImages", "completedDate", "completedAt", "completionImages", "completionNotes", "completer_emp_id", "checkedBy", "approvedBy", "checkedByName", "approvedByName", "rejectedAt", "rejectedNotes", "reportDate", "colorFastnessRows", "colorStainingRows", "shrinkageRows", "visualAssessmentRows", "careSymbols", "careLabelImageUrls", "season", "styleDescription", "mainFabric", "liningInserts", "detergent", "washingMethod", "beforeWashComments", "afterWashComments", "finalResult", "washType", "custStyle", "fabricColor", "reporter_emp_id", "reporter_name"];
+
 // Update Report Washing by ID
 export const updateReportWashing = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = { ...req.body };
+    const updateData = {};
+    for (const key of UPDATE_ALLOWED) {
+      const val = req.body[key];
+      if (val === undefined || val === null) continue;
+      if (key === "reportDate" && String(val).trim() === "") continue;
+      updateData[key] = val;
+    }
+    if (updateData.reporter_emp_id === undefined && req.body.userId !== undefined) updateData.reporter_emp_id = req.body.userId;
+    if (updateData.reporter_name === undefined && req.body.userName !== undefined) updateData.reporter_name = req.body.userName;
 
     // Find the right model and doc
     const { model: ReportModel, doc: existingReport } = await findReportById(id);
@@ -551,23 +561,24 @@ export const updateReportWashing = async (req, res) => {
       }
     }
 
-    if (updateData.sampleSize != null) {
+    const rawSizes = updateData.reportSampleSizes ?? updateData.sampleSize;
+    if (rawSizes != null) {
       try {
-        const raw = updateData.sampleSize;
         let parsed = [];
-        if (Array.isArray(raw)) {
-          parsed = raw.map((s) => String(s).trim()).filter(Boolean);
-        } else if (typeof raw === "string" && raw.trim()) {
+        if (Array.isArray(rawSizes)) {
+          parsed = rawSizes.map((s) => String(s).trim()).filter(Boolean);
+        } else if (typeof rawSizes === "string" && rawSizes.trim()) {
           try {
-            const p = JSON.parse(raw);
+            const p = JSON.parse(rawSizes);
             parsed = Array.isArray(p) ? p.map((s) => String(s).trim()).filter(Boolean) : [];
           } catch (e) {
-            parsed = raw.split(",").map((s) => s.trim()).filter(Boolean);
+            parsed = rawSizes.split(",").map((s) => s.trim()).filter(Boolean);
           }
         }
-        updateData.sampleSize = parsed;
+        updateData.reportSampleSizes = parsed;
+        delete updateData.sampleSize;
       } catch (error) {
-        console.error("Error parsing sampleSize:", error);
+        console.error("Error parsing reportSampleSizes:", error);
       }
     }
 
@@ -907,26 +918,6 @@ export const updateReportWashing = async (req, res) => {
         console.error("Error parsing careLabelImageUrls:", error);
       }
     }
-
-    // Automatically map the submitter info from req.body if available
-    if (updateData.userId) {
-      updateData.reporter_emp_id = updateData.userId;
-      delete updateData.userId;
-    }
-    if (updateData.userName) {
-      updateData.reporter_name = updateData.userName;
-      delete updateData.userName;
-    }
-    // Clean up other obsolete fields if they leak in
-    delete updateData.userSubmit;
-    delete updateData.userSubmitName;
-    delete updateData.size; // Only sampleSize is stored
-    delete updateData.editedByWarehouse;
-    delete updateData.editorUserId;
-    delete updateData.editorUserName;
-    delete updateData.editorEmpId;
-    delete updateData.editorName;
-    delete updateData.notificationHistory;
 
     // Find and update the report using the correct model
     const updateOp = { $set: updateData };

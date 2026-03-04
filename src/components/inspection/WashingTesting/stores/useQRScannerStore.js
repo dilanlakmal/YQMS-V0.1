@@ -483,6 +483,19 @@ export const useQRScannerStore = create((set, get) => ({
                     exFtyDate: currentReport.exFtyDate || [],
                     images: [],
                     moNo: currentReport.moNo || currentReport.ymStyle || "",
+                    // Preserve report's sample size list so SIZE dropdown shows all stored sizes (e.g. XS, M, XL) and user can change selection
+                    reportSampleSizes: (() => {
+                        const s = currentReport.reportSampleSizes ?? currentReport.sampleSize;
+                        if (Array.isArray(s) && s.length > 0) return s.map((x) => String(x).trim()).filter(Boolean);
+                        if (typeof s === "string" && s.trim()) {
+                            try {
+                                const p = JSON.parse(s);
+                                if (Array.isArray(p) && p.length > 0) return p.map((x) => String(x).trim()).filter(Boolean);
+                            } catch (_) { /* not JSON */ }
+                            return s.split(",").map((x) => x.trim()).filter(Boolean);
+                        }
+                        return undefined;
+                    })(),
                 });
                 if (currentReport.ymStyle) {
                     orderStore.fetchOrderColors(currentReport.ymStyle, formStore.setFormData);

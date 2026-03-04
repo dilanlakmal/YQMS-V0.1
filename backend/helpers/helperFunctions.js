@@ -835,7 +835,10 @@ if (!fs.existsSync(washingMachineTestUploadPath)) {
 const washingMachineTestMemoryStorage = multer.memoryStorage();
 export const uploadWashingMachineTestImage = multer({
   storage: washingMachineTestMemoryStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB per file
+    fieldSize: 50 * 1024 * 1024  // 50MB for non-file fields (careSymbolsImages base64, shrinkageRows, etc.)
+  },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
     if (allowedTypes.includes(file.mimetype)) {
