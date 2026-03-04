@@ -20,6 +20,67 @@ import {
   useFormStore,
 } from "./stores";
 
+const WashingReportsSkeleton = ({ tab }) => {
+  if (tab === "easy_scan") {
+    return (
+      <div className="animate-pulse">
+        <div className="hidden sm:block overflow-x-auto rounded-lg border border-amber-200/60 dark:border-amber-700/40 bg-white dark:bg-gray-800 shadow-sm">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+            <thead className="bg-amber-50 dark:bg-amber-900/20">
+              <tr>
+                <th scope="col" className="px-3 py-3 w-[74px] h-[72px]" />
+                <th scope="col" className="px-4 py-3 h-[72px]" />
+                <th scope="col" className="px-4 py-3 h-[72px]" />
+                <th scope="col" className="px-4 py-3 h-[72px]" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <tr key={i}>
+                  <td className="px-3 py-4"><div className="h-14 w-14 bg-gray-200 dark:bg-gray-700 rounded mx-auto" /></td>
+                  <td className="px-4 py-4"><div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-1" /><div className="h-3 w-16 bg-gray-100 dark:bg-gray-800 rounded" /></td>
+                  <td className="px-4 py-4"><div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded" /></td>
+                  <td className="px-4 py-4"><div className="h-6 w-20 bg-gray-100 dark:bg-gray-800 rounded-full" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="sm:hidden space-y-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 border border-amber-200/60 dark:border-amber-700/40 rounded-xl p-4 h-32 flex flex-col gap-3">
+              <div className="h-6 w-1/2 bg-gray-200 dark:bg-gray-700 rounded" />
+              <div className="h-10 w-full bg-gray-100 dark:bg-gray-800 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 animate-pulse">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-6 h-64 shadow-sm">
+          <div className="flex justify-between mb-4">
+            <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded" />
+            <div className="h-8 w-8 bg-gray-100 dark:bg-gray-800 rounded-full" />
+          </div>
+          <div className="space-y-3">
+            <div className="h-4 w-full bg-gray-100 dark:bg-gray-800 rounded" />
+            <div className="h-4 w-3/4 bg-gray-100 dark:bg-gray-800 rounded" />
+            <div className="h-4 w-1/2 bg-gray-100 dark:bg-gray-800 rounded" />
+          </div>
+          <div className="mt-6 flex gap-2">
+            <div className="h-10 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+            <div className="h-10 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const ReportsList = ({
   tab, // "standard" | "warehouse"
   onPrintPDF,
@@ -257,7 +318,7 @@ const ReportsList = ({
         <h2 className="text-xl font-semibold text-gray-800 dark:text-white flex items-center gap-2">
           {/* <ClipboardList className="w-6 h-6 text-blue-600" /> */}
           {tab === "easy_scan"
-            ? "Userwarehouse Easy Scan"
+            ? "Today"
             : activeTab === "warehouse_reports"
               ? "Warehouse Report"
               : "Reports"}
@@ -316,9 +377,9 @@ const ReportsList = ({
           <div className="h-5 w-px bg-gray-200 dark:bg-gray-700 mx-2" />
 
           {/* Range Indicator */}
-          {pagination && (
+          {pagination && pagination.totalRecords > 0 && (
             <div className="text-sm font-semibold text-slate-700 dark:text-gray-200 whitespace-nowrap px-2">
-              {Math.min((pagination.currentPage - 1) * pagination.limit + 1, pagination.totalRecords)} - {Math.min(pagination.currentPage * pagination.limit, pagination.totalRecords)} of {pagination.totalRecords}
+              {Math.max(1, (pagination.currentPage - 1) * pagination.limit + 1)} - {Math.min(pagination.currentPage * pagination.limit, pagination.totalRecords)} of {pagination.totalRecords}
             </div>
           )}
 
@@ -342,7 +403,7 @@ const ReportsList = ({
 
             {/* Pagination Controls */}
             <button
-              onClick={() => setFilterPage && setFilterPage(prev => Math.max(1, prev - 1))}
+              onClick={() => setFilterPage && setFilterPage(Math.max(1, filterPage - 1))}
               disabled={!pagination || pagination.currentPage === 1 || isLoadingReports}
               className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-400 disabled:opacity-30 transition-colors"
               title="Previous Page"
@@ -351,7 +412,7 @@ const ReportsList = ({
             </button>
 
             <button
-              onClick={() => setFilterPage && setFilterPage(prev => Math.min(pagination.totalPages, prev + 1))}
+              onClick={() => setFilterPage && setFilterPage(Math.min(pagination.totalPages, filterPage + 1))}
               disabled={!pagination || pagination.currentPage === pagination.totalPages || isLoadingReports}
               className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 disabled:opacity-30 transition-colors"
               title="Next Page"
@@ -578,12 +639,11 @@ const ReportsList = ({
         </div>
       )}
 
-      {reports.length === 0 ? (
+      {isLoadingReports ? (
+        <WashingReportsSkeleton tab={tab} />
+      ) : reports.length === 0 ? (
         <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-          <p>{tab === "easy_scan" ? "No non-completed reports." : "No reports submitted yet."}</p>
-          {/* <p className="text-sm mt-2">
-            Go to the <button onClick={() => setActiveTab("form")} className="text-blue-600 dark:text-blue-400 hover:underline font-medium">New Report</button> tab to submit a report.
-          </p> */}
+          <p>{tab === "easy_scan" ? "No Report Today!" : "No reports submitted yet."}</p>
         </div>
       ) : tab === "easy_scan" ? (
         <>

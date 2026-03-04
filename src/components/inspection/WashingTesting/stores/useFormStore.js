@@ -35,6 +35,7 @@ export const useFormStore = create((set, get) => ({
         });
     },
 
+    // Form is only reset on explicit submit/completion (not when switching tabs).
     resetForm: (defaultData) => set({ formData: defaultData || {} }),
 
     orderNoSuggestions: [],
@@ -256,33 +257,44 @@ export const useFormStore = create((set, get) => ({
         const orderStore = useOrderDataStore.getState();
 
         if (completingReport) {
-            const now = new Date().toISOString();
-            const dateOnly = now.split("T")[0];
-            const completionPayload = {
-                ...formData,
-                images: completingReport.images || [],
-                completionImages: formData.images || [],
-                status: "completed",
-                completedDate: dateOnly,
-                completedAt: now,
-            };
-            if (completingReport.status === "pending" || !completingReport.status) {
-                completionPayload.receivedDate = dateOnly;
-                completionPayload.receivedAt = now;
-                if (user?.emp_id) completionPayload.receiver_emp_id = user.emp_id;
-            }
-            const reportId = completingReport._id != null ? String(completingReport._id) : (completingReport.id != null ? String(completingReport.id) : "");
-            const success = reportId ? await reportStore.updateReport(reportId, completionPayload) : false;
-            if (success) {
-                modalStore.setCompletingReport(null);
-                const currentReportType = formData.reportType || REPORT_TYPES.GARMENT_WASH;
-                resetForm(getInitialFormData(currentReportType));
-                setActiveTab("reports");
-                imageStore.setImageRotations({});
-                setShowColorDropdown(false);
-                setShowPODropdown(false);
-                setShowETDDropdown(false);
-                orderStore.resetOrderData();
+            // While completing from the main form, show the same
+            // submitting spinner + disable the button to block
+            // duplicate clicks while the update is in-flight.
+            set({ isSubmitting: true });
+            try {
+                const now = new Date().toISOString();
+                const dateOnly = now.split("T")[0];
+                const completionPayload = {
+                    ...formData,
+                    images: completingReport.images || [],
+                    completionImages: formData.images || [],
+                    status: "completed",
+                    completedDate: dateOnly,
+                    completedAt: now,
+                };
+                if (completingReport.status === "pending" || !completingReport.status) {
+                    completionPayload.receivedDate = dateOnly;
+                    completionPayload.receivedAt = now;
+                    if (user?.emp_id) completionPayload.receiver_emp_id = user.emp_id;
+                }
+                const reportId =
+                    completingReport._id != null
+                        ? String(completingReport._id)
+                        : (completingReport.id != null ? String(completingReport.id) : "");
+                const success = reportId ? await reportStore.updateReport(reportId, completionPayload) : false;
+                if (success) {
+                    modalStore.setCompletingReport(null);
+                    const currentReportType = formData.reportType || REPORT_TYPES.GARMENT_WASH;
+                    resetForm(getInitialFormData(currentReportType));
+                    setActiveTab("reports");
+                    imageStore.setImageRotations({});
+                    setShowColorDropdown(false);
+                    setShowPODropdown(false);
+                    setShowETDDropdown(false);
+                    orderStore.resetOrderData();
+                }
+            } finally {
+                set({ isSubmitting: false });
             }
             return;
         }

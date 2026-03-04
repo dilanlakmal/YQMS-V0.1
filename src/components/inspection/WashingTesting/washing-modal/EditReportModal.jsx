@@ -121,11 +121,16 @@ const EditReportModal = ({
                 readOnly={editingReport?.status === "completed"}
               />
 
-              {/* PO - Multi-Select */}
+              {/* PO - Multi-Select: when report has current POs only, show those; else full list */}
               <MultiSelectDropdown
                 containerClass="po-dropdown-container"
                 label="PO (Optional)"
-                options={editAvailablePOs}
+                options={
+                  (() => {
+                    const reportPOs = Array.isArray(editingReport.po) ? editingReport.po : editingReport.po ? [editingReport.po] : [];
+                    return reportPOs.length > 0 ? reportPOs : editAvailablePOs || [];
+                  })()
+                }
                 selected={editFormData.po}
                 onChange={(v) => setEditFormData((p) => ({ ...p, po: v }))}
                 isOpen={showEditPODropdown}
@@ -137,11 +142,16 @@ const EditReportModal = ({
                 readOnly={editingReport?.status === "completed"}
               />
 
-              {/* Ex Fty Date - Multi-Select */}
+              {/* Ex Fty Date - Multi-Select: when report has current ETDs only, show those; else full list */}
               <MultiSelectDropdown
                 containerClass="etd-dropdown-container"
                 label="Ex Fty Date (Optional)"
-                options={editAvailableETDs}
+                options={
+                  (() => {
+                    const reportETDs = Array.isArray(editingReport.exFtyDate) ? editingReport.exFtyDate : editingReport.exFtyDate ? [editingReport.exFtyDate] : [];
+                    return reportETDs.length > 0 ? reportETDs : editAvailableETDs || [];
+                  })()
+                }
                 selected={editFormData.exFtyDate}
                 onChange={(v) => setEditFormData((p) => ({ ...p, exFtyDate: v }))}
                 isOpen={showEditETDDropdown}
@@ -153,11 +163,16 @@ const EditReportModal = ({
                 readOnly={editingReport?.status === "completed"}
               />
 
-              {/* SIZE - Multi-Select */}
+              {/* SIZE - Multi-Select: when report has current sizes only, show those; else full list */}
               <MultiSelectDropdown
                 containerClass="size-dropdown-container"
                 label="SIZE (Optional)"
-                options={editAvailableSizes}
+                options={
+                  (() => {
+                    const reportSizes = Array.isArray(editingReport.sampleSize) ? editingReport.sampleSize : editingReport.sampleSize ? [editingReport.sampleSize] : [];
+                    return reportSizes.length > 0 ? reportSizes : editAvailableSizes || [];
+                  })()
+                }
                 selected={editFormData.sampleSize}
                 onChange={(v) => setEditFormData((p) => ({ ...p, sampleSize: v }))}
                 isOpen={showEditSizeDropdown}

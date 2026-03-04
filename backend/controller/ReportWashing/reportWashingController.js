@@ -296,8 +296,12 @@ export const saveReportWashing = async (req, res) => {
 // Get all Report Washing data
 export const getReportWashing = async (req, res) => {
   try {
-    const { ymStyle, factory, startDate, endDate, limit = 10, page = 1, reportType, status, excludeStatus, idOrQr } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const { ymStyle, factory, startDate, endDate, reportType, status, excludeStatus, idOrQr } = req.query;
+
+    // Sanitize pagination parameters
+    const limitNum = Math.max(1, parseInt(req.query.limit) || 10);
+    const pageNum = Math.max(1, parseInt(req.query.page) || 1);
+    const skip = (pageNum - 1) * limitNum;
 
     let query = {};
 
@@ -376,16 +380,16 @@ export const getReportWashing = async (req, res) => {
     });
 
     // Apply pagination to the aggregated list
-    const paginatedReports = allReports.slice(skip, skip + parseInt(limit));
+    const paginatedReports = allReports.slice(skip, skip + limitNum);
 
     res.status(200).json({
       success: true,
       data: paginatedReports,
       pagination: {
         totalRecords,
-        totalPages: Math.ceil(totalRecords / parseInt(limit)),
-        currentPage: parseInt(page),
-        limit: parseInt(limit)
+        totalPages: Math.ceil(totalRecords / limitNum),
+        currentPage: pageNum,
+        limit: limitNum
       }
     });
   } catch (error) {

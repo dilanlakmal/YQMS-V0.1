@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   XCircle,
   Check,
-  Hash,
   Maximize2,
   Save,
   Edit,
@@ -890,7 +889,7 @@ const GarmentWashForm = ({
           requirement: existingRow ? existingRow.requirement : "±5%",
           passFail: passFail,
           isFromSpec: true,
-          selected: existingRow ? existingRow.selected : false,
+          selected: existingRow ? existingRow.selected : true,
           id: existingRow
             ? existingRow.id
             : Math.random().toString(36).substr(2, 9),
@@ -1205,12 +1204,14 @@ const GarmentWashForm = ({
     handleInputChange("shrinkageRows", newRows);
   };
 
-  // Fraction Keypad Component
+  // Fraction Keypad Component — supports both free-text input AND fraction quick-select
   const FractionKeypad = ({ isOpen, onClose, initialValue, onConfirm }) => {
-    const [inputValue, setInputValue] = useState(initialValue || "");
+    const [manualInput, setManualInput] = useState(initialValue || "");
     const [integerPart, setIntegerPart] = useState(0);
     const [fractionPart, setFractionPart] = useState("");
     const [isNegative, setIsNegative] = useState(false);
+    const [useManualMode, setUseManualMode] = useState(true); // default to manual input mode
+    const inputRef = useRef(null);
 
     const fractions = [
       "1/16",
@@ -1231,7 +1232,31 @@ const GarmentWashForm = ({
       "-1",
     ];
 
+    // Auto-focus the input when keypad opens
+    useEffect(() => {
+      if (isOpen && inputRef.current) {
+        setTimeout(() => {
+          inputRef.current?.focus();
+          inputRef.current?.select();
+        }, 100);
+      }
+    }, [isOpen]);
+
+    // Sync initialValue when keypad opens
+    useEffect(() => {
+      if (isOpen) {
+        setManualInput(initialValue || "");
+        setIntegerPart(0);
+        setFractionPart("");
+        setIsNegative(false);
+        setUseManualMode(true);
+      }
+    }, [isOpen, initialValue]);
+
     const getCurrentValue = () => {
+      if (useManualMode) {
+        return manualInput.trim() || "0";
+      }
       const sign = isNegative ? "-" : "";
       const intStr = integerPart === 0 ? "" : `${integerPart} `;
       const fracStr = fractionPart || "";
@@ -1241,124 +1266,172 @@ const GarmentWashForm = ({
 
     if (!isOpen) return null;
 
-    const handleNumClick = (num) => {
-      setInputValue((prev) => {
-        const parts = prev.split(" ");
-        if (parts.length === 0 || parts[0] === "") return num.toString();
-        if (!prev.includes("/") && !isNaN(parts[0]))
-          return parts[0] + num.toString();
-        return prev + num.toString();
-      });
+    const handleManualInputChange = (e) => {
+      setManualInput(e.target.value);
+      setUseManualMode(true);
     };
 
-    const handleFractionClick = (frac) => {
-      if (frac === "0") {
-        setInputValue("0");
-        return;
+    const handleManualKeyDown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        onConfirm(getCurrentValue());
       }
-      setInputValue((prev) => {
-        const parts = prev.trim().split(/\s+/);
-        // If there's an integer part, add fraction with space
-        if (parts.length === 1 && !parts[0].includes("/") && parts[0] !== "") {
-          return `${parts[0]} ${frac}`;
-        }
-        return frac;
-      });
     };
 
-    const handleBackspace = () => {
-      setInputValue((prev) => prev.slice(0, -1).trim());
+    const handleFractionQuickSelect = (frac) => {
+      if (frac === "-1") {
+        // Decrement integer part and build value
+        const newVal = integerPart - 1;
+        setIntegerPart(newVal);
+        const sign = isNegative ? "-" : "";
+        const intStr = newVal === 0 ? "" : `${newVal} `;
+        const fracStr = fractionPart || "";
+        const result = `${sign}${intStr}${fracStr}`.trim() || "0";
+        setManualInput(result);
+        setUseManualMode(true);
+        onConfirm(result);
+      } else {
+        setFractionPart(frac);
+        const sign = isNegative ? "-" : "";
+        const intStr = integerPart === 0 ? "" : `${integerPart} `;
+        const result = `${sign}${intStr}${frac}`.trim();
+        setManualInput(result);
+        setUseManualMode(true);
+        onConfirm(result);
+      }
     };
 
-    const toggleSign = () => {
-      setInputValue((prev) =>
-        prev.startsWith("-") ? prev.slice(1) : "-" + prev,
-      );
+    const handleClear = () => {
+      setManualInput("");
+      setIntegerPart(0);
+      setFractionPart("");
+      setIsNegative(false);
+      setUseManualMode(true);
+      inputRef.current?.focus();
     };
 
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-xs overflow-hidden border border-gray-200 dark:border-gray-700">
-          {/* Header/Controls */}
-          <div className="p-4 border-b dark:border-gray-700 grid grid-cols-4 gap-2 bg-gray-50 dark:bg-gray-700/50">
-            <button
-              onClick={() => setIsNegative(true)}
-              className={`h-10 rounded-lg font-bold flex items-center justify-center shadow-sm active:scale-95 transition-all ${isNegative ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-400"}`}
-            >
-              <span className="text-2xl leading-none">−</span>
-            </button>
-            <button
-              onClick={() => setIsNegative(false)}
-              className={`h-10 rounded-lg font-bold flex items-center justify-center shadow-sm active:scale-95 transition-all ${!isNegative ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-400"}`}
-            >
-              <span className="text-2xl leading-none">+</span>
-            </button>
-            <div className="h-10 rounded-lg bg-gray-100 dark:bg-gray-900 flex items-center justify-center border border-gray-200 dark:border-gray-700 group relative">
-              <span className="text-xs font-bold text-gray-400 mr-1">N:</span>
-              <span className="text-sm font-bold text-gray-800 dark:text-white">
-                {isNegative && integerPart !== 0 ? "-" : ""}
-                {integerPart}
+      <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+        <div
+          className="bg-white dark:bg-gray-800 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-200/50 dark:border-gray-700 animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Input Header */}
+          <div className="px-5 pt-5 pb-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+                Enter Measurement
               </span>
-            </div>
-            <button
-              onClick={onClose}
-              className="h-10 rounded-lg bg-red-500 text-white font-bold flex items-center justify-center shadow-sm active:scale-95 transition-transform"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          {/* Keypad Grid */}
-          <div className="p-4 grid grid-cols-4 gap-2">
-            {fractions.map((f) => (
               <button
-                key={f}
-                onClick={() => {
-                  if (f === "-1") {
-                    const newVal = integerPart - 1;
-                    setIntegerPart(newVal);
-                    // Auto confirm with new integer part
-                    const sign = isNegative ? "-" : "";
-                    const intStr = newVal === 0 ? "" : `${newVal} `;
-                    const fracStr = fractionPart || "";
-                    onConfirm(`${sign}${intStr}${fracStr}`.trim() || "0");
-                  } else {
-                    setFractionPart(f);
-                    // Auto confirm with selected fraction
-                    const sign = isNegative ? "-" : "";
-                    const intStr = integerPart === 0 ? "" : `${integerPart} `;
-                    onConfirm(`${sign}${intStr}${f}`.trim());
-                  }
-                }}
-                className="h-14 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm font-medium transition-all flex flex-col items-center justify-center dark:text-white shadow-sm active:scale-95"
+                type="button"
+                onClick={onClose}
+                className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-400 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors"
               >
-                {f.includes("/") ? (
-                  <>
-                    <span className="text-[14px] font-black leading-tight text-gray-800 dark:text-white">
-                      {isNegative ? "-" : ""}
-                      {f.split("/")[0]}
-                    </span>
-                    <div className="w-6 h-[2px] bg-gray-400 dark:bg-gray-500 my-0.5"></div>
-                    <span className="text-[14px] font-black leading-tight text-gray-800 dark:text-white">
-                      {f.split("/")[1]}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-lg font-black text-gray-800 dark:text-white">
-                    {f}
-                  </span>
-                )}
+                <X size={14} />
               </button>
-            ))}
+            </div>
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="decimal"
+              value={manualInput}
+              onChange={handleManualInputChange}
+              onKeyDown={handleManualKeyDown}
+              placeholder="Type here... (e.g. 42, 10.5, 33 1/4)"
+              className="w-full px-4 py-3.5 text-2xl font-black text-center text-gray-800 dark:text-white bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-600 rounded-2xl focus:border-blue-500 focus:bg-white dark:focus:bg-gray-800 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all placeholder:text-gray-300 dark:placeholder:text-gray-600 placeholder:text-base placeholder:font-normal"
+            />
+            {/* Quick actions row */}
+            <div className="flex items-center gap-2 mt-3">
+              <button
+                type="button"
+                onClick={handleClear}
+                className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 active:scale-95 transition-all text-[11px] font-bold uppercase tracking-wider"
+              >
+                Clear
+              </button>
+              <div className="flex-1" />
+              <button
+                type="button"
+                onClick={() => onConfirm(getCurrentValue())}
+                className="px-5 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white active:scale-95 transition-all text-[11px] font-bold uppercase tracking-wider shadow-sm flex items-center gap-1.5"
+              >
+                <Check size={14} strokeWidth={3} />
+                Confirm
+              </button>
+            </div>
           </div>
 
-          {/* Result / Confirm Button */}
-          <div className="p-4 pt-0">
+          {/* Divider */}
+          <div className="h-px bg-gray-100 dark:bg-gray-700 mx-5" />
+
+          {/* Fraction Quick-Select Section */}
+          <div className="px-5 pt-3 pb-4">
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                Quick Fractions
+              </span>
+              {/* Integer & Sign Controls */}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => { setIsNegative(!isNegative); setUseManualMode(false); }}
+                  className={`w-7 h-7 rounded-lg text-xs font-black flex items-center justify-center transition-all active:scale-90 ${isNegative ? "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400" : "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500"}`}
+                  title="Toggle negative"
+                >
+                  ±
+                </button>
+                <div className="flex items-center bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => { setIntegerPart(Math.max(0, integerPart - 1)); setUseManualMode(false); }}
+                    className="w-7 h-7 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors text-sm font-black"
+                  >
+                    −
+                  </button>
+                  <span className="w-7 h-7 flex items-center justify-center text-xs font-black text-gray-700 dark:text-gray-300 border-x border-gray-200 dark:border-gray-700">
+                    {integerPart}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => { setIntegerPart(integerPart + 1); setUseManualMode(false); }}
+                    className="w-7 h-7 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors text-sm font-black"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Fraction Buttons Grid */}
+            <div className="grid grid-cols-5 gap-1.5">
+              {fractions.filter(f => f !== "-1").map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => handleFractionQuickSelect(f)}
+                  className="h-11 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 hover:bg-blue-50 hover:border-blue-200 dark:hover:bg-blue-900/20 dark:hover:border-blue-700 text-sm font-medium transition-all flex flex-col items-center justify-center active:scale-90"
+                >
+                  <span className="text-[11px] font-black leading-none text-gray-700 dark:text-gray-200">
+                    {f.split("/")[0]}
+                  </span>
+                  <div className="w-4 h-[1.5px] bg-gray-300 dark:bg-gray-600 my-[2px]" />
+                  <span className="text-[11px] font-black leading-none text-gray-700 dark:text-gray-200">
+                    {f.split("/")[1]}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Bottom Confirm — large green button */}
+          <div className="px-5 pb-5">
             <button
+              type="button"
               onClick={() => onConfirm(getCurrentValue())}
-              className="w-full py-4 rounded-xl bg-green-500 hover:bg-green-600 text-white font-black text-2xl shadow-lg shadow-green-200 dark:shadow-none transition-all transform active:scale-95"
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-black text-xl shadow-lg shadow-green-500/20 dark:shadow-none transition-all transform active:scale-[0.97] flex items-center justify-center gap-2"
             >
-              {getCurrentValue()}
+              <Check size={20} strokeWidth={3} />
+              <span>{getCurrentValue()}</span>
             </button>
           </div>
         </div>
@@ -2649,21 +2722,24 @@ const GarmentWashForm = ({
                               </span>
                             </div>
                           ) : (
-                            <input
-                              type="text"
-                              value={row.beforeWashSpec}
-                              onClick={() =>
-                                openKeypad(
-                                  "shrinkageRows",
-                                  index,
-                                  "beforeWashSpec",
-                                  row.beforeWashSpec,
-                                )
-                              }
-                              readOnly
-                              className={`w-full bg-white/50 dark:bg-gray-800/50 border border-blue-100 dark:border-blue-800 rounded px-1 text-center cursor-pointer hover:bg-white dark:hover:bg-gray-800 font-black text-lg ${formData.washType !== "After Wash" ? "text-blue-600" : "text-gray-400"}`}
-                              placeholder="-"
-                            />
+                            <div className="relative group/spec">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={row.beforeWashSpec}
+                                onChange={(e) =>
+                                  updateRow(
+                                    "shrinkageRows",
+                                    index,
+                                    "beforeWashSpec",
+                                    e.target.value,
+                                  )
+                                }
+                                className={`w-full bg-white/50 dark:bg-gray-800/50 border border-blue-100 dark:border-blue-800 rounded-lg px-2 py-1 text-center hover:bg-white dark:hover:bg-gray-800 font-black text-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition-all ${formData.washType !== "After Wash" ? "text-blue-600" : "text-gray-400"}`}
+                                placeholder="-"
+                              />
+
+                            </div>
                           )}
                           {row.beforeWashSpec && (
                             <span className="text-[10px] text-gray-400 font-mono font-medium">
@@ -2688,21 +2764,24 @@ const GarmentWashForm = ({
                               </span>
                             </div>
                           ) : (
-                            <input
-                              type="text"
-                              value={row.afterWashSpec}
-                              onClick={() =>
-                                openKeypad(
-                                  "shrinkageRows",
-                                  index,
-                                  "afterWashSpec",
-                                  row.afterWashSpec,
-                                )
-                              }
-                              readOnly
-                              className={`w-full bg-white/50 dark:bg-gray-800/50 border border-purple-100 dark:border-purple-800 rounded px-1 text-center cursor-pointer hover:bg-white dark:hover:bg-gray-800 font-black text-lg ${formData.washType === "After Wash" ? "text-purple-600" : "text-gray-400"}`}
-                              placeholder="-"
-                            />
+                            <div className="relative group/spec">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={row.afterWashSpec}
+                                onChange={(e) =>
+                                  updateRow(
+                                    "shrinkageRows",
+                                    index,
+                                    "afterWashSpec",
+                                    e.target.value,
+                                  )
+                                }
+                                className={`w-full bg-white/50 dark:bg-gray-800/50 border border-purple-100 dark:border-purple-800 rounded-lg px-2 py-1 text-center hover:bg-white dark:hover:bg-gray-800 font-black text-lg focus:ring-2 focus:ring-purple-400 focus:border-purple-400 outline-none transition-all ${formData.washType === "After Wash" ? "text-purple-600" : "text-gray-400"}`}
+                                placeholder="-"
+                              />
+
+                            </div>
                           )}
                           {row.afterWashSpec && (
                             <span className="text-[10px] text-gray-400 font-mono font-medium">
@@ -2712,61 +2791,57 @@ const GarmentWashForm = ({
                         </div>
                       </td>
                       <td className="p-3 relative">
-                        <div
-                          onClick={() =>
-                            openKeypad(
-                              "shrinkageRows",
-                              index,
-                              "beforeWash",
-                              row.beforeWash,
-                            )
-                          }
-                          className={`cursor-pointer rounded-xl border transition-all duration-200 flex flex-col items-center justify-center h-14 w-full relative group/input
-                                                    ${row.beforeWash ? "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 shadow-sm" : "bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700 border-dashed hover:border-blue-300 hover:bg-white"}`}
+                        <div className={`group/cell rounded-xl border transition-all duration-200 flex flex-col items-center justify-center w-full relative overflow-visible
+                                                    ${row.beforeWash ? "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 shadow-sm" : "bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700 border-dashed hover:border-gray-300"}`}
                         >
-                          {row.beforeWash ? (
-                            <>
-                              <span className="text-lg font-black tabular-nums text-gray-800 dark:text-white">
-                                {row.beforeWash}
-                              </span>
-                              <span className="text-[10px] text-gray-400 font-mono">
-                                {parseFraction(row.beforeWash).toFixed(3)}"
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-gray-300 group-hover/input:text-blue-400 transition-colors">
-                              <Hash size={16} />
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={row.beforeWash || ""}
+                            onChange={(e) =>
+                              updateRow(
+                                "shrinkageRows",
+                                index,
+                                "beforeWash",
+                                e.target.value,
+                              )
+                            }
+                            className="w-full bg-transparent text-center text-lg font-black tabular-nums text-gray-800 dark:text-white outline-none focus:ring-0 border-none px-2 py-2"
+                            placeholder="—"
+                          />
+                          {row.beforeWash && (
+                            <span className="text-[9px] text-gray-400 font-mono -mt-1 pb-1">
+                              {parseFraction(row.beforeWash).toFixed(3)}"
                             </span>
                           )}
+
                         </div>
                       </td>
                       <td className="p-3">
-                        <div
-                          onClick={() =>
-                            openKeypad(
-                              "shrinkageRows",
-                              index,
-                              "afterWash",
-                              row.afterWash,
-                            )
-                          }
-                          className={`cursor-pointer rounded-xl border transition-all duration-200 flex flex-col items-center justify-center h-14 w-full relative group/input
-                                                    ${row.afterWash ? "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 shadow-sm" : "bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700 border-dashed hover:border-blue-300 hover:bg-white"}`}
+                        <div className={`group/cell rounded-xl border transition-all duration-200 flex flex-col items-center justify-center w-full relative overflow-visible
+                                                    ${row.afterWash ? "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 shadow-sm" : "bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700 border-dashed hover:border-gray-300"}`}
                         >
-                          {row.afterWash ? (
-                            <>
-                              <span className="text-lg font-black tabular-nums text-gray-800 dark:text-white">
-                                {row.afterWash}
-                              </span>
-                              <span className="text-[10px] text-gray-400 font-mono">
-                                {parseFraction(row.afterWash).toFixed(3)}"
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-gray-300 group-hover/input:text-blue-400 transition-colors">
-                              <Hash size={16} />
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={row.afterWash || ""}
+                            onChange={(e) =>
+                              updateRow(
+                                "shrinkageRows",
+                                index,
+                                "afterWash",
+                                e.target.value,
+                              )
+                            }
+                            className="w-full bg-transparent text-center text-lg font-black tabular-nums text-gray-800 dark:text-white outline-none focus:ring-0 border-none px-2 py-2"
+                            placeholder="—"
+                          />
+                          {row.afterWash && (
+                            <span className="text-[9px] text-gray-400 font-mono -mt-1 pb-1">
+                              {parseFraction(row.afterWash).toFixed(3)}"
                             </span>
                           )}
+
                         </div>
                       </td>
                       <td className="p-3 text-center">

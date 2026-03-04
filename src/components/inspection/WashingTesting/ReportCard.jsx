@@ -705,7 +705,7 @@ const ReportCard = ({
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                     {report.shrinkageRows
-                      .filter(row => row.selected) // Only show selected rows in the summary card!
+                      .filter(row => row.selected !== false || row.beforeWash || row.afterWash || row.location)
                       .map((row, idx) => (
                         <tr key={idx} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
                           <td className="p-2 font-medium text-gray-700 dark:text-gray-300 max-w-[150px] truncate" title={row.location}>
@@ -720,7 +720,10 @@ const ReportCard = ({
                           <td className="p-2 text-center text-gray-600 dark:text-gray-400">
                             {row.afterWash || "-"}
                           </td>
-                          <td className={`p-2 text-center font-bold ${parseFloat(row.shrinkage) > 0 ? 'text-green-600' : 'text-blue-600'}`}>
+                          <td className={`p-2 text-center font-bold ${
+                            row.passFail === 'FAIL' ? 'text-red-600 dark:text-red-400' :
+                            parseFloat(row.shrinkage) > 0 ? 'text-green-600' : 'text-blue-600'
+                          }`}>
                             {row.shrinkage || "-"}
                           </td>
                           <td className="p-2 text-center">
@@ -734,7 +737,7 @@ const ReportCard = ({
                           </td>
                         </tr>
                       ))}
-                    {report.shrinkageRows.filter(row => row.selected).length === 0 && (
+                    {report.shrinkageRows.filter(row => row.selected !== false || row.beforeWash || row.afterWash || row.location).length === 0 && (
                       <tr>
                         <td colSpan={6} className="p-4 text-center text-gray-400 italic">
                           No measurement points selected.

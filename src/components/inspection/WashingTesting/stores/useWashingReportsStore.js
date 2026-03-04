@@ -307,8 +307,12 @@ export const useWashingReportsStore = create((set, get) => ({
                 if (!skipFields.includes(key) && dataToSubmit[key] !== undefined && dataToSubmit[key] !== null) {
                     if (key === "fabricColor" && Array.isArray(dataToSubmit[key]))
                         fd.append(key, dataToSubmit[key].join(", "));
-                    else if (key === "shrinkageRows" && Array.isArray(dataToSubmit[key]))
-                        fd.append(key, JSON.stringify(dataToSubmit[key].filter((r) => r.selected)));
+                    else if (key === "shrinkageRows" && Array.isArray(dataToSubmit[key])) {
+                        const rowsToStore = dataToSubmit[key].filter(
+                            (r) => r.selected || r.beforeWash || r.afterWash || r.location
+                        );
+                        fd.append(key, JSON.stringify(rowsToStore));
+                    }
                     else if (Array.isArray(dataToSubmit[key])) fd.append(key, JSON.stringify(dataToSubmit[key]));
                     else if (typeof dataToSubmit[key] === "object") fd.append(key, JSON.stringify(dataToSubmit[key]));
                     else fd.append(key, dataToSubmit[key]);
@@ -513,8 +517,12 @@ export const useWashingReportsStore = create((set, get) => ({
             ];
             Object.keys(editFormData).forEach((key) => {
                 if (!skipFields.includes(key) && editFormData[key] !== undefined && editFormData[key] !== null) {
-                    if (key === "shrinkageRows" && Array.isArray(editFormData[key]))
-                        fd.append(key, JSON.stringify(editFormData[key].filter((r) => r.selected)));
+                    if (key === "shrinkageRows" && Array.isArray(editFormData[key])) {
+                        const rowsToStore = editFormData[key].filter(
+                            (r) => r.selected || r.beforeWash || r.afterWash || r.location
+                        );
+                        fd.append(key, JSON.stringify(rowsToStore));
+                    }
                     else if (Array.isArray(editFormData[key])) fd.append(key, JSON.stringify(editFormData[key]));
                     else if (typeof editFormData[key] === "object") fd.append(key, JSON.stringify(editFormData[key]));
                     else fd.append(key, editFormData[key]);

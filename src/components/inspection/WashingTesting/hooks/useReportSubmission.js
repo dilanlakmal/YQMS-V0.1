@@ -71,9 +71,11 @@ export const useReportSubmission = (user, fetchReports) => {
             // Multi-select fabric: send as comma-separated string
             formDataToSubmit.append(key, dataToSubmit[key].join(', '));
           } else if (key === 'shrinkageRows' && Array.isArray(dataToSubmit[key])) {
-            // Filter shrinkageRows to only include selected rows
-            const selectedRows = dataToSubmit[key].filter(row => row.selected);
-            formDataToSubmit.append(key, JSON.stringify(selectedRows));
+            // Include rows that are selected OR have measurement data (so record card & DB match form)
+            const rowsToStore = dataToSubmit[key].filter(
+              row => row.selected || row.beforeWash || row.afterWash || row.location
+            );
+            formDataToSubmit.append(key, JSON.stringify(rowsToStore));
           } else if (Array.isArray(dataToSubmit[key])) {
             formDataToSubmit.append(key, JSON.stringify(dataToSubmit[key]));
           } else if (typeof dataToSubmit[key] === 'object') {
@@ -364,9 +366,11 @@ export const useReportSubmission = (user, fetchReports) => {
       Object.keys(editFormData).forEach(key => {
         if (!skipFields.includes(key) && editFormData[key] !== undefined && editFormData[key] !== null) {
           if (key === 'shrinkageRows' && Array.isArray(editFormData[key])) {
-            // Filter shrinkageRows to only include selected rows
-            const selectedRows = editFormData[key].filter(row => row.selected);
-            formDataToSubmit.append(key, JSON.stringify(selectedRows));
+            // Include rows that are selected OR have measurement data (so record card & DB match form)
+            const rowsToStore = editFormData[key].filter(
+              row => row.selected || row.beforeWash || row.afterWash || row.location
+            );
+            formDataToSubmit.append(key, JSON.stringify(rowsToStore));
           } else if (Array.isArray(editFormData[key])) {
             formDataToSubmit.append(key, JSON.stringify(editFormData[key]));
           } else if (typeof editFormData[key] === 'object') {

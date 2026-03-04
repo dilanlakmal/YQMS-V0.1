@@ -282,7 +282,8 @@ const LaundryWashingMachineTest = () => {
         <div className="p-4 md:p-6">
           <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
             <nav className="flex overflow-x-auto scrollbar-hide -mb-px" aria-label="Tabs" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
-              {((isAdminUser || !isWarehouseUser) || (isWarehouseUser && activeTab === "form")) && (
+              {/* Create New Report: always for admin/reporter; for warehouse show when on form OR when completing a report (so they can switch tabs without losing form) */}
+              {((isAdminUser || !isWarehouseUser) || (isWarehouseUser && (activeTab === "form" || completingReport))) && (
                 <button onClick={() => setActiveTab("form")} className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "form" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}>
                   <span className="flex items-center gap-1.5 sm:gap-2">
                     <HiDocumentAdd className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "form" ? "text-emerald-600" : "text-emerald-500/70"}`} />
@@ -336,10 +337,10 @@ const LaundryWashingMachineTest = () => {
                 <button
                   type="button"
                   onClick={() => { setShowReportDateScanner("standalone"); setTimeout(() => initializeScanner("standalone"), 300); }}
-                  className="p-2 text-indigo-600 hover:text-indigo-700 transform transition-all duration-300 hover:scale-125 active:scale-95 group border-b-2 border-transparent"
+                  className="p-2 text-indigo-600 hover:text-indigo-700 transition-colors border-b-2 border-transparent"
                   title="Open Live Camera Scanner"
                 >
-                  <Camera size={32} className="group-hover:rotate-12 transition-transform" />
+                  <Camera size={32} />
                 </button>
               </div>
             </nav>

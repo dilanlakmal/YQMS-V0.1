@@ -138,7 +138,7 @@ export const useQRCode = (getQRCodeBaseURL) => {
     });
   }, []);
 
-  // Download QR code as image (no logo — plain QR for download)
+  // Download QR code as image (no logo — JPEG, filename YYYY-MM-DD-QR-Code-Report-{id}.jpg)
   const downloadQRCode = useCallback(
     (reportId) => {
       const value = `${getQRCodeBaseURL()}/Launch-washing-machine-test?scan=${reportId}`;
@@ -147,18 +147,35 @@ export const useQRCode = (getQRCodeBaseURL) => {
           showToast.error("Failed to generate QR code. Please try again.");
           return;
         }
-        try {
-          const link = document.createElement("a");
-          link.href = dataURL;
-          link.download = `QR-Code-Report-${reportId}.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          showToast.success("QR code downloaded successfully!");
-        } catch (e) {
-          console.error("Download failed:", e);
-          showToast.error("Failed to download QR code. Please try again.");
-        }
+        const d = new Date();
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const filename = `${dateStr}-QR-Code-Report-${reportId}.jpg`;
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0);
+            const jpegURL = canvas.toDataURL("image/jpeg", 0.95);
+            const link = document.createElement("a");
+            link.href = jpegURL;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast.success("QR code downloaded successfully!");
+          } catch (e) {
+            console.error("Download failed:", e);
+            showToast.error("Failed to download QR code. Please try again.");
+          }
+        };
+        img.onerror = () => {
+          showToast.error("Failed to prepare image for download.");
+        };
+        img.src = dataURL;
       });
     },
     [getQRCodeBaseURL, generateQRCodeDataURLNoLogo]
