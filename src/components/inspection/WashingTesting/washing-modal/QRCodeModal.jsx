@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import { X, Upload, Printer, Camera, Download, CheckCircle, RotateCw } from "lucide-react";
+import { X, Upload, Printer, Camera, Download, RotateCw } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { useQRScannerStore } from "../stores/useQRScannerStore";
 import "./QRCodeModal.css";
@@ -18,29 +18,12 @@ const QRCodeModal = ({
 }) => {
   const qrCodeContainerRef = useRef(null);
   const [hideQR, setHideQR] = useState(false);
-  const [scanSuccess, setScanSuccess] = useState(false);
   const { isProcessingScan: isProcessing } = useQRScannerStore();
-
-  // Listen for QR scan success events
-  useEffect(() => {
-    const handleScanSuccess = () => {
-      setScanSuccess(true);
-      // Success popup shows for a while, then will close naturally 
-      // as the app navigates or store state changes.
-      setTimeout(() => {
-        setScanSuccess(false);
-      }, 3500);
-    };
-
-    window.addEventListener('qr-scan-success', handleScanSuccess);
-    return () => window.removeEventListener('qr-scan-success', handleScanSuccess);
-  }, []);
 
   // Unassigned users (isLocked) can't scan — default to hiding QR; they use Print/Download only
   useEffect(() => {
     if (isOpen && reportId) {
       setHideQR(!!isLocked);
-      setScanSuccess(false);
     }
   }, [isOpen, reportId, isLocked]);
   // Animated Logo Component for the QR center
@@ -248,25 +231,6 @@ const QRCodeModal = ({
           </div>
         )}
 
-        {/* Success Overlay */}
-        {scanSuccess && (
-          <div className="absolute inset-0 z-[70] bg-white/95 dark:bg-gray-900/95 flex flex-col items-center justify-center animate-modal-pop">
-            <div className="scale-125 md:scale-150">
-              <CheckCircle size={80} className="text-green-500 animate-success-check" strokeWidth={2.5} />
-            </div>
-            <h4 className="mt-8 text-2xl font-bold text-gray-900 dark:text-white">
-              Scan Success!
-            </h4>
-            <p className="mt-2 text-gray-600 dark:text-gray-400 font-medium">
-              Correct check
-            </p>
-            <div className="mt-6 flex gap-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-            </div>
-          </div>
-        )}
       </div>
     </div >
   );

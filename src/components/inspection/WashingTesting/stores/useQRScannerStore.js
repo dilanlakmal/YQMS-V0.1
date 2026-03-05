@@ -62,8 +62,18 @@ const _drawQRReportImage = (qrDataURL, report, idQr) => {
             return Array.isArray(c) ? c.join(", ") : (c ? String(c) : "N/A");
         };
         const formatSize = (report) => {
-            const s = report?.size ?? report?.sizes ?? report?.sizeList;
-            return Array.isArray(s) ? s.join(", ") : (s != null && s !== "" ? String(s) : "N/A");
+            const s = report?.reportSampleSizes ?? report?.sampleSize ?? report?.size ?? report?.sizes ?? report?.sizeList;
+            if (Array.isArray(s) && s.length > 0) return s.join(", ");
+            if (typeof s === "string" && s.trim()) {
+                if (s.startsWith("[") && s.endsWith("]")) {
+                    try {
+                        const p = JSON.parse(s);
+                        if (Array.isArray(p) && p.length > 0) return p.join(", ");
+                    } catch (_) {}
+                }
+                return s;
+            }
+            return s != null && s !== "" ? String(s) : "N/A";
         };
         const formatQty = (report) => {
             const q = report?.qty ?? report?.quantity ?? report?.qtyTotal;
@@ -98,7 +108,7 @@ const _drawQRReportImage = (qrDataURL, report, idQr) => {
             { label: "Style:", value: report?.ymStyle || "N/A" },
             { label: "Color:", value: formatColor(report) },
             { label: "Size:", value: formatSize(report) },
-            { label: "Qty:", value: formatQty(report) },
+            // { label: "Qty:", value: formatQty(report) },
             { label: "Buyer Style:", value: report?.buyerStyle || "N/A" },
             { label: "Report Type:", value: report?.reportType || "N/A" },
         ];

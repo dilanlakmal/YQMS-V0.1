@@ -243,7 +243,8 @@ export const saveReportWashing = async (req, res) => {
     if (reportDate && String(reportDate).trim()) reportData.reportDate = new Date(reportDate);
 
     // Copy allowed report-type specific fields from req.body (explicit allowlist)
-    const ALLOWED_EXTRA = ["season", "styleDescription", "mainFabric", "liningInserts", "detergent", "washingMethod", "beforeWashComments", "afterWashComments", "finalResult", "checkedBy", "approvedBy", "washType", "custStyle", "fabricColor"];
+        // custStyle removed: we use buyerStyle only (same value; avoid storing duplicate)
+    const ALLOWED_EXTRA = ["season", "styleDescription", "mainFabric", "liningInserts", "detergent", "washingMethod", "beforeWashComments", "afterWashComments", "finalResult", "checkedBy", "approvedBy", "washType", "fabricColor"];
     for (const key of ALLOWED_EXTRA) {
       const val = req.body[key];
       if (val !== undefined && val !== null) {
@@ -431,7 +432,8 @@ export const getReportWashingById = async (req, res) => {
 };
 
 // Allowed fields for update — only these are copied from req.body (no spread)
-const UPDATE_ALLOWED = ["reportType", "color", "buyerStyle", "po", "exFtyDate", "reportSampleSizes", "factory", "sendToHomeWashingDate", "status", "receivedDate", "receivedAt", "receiver_emp_id", "receivedNotes", "receivedImages", "completedDate", "completedAt", "completionImages", "completionNotes", "completer_emp_id", "checkedBy", "approvedBy", "checkedByName", "approvedByName", "rejectedAt", "rejectedNotes", "reportDate", "colorFastnessRows", "colorStainingRows", "shrinkageRows", "visualAssessmentRows", "careSymbols", "careLabelImageUrls", "season", "styleDescription", "mainFabric", "liningInserts", "detergent", "washingMethod", "beforeWashComments", "afterWashComments", "finalResult", "washType", "custStyle", "fabricColor", "reporter_emp_id", "reporter_name"];
+// custStyle removed: use buyerStyle only (same value; avoid storing duplicate)
+const UPDATE_ALLOWED = ["reportType", "color", "buyerStyle", "po", "exFtyDate", "reportSampleSizes", "factory", "sendToHomeWashingDate", "status", "receivedDate", "receivedAt", "receiver_emp_id", "receivedNotes", "receivedImages", "completedDate", "completedAt", "completionImages", "completionNotes", "completer_emp_id", "checkedBy", "approvedBy", "checkedByName", "approvedByName", "rejectedAt", "rejectedNotes", "reportDate", "colorFastnessRows", "colorStainingRows", "shrinkageRows", "visualAssessmentRows", "careSymbols", "careLabelImageUrls", "season", "styleDescription", "mainFabric", "liningInserts", "detergent", "washingMethod", "beforeWashComments", "afterWashComments", "finalResult", "washType", "fabricColor", "reporter_emp_id", "reporter_name"];
 
 // Update Report Washing by ID
 export const updateReportWashing = async (req, res) => {

@@ -1062,7 +1062,7 @@ const ReportsList = ({
                     { label: "Style:", value: styleStr },
                     { label: "Color:", value: colorStr },
                     { label: "Size:", value: sizeStr },
-                    { label: "Qty:", value: qtyStr },
+                    // { label: "Qty:", value: qtyStr },
                     { label: "Buyer Style:", value: buyerStyleStr },
                     { label: "Report Type:", value: reportTypeStr },
                   ].map((row, i) => (
