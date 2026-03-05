@@ -861,6 +861,14 @@ function Home() {
             title: t("home.select_dt_specs"),
             description: "Select After Wash DT Specs",
           },
+          {
+            path: "/Launch-washing-machine-test",
+            roles: ["Washing Testing"],
+            image: "assets/Home/Launch-washing-machine-test.png",
+            title: "Lab Testsing",
+            description: "All Lab Testing",
+            imageSize: "large",
+          },
         ],
       },
       {

@@ -136,6 +136,10 @@ import createHumidityModel from "../../models/huminity/HumidityReport.js";
 import createHumidityFiberNameModel from "../../models/HumidityFiberName.js";
 import createReitmansReportModel from "../../models/huminity/ReitmansReport.js";
 
+// Washing Test Models
+import createReportWashingModel from "../../models/ReportWashing.js";
+import createReportAssignControlModel from "../../models/ReportAssignControl.js";
+
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
   process.env.MongoDB_URI_ym_prod,
@@ -330,6 +334,35 @@ export const CoverPage = createCoverPageSchema(ymProdConnection);
 //Humidity Exported Models
 export const HumidityReport = createHumidityModel(ymProdConnection);
 export const ReitmansReport = createReitmansReportModel(ymProdConnection);
+
+// Washing Test Models
+export const ReportWashing = createReportWashingModel(
+  ymProdConnection,
+  "report_washing",
+);
+export const ReportHomeWash = createReportWashingModel(
+  ymProdConnection,
+  "report_home_wash",
+);
+export const ReportGarmentWash = createReportWashingModel(
+  ymProdConnection,
+  "report_garment_wash",
+);
+export const ReportHTTesting = createReportWashingModel(
+  ymProdConnection,
+  "report_ht_testing",
+);
+export const ReportEMBPrinting = createReportWashingModel(
+  ymProdConnection,
+  "report_emb_printing",
+);
+export const ReportPullingTest = createReportWashingModel(
+  ymProdConnection,
+  "report_pulling_test",
+);
+
+export const ReportAssignControl =
+  createReportAssignControlModel(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

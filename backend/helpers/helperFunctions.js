@@ -7,6 +7,7 @@ import {
   SubconSewingQc1Report,
   SubconSewingQAReport,
 } from "../controller/MongoDB/dbConnectionController.js";
+import fs from "fs";
 import multer from "multer";
 import path from "path";
 import {
@@ -841,3 +842,34 @@ export const validateImageBuffer = (buffer, maxSizeInMB = 5) => {
     };
   }
 };
+
+// Washing Machine Test Image Upload Configuration
+const washingMachineTestUploadPath = path.join(
+  __backendDir,
+  "public",
+  "storage",
+  "washing_machine_test",
+);
+// Ensure directory exists
+if (!fs.existsSync(washingMachineTestUploadPath)) {
+  fs.mkdirSync(washingMachineTestUploadPath, { recursive: true });
+}
+
+const washingMachineTestMemoryStorage = multer.memoryStorage();
+export const uploadWashingMachineTestImage = multer({
+  storage: washingMachineTestMemoryStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB per file
+    fieldSize: 50 * 1024 * 1024, // 50MB for non-file fields (careSymbolsImages base64, shrinkageRows, etc.)
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG, PNG, GIF, and WebP images are allowed"), false);
+    }
+  },
+});
+
+export { washingMachineTestUploadPath };

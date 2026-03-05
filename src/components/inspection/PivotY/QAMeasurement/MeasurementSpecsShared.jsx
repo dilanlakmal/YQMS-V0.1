@@ -72,6 +72,9 @@ const MeasurementSpecsShared = ({
   // Repair TOL State (AW only)
   const [isRepairingTol, setIsRepairingTol] = useState(false);
 
+  // Update New K Specs State
+  const [isUpdatingKValue, setIsUpdatingKValue] = useState(false);
+
   // =========================================================================
   // Repair Specs State
   // =========================================================================
@@ -432,6 +435,65 @@ const MeasurementSpecsShared = ({
       );
     } finally {
       setIsRepairingTol(false);
+    }
+  };
+
+  // =========================================================================
+  // UPDATE NEW K-VALUE SPECS FROM MASTER DATA (BW only)
+  // =========================================================================
+  const handleUpdateNewKValueSpecs = async () => {
+    if (!moNoSearch.trim()) {
+      setError("Please search for an order first.");
+      return;
+    }
+
+    setIsUpdatingKValue(true);
+    setError("");
+    setSuccessMsg("");
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/qa-sections/measurement-specs/update-new-kvalue`,
+        { moNo: moNoSearch.trim() },
+      );
+
+      if (response.data.success) {
+        const {
+          newKValuesFound,
+          objectsAddedToAll,
+          objectsAddedToSelected,
+          newKValues,
+        } = response.data.summary || {};
+
+        if (newKValuesFound > 0) {
+          setSuccessMsg(
+            `✅ ${response.data.message} | New kValues: ${newKValues?.join(", ")}`,
+          );
+          // Refresh data to show newly added specs
+          handleSearch(null, moNoSearch);
+        } else {
+          setSuccessMsg(`✅ ${response.data.message}`);
+        }
+
+        setTimeout(() => setSuccessMsg(""), 6000);
+      }
+    } catch (err) {
+      console.error("Error updating new kValue specs:", err);
+      const status = err.response?.status;
+      if (status === 404) {
+        setError(
+          err.response?.data?.message ||
+            "No saved configuration found. Please save configuration first.",
+        );
+      } else {
+        setError(
+          err.response?.data?.message ||
+            err.response?.data?.error ||
+            "Failed to update new kValue specs.",
+        );
+      }
+    } finally {
+      setIsUpdatingKValue(false);
     }
   };
 
@@ -1414,6 +1476,25 @@ const MeasurementSpecsShared = ({
               )}
               Update Specs
             </button>
+
+            {/* Update New K Specs Button - BW only */}
+            {!isAw && (
+              <button
+                onClick={handleUpdateNewKValueSpecs}
+                disabled={
+                  !moNoSearch || isUpdatingKValue || isSaving || isApplyingAW
+                }
+                className="w-full sm:w-auto px-6 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all transform active:scale-95"
+                title="Add new kValue spec groups from Master Data (dt_orders) that don't yet exist in saved configuration"
+              >
+                {isUpdatingKValue ? (
+                  <Loader className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Layers className="w-4 h-4" />
+                )}
+                Update New K Specs
+              </button>
+            )}
           </div>
         </div>
       )}

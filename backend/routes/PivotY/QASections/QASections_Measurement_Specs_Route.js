@@ -17,6 +17,7 @@ import {
   previewSpecsUpdate,
   repairCorruptedSpecs,
   repairAWTolerancesFromMaster,
+  updateNewKValueSpecs,
 } from "../../../controller/PivotY/QASections/QASections_Measurement_Specs_Update_Controller.js";
 
 // Import Name Swap Controller
@@ -98,6 +99,12 @@ router.post(
 router.post(
   "/api/qa-sections/measurement-specs-aw/repair-tolerances",
   repairAWTolerancesFromMaster,
+);
+
+// Update K value specs based on master data
+router.post(
+  "/api/qa-sections/measurement-specs/update-new-kvalue",
+  updateNewKValueSpecs,
 );
 
 // =========================================================================

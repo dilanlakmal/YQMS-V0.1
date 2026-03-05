@@ -2,6 +2,7 @@ import {
   QASectionsMeasurementSpecs,
   DtOrder,
 } from "../../MongoDB/dbConnectionController.js";
+import mongoose from "mongoose";
 
 // =========================================================================
 // HELPER: SANITIZERS (Reused from main controller)
@@ -1100,6 +1101,174 @@ export const repairAWTolerancesFromMaster = async (req, res) => {
     });
   } catch (error) {
     console.error("Error repairing AW tolerances from master:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// =========================================================================
+// UPDATE NEW K-VALUE SPECS FROM MASTER DATA - BEFORE WASH
+// Finds kValues in dt_orders.BeforeWashSpecs that don't exist in
+// qa_sections AllBeforeWashSpecs, then adds those new objects.
+// Never touches existing data.
+// =========================================================================
+
+export const updateNewKValueSpecs = async (req, res) => {
+  const { moNo } = req.body;
+
+  if (!moNo) {
+    return res.status(400).json({ message: "MO Number is required." });
+  }
+
+  try {
+    const cleanMoNo = moNo.trim();
+
+    // 1. Fetch QA Sections record
+    const qaRecord = await QASectionsMeasurementSpecs.findOne({
+      Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") },
+    });
+
+    if (!qaRecord) {
+      return res.status(404).json({
+        message: `No saved configuration found for Order No: ${cleanMoNo}. Please save configuration first.`,
+      });
+    }
+
+    // 2. Fetch Master Data - BeforeWashSpecs
+    const dtOrderData = await DtOrder.findOne(
+      { Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") } },
+      { BeforeWashSpecs: 1, Order_No: 1, _id: 0 },
+    ).lean();
+
+    if (!dtOrderData) {
+      return res.status(404).json({
+        message: `Order No '${cleanMoNo}' not found in Master Data.`,
+      });
+    }
+
+    if (
+      !dtOrderData.BeforeWashSpecs ||
+      dtOrderData.BeforeWashSpecs.length === 0
+    ) {
+      return res.status(404).json({
+        message: "No 'Before Wash Specs' found in Master Data.",
+      });
+    }
+
+    // 3. Collect all kValues currently present in AllBeforeWashSpecs
+    const existingAllSpecs = qaRecord.AllBeforeWashSpecs || [];
+    const existingKValues = new Set(
+      existingAllSpecs
+        .map((item) => item.kValue)
+        .filter((k) => k && k !== "NA" && k !== ""),
+    );
+
+    // 4. Find new kValues from master data
+    const masterKValues = new Set(
+      dtOrderData.BeforeWashSpecs.map((item) => item.kValue).filter(
+        (k) => k && k !== "NA" && k !== "",
+      ),
+    );
+
+    const newKValues = [...masterKValues].filter(
+      (k) => !existingKValues.has(k),
+    );
+
+    if (newKValues.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No new kValues found. All kValues are already up to date.",
+        summary: {
+          newKValuesFound: 0,
+          objectsAddedToAll: 0,
+          objectsAddedToSelected: 0,
+        },
+        newKValues: [],
+      });
+    }
+
+    // 5. Filter master objects that have a new kValue
+    const newMasterObjects = dtOrderData.BeforeWashSpecs.filter(
+      (item) => item.kValue && newKValues.includes(item.kValue),
+    );
+
+    // 6. Transform new objects into proper qa_sections format
+    // Determine starting 'no' value
+    const maxNoInAll =
+      existingAllSpecs.length > 0
+        ? Math.max(...existingAllSpecs.map((i) => i.no || 0))
+        : 0;
+
+    const transformedNewObjects = newMasterObjects.map((item, idx) => {
+      const transformedSpecs = transformMasterSpecs(item.Specs);
+      const shrinkage = item.Shrinkage
+        ? sanitizeSpecValue(item.Shrinkage)
+        : { fraction: "0", decimal: 0 };
+      const tolMinus = sanitizeToleranceValue(item.TolMinus);
+      const tolPlus = sanitizeToleranceValue(item.TolPlus);
+
+      return {
+        id: new mongoose.Types.ObjectId().toString(),
+        no: maxNoInAll + idx + 1,
+        kValue: item.kValue || "NA",
+        MeasurementPointEngName: item.MeasurementPointEngName || "",
+        MeasurementPointChiName: item.MeasurementPointChiName || "",
+        TolMinus: tolMinus,
+        TolPlus: tolPlus,
+        Shrinkage: shrinkage,
+        Specs: transformedSpecs,
+      };
+    });
+
+    // 7. Add new objects to AllBeforeWashSpecs
+    qaRecord.AllBeforeWashSpecs = [
+      ...existingAllSpecs,
+      ...transformedNewObjects,
+    ];
+
+    // 8. Determine which new objects should go into selectedBeforeWashSpecs
+    // Rule: if MeasurementPointEngName is already selected, include the new kValue object too
+    const existingSelectedSpecs = qaRecord.selectedBeforeWashSpecs || [];
+    const selectedEngNames = new Set(
+      existingSelectedSpecs.map((s) => s.MeasurementPointEngName),
+    );
+
+    const maxNoInSelected =
+      existingSelectedSpecs.length > 0
+        ? Math.max(...existingSelectedSpecs.map((i) => i.no || 0))
+        : 0;
+
+    const newObjectsForSelected = transformedNewObjects
+      .filter((obj) => selectedEngNames.has(obj.MeasurementPointEngName))
+      .map((obj, idx) => ({
+        ...obj,
+        id: new mongoose.Types.ObjectId().toString(), // fresh id for selected array
+        no: maxNoInSelected + idx + 1,
+      }));
+
+    qaRecord.selectedBeforeWashSpecs = [
+      ...existingSelectedSpecs,
+      ...newObjectsForSelected,
+    ];
+
+    // 9. Mark modified and save
+    qaRecord.markModified("AllBeforeWashSpecs");
+    qaRecord.markModified("selectedBeforeWashSpecs");
+    qaRecord.updatedAt = new Date();
+    await qaRecord.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully added ${transformedNewObjects.length} new spec object(s) from ${newKValues.length} new kValue(s). Added ${newObjectsForSelected.length} to selected specs.`,
+      summary: {
+        newKValuesFound: newKValues.length,
+        newKValues: newKValues,
+        objectsAddedToAll: transformedNewObjects.length,
+        objectsAddedToSelected: newObjectsForSelected.length,
+      },
+      updatedAt: qaRecord.updatedAt,
+    });
+  } catch (error) {
+    console.error("Error updating new kValue specs:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 };

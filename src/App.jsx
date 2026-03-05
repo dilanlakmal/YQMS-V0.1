@@ -110,6 +110,9 @@ import FCSystem from "./pages/FCSystem";
 import WIP from "./pages/WIP.jsx";
 import WIPSewingDefects from "./pages/WIPSewingDefects";
 
+// Washing Test
+import LaundryWashingMachineTest from "./pages/LaunchWashingMachineTest.jsx";
+
 export const BluetoothContext = createContext(null);
 
 function AppContent() {
@@ -505,6 +508,10 @@ function AppContent() {
               <Route
                 path="/wip-sewing-defects"
                 element={<WIPSewingDefects />}
+              />
+              <Route
+                path="/Launch-washing-machine-test"
+                element={<LaundryWashingMachineTest />}
               />
             </>
           ) : (
