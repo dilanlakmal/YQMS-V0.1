@@ -69,6 +69,9 @@ const MeasurementSpecsShared = ({
   const [isLoadingUpdatePreview, setIsLoadingUpdatePreview] = useState(false);
   const [hasSavedConfig, setHasSavedConfig] = useState(false);
 
+  // Repair TOL State (AW only)
+  const [isRepairingTol, setIsRepairingTol] = useState(false);
+
   // =========================================================================
   // Repair Specs State
   // =========================================================================
@@ -392,6 +395,47 @@ const MeasurementSpecsShared = ({
   };
 
   // =========================================================================
+  // REPAIR AW TOLERANCE VALUES FROM MASTER DATA
+  // =========================================================================
+  const handleRepairAWTolerances = async () => {
+    if (!moNoSearch.trim()) {
+      setError("Please search for an order first.");
+      return;
+    }
+
+    setIsRepairingTol(true);
+    setError("");
+    setSuccessMsg("");
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/qa-sections/measurement-specs-aw/repair-tolerances`,
+        { moNo: moNoSearch.trim() },
+      );
+
+      if (response.data.success) {
+        const { totalUpdated } = response.data.summary || {};
+        setSuccessMsg(
+          totalUpdated > 0
+            ? `✅ ${response.data.message}`
+            : `✅ ${response.data.message}`,
+        );
+        handleSearch(null, moNoSearch);
+        setTimeout(() => setSuccessMsg(""), 5000);
+      }
+    } catch (err) {
+      console.error("Error repairing AW tolerances:", err);
+      setError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to repair tolerance values.",
+      );
+    } finally {
+      setIsRepairingTol(false);
+    }
+  };
+
+  // =========================================================================
   // Handle Repair Names Success
   // =========================================================================
   const handleRepairNamesSuccess = (message) => {
@@ -676,6 +720,25 @@ const MeasurementSpecsShared = ({
             >
               <RotateCcw className="w-4 h-4" />
               <span className="hidden sm:inline">Repair</span>
+            </button>
+          )}
+
+          {/* ========================================================= */}
+          {/* Repair TOL Button (Only for AW - isAw = true) */}
+          {/* ========================================================= */}
+          {isAw && moNoSearch && hasSavedConfig && (
+            <button
+              onClick={handleRepairAWTolerances}
+              disabled={isRepairingTol}
+              className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2 disabled:opacity-50"
+              title="Repair Tolerance Values from Master Data (dt_orders SizeSpec)"
+            >
+              {isRepairingTol ? (
+                <Loader className="w-4 h-4 animate-spin" />
+              ) : (
+                <Wrench className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">Repair TOL</span>
             </button>
           )}
 

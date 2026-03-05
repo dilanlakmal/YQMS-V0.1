@@ -975,3 +975,131 @@ export const repairCorruptedSpecs = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// =========================================================================
+// REPAIR AW TOLERANCE VALUES FROM MASTER DATA
+// =========================================================================
+
+export const repairAWTolerancesFromMaster = async (req, res) => {
+  const { moNo } = req.body;
+
+  if (!moNo) {
+    return res.status(400).json({ message: "MO Number is required." });
+  }
+
+  try {
+    const cleanMoNo = moNo.trim();
+
+    // 1. Fetch QA Sections record
+    const qaRecord = await QASectionsMeasurementSpecs.findOne({
+      Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") },
+    });
+
+    if (!qaRecord) {
+      return res.status(404).json({
+        message: `No saved configuration found for Order No: ${cleanMoNo}.`,
+      });
+    }
+
+    // 2. Fetch Master Data - SizeSpec
+    const dtOrderData = await DtOrder.findOne(
+      { Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") } },
+      { SizeSpec: 1, Order_No: 1, _id: 0 },
+    ).lean();
+
+    if (
+      !dtOrderData ||
+      !dtOrderData.SizeSpec ||
+      dtOrderData.SizeSpec.length === 0
+    ) {
+      return res.status(404).json({
+        message: "No 'Size Spec' data found in Master Data.",
+      });
+    }
+
+    // 3. Build master tolerance map keyed by EnglishRemark
+    const masterTolMap = new Map();
+
+    dtOrderData.SizeSpec.forEach((item) => {
+      const pointName = item.EnglishRemark || item.Area || "";
+      if (!pointName) return;
+
+      masterTolMap.set(pointName, {
+        TolMinus: sanitizeToleranceValue(item.ToleranceMinus),
+        TolPlus: sanitizeToleranceValue(item.TolerancePlus),
+      });
+    });
+
+    // 4. Update AllAfterWashSpecs and selectedAfterWashSpecs
+    const arrayFields = ["AllAfterWashSpecs", "selectedAfterWashSpecs"];
+    let totalUpdated = 0;
+    const updateDetails = [];
+
+    for (const fieldName of arrayFields) {
+      const arr = qaRecord[fieldName];
+      if (!Array.isArray(arr) || arr.length === 0) continue;
+
+      let fieldModified = false;
+
+      for (let i = 0; i < arr.length; i++) {
+        const item = arr[i];
+        const pointName = item.MeasurementPointEngName;
+
+        if (!pointName || !masterTolMap.has(pointName)) continue;
+
+        const masterTol = masterTolMap.get(pointName);
+        let itemChanged = false;
+
+        // Check & update TolMinus
+        const currentMinus = item.TolMinus?.fraction ?? "";
+        const masterMinus = masterTol.TolMinus.fraction;
+        if (currentMinus !== masterMinus) {
+          arr[i].TolMinus = masterTol.TolMinus;
+          itemChanged = true;
+        }
+
+        // Check & update TolPlus
+        const currentPlus = item.TolPlus?.fraction ?? "";
+        const masterPlus = masterTol.TolPlus.fraction;
+        if (currentPlus !== masterPlus) {
+          arr[i].TolPlus = masterTol.TolPlus;
+          itemChanged = true;
+        }
+
+        if (itemChanged) {
+          totalUpdated++;
+          fieldModified = true;
+          updateDetails.push({
+            field: fieldName,
+            pointName,
+            newTolMinus: masterTol.TolMinus.fraction,
+            newTolPlus: masterTol.TolPlus.fraction,
+          });
+        }
+      }
+
+      if (fieldModified) {
+        qaRecord.markModified(fieldName);
+      }
+    }
+
+    if (totalUpdated > 0) {
+      qaRecord.updatedAt = new Date();
+      await qaRecord.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message:
+        totalUpdated > 0
+          ? `Successfully repaired ${totalUpdated} tolerance value(s) from Master Data.`
+          : "All tolerance values are already in sync. No changes needed.",
+      summary: { totalUpdated },
+      details: updateDetails,
+      updatedAt: qaRecord.updatedAt,
+    });
+  } catch (error) {
+    console.error("Error repairing AW tolerances from master:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
