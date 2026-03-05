@@ -334,6 +334,12 @@ import { closeFCPool } from "./controller/SQL/fcConnectionManager.js";
 import RealTimeSunriseRoutes from "./routes/SQL/RealTimeSunriseRoutes.js";
 import { closeRealTimeSunrisePool } from "./controller/SQL/RealTimeSunriseConnectionManager.js";
 
+// /* ------------------------------
+//    DT Orders Sync to Eco Board
+// ------------------------------ */
+// import dtOrdersSync from "./routes/Common/DTOrdersSyncRoutes.js";
+// import { initializeSyncOnStartup } from "./controller/Common/dtOrdersSyncEcoBoardController.js";
+
 /* ------------------------------
    FC and Real Time Sunrise System Routes
 ------------------------------ */
@@ -396,6 +402,8 @@ app.use(buyerSpec);
 app.use(buyerSpecPacking);
 /* ----------- DT_Orders -----------------*/
 app.use(dtOrders);
+// /* ----------- DT_Orders Sync to Eco Board -----------------*/
+// app.use(dtOrdersSync);
 
 /* -----------------------------
 Measurement Routes
@@ -701,3 +709,16 @@ app.get("/api/health", (req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`HTTPS Server is running on PORT:${PORT}`);
 });
+
+// server.listen(PORT, "0.0.0.0", async () => {
+//   console.log(`HTTPS Server is running on PORT:${PORT}`);
+
+//   // Initialize dt_orders sync to ym_eco_board after server starts
+//   // This runs the full load in the background
+//   try {
+//     await initializeSyncOnStartup();
+//   } catch (err) {
+//     console.error("❌ DT Orders Sync initialization error:", err.message);
+//     // Don't crash the server if sync fails
+//   }
+// });
