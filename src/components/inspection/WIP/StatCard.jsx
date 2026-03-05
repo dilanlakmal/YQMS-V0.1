@@ -361,7 +361,12 @@ const StatCard = ({
                   textShadow: `0 0 24px ${glow}`,
                 }}
               >
-                {String(typeof value === "number" ? value : 0).padStart(2, "0")}
+                {typeof value === "number"
+                  ? value >= 100
+                    ? value.toLocaleString()
+                    : String(value).padStart(2, "0")
+                  : "00"}
+                {/* {String(typeof value === "number" ? value : 0).padStart(2, "0")} */}
               </div>
               {(subtitle || trend) && (
                 <div

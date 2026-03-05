@@ -296,10 +296,10 @@ import YourksysOrders from "./routes/YorksysOrders/uploadOrderRoutes.js";
   Washing Report and Assign Control
 ------------------------------ */
 
-import washingOrderRoutes from "./routes/ReportWashing/WashingOrdersRoutes.js";
-import reportWashing from "./routes/ReportWashing/reportWashingRoutes.js";
-import reportAssign from "./routes/ReportWashing/reportAssignRoutes.js";
-import washingImageRoutes from "./routes/ReportWashing/ImageWashRoute.js";
+// import washingOrderRoutes from "./routes/ReportWashing/WashingOrdersRoutes.js";
+// import reportWashing from "./routes/ReportWashing/reportWashingRoutes.js";
+// import reportAssign from "./routes/ReportWashing/reportAssignRoutes.js";
+// import washingImageRoutes from "./routes/ReportWashing/ImageWashRoute.js";
 
 /* ------------------------------
   Packing List
@@ -678,10 +678,10 @@ app.use(YourksysOrders);
 /* ------------------------------
   Washing Report and Assign Control
 ------------------------------ */
-app.use(washingOrderRoutes);
-app.use(reportWashing);
-app.use(reportAssign);
-app.use(washingImageRoutes);
+// app.use(washingOrderRoutes);
+// app.use(reportWashing);
+// app.use(reportAssign);
+// app.use(washingImageRoutes);
 
 /* ------------------------------
   Packing List

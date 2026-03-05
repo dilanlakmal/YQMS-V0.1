@@ -111,7 +111,7 @@ import WIP from "./pages/WIP.jsx";
 import WIPSewingDefects from "./pages/WIPSewingDefects";
 
 // Washing Test
-import LaundryWashingMachineTest from "./pages/LaunchWashingMachineTest.jsx";
+//import LaundryWashingMachineTest from "./pages/LaunchWashingMachineTest.jsx";
 
 export const BluetoothContext = createContext(null);
 
@@ -509,10 +509,10 @@ function AppContent() {
                 path="/wip-sewing-defects"
                 element={<WIPSewingDefects />}
               />
-              <Route
+              {/* <Route
                 path="/Launch-washing-machine-test"
                 element={<LaundryWashingMachineTest />}
-              />
+              /> */}
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />
