@@ -123,6 +123,9 @@ import createReitmansReportModel from "../../models/huminity/ReitmansReport.js";
 
 import feedbackModel from "../../models/Feedback/Feedback.js";
 import createRatingModel from "../../models/Feedback/Rating.js";
+// Washing Test Models
+import createReportWashingModel from "../../models/ReportWashing.js";
+import createReportAssignControlModel from "../../models/ReportAssignControl.js";
 
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
@@ -296,6 +299,34 @@ export const ReitmansReport = createReitmansReportModel(ymProdConnection);
 
 export const Feedback = feedbackModel(ymProdConnection);
 export const Rating = createRatingModel(ymProdConnection);
+// Washing Test Models
+export const ReportWashing = createReportWashingModel(
+  ymProdConnection,
+  "report_washing",
+);
+export const ReportHomeWash = createReportWashingModel(
+  ymProdConnection,
+  "report_home_wash",
+);
+export const ReportGarmentWash = createReportWashingModel(
+  ymProdConnection,
+  "report_garment_wash",
+);
+export const ReportHTTesting = createReportWashingModel(
+  ymProdConnection,
+  "report_ht_testing",
+);
+export const ReportEMBPrinting = createReportWashingModel(
+  ymProdConnection,
+  "report_emb_printing",
+);
+export const ReportPullingTest = createReportWashingModel(
+  ymProdConnection,
+  "report_pulling_test",
+);
+
+export const ReportAssignControl =
+  createReportAssignControlModel(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

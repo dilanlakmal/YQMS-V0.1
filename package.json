@@ -73,6 +73,7 @@
     "express-fileupload": "^1.5.2",
     "file-saver": "^2.0.5",
     "graceful-fs": "^4.2.11",
+    "framer-motion": "^12.35.0",
     "groq-sdk": "^0.37.0",
     "helmet": "^6.0.0",
     "html2canvas": "^1.4.1",
@@ -137,7 +138,8 @@
     "uuid": "^11.0.5",
     "web-push": "^3.6.7",
     "xlsx": "^0.18.5",
-    "xlsx-style": "^0.8.13"
+    "xlsx-style": "^0.8.13",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@types/react": "^18.2.64",

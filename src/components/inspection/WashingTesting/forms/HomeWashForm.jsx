@@ -1,0 +1,1166 @@
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Upload,
+  Camera,
+  X,
+  Send,
+  RotateCw,
+  Calendar,
+  Check,
+} from "lucide-react";
+import Select from "react-select";
+import { DatePicker as AntDatePicker } from "antd";
+import dayjs from "dayjs";
+
+const HomeWashForm = ({
+  formData,
+  handleInputChange,
+  handleSubmit,
+  isSubmitting,
+  isCompleting,
+  // Order No suggestions
+  orderNoSuggestions,
+  showOrderNoSuggestions,
+  setShowOrderNoSuggestions,
+  isSearchingOrderNo,
+  handleOrderNoSelect,
+  searchOrderNo,
+  // Colors
+  availableColors,
+  usedColors = [], // Added prop
+  isLoadingColors,
+  showColorDropdown,
+  setShowColorDropdown,
+  // PO
+  availablePOs,
+  showPODropdown,
+  setShowPODropdown,
+  // ETD
+  availableETDs,
+  showETDDropdown,
+  setShowETDDropdown,
+  // Factory
+  factories,
+  isLoadingFactories,
+  // Images
+  handleFileInputChange,
+  handleCameraInputChange,
+  triggerFileInput,
+  triggerCameraInput,
+  handleRemoveImage,
+  fileInputRef,
+  cameraInputRef,
+  // Fabrication data
+  fabrication,
+  season,
+  styleDescription,
+  custStyle,
+  // Sizes
+  availableSizes = [],
+}) => {
+  const [showSizeDropdown, setShowSizeDropdown] = useState(false);
+  const sizeDropdownRef = useRef(null);
+
+  // Sort sizes in logical order
+  const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "4XL", "5XL"];
+  const sortedSizes = [...availableSizes].sort((a, b) => {
+    const ia = SIZE_ORDER.indexOf(a.toUpperCase());
+    const ib = SIZE_ORDER.indexOf(b.toUpperCase());
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  // Parse currently selected sizes from formData.size (stored as comma-separated string)
+  const selectedSizes = formData.size
+    ? formData.size
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+
+  const toggleSize = (size) => {
+    const current = selectedSizes;
+    const next = current.includes(size)
+      ? current.filter((s) => s !== size)
+      : [...current, size];
+    handleInputChange("size", next.join(", "));
+  };
+
+  const selectAllSizes = () =>
+    handleInputChange("size", sortedSizes.join(", "));
+  const clearAllSizes = () => handleInputChange("size", "");
+
+  // Click-outside closes the size dropdown
+  useEffect(() => {
+    const handler = (e) => {
+      if (
+        sizeDropdownRef.current &&
+        !sizeDropdownRef.current.contains(e.target)
+      ) {
+        setShowSizeDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+  const normalize = (s) => (s || "").toString().trim().toUpperCase();
+  // Synchronization effects for derived metadata
+  // These ensure that data fetched by the hook correctly enters the form's local state
+  useEffect(() => {
+    if (
+      season &&
+      season !== "" &&
+      (!formData.season || formData.season === "")
+    ) {
+      handleInputChange("season", season);
+    }
+  }, [season, formData.season, handleInputChange]);
+
+  useEffect(() => {
+    if (
+      styleDescription &&
+      styleDescription !== "" &&
+      (!formData.styleDescription || formData.styleDescription === "")
+    ) {
+      handleInputChange("styleDescription", styleDescription);
+    }
+  }, [styleDescription, formData.styleDescription, handleInputChange]);
+
+  useEffect(() => {
+    if (
+      fabrication &&
+      fabrication !== "" &&
+      (!formData.fabrication || formData.fabrication === "")
+    ) {
+      handleInputChange("fabrication", fabrication);
+    }
+  }, [fabrication, formData.fabrication, handleInputChange]);
+
+  useEffect(() => {
+    if (
+      custStyle &&
+      custStyle !== "" &&
+      (!formData.custStyle || formData.custStyle === "")
+    ) {
+      handleInputChange("custStyle", custStyle);
+    }
+  }, [custStyle, formData.custStyle, handleInputChange]);
+
+  // Filter colors that have already been reported
+  // Filter colors that have already been reported, but ALWAYS include currently selected colors
+  const filteredColors = Array.from(
+    new Set([
+      ...(availableColors || []),
+      ...(Array.isArray(formData.color)
+        ? formData.color
+        : formData.color
+          ? [formData.color]
+          : []),
+    ]),
+  ).filter((color) => {
+    const colorStr = String(color).trim().toUpperCase();
+    const isAlreadySelected = Array.isArray(formData.color)
+      ? formData.color.some((c) => String(c).trim().toUpperCase() === colorStr)
+      : String(formData.color).trim().toUpperCase() === colorStr;
+
+    const isUsed = usedColors?.some(
+      (uc) => String(uc).trim().toUpperCase() === colorStr,
+    );
+
+    return isAlreadySelected || !isUsed;
+  });
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* YM Style */}
+        <div className="relative">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            YM Style <span className="text-red-500 font-bold">*</span>
+          </label>
+          <input
+            type="text"
+            value={formData.ymStyle || ""}
+            onChange={(e) => handleInputChange("ymStyle", e.target.value)}
+            onFocus={() => {
+              if (formData.ymStyle?.length >= 2) {
+                searchOrderNo(formData.ymStyle);
+              }
+            }}
+            onBlur={() => {
+              setTimeout(() => {
+                setShowOrderNoSuggestions(false);
+              }, 200);
+            }}
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" &&
+                showOrderNoSuggestions &&
+                orderNoSuggestions?.length > 0
+              ) {
+                e.preventDefault();
+                const firstValidSuggestion = orderNoSuggestions.filter(
+                  (on) => normalize(on) !== normalize(formData.ymStyle),
+                )[0];
+                if (firstValidSuggestion) {
+                  if (handleOrderNoSelect)
+                    handleOrderNoSelect(firstValidSuggestion);
+                }
+              }
+            }}
+            disabled={isCompleting}
+            className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white ${isCompleting ? "cursor-not-allowed bg-gray-100 dark:bg-gray-800 opacity-60" : ""}`}
+            required
+            placeholder="Search from Yorksys"
+          />
+          {isSearchingOrderNo && (
+            <div className="absolute right-3 top-9 text-gray-400">
+              <svg
+                className="animate-spin h-4 w-4"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+            </div>
+          )}
+          {showOrderNoSuggestions &&
+            orderNoSuggestions &&
+            orderNoSuggestions.filter(
+              (on) => normalize(on) !== normalize(formData.ymStyle),
+            ).length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+                {orderNoSuggestions
+                  .filter(
+                    (orderNo) =>
+                      normalize(orderNo) !== normalize(formData.ymStyle),
+                  )
+                  .map((orderNo, index) => (
+                    <div
+                      key={index}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (handleOrderNoSelect) {
+                          handleOrderNoSelect(orderNo);
+                        }
+                      }}
+                      className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-900 dark:text-white"
+                    >
+                      {orderNo}
+                    </div>
+                  ))}
+              </div>
+            )}
+        </div>
+
+        {/* COLOR - Multi-Select */}
+        <div className="relative color-dropdown-container">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            COLOR <span className="text-red-500 font-bold">*</span>
+          </label>
+          <div className="relative">
+            {isCompleting ? (
+              <div
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700 dark:text-gray-300 text-gray-700"
+                title={
+                  Array.isArray(formData.color) && formData.color?.length > 0
+                    ? formData.color.join(", ")
+                    : ""
+                }
+              >
+                <span className="truncate block">
+                  {formData.color?.length > 0
+                    ? `${formData.color.length} color(s) selected`
+                    : "No colors selected"}
+                </span>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowColorDropdown(!showColorDropdown)}
+                  disabled={
+                    isLoadingColors ||
+                    !formData.ymStyle ||
+                    (filteredColors.length === 0 && usedColors?.length === 0)
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="truncate">
+                    {isLoadingColors
+                      ? "Loading colors..."
+                      : !formData.ymStyle
+                        ? "Select Order_No first"
+                        : formData.color?.length > 0
+                          ? Array.isArray(formData.color) &&
+                            formData.color.length === filteredColors.length &&
+                            filteredColors.length === availableColors.length
+                            ? "All colors selected"
+                            : Array.isArray(formData.color) &&
+                                formData.color.length === filteredColors.length
+                              ? "All available colors selected"
+                              : `${formData.color.length} color(s) selected`
+                          : filteredColors.length === 0 &&
+                              availableColors.length > 0
+                            ? "All colors already reported"
+                            : filteredColors.length === 0
+                              ? "No colors available"
+                              : "Select Color(s)"}
+                  </span>
+                  <svg
+                    className={`w-4 h-4 transition-transform ${showColorDropdown ? "rotate-180" : ""}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
+
+                {showColorDropdown &&
+                  (filteredColors.length > 0 || usedColors?.length > 0) && (
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {filteredColors.length > 0 && (
+                        <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleInputChange("color", [...filteredColors]);
+                            }}
+                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                          >
+                            Select All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleInputChange("color", []);
+                            }}
+                            className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                      )}
+                      <div className="p-2">
+                        <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Available Colors:
+                        </div>
+                        <div className="space-y-1">
+                          {filteredColors.map((color, index) => {
+                            const isSelected = formData.color.includes(color);
+                            return (
+                              <label
+                                key={index}
+                                className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors duration-200 ${
+                                  isSelected
+                                    ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                                    : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        handleInputChange("color", [
+                                          ...formData.color,
+                                          color,
+                                        ]);
+                                      } else {
+                                        handleInputChange(
+                                          "color",
+                                          formData.color.filter(
+                                            (c) => c !== color,
+                                          ),
+                                        );
+                                      }
+                                    }}
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                                  />
+                                  <span className="text-sm font-medium">
+                                    {color}
+                                  </span>
+                                </div>
+                                {isSelected && (
+                                  <Check className="w-4 h-4 text-blue-600" />
+                                )}
+                              </label>
+                            );
+                          })}
+                        </div>
+                        {usedColors.filter((uc) => {
+                          const ucStr = String(uc).trim().toUpperCase();
+                          return !formData.color?.some(
+                            (c) => String(c).trim().toUpperCase() === ucStr,
+                          );
+                        }).length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                            <div className="text-[10px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider px-1">
+                              Already Reported:
+                            </div>
+                            <div className="flex flex-wrap gap-1 mt-1 px-1">
+                              {usedColors
+                                .filter((uc) => {
+                                  const ucStr = String(uc).trim().toUpperCase();
+                                  return !formData.color?.some(
+                                    (c) =>
+                                      String(c).trim().toUpperCase() === ucStr,
+                                  );
+                                })
+                                .map((uc, i) => (
+                                  <div
+                                    key={i}
+                                    className="flex items-center gap-1"
+                                  >
+                                    <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px] rounded border border-gray-200 dark:border-gray-600 line-through">
+                                      {uc}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const currentColors = Array.isArray(
+                                          formData.color,
+                                        )
+                                          ? formData.color
+                                          : formData.color
+                                            ? [formData.color]
+                                            : [];
+                                        const ucStr = String(uc)
+                                          .trim()
+                                          .toUpperCase();
+                                        if (
+                                          !currentColors.some(
+                                            (c) =>
+                                              String(c).trim().toUpperCase() ===
+                                              ucStr,
+                                          )
+                                        ) {
+                                          handleInputChange("color", [
+                                            ...currentColors,
+                                            uc,
+                                          ]);
+                                        }
+                                      }}
+                                      className="p-1 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-500 rounded-full transition-colors"
+                                      title="Re-select this color"
+                                    >
+                                      <RotateCw className="w-2.5 h-2.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+              </>
+            )}
+          </div>
+          {formData.ymStyle && filteredColors.length > 0 && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {filteredColors.length} color(s) available
+            </p>
+          )}
+        </div>
+
+        {/* Buyer Style */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Buyer Style{" "}
+            <span className="text-gray-400 text-xs">(Optional)</span>
+          </label>
+          <input
+            type="text"
+            value={formData.buyerStyle || ""}
+            readOnly
+            placeholder="Select YM Style first"
+            className="w-full px-3 py-2 border border-gray-300  rounded-md  cursor-not-allowed"
+          />
+        </div>
+
+        {/* PO - Multi-Select */}
+        <div className="relative po-dropdown-container">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            PO <span className="text-gray-400 text-xs">(Optional)</span>
+          </label>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowPODropdown(!showPODropdown)}
+              disabled={!formData.ymStyle}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className="truncate">
+                {!formData.ymStyle
+                  ? "Select YM Style first"
+                  : availablePOs.length === 0
+                    ? "No PO available (Optional)"
+                    : formData.po.length === 0
+                      ? "Select PO(s) (Optional)"
+                      : formData.po.length === availablePOs.length
+                        ? "All PO(s) selected"
+                        : `${formData.po.length} PO(s) selected`}
+              </span>
+              <svg
+                className={`w-4 h-4 transition-transform ${showPODropdown ? "rotate-180" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+
+            {showPODropdown && (
+              <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                {availablePOs.length > 0 ? (
+                  <>
+                    <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleInputChange("po", [...availablePOs]);
+                        }}
+                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleInputChange("po", []);
+                        }}
+                        className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                    <div className="p-2">
+                      <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Available PO(s):
+                      </div>
+                      <div className="space-y-1">
+                        {availablePOs.map((po, index) => {
+                          const isSelected = formData.po.includes(po);
+                          return (
+                            <label
+                              key={index}
+                              className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors duration-200 ${
+                                isSelected
+                                  ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                                  : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      handleInputChange("po", [
+                                        ...formData.po,
+                                        po,
+                                      ]);
+                                    } else {
+                                      handleInputChange(
+                                        "po",
+                                        formData.po.filter((p) => p !== po),
+                                      );
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                                />
+                                <span className="text-sm font-medium">
+                                  {po}
+                                </span>
+                              </div>
+                              {isSelected && (
+                                <Check className="w-4 h-4 text-blue-600" />
+                              )}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                    No PO available. This field is optional.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          {formData.ymStyle && availablePOs.length > 0 && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {availablePOs.length} PO(s) available
+            </p>
+          )}
+        </div>
+
+        {/* Ex Fty Date - Multi-Select */}
+        <div className="relative etd-dropdown-container">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Ex Fty Date{" "}
+            <span className="text-gray-400 text-xs">(Optional)</span>
+          </label>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowETDDropdown(!showETDDropdown)}
+              disabled={!formData.ymStyle}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className="truncate">
+                {!formData.ymStyle
+                  ? "Select YM Style first"
+                  : availableETDs.length === 0
+                    ? "No ETD dates available (Optional)"
+                    : formData.exFtyDate.length === 0
+                      ? "Select ETD Date(s) (Optional)"
+                      : formData.exFtyDate.length === availableETDs.length
+                        ? "All ETD dates selected"
+                        : `${formData.exFtyDate.length} date(s) selected`}
+              </span>
+              <svg
+                className={`w-4 h-4 transition-transform ${showETDDropdown ? "rotate-180" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+
+            {showETDDropdown && (
+              <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                {availableETDs.length > 0 ? (
+                  <>
+                    <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleInputChange("exFtyDate", [...availableETDs]);
+                        }}
+                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleInputChange("exFtyDate", []);
+                        }}
+                        className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                    <div className="p-2">
+                      <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Available ETD Dates:
+                      </div>
+                      <div className="space-y-1">
+                        {availableETDs.map((etd, index) => {
+                          const isSelected = formData.exFtyDate.includes(etd);
+                          return (
+                            <label
+                              key={index}
+                              className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors duration-200 ${
+                                isSelected
+                                  ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                                  : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      handleInputChange("exFtyDate", [
+                                        ...formData.exFtyDate,
+                                        etd,
+                                      ]);
+                                    } else {
+                                      handleInputChange(
+                                        "exFtyDate",
+                                        formData.exFtyDate.filter(
+                                          (d) => d !== etd,
+                                        ),
+                                      );
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                                />
+                                <span className="text-sm font-medium">
+                                  {etd}
+                                </span>
+                              </div>
+                              {isSelected && (
+                                <Check className="w-4 h-4 text-blue-600" />
+                              )}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                    No ETD dates available. This field is optional.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          {formData.ymStyle && availableETDs.length > 0 && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {availableETDs.length} ETD date(s) available
+            </p>
+          )}
+        </div>
+
+        {/* Factory */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Factory <span className="text-red-500 font-bold">*</span>
+          </label>
+          <Select
+            value={
+              formData.factory
+                ? { value: formData.factory, label: formData.factory }
+                : null
+            }
+            onChange={(selectedOption) => {
+              handleInputChange(
+                "factory",
+                selectedOption ? selectedOption.value : "",
+              );
+            }}
+            options={factories.map((factory) => ({
+              value: factory.factory,
+              label: factory.factory,
+            }))}
+            placeholder="Select Factory"
+            isSearchable={true}
+            isClearable={true}
+            isLoading={isLoadingFactories}
+            isDisabled={isLoadingFactories}
+            className="react-select-container"
+            classNamePrefix="react-select"
+            components={{
+              Option: (props) => (
+                <div
+                  {...props.innerProps}
+                  className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-colors duration-200 ${
+                    props.isSelected
+                      ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                      : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  }`}
+                >
+                  <span className="text-sm font-medium">{props.label}</span>
+                  {props.isSelected && (
+                    <Check className="w-4 h-4 text-blue-600" />
+                  )}
+                </div>
+              ),
+            }}
+            styles={{
+              control: (baseStyles, state) => ({
+                ...baseStyles,
+                borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+                boxShadow: state.isFocused
+                  ? "0 0 0 2px rgba(59, 130, 246, 0.2)"
+                  : "none",
+                minHeight: "42px",
+                backgroundColor: "transparent",
+                cursor: "pointer",
+                "&:hover": {
+                  borderColor: "#3b82f6",
+                },
+              }),
+              menu: (baseStyles) => ({
+                ...baseStyles,
+                zIndex: 9999,
+                backgroundColor: "white",
+                "@media (prefers-color-scheme: dark)": {
+                  backgroundColor: "#1f2937",
+                },
+              }),
+              option: (baseStyles) => ({
+                ...baseStyles,
+                padding: 0, // Handled by custom component
+                backgroundColor: "transparent",
+              }),
+              singleValue: (baseStyles) => ({
+                ...baseStyles,
+                color: "inherit",
+              }),
+              indicatorSeparator: () => ({
+                display: "none",
+              }),
+              dropdownIndicator: (baseStyles) => ({
+                ...baseStyles,
+                cursor: "pointer",
+              }),
+              clearIndicator: (baseStyles) => ({
+                ...baseStyles,
+                cursor: "pointer",
+              }),
+            }}
+            theme={(theme) => ({
+              ...theme,
+              colors: {
+                ...theme.colors,
+                primary: "#3b82f6",
+                primary25: "#eff6ff",
+                primary50: "#dbeafe",
+                primary75: "#93c5fd",
+              },
+            })}
+          />
+          {isLoadingFactories && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Loading factories...
+            </p>
+          )}
+        </div>
+
+        {/* Fabrication - Auto-populated from Yorksys */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Fabrication{" "}
+            <span className="text-gray-400 text-xs">(Auto-filled)</span>
+          </label>
+          <input
+            type="text"
+            value={formData.fabrication || fabrication || ""}
+            readOnly
+            placeholder="Select YM Style to load fabrication"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:text-white cursor-not-allowed"
+            title={
+              fabrication ||
+              "Fabrication will be auto-filled when you select a YM Style"
+            }
+          />
+          {fabrication && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              ✓ Loaded from Yorksys order data
+            </p>
+          )}
+        </div>
+
+        {/* Size - Multi-Select Dropdown */}
+        <div className="relative" ref={sizeDropdownRef}>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Size <span className="text-red-500 font-bold">*</span>
+          </label>
+
+          {/* Trigger button */}
+          <button
+            type="button"
+            onClick={() => setShowSizeDropdown((v) => !v)}
+            disabled={!formData.ymStyle || sortedSizes.length === 0}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span className="truncate">
+              {!formData.ymStyle
+                ? "Select YM Style first"
+                : sortedSizes.length === 0
+                  ? "No sizes available"
+                  : selectedSizes.length === 0
+                    ? "Select Size(s)"
+                    : selectedSizes.length === sortedSizes.length
+                      ? "All sizes selected"
+                      : selectedSizes.join(", ")}
+            </span>
+            <svg
+              className={`w-4 h-4 flex-shrink-0 transition-transform ${showSizeDropdown ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
+
+          {/* Dropdown list */}
+          {showSizeDropdown && sortedSizes.length > 0 && (
+            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+              {/* Select All / Clear All */}
+              <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
+                <button
+                  type="button"
+                  onClick={selectAllSizes}
+                  className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                >
+                  Select All
+                </button>
+                <button
+                  type="button"
+                  onClick={clearAllSizes}
+                  className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                >
+                  Clear All
+                </button>
+              </div>
+
+              {/* Size list */}
+              <div className="p-2 space-y-1">
+                {sortedSizes.map((size) => {
+                  const isSelected = selectedSizes.includes(size);
+                  return (
+                    <label
+                      key={size}
+                      className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors duration-200 ${
+                        isSelected
+                          ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                          : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSize(size)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                        />
+                        <span className="text-sm font-medium">{size}</span>
+                      </div>
+                      {isSelected && (
+                        <Check className="w-4 h-4 text-blue-600" />
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Helper hint */}
+          {formData.ymStyle && sortedSizes.length > 0 && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {sortedSizes.length} size(s) available
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            SEND To Home Washing Date{" "}
+            <span className="text-red-500 font-bold">*</span>
+          </label>
+          <div className="relative group ant-datepicker-container">
+            <AntDatePicker
+              value={
+                formData.sendToHomeWashingDate
+                  ? dayjs(formData.sendToHomeWashingDate)
+                  : null
+              }
+              onChange={(date, dateString) =>
+                handleInputChange(
+                  "sendToHomeWashingDate",
+                  dateString ? dayjs(date).format("YYYY-MM-DD") : "",
+                )
+              }
+              format="MM/DD/YYYY"
+              placeholder="mm/dd/yyyy"
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white h-[42px]"
+              suffixIcon={null}
+              allowClear
+              inputReadOnly={true}
+            />
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none z-10" />
+          </div>
+        </div>
+
+        {/* Image Upload */}
+        <div className="md:col-span-2 lg:col-span-3">
+          <div className="flex justify-between items-center mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Images
+            </label>
+            <span
+              className={`text-xs font-medium ${formData.images.length >= 5 ? "text-red-500" : "text-gray-500"}`}
+            >
+              {formData.images.length}/5 images
+            </span>
+          </div>
+          <div className="mt-1">
+            {/* Image Preview Area - compact flex thumbnails */}
+            {formData.images.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {formData.images.map((imageFile, index) => {
+                  const imageUrl = URL.createObjectURL(imageFile);
+                  return (
+                    <div
+                      key={index}
+                      className="relative w-20 h-20 sm:w-24 sm:h-24 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800/50 flex-shrink-0 group"
+                    >
+                      <img
+                        src={imageUrl}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          URL.revokeObjectURL(imageUrl);
+                          handleRemoveImage(index);
+                        }}
+                        className="absolute top-0.5 right-0.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                        aria-label="Remove image"
+                        title="Remove"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50/30 dark:bg-gray-800/30 p-8">
+                <div className="text-center text-gray-500 dark:text-gray-400">
+                  <Upload size={40} className="mx-auto mb-2" />
+                  <p>No image selected</p>
+                </div>
+              </div>
+            )}
+
+            {/* Capture and Upload Buttons */}
+            <div className="flex justify-center space-x-2">
+              <button
+                type="button"
+                onClick={triggerCameraInput}
+                disabled={formData.images.length >= 5}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Camera size={18} className="mr-2" />
+                Capture
+              </button>
+              <button
+                type="button"
+                onClick={triggerFileInput}
+                disabled={formData.images.length >= 5}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Upload size={18} className="mr-2" />
+                Upload
+              </button>
+            </div>
+
+            {/* Hidden File Inputs */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+              multiple
+              onChange={handleFileInputChange}
+            />
+            <input
+              ref={cameraInputRef}
+              type="file"
+              className="hidden"
+              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+              capture="environment"
+              onChange={handleCameraInputChange}
+            />
+          </div>
+        </div>
+
+        {/* Notes Field */}
+        <div className="md:col-span-2 lg:col-span-3">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {isCompleting ? "Completion Notes" : "Notes"}
+          </label>
+          <textarea
+            value={
+              isCompleting
+                ? formData.completionNotes || ""
+                : formData.notes || ""
+            }
+            onChange={(e) =>
+              handleInputChange(
+                isCompleting ? "completionNotes" : "notes",
+                e.target.value,
+              )
+            }
+            rows={4}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-vertical"
+            placeholder={
+              isCompleting
+                ? "Add completion notes..."
+                : "Add any additional notes or comments about this report..."
+            }
+          />
+        </div>
+      </div>
+
+      {/* Submit Button */}
+      <div className="flex justify-end pt-4">
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {isSubmitting ? (
+            <RotateCw className="w-4 h-4 animate-spin" />
+          ) : (
+            <Send className="w-4 h-4" />
+          )}
+          {isSubmitting
+            ? "Submitting..."
+            : isCompleting
+              ? "Complete Report"
+              : "Submit Report"}
+        </button>
+      </div>
+    </form>
+  );
+};
+
+export default HomeWashForm;

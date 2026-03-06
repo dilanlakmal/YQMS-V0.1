@@ -700,3 +700,16 @@ app.use((req, res, next) => {
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ HTTPS Server is running on https://localhost:${PORT}`);
 });
+
+// server.listen(PORT, "0.0.0.0", async () => {
+//   console.log(`HTTPS Server is running on PORT:${PORT}`);
+
+//   // Initialize dt_orders sync to ym_eco_board after server starts
+//   // This runs the full load in the background
+//   try {
+//     await initializeSyncOnStartup();
+//   } catch (err) {
+//     console.error("❌ DT Orders Sync initialization error:", err.message);
+//     // Don't crash the server if sync fails
+//   }
+// });

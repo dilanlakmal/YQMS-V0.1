@@ -102,7 +102,17 @@ import CoverPage from "./pages/coverPage.jsx";
 //Hummidity Report
 import HumidityReportPage from "./pages/HumidityReport.jsx";
 
+//FC Direct SQL
+import FCSystem from "./pages/FCSystem";
+
+// Real-Time Sunrise System
+import WIP from "./pages/WIP.jsx";
+import WIPSewingDefects from "./pages/WIPSewingDefects";
+
 import FeedBack from "./pages/Feedback.jsx";
+
+// Washing Test
+//import LaundryWashingMachineTest from "./pages/LaunchWashingMachineTest.jsx";
 
 export const BluetoothContext = createContext(null);
 
@@ -515,6 +525,16 @@ function AppContent() {
               <Route path="/production-Sheet" element={<CoverPage />} />
               <Route path="/humidity-report" element={<HumidityReportPage />} />
               <Route path="/feedback" element={<FeedBack />} />
+              <Route path="/fc-system" element={<FCSystem />} />
+              <Route path="/wip-sewing-output" element={<WIP />} />
+              <Route
+                path="/wip-sewing-defects"
+                element={<WIPSewingDefects />}
+              />
+              {/* <Route
+                path="/Launch-washing-machine-test"
+                element={<LaundryWashingMachineTest />}
+              /> */}
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

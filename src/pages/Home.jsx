@@ -863,6 +863,14 @@ function Home() {
             description: "Select After Wash DT Specs",
             version: '0.1',
           },
+          {
+            path: "/Launch-washing-machine-test",
+            roles: ["Washing Testing"],
+            image: "assets/Home/Launch-washing-machine-test.png",
+            title: "Lab Testsing",
+            description: "All Lab Testing",
+            imageSize: "large",
+          },
         ],
       },
       {
@@ -1202,7 +1210,31 @@ function Home() {
             version: "0"
           }
         ]
-      }
+      },
+      {
+        id: "wip",
+        title: "WIP",
+        icon: <TrendingUp className="w-5 h-5" />,
+        bgColor: "bg-rose-50 dark:bg-rose-900/20",
+        gradientFrom: "from-green-500",
+        gradientTo: "to-red-500",
+        items: [
+          {
+            path: "/wip-sewing-output",
+            roles: ["WIP"],
+            image: "assets/Home/wip-sewing_output.png",
+            title: t("home.wip-sewing_output"),
+            description: "Real Time Daily Production",
+          },
+          {
+            path: "/wip-sewing-defects",
+            roles: ["WIP"],
+            image: "assets/Home/wip-sewing_defects.png",
+            title: t("home.wip-sewing_defects"),
+            description: "Real Time Daily QC1 Defect Analysis",
+          },
+        ],
+      },
     ],
     [t],
   );
