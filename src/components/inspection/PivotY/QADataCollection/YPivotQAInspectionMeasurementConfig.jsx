@@ -11,7 +11,7 @@ import {
   AlertTriangle,
   Play,
   CheckCircle,
-  FilePenLine
+  FilePenLine,
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 
@@ -28,7 +28,7 @@ const YPivotQAInspectionMeasurementConfig = ({
   reportData,
   onUpdateMeasurementData,
   activeGroup,
-  displayLabel
+  displayLabel,
 }) => {
   const activeMoNo =
     selectedOrders && selectedOrders.length > 0 ? selectedOrders[0] : null;
@@ -78,7 +78,7 @@ const YPivotQAInspectionMeasurementConfig = ({
       measurementsCount: savedState.savedMeasurements?.length || 0,
       sizesCount: savedState.orderSizes?.length || 0,
       kValuesCount: savedState.kValuesList?.length || 0,
-      lastKValue: savedState.lastSelectedKValue
+      lastKValue: savedState.lastSelectedKValue,
     });
 
     // Skip if nothing changed
@@ -90,7 +90,7 @@ const YPivotQAInspectionMeasurementConfig = ({
     console.log(`[MeasConfig ${measConfig}] Syncing state from props`, {
       specs: savedState.fullSpecsList?.length,
       kValues: savedState.kValuesList,
-      lastK: savedState.lastSelectedKValue
+      lastK: savedState.lastSelectedKValue,
     });
 
     setFullSpecsList(savedState.fullSpecsList || []);
@@ -127,8 +127,8 @@ const YPivotQAInspectionMeasurementConfig = ({
       onUpdateMeasurementData({
         manualDataByGroup: {
           ...existingManualDataMap,
-          [groupId]: newManualData
-        }
+          [groupId]: newManualData,
+        },
       });
     }
   };
@@ -137,7 +137,7 @@ const YPivotQAInspectionMeasurementConfig = ({
   const updateParent = (updates, options = {}) => {
     if (onUpdateMeasurementData) {
       const enhancedUpdates = {
-        ...updates
+        ...updates,
       };
 
       // Always persist current selection state unless explicitly told not to
@@ -225,7 +225,7 @@ const YPivotQAInspectionMeasurementConfig = ({
         all = data.AllBeforeWashSpecs || [];
         selected = data.selectedBeforeWashSpecs || [];
         const kSet = new Set(
-          all.map((s) => s.kValue).filter((k) => k && k !== "NA")
+          all.map((s) => s.kValue).filter((k) => k && k !== "NA"),
         );
         newKValues = Array.from(kSet).sort();
       } else {
@@ -261,9 +261,9 @@ const YPivotQAInspectionMeasurementConfig = ({
           orderSizes: currentSizes,
           // Also persist the auto-selected K value
           lastSelectedKValue:
-            newKValues.length > 0 ? selectedKValue || newKValues[0] : ""
+            newKValues.length > 0 ? selectedKValue || newKValues[0] : "",
         },
-        { skipSelectionPersist: true }
+        { skipSelectionPersist: true },
       );
     } catch (error) {
       console.error(`Error fetching specs for ${type}:`, error);
@@ -277,7 +277,7 @@ const YPivotQAInspectionMeasurementConfig = ({
   const filteredFullSpecsList = useMemo(() => {
     if (measConfig === "Before" && selectedKValue) {
       return fullSpecsList.filter(
-        (s) => s.kValue === selectedKValue || s.kValue === "NA"
+        (s) => s.kValue === selectedKValue || s.kValue === "NA",
       );
     }
     return fullSpecsList;
@@ -286,7 +286,7 @@ const YPivotQAInspectionMeasurementConfig = ({
   const filteredSelectedSpecsList = useMemo(() => {
     if (measConfig === "Before" && selectedKValue) {
       return selectedSpecsList.filter(
-        (s) => s.kValue === selectedKValue || s.kValue === "NA"
+        (s) => s.kValue === selectedKValue || s.kValue === "NA",
       );
     }
     return selectedSpecsList;
@@ -303,7 +303,7 @@ const YPivotQAInspectionMeasurementConfig = ({
     updateParent({
       selectedSpecsList: filtered,
       isConfigured: true,
-      sourceType: "qa_sections"
+      sourceType: "qa_sections",
     });
 
     // Save to DB
@@ -316,7 +316,7 @@ const YPivotQAInspectionMeasurementConfig = ({
       moNo: activeMoNo,
       allSpecs: fullSpecsList,
       selectedSpecs: filtered,
-      isSaveAll: false
+      isSaveAll: false,
     };
     try {
       await axios.post(`${API_BASE_URL}${endpoint}`, payload);
@@ -339,7 +339,7 @@ const YPivotQAInspectionMeasurementConfig = ({
       colorName: activeGroup?.colorName,
       qcUser: activeGroup?.activeQC,
       stage: measConfig, // Save stage from current config
-      kValue: measConfig === "Before" ? selectedKValue : "" // Always save kValue for Before
+      kValue: measConfig === "Before" ? selectedKValue : "", // Always save kValue for Before
     };
 
     let updatedMeasurements;
@@ -357,7 +357,7 @@ const YPivotQAInspectionMeasurementConfig = ({
     updateParent({
       savedMeasurements: updatedMeasurements,
       lastSelectedKValue: selectedKValue, // Persist K value
-      triggerAutoSave: true
+      triggerAutoSave: true,
     });
 
     if (editingMeasurementIndex === null) {
@@ -394,7 +394,7 @@ const YPivotQAInspectionMeasurementConfig = ({
 
     // Persist to parent immediately
     updateParent({
-      lastSelectedKValue: newKValue
+      lastSelectedKValue: newKValue,
     });
   };
 
@@ -403,7 +403,7 @@ const YPivotQAInspectionMeasurementConfig = ({
     if (!activeGroup) return statusMap;
 
     const contextMeasurements = savedMeasurements.filter(
-      (m) => m.groupId === activeGroup.id
+      (m) => m.groupId === activeGroup.id,
     );
 
     contextMeasurements.forEach((m) => {
@@ -421,7 +421,7 @@ const YPivotQAInspectionMeasurementConfig = ({
       statusMap[key] = {
         isComplete,
         inspectorDecision: m.inspectorDecision,
-        systemDecision: m.systemDecision
+        systemDecision: m.systemDecision,
       };
     });
     return statusMap;
@@ -671,8 +671,8 @@ const YPivotQAInspectionMeasurementConfig = ({
                             selectedSize === s
                               ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30"
                               : status?.isComplete
-                              ? "border-green-300 bg-green-50 dark:bg-green-900/20"
-                              : "border-gray-200 dark:border-gray-700"
+                                ? "border-green-300 bg-green-50 dark:bg-green-900/20"
+                                : "border-gray-200 dark:border-gray-700"
                           } ${
                             isDisabled
                               ? "opacity-60 cursor-not-allowed"

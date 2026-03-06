@@ -189,7 +189,10 @@ export const getInspectionOrderDetails = async (req, res) => {
     }
 
     const sizeTotals = {};
-    const sizeList = Array.from(sizeSet);
+    const sizeList =
+      dtOrder.SizeList && dtOrder.SizeList.length > 0
+        ? dtOrder.SizeList
+        : Array.from(sizeSet);
 
     sizeList.forEach((size) => {
       sizeTotals[size] = colorSizeData.reduce(
@@ -197,6 +200,15 @@ export const getInspectionOrderDetails = async (req, res) => {
         0,
       );
     });
+
+    // const sizeList = Array.from(sizeSet);
+
+    // sizeList.forEach((size) => {
+    //   sizeTotals[size] = colorSizeData.reduce(
+    //     (sum, row) => sum + (row.sizes[size] || 0),
+    //     0,
+    //   );
+    // });
 
     let yorksysData = null;
     if (yorksysOrder) {

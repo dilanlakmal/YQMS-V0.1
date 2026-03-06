@@ -24,6 +24,7 @@ import Measurement from "./Measurement";
 import QASectionsMeasurementSpecsSelection from "../components/inspection/PivotY/QAMeasurement/QASectionsMeasurementSpecsSelection";
 import QASectionsMeasurementAWSelection from "../components/inspection/PivotY/QAMeasurement/QASectionsMeasurementAWSelection";
 import ModifyDTSpec from "../components/inspection/PivotY/QAMeasurement/ModifyDTSpec";
+import CorrectMeasurementID from "../components/inspection/PivotY/QAMeasurement/CorrectMeasurementID";
 
 // --- PLACEHOLDER ---
 const PlaceholderComponent = ({ title, icon: Icon }) => {
@@ -100,6 +101,13 @@ const YPivotQAMeasurements = () => {
         icon: <Pencil size={20} />,
         component: <ModifyDTSpec />,
         description: "Select Measurement Specs (After Wash)",
+      },
+      {
+        id: "correct-measurement-id",
+        label: "Correct Measurement ID",
+        icon: <Pencil size={20} />,
+        component: <CorrectMeasurementID />,
+        description: "Correct Measurement IDs based on Fincheck Reports",
       },
     ],
     [activeYorksysSubTab], // Dependency added so component updates when subTab changes

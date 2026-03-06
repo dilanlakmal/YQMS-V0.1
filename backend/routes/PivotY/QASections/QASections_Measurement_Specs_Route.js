@@ -27,44 +27,49 @@ import {
   validatePointNames,
 } from "../../../controller/PivotY/QASections/QASections_Measurement_Specs_Names_Controller.js";
 
+// Import ID Correction Controller
+import {
+  searchFincheckOrders,
+  previewMeasurementIdMapping,
+  executeMeasurementIdUpdate,
+  checkQASpecsExists,
+  analyzeSourceOrder,
+} from "../../../controller/PivotY/QASections/QASections_Measurement_Specs_ID_Correction_Controller.js";
+
 const router = express.Router();
 
-// Before Wash
+// =========================================================================
+// ID Correction Routes (From Fincheck Reports)
+// =========================================================================
+
+// Search fincheck orders
 router.get(
-  "/api/qa-sections/measurement-specs/:moNo",
-  getQASectionsMeasurementSpecs,
-);
-router.post(
-  "/api/qa-sections/measurement-specs/save",
-  saveQASectionsMeasurementSpecs,
+  "/api/qa-sections/measurement-specs/search-fincheck-orders",
+  searchFincheckOrders,
 );
 
-// After Wash
+// Analyze source order for available measurement data
 router.get(
-  "/api/qa-sections/measurement-specs-aw/:moNo",
-  getQASectionsMeasurementSpecsAW,
-);
-router.post(
-  "/api/qa-sections/measurement-specs-aw/save",
-  saveQASectionsMeasurementSpecsAW,
+  "/api/qa-sections/measurement-specs/analyze-source/:orderNo",
+  analyzeSourceOrder,
 );
 
-// Fix Tolerance Values
-router.post(
-  "/api/qa-sections/measurement-specs/fix-tolerances",
-  fixAllToleranceValues,
-);
-router.post(
-  "/api/qa-sections/measurement-specs/fix-tolerances/:moNo",
-  fixTolerancesByOrder,
-);
+// Check if QA specs exist for an order
 router.get(
-  "/api/qa-sections/measurement-specs/preview-tolerance-issues",
-  previewToleranceIssues,
+  "/api/qa-sections/measurement-specs/check-qa-specs/:orderNo",
+  checkQASpecsExists,
 );
+
+// Preview ID mapping (auto-analyzes all reports)
 router.post(
-  "/api/qa-sections/measurement-specs/apply-to-aw",
-  applyBWSelectionToAW,
+  "/api/qa-sections/measurement-specs/preview-id-mapping",
+  previewMeasurementIdMapping,
+);
+
+// Execute ID update
+router.post(
+  "/api/qa-sections/measurement-specs/execute-id-update",
+  executeMeasurementIdUpdate,
 );
 
 // =========================================================================
@@ -121,6 +126,48 @@ router.post(
 router.post(
   "/api/qa-sections/measurement-specs/validate-point-names",
   validatePointNames,
+);
+
+// =========================================================================
+// Parameter Routes
+// =========================================================================
+
+// Before Wash
+router.get(
+  "/api/qa-sections/measurement-specs/:moNo",
+  getQASectionsMeasurementSpecs,
+);
+router.post(
+  "/api/qa-sections/measurement-specs/save",
+  saveQASectionsMeasurementSpecs,
+);
+
+// After Wash
+router.get(
+  "/api/qa-sections/measurement-specs-aw/:moNo",
+  getQASectionsMeasurementSpecsAW,
+);
+router.post(
+  "/api/qa-sections/measurement-specs-aw/save",
+  saveQASectionsMeasurementSpecsAW,
+);
+
+// Fix Tolerance Values
+router.post(
+  "/api/qa-sections/measurement-specs/fix-tolerances",
+  fixAllToleranceValues,
+);
+router.post(
+  "/api/qa-sections/measurement-specs/fix-tolerances/:moNo",
+  fixTolerancesByOrder,
+);
+router.get(
+  "/api/qa-sections/measurement-specs/preview-tolerance-issues",
+  previewToleranceIssues,
+);
+router.post(
+  "/api/qa-sections/measurement-specs/apply-to-aw",
+  applyBWSelectionToAW,
 );
 
 export default router;
