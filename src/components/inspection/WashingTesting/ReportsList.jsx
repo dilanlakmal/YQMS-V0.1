@@ -102,8 +102,8 @@ const ReportsList = ({
 }) => {
   const { user } = useAuth();
   const { factories } = useOrderDataStore();
-  const { users, causeAssignHistory } = useAssignControlStore();
-  const { isAdminUser, isWarehouseUser } = computeUserRoles(user, causeAssignHistory);
+  const { users, causeAssignHistory, adminUsers, washingRoles } = useAssignControlStore();
+  const { isAdminUser, isWarehouseUser, isReporterUser, isSystemAdmin } = computeUserRoles(user, causeAssignHistory, adminUsers, washingRoles);
   const { activeTab, setActiveTab } = useFormStore();
   // Read filter state directly from store using the tab key
   const { [tab]: filters, setFilter, setPage } = useWashingFilterStore();
@@ -803,11 +803,11 @@ const ReportsList = ({
             const reportHasColorEdit =
               !!(report.colorEditedByWarehouseAt && report.colorEditedByWarehouseBy) ||
               !!(report.notificationHistory?.length && report.notificationHistory.some((e) => e.type === "COLOR_UPDATE"));
-            const reportHasAdminEdit = !!report.editedByAdminAt || !!(report.notificationHistory?.length && report.notificationHistory.some((e) => e.type === "ADMIN_EDIT"));
+            const reportHasReporterEdit = !!report.editedByReporterAt || !!(report.notificationHistory?.length && report.notificationHistory.some((e) => e.type === "REPORTER_EDIT"));
             // Show ringing bell whenever report has notification content (so both records show same icon when both have info)
             const hasWarehouseNotification = reportHasColorEdit;
-            const hasAdminNotification = reportHasAdminEdit;
-            const hasNotification = hasWarehouseNotification || hasAdminNotification;
+            const hasReporterNotification = reportHasReporterEdit;
+            const hasNotification = hasWarehouseNotification || hasReporterNotification;
             const notificationParts = [];
             if (notYetAssignedReport) {
               if (isReporter) notificationParts.push("Not yet assigned by warehouse.");
@@ -830,9 +830,9 @@ const ReportsList = ({
                 : `${name} edited colors: sent ${totalPrev} → now ${currentForMsg}.${removed}`;
               notificationParts.push(msg);
             }
-            if (reportHasAdminEdit) {
-              const name = report.editedByAdminName || report.editedByAdminBy || "Admin";
-              notificationParts.push(`Admin edit by ${name}.`);
+            if (reportHasReporterEdit) {
+              const name = report.editedByReporterName || report.editedByReporterBy || "Reporter";
+              notificationParts.push(`Reporter edit by ${name}.`);
             }
             const notificationTitle = hasNotification ? notificationParts.join(" ") : "Notification";
 
@@ -865,7 +865,7 @@ const ReportsList = ({
                 enableRoleLocking={enableRoleLocking}
                 hasNotification={hasNotification}
                 hasWarehouseNotification={hasWarehouseNotification}
-                hasAdminNotification={hasAdminNotification}
+                hasReporterNotification={hasReporterNotification}
                 notificationRead={readNotificationReportIds.has(reportId)}
                 showNotificationButton={showNotificationButton}
                 notificationTitle={notificationTitle}
@@ -899,17 +899,17 @@ const ReportsList = ({
               <span className="font-semibold uppercase tracking-wide text-gray-800 dark:text-white">{notificationReport.ymStyle || "—"}</span>
             </p>
 
-            {(notificationReport.notificationHistory?.length > 0 || notificationReport.colorEditedByWarehouseAt || notificationReport.editedByAdminAt) ? (
+            {(notificationReport.notificationHistory?.length > 0 || notificationReport.colorEditedByWarehouseAt || notificationReport.editedByReporterAt) ? (
               <div className="space-y-3 text-sm">
                 {/* Show full history (newest first); fallback to single latest for older reports */}
                 {(notificationReport.notificationHistory?.length > 0
                   ? [...notificationReport.notificationHistory].reverse()
-                  : notificationReport.editedByAdminAt
+                  : notificationReport.editedByReporterAt
                     ? [{
-                      type: "ADMIN_EDIT",
-                      at: notificationReport.editedByAdminAt,
-                      userName: notificationReport.editedByAdminName,
-                      userId: notificationReport.editedByAdminBy,
+                      type: "REPORTER_EDIT",
+                      at: notificationReport.editedByReporterAt,
+                      userName: notificationReport.editedByReporterName,
+                      userId: notificationReport.editedByReporterBy,
                       previousColorCount: notificationReport.color?.length || 0,
                       newColorCount: notificationReport.color?.length || 0,
                       rejectedColors: [],
@@ -924,22 +924,22 @@ const ReportsList = ({
                       rejectedColors: notificationReport.colorUncheckedByWarehouse || [],
                     }]
                 ).map((entry, idx) => {
-                  const isAdminEdit = entry.type === "ADMIN_EDIT";
-                  const boxClass = isAdminEdit
+                  const isReporterEdit = entry.type === "REPORTER_EDIT";
+                  const boxClass = isReporterEdit
                     ? "rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/50 p-3 space-y-2"
                     : "rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 p-3 space-y-2";
-                  const titleClass = isAdminEdit
+                  const titleClass = isReporterEdit
                     ? "font-semibold text-violet-800 dark:text-violet-200 text-xs uppercase tracking-wide"
                     : "font-semibold text-amber-800 dark:text-amber-200 text-xs uppercase tracking-wide";
                   return (
                     <div key={entry.at ? new Date(entry.at).getTime() : idx} className={boxClass}>
                       <p className={titleClass}>
-                        {entry.type === "COLOR_UPDATE" ? "Color update" : entry.type === "ADMIN_EDIT" ? "Admin edit" : entry.type || "Update"}
+                        {entry.type === "COLOR_UPDATE" ? "Color update" : entry.type === "REPORTER_EDIT" ? "Reporter edit" : entry.type || "Update"}
                       </p>
                       <div className="grid gap-1.5">
                         <p className="text-gray-700 dark:text-gray-300">
                           <span className="text-gray-500 dark:text-gray-400 font-medium">User:</span>{" "}
-                          {entry.userName || entry.userId || (isAdminEdit ? "Admin" : "Warehouse")}
+                          {entry.userName || entry.userId || (isReporterEdit ? "Reporter" : "Warehouse")}
                         </p>
                         <p className="text-gray-700 dark:text-gray-300">
                           <span className="text-gray-500 dark:text-gray-400 font-medium">When:</span>{" "}

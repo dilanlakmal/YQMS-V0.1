@@ -48,6 +48,7 @@ const PullingTestForm = ({
     isLoadingUsers = false,
     assignHistory,
     causeAssignData,
+    washingRoles = [], // NEW: roles from role_management
     // Order data for Fabric Color multi-select
     fabricContent = [],
 }) => {
@@ -88,71 +89,18 @@ const PullingTestForm = ({
     // Use the passed users or fallback
     const users = parentUsers || [];
 
-    // Filter users based on assignHistory (report_assign_control collection)
+    // Get options from role_management
     const getFilteredOptions = (field) => {
-        if (!assignHistory || assignHistory.length === 0) {
-            // No history configured? Return empty.
-            return [];
-        }
+        const roleMap = { preparedBy: "PreparedBy", checkedBy: "CheckedBy", approvedBy: "ApprovedBy" };
+        const roleName = roleMap[field];
+        if (!roleName) return [];
 
-        // 1. Process history to find the LATEST state for each user.
-        // Sort chronologically (oldest to newest) to replay inputs
-        const sortedHistory = [...assignHistory].sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt));
+        const roleDoc = washingRoles.find(r => r.role === roleName);
+        if (!roleDoc || !roleDoc.users || roleDoc.users.length === 0) return [];
 
-        // Map<EmpID, { preparedBy: boolean, checkedBy: boolean, approvedBy: boolean }>
-        const userRolesMap = new Map();
-
-        // Helper to extract ID
-        const extractId = (val) => {
-            if (!val) return null;
-            const match = val.match(/\((.*?)\)/);
-            return match ? match[1] : val;
-        };
-
-        sortedHistory.forEach(item => {
-            const preparedId = extractId(item.preparedBy);
-            const checkedId = extractId(item.checkedBy);
-            const approvedId = extractId(item.approvedBy);
-
-            // If this record has a preparedId, update that user's state
-            if (preparedId) {
-                const current = userRolesMap.get(preparedId) || { preparedBy: false, checkedBy: false, approvedBy: false };
-                current.preparedBy = true;
-                userRolesMap.set(preparedId, current);
-            }
-
-            // If this record has a checkedId, update that user's state
-            if (checkedId) {
-                const current = userRolesMap.get(checkedId) || { preparedBy: false, checkedBy: false, approvedBy: false };
-                current.checkedBy = true;
-                userRolesMap.set(checkedId, current);
-            }
-
-            // If approvedId exists
-            if (approvedId) {
-                const current = userRolesMap.get(approvedId) || { preparedBy: false, checkedBy: false, approvedBy: false };
-                current.approvedBy = true;
-                userRolesMap.set(approvedId, current);
-            }
-        });
-
-        // 2. Now filter users who have the requested permission in their LATEST state
-        const allowedEmpIds = new Set();
-        userRolesMap.forEach((roles, empId) => {
-            if (roles[field]) {
-                allowedEmpIds.add(empId);
-            }
-        });
-
-        // If no valid IDs found, return empty
-        if (allowedEmpIds.size === 0) return [];
-
-        // Filter users who match the allowed IDs
-        const filteredUsers = users.filter(u => allowedEmpIds.has(u.emp_id));
-
-        return filteredUsers.map(u => ({
+        return roleDoc.users.map(u => ({
             value: u.emp_id,
-            label: `(${u.emp_id}) ${u.name}`
+            label: `(${u.emp_id}) ${u.name || u.eng_name || u.emp_id}`,
         }));
     };
 

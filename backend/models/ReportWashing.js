@@ -45,10 +45,10 @@ const reportWashingSchema = new mongoose.Schema(
     colorEditedByWarehouseBy: { type: String, default: "" },
     colorEditedByWarehouseName: { type: String, default: "" },
     colorUncheckedByWarehouse: { type: [String], default: [] }, // Colors warehouse removed (submitter sent more, warehouse kept fewer)
-    // Admin edit notification (non-warehouse user edited report – different icon from warehouse edit)
-    editedByAdminAt: { type: Date, default: null },
-    editedByAdminBy: { type: String, default: "" },
-    editedByAdminName: { type: String, default: "" },
+    // Reporter edit notification (non-warehouse user edited report – different icon from warehouse edit)
+    editedByReporterAt: { type: Date, default: null },
+    editedByReporterBy: { type: String, default: "" },
+    editedByReporterName: { type: String, default: "" },
     // Persistent history of updates (e.g. color edits when status is received) – so notification modal can show full history
     notificationHistory: {
       type: [
@@ -73,9 +73,19 @@ const reportWashingSchema = new mongoose.Schema(
   }
 );
 
+// Set qrId on save so we don't need a second DB write
+reportWashingSchema.pre("save", function (next) {
+  if (this.isNew && this._id && !this.qrId) {
+    this.qrId = this._id.toString();
+  }
+  next();
+});
+
 // Index for faster queries
 reportWashingSchema.index({ ymStyle: 1, reportDate: -1 });
 reportWashingSchema.index({ factory: 1, reportDate: -1 });
+reportWashingSchema.index({ reportDate: -1, createdAt: -1 });
+reportWashingSchema.index({ qrId: 1 });
 
 export default function createReportWashingModel(connection, collectionName = "report_washing") {
   return connection.model("ReportWashing_" + collectionName, reportWashingSchema, collectionName);

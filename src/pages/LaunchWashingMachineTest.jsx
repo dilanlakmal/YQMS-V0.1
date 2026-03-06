@@ -13,7 +13,7 @@ import {
 import { Camera, ScanSearch } from "lucide-react";
 import { io } from "socket.io-client";
 import { API_BASE_URL, QR_CODE_BASE_URL } from "../../config.js";
-import GameAssignControl from "../components/inspection/WashingTesting/assign_control/GameAssignControl";
+
 import {
   ImageViewerModal,
   DynamicFormSection,
@@ -94,8 +94,8 @@ const LaundryWashingMachineTest = () => {
   const { standard: _stdF, warehouse: _whF, easy_scan: _ef } = useWashingFilterStore();
   const { fetchFactories, fetchOrderColors, fetchYorksysOrderETD, fetchAnfSpecs } = useOrderDataStore();
 
-  const { causeAssignHistory, fetchAssignControl, fetchUsers } = useAssignControlStore();
-  const { isAdminUser, isWarehouseUser } = computeUserRoles(user, causeAssignHistory);
+  const { causeAssignHistory, fetchAssignControl, fetchUsers, adminUsers, washingRoles } = useAssignControlStore();
+  const { isAdminUser, isWarehouseUser, isReporterUser, isSystemAdmin } = computeUserRoles(user, causeAssignHistory, adminUsers, washingRoles);
 
   const {
     receivedModal, closeReceivedModal, setReceivedImages, setReceivedNotes,
@@ -145,20 +145,30 @@ const LaundryWashingMachineTest = () => {
 
   // ─── Tab access control ───────────────────────────────────────────
   useEffect(() => {
-    if (isWarehouseUser && activeTab === "reports") setActiveTab("warehouse_reports");
-    else if (isWarehouseUser && activeTab === "form" && !completingReport) setActiveTab("warehouse_reports");
-    else if (!isAdminUser && !isWarehouseUser && (activeTab === "warehouse_reports" || activeTab === "easy_scan")) setActiveTab("reports");
-    else if (!isAdminUser && activeTab === "assign_control") setActiveTab(isWarehouseUser ? "warehouse_reports" : "reports");
-  }, [isWarehouseUser, activeTab, isAdminUser, completingReport]); // eslint-disable-line
+    // System admins see everything, no redirect needed
+    if (isSystemAdmin) return;
 
-  // ─── Polling: assign control + users ──────────────────────────────
+    if (isWarehouseUser && !isReporterUser) {
+      // Warehouse only users: redirect away from reporter tabs
+      // Allow warehouse users to enter the Form tab only when they are completing
+      // a scanned "received" report (set by QR scan flow).
+      if ((activeTab === "reports") || (activeTab === "form" && !completingReport)) {
+        setActiveTab("warehouse_reports");
+      }
+    } else if (isReporterUser && !isWarehouseUser) {
+      // Reporter only users: redirect away from warehouse tabs
+      if (activeTab === "warehouse_reports" || activeTab === "easy_scan") {
+        setActiveTab("reports");
+      }
+    }
+
+
+  }, [isSystemAdmin, isWarehouseUser, isReporterUser, activeTab, setActiveTab, completingReport]); // eslint-disable-line
+
+  // ─── Fetch users for dropdowns ───────────────────────────────────
   useEffect(() => {
-    fetchAssignControl();
     fetchUsers();
-    const intervalId = setInterval(fetchAssignControl, 5000);
-    const handleFocus = () => fetchAssignControl();
-    window.addEventListener("focus", handleFocus);
-    return () => { clearInterval(intervalId); window.removeEventListener("focus", handleFocus); };
+    fetchAssignControl();
   }, []); // eslint-disable-line
 
   // ─── Debounced report fetching ────────────────────────────────────
@@ -251,7 +261,8 @@ const LaundryWashingMachineTest = () => {
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [showColorDropdown, showPODropdown, showETDDropdown, showEditColorDropdown, showEditPODropdown, showEditETDDropdown, isReportTypeOpen]); // eslint-disable-line
 
-  const isQRLocked = !isAdminUser && !isWarehouseUser;
+  const hasAccess = isSystemAdmin || isReporterUser || isWarehouseUser;
+  const isQRLocked = !hasAccess;
 
   // ═══════════════════════════════════════════════════════════════════
   // RENDER
@@ -279,175 +290,192 @@ const LaundryWashingMachineTest = () => {
           </div>
         </div>
 
-        <div className="p-4 md:p-6">
-          <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-            <nav className="flex overflow-x-auto scrollbar-hide -mb-px" aria-label="Tabs" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
-              {/* Create New Report: always for admin/reporter; for warehouse show when on form OR when completing a report (so they can switch tabs without losing form) */}
-              {((isAdminUser || !isWarehouseUser) || (isWarehouseUser && (activeTab === "form" || completingReport))) && (
-                <button onClick={() => setActiveTab("form")} className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "form" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}>
-                  <span className="flex items-center gap-1.5 sm:gap-2">
-                    <HiDocumentAdd className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "form" ? "text-emerald-600" : "text-emerald-500/70"}`} />
+        <div className="p-3 sm:p-4 md:p-6">
+          <div className="mb-4 sm:mb-6 border-b border-gray-200 dark:border-gray-700">
+            <nav className="flex overflow-x-auto scrollbar-hide -mb-px gap-0 min-w-0" aria-label="Tabs" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+              {/* Create New Report */}
+              {(isSystemAdmin || isReporterUser) && (
+                <button
+                  onClick={() => setActiveTab("form")}
+                  className={`flex-shrink-0 py-2.5 sm:py-3 px-2 sm:px-3 md:px-4 border-b-2 font-medium text-[11px] sm:text-xs md:text-sm transition-colors whitespace-nowrap min-h-[44px] sm:min-h-0 flex items-center ${activeTab === "form" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}
+                >                  <span className="flex items-center gap-1 sm:gap-2">
+                    <HiDocumentAdd className={`w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 ${activeTab === "form" ? "text-emerald-600" : "text-emerald-500/70"}`} />
                     <span className="hidden sm:inline">Create New Report</span>
                     <span className="sm:hidden">Create</span>
                   </span>
                 </button>
               )}
 
-              {(isAdminUser || !isWarehouseUser) && (
-                <button onClick={() => setActiveTab("reports")} className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "reports" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}>
-                  <span className="flex items-center gap-1.5 sm:gap-2">
-                    <HiClipboardList className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "reports" ? "text-blue-600" : "text-blue-500/70"}`} />
+              {(isSystemAdmin || isReporterUser) && (
+                <button
+                  onClick={() => setActiveTab("reports")}
+                  className={`flex-shrink-0 py-2.5 sm:py-3 px-2 sm:px-3 md:px-4 border-b-2 font-medium text-[11px] sm:text-xs md:text-sm transition-colors whitespace-nowrap min-h-[44px] sm:min-h-0 flex items-center ${activeTab === "reports" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}
+                >                  <span className="flex items-center gap-1 sm:gap-2">
+                    <HiClipboardList className={`w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 ${activeTab === "reports" ? "text-blue-600" : "text-blue-500/70"}`} />
                     <span className="hidden sm:inline">Reports ({pagination.totalRecords})</span>
-                    <span className="sm:hidden">Reports <span className="text-[10px] bg-blue-100 px-1.5 py-0.5 rounded-full">{pagination.totalRecords}</span></span>
+                    <span className="sm:hidden">Reports <span className="text-[9px] bg-blue-100 dark:bg-blue-900/40 px-1 py-0.5 rounded">{pagination.totalRecords}</span></span>
                   </span>
                 </button>
               )}
 
-              {(isAdminUser || isWarehouseUser) && (
-                <button onClick={() => setActiveTab("warehouse_reports")} className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "warehouse_reports" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}>
-                  <span className="flex items-center gap-1.5 sm:gap-2">
-                    <MdWarehouse className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "warehouse_reports" ? "text-amber-600" : "text-amber-500/70"}`} />
+              {(isSystemAdmin || isWarehouseUser) && (
+                <button onClick={() => setActiveTab("warehouse_reports")} className={`flex-shrink-0 py-2.5 sm:py-3 px-2 sm:px-3 md:px-4 border-b-2 font-medium text-[11px] sm:text-xs md:text-sm transition-colors whitespace-nowrap min-h-[44px] sm:min-h-0 flex items-center ${activeTab === "warehouse_reports" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}>
+                  <span className="flex items-center gap-1 sm:gap-2">
+                    <MdWarehouse className={`w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 ${activeTab === "warehouse_reports" ? "text-amber-600" : "text-amber-500/70"}`} />
                     <span className="hidden sm:inline">Warehouse Report</span>
                     <span className="sm:hidden">Warehouse</span>
                   </span>
                 </button>
               )}
 
-              {(isAdminUser || isWarehouseUser) && (
-                <button onClick={() => setActiveTab("easy_scan")} className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "easy_scan" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}>
-                  <span className="flex items-center gap-1.5 sm:gap-2">
-                    <ScanSearch className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "easy_scan" ? "text-teal-600" : "text-teal-500/70"}`} />
+              {(isSystemAdmin || isWarehouseUser) && (
+                <button onClick={() => setActiveTab("easy_scan")} className={`flex-shrink-0 py-2.5 sm:py-3 px-2 sm:px-3 md:px-4 border-b-2 font-medium text-[11px] sm:text-xs md:text-sm transition-colors whitespace-nowrap min-h-[44px] sm:min-h-0 flex items-center ${activeTab === "easy_scan" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}>
+                  <span className="flex items-center gap-1 sm:gap-2">
+                    <ScanSearch className={`w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 ${activeTab === "easy_scan" ? "text-teal-600" : "text-teal-500/70"}`} />
                     <span className="hidden sm:inline">Easy Scan</span>
                     <span className="sm:hidden">Easy Scan</span>
                   </span>
                 </button>
               )}
 
-              {isAdminUser && (
-                <button onClick={() => setActiveTab("assign_control")} className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "assign_control" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}>
-                  <span className="flex items-center gap-1.5 sm:gap-2">
-                    <MdAssignmentInd className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "assign_control" ? "text-purple-600" : "text-purple-500/70"}`} />
-                    <span className="hidden sm:inline">Assign Control</span>
-                    <span className="sm:hidden">Assign</span>
-                  </span>
-                </button>
-              )}
 
-              <div className="ml-auto flex items-center flex-shrink-0 pr-0">
+
+              <div className="ml-auto flex items-center flex-shrink-0 pl-2">
                 <button
                   type="button"
                   onClick={() => { setShowReportDateScanner("standalone"); setTimeout(() => initializeScanner("standalone"), 300); }}
-                  className="p-2 text-indigo-600 hover:text-indigo-700 transition-colors border-b-2 border-transparent"
+                  className="p-1.5 sm:p-2 text-indigo-600 hover:text-indigo-700 transition-colors border-b-2 border-transparent min-h-[44px] sm:min-h-0 flex items-center justify-center"
                   title="Open Live Camera Scanner"
                 >
-                  <Camera size={32} />
+                  <Camera className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8" />
                 </button>
               </div>
             </nav>
           </div>
 
-          {activeTab === "form" && (
-            <DynamicFormSection
-              handleInputChange={handleInputChange}
-              handleSubmit={(e) => handleSubmit(e, user)}
-              isCompleting={!!completingReport}
-              handleOrderNoSelect={handleOrderNoSelect}
-              searchOrderNo={searchOrderNo}
-              fetchOrderColors={fetchOrderColors}
-              fetchYorksysOrderETD={fetchYorksysOrderETD}
-              fetchAnfSpecs={fetchAnfSpecs}
-              handleFileInputChange={handleFileInputChange}
-              handleCameraInputChange={handleCameraInputChange}
-              triggerFileInput={triggerFileInput}
-              triggerCameraInput={triggerCameraInput}
-              handleRemoveImage={handleRemoveImageWrapper}
-              fileInputRef={fileInputRef}
-              cameraInputRef={cameraInputRef}
-              imageRotations={imageRotations}
-              dropdownRef={dropdownRef}
-              reportTypeIcons={{
-                "Home Wash Test": <MdLocalLaundryService />,
-                "Garment Wash Report": <MdLocalLaundryService />,
-                "HT Testing": <MdOutlineDeviceThermostat />,
-                "EMB/Printing Testing": <MdOutlineImagesearchRoller />,
-                "Pulling Test": <MdOutlineExpand />,
-              }}
-              reportTypes={[
-                { val: "Garment Wash Report", icon: <MdLocalLaundryService /> },
-                { val: "HT Testing", icon: <MdOutlineDeviceThermostat /> },
-                { val: "EMB/Printing Testing", icon: <MdOutlineImagesearchRoller /> },
-                { val: "Pulling Test", icon: <MdOutlineExpand /> },
-              ]}
-            />
-          )}
+          <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+            {!hasAccess ? (
+              <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-full mb-4">
+                  <MdAssignmentInd className="w-12 h-12 text-red-500 opacity-80" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2">Can't Access</h2>
+                <p className="text-gray-500 dark:text-gray-400 max-w-md">
+                  You are not currently assigned as a Reporter or Warehouse User for this module.
+                  Please contact your administrator to request access.
+                </p>
+              </div>
+            ) : (
+              <>
+                {activeTab === "form" && (isSystemAdmin || isReporterUser || (isWarehouseUser && !!completingReport)) && (
+                  <DynamicFormSection
+                    formData={useFormStore.getState().formData}
+                    handleInputChange={handleInputChange}
+                    handleOrderNoSelect={handleOrderNoSelect}
+                    handleSubmit={(e) => handleSubmit(e, user)}
+                    isCompleting={!!completingReport}
+                    searchOrderNo={searchOrderNo}
+                    fetchOrderColors={fetchOrderColors}
+                    fetchYorksysOrderETD={fetchYorksysOrderETD}
+                    fetchAnfSpecs={fetchAnfSpecs}
+                    handleFileInputChange={handleFileInputChange}
+                    handleCameraInputChange={handleCameraInputChange}
+                    triggerFileInput={triggerFileInput}
+                    triggerCameraInput={triggerCameraInput}
+                    handleRemoveImage={handleRemoveImageWrapper}
+                    isSubmitting={useFormStore.getState().isSubmitting}
+                    fileInputRef={fileInputRef}
+                    cameraInputRef={cameraInputRef}
+                    imageRotations={imageRotations}
+                    user={user}
+                    completingReport={completingReport}
+                    closeCompletion={() => closeCompletionModal()}
+                    dropdownRef={dropdownRef}
+                    reportTypeIcons={{
+                      "Home Wash Test": <MdLocalLaundryService />,
+                      "Garment Wash Report": <MdLocalLaundryService />,
+                      "HT Testing": <MdOutlineDeviceThermostat />,
+                      "EMB/Printing Testing": <MdOutlineImagesearchRoller />,
+                      "Pulling Test": <MdOutlineExpand />,
+                    }}
+                    reportTypes={[
+                      { val: "Garment Wash Report", icon: <MdLocalLaundryService /> },
+                      { val: "HT Testing", icon: <MdOutlineDeviceThermostat /> },
+                      { val: "EMB/Printing Testing", icon: <MdOutlineImagesearchRoller /> },
+                      { val: "Pulling Test", icon: <MdOutlineExpand /> },
+                    ]}
+                  />
+                )}
 
-          {activeTab === "reports" && (
-            <ReportsList
-              tab="standard"
-              onPrintPDF={handlePrintPDF}
-              onDownloadPDF={handleDownloadPDF}
-              onExportExcel={handleExportExcel}
-              onEdit={handleEditReport}
-              onDelete={handleDelete}
-              onReject={handleReject}
-              openRejectModal={openRejectModal}
-              onAcceptReceived={handleAcceptReceivedFromCard}
-              savedImageRotations={savedImageRotations}
-              openImageViewer={openImageViewer}
-              restrictDeleteStatuses={["received", "completed"]}
-              restrictEditStatuses={["received", "completed"]}
-              onEditInitialImages={handleEditInitialImages}
-              onEditReceivedImages={handleEditReceivedImages}
-              onEditCompletionImages={handleEditCompletionImages}
-            />
-          )}
+                {activeTab === "reports" && (isSystemAdmin || isReporterUser) && (
+                  <ReportsList
+                    tab="standard"
+                    onPrintPDF={handlePrintPDF}
+                    onDownloadPDF={handleDownloadPDF}
+                    onExportExcel={handleExportExcel}
+                    onEdit={handleEditReport}
+                    onDelete={handleDelete}
+                    onReject={handleReject}
+                    openRejectModal={openRejectModal}
+                    onAcceptReceived={handleAcceptReceivedFromCard}
+                    savedImageRotations={savedImageRotations}
+                    openImageViewer={openImageViewer}
+                    restrictDeleteStatuses={["received", "completed"]}
+                    restrictEditStatuses={["received", "completed"]}
+                    onEditInitialImages={handleEditInitialImages}
+                    onEditReceivedImages={handleEditReceivedImages}
+                    onEditCompletionImages={handleEditCompletionImages}
+                  />
+                )}
 
-          {activeTab === "warehouse_reports" && (
-            <ReportsList
-              tab="warehouse"
-              onPrintPDF={handlePrintPDF}
-              onDownloadPDF={handleDownloadPDF}
-              onExportExcel={handleExportExcel}
-              onEdit={handleEditReport}
-              onDelete={handleDelete}
-              onReject={handleReject}
-              openRejectModal={openRejectModal}
-              onAcceptReceived={handleAcceptReceivedFromCard}
-              savedImageRotations={savedImageRotations}
-              openImageViewer={openImageViewer}
-              restrictDeleteStatuses={["received", "completed"]}
-              restrictEditStatuses={["received", "completed"]}
-              onEditInitialImages={handleEditInitialImages}
-              onEditReceivedImages={handleEditReceivedImages}
-              onEditCompletionImages={handleEditCompletionImages}
-              enableRoleLocking={true}
-            />
-          )}
+                {activeTab === "warehouse_reports" && (isSystemAdmin || isWarehouseUser) && (
+                  <ReportsList
+                    tab="warehouse"
+                    onPrintPDF={handlePrintPDF}
+                    onDownloadPDF={handleDownloadPDF}
+                    onExportExcel={handleExportExcel}
+                    onEdit={handleEditReport}
+                    onDelete={handleDelete}
+                    onReject={handleReject}
+                    openRejectModal={openRejectModal}
+                    onAcceptReceived={handleAcceptReceivedFromCard}
+                    savedImageRotations={savedImageRotations}
+                    openImageViewer={openImageViewer}
+                    restrictDeleteStatuses={["received", "completed"]}
+                    restrictEditStatuses={["received", "completed"]}
+                    onEditInitialImages={handleEditInitialImages}
+                    onEditReceivedImages={handleEditReceivedImages}
+                    onEditCompletionImages={handleEditCompletionImages}
+                    enableRoleLocking={true}
+                  />
+                )}
 
-          {activeTab === "easy_scan" && (
-            <ReportsList
-              tab="easy_scan"
-              onPrintPDF={handlePrintPDF}
-              onDownloadPDF={handleDownloadPDF}
-              onExportExcel={handleExportExcel}
-              onEdit={handleEditReport}
-              onDelete={handleDelete}
-              onReject={handleReject}
-              openRejectModal={openRejectModal}
-              onAcceptReceived={handleAcceptReceivedFromCard}
-              savedImageRotations={savedImageRotations}
-              openImageViewer={openImageViewer}
-              restrictDeleteStatuses={["received", "completed"]}
-              restrictEditStatuses={["received", "completed"]}
-              onEditInitialImages={handleEditInitialImages}
-              onEditReceivedImages={handleEditReceivedImages}
-              onEditCompletionImages={handleEditCompletionImages}
-              enableRoleLocking={true}
-            />
-          )}
+                {activeTab === "easy_scan" && (isSystemAdmin || isWarehouseUser) && (
+                  <ReportsList
+                    tab="easy_scan"
+                    onPrintPDF={handlePrintPDF}
+                    onDownloadPDF={handleDownloadPDF}
+                    onExportExcel={handleExportExcel}
+                    onEdit={handleEditReport}
+                    onDelete={handleDelete}
+                    onReject={handleReject}
+                    openRejectModal={openRejectModal}
+                    onAcceptReceived={handleAcceptReceivedFromCard}
+                    savedImageRotations={savedImageRotations}
+                    openImageViewer={openImageViewer}
+                    restrictDeleteStatuses={["received", "completed"]}
+                    restrictEditStatuses={["received", "completed"]}
+                    onEditInitialImages={handleEditInitialImages}
+                    onEditReceivedImages={handleEditReceivedImages}
+                    onEditCompletionImages={handleEditCompletionImages}
+                    enableRoleLocking={true}
+                  />
+                )}
 
-          {activeTab === "assign_control" && isAdminUser && <GameAssignControl user={user} />}
 
+              </>
+            )}
+          </div>
           <ReceivedModal
             isOpen={receivedModal.isOpen}
             onClose={() => { closeReceivedModal(); setReceivedImageRotations({}); }}

@@ -302,7 +302,7 @@ const QRScannerModal = ({
                 <div className="flex flex-col items-center gap-3 px-10 py-6 rounded-2xl bg-white/95 dark:bg-gray-900/95 border-2 border-green-500 shadow-2xl animate-modal-pop">
                   <CheckCircle size={72} className="text-green-500 animate-success-check" strokeWidth={2.5} />
                   <p className="text-xl font-bold text-gray-900 dark:text-white">Success</p>
-                  
+
                 </div>
               </div>
             )}

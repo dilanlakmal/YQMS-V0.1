@@ -838,8 +838,11 @@ export const getInitialFormData = (reportType) => {
                     } else if (reportType === REPORT_TYPES.PULLING_TEST && fieldName === 'testDate') {
                         // Pulling Test: Test date defaults to today
                         initialData[fieldName] = new Date().toISOString().split('T')[0];
+                    } else if (fieldName === 'reportDate') {
+                        // Report Date defaults to today for HT Testing, EMB/Printing
+                        initialData[fieldName] = new Date().toISOString().split('T')[0];
                     } else {
-                        // All other dates (Report Date, Rec. Date, etc.) default to empty
+                        // All other dates (Rec. Date, etc.) default to empty
                         initialData[fieldName] = '';
                     }
                     break;

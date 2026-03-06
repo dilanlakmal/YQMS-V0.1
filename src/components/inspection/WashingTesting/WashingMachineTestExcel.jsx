@@ -80,6 +80,10 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "", users = 
       { key: "value2", width: 30 },
     ];
 
+    // --- Border definition (consistent table borders) ---
+    const thinBorder = { style: "thin", color: { argb: "FFD1D5DB" } };
+    const fullBorder = { top: thinBorder, left: thinBorder, right: thinBorder, bottom: thinBorder };
+
     // --- Styles ---
     const titleStyle = {
       font: { bold: true, size: 16, color: { argb: "FF1E3A8A" } },
@@ -94,9 +98,7 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "", users = 
         fgColor: { argb: color }
       },
       alignment: { vertical: "middle", horizontal: "left" },
-      border: {
-        bottom: { style: "medium", color: { argb: "FFFFFFFF" } }
-      }
+      border: fullBorder
     });
 
     const labelStyle = {
@@ -107,18 +109,13 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "", users = 
         fgColor: { argb: "FFF9FAFB" }
       },
       alignment: { vertical: "middle" },
-      border: {
-        bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
-        right: { style: "thin", color: { argb: "FFE5E7EB" } }
-      }
+      border: fullBorder
     };
 
     const valueStyle = {
       font: { size: 10, color: { argb: "FF111827" } },
       alignment: { vertical: "middle", wrapText: true },
-      border: {
-        bottom: { style: "thin", color: { argb: "FFE5E7EB" } }
-      }
+      border: fullBorder
     };
 
     // Status Styling
@@ -130,9 +127,7 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "", users = 
       return {
         font: { bold: true, size: 10, color: { argb: color } },
         alignment: { vertical: "middle" },
-        border: {
-          bottom: { style: "thin", color: { argb: "FFE5E7EB" } }
-        }
+        border: fullBorder
       };
     };
 
@@ -188,7 +183,7 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "", users = 
         worksheet.mergeCells(`B${currentRow}:D${currentRow}`);
       }
 
-      row.height = 20;
+      row.height = 22;
       currentRow++;
     };
 
@@ -221,14 +216,105 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "", users = 
     addInfoRow("PO:", report.po && report.po.length > 0 ? report.po.join(", ") : "N/A");
     addInfoRow("Ex Fty Date:", report.exFtyDate && report.exFtyDate.length > 0 ? report.exFtyDate.join(", ") : "N/A");
 
+    // --- Measurements & Shrinkage Section ---
+    const shrinkageRows = report.shrinkageRows && Array.isArray(report.shrinkageRows)
+      ? report.shrinkageRows.filter((row) => row.selected !== false || row.beforeWash || row.afterWash || row.location)
+      : [];
+    if (shrinkageRows.length > 0) {
+      currentRow += 2; // Extra space before section
+      worksheet.mergeCells(`A${currentRow}:F${currentRow}`);
+      const shrinkHeaderCell = worksheet.getCell(`A${currentRow}`);
+      shrinkHeaderCell.value = "  MEASUREMENTS & SHRINKAGE";
+      shrinkHeaderCell.style = sectionHeaderStyle("FF1E40AF");
+      worksheet.getRow(currentRow).height = 24;
+      currentRow++;
+      // Set column widths for 6-column table (A=Point, B=Spec, C=G1, D=G2, E=Shrinkage, F=Result)
+      worksheet.getColumn(1).width = 32; // Wider Point column for long text + spacing
+      worksheet.getColumn(5).width = 14;
+      worksheet.getColumn(6).width = 10;
+      // Header row
+      const headerRow = worksheet.getRow(currentRow);
+      const headerCells = ["Point", "Spec (B)", "G1 (B)", "G2 (A)", "Shrinkage", "Result"];
+      headerCells.forEach((text, colIdx) => {
+        const cell = headerRow.getCell(colIdx + 1);
+        cell.value = text;
+        cell.style = {
+          font: { bold: true, size: 10, color: { argb: "FF374151" } },
+          fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } },
+          alignment: { vertical: "middle", horizontal: colIdx === 0 ? "left" : "center", indent: colIdx === 0 ? 1 : 0 },
+          border: fullBorder
+        };
+      });
+      headerRow.height = 26;
+      currentRow++;
+      // Data rows
+      shrinkageRows.forEach((row) => {
+        const dataRow = worksheet.getRow(currentRow);
+        const cells = [
+          row.location || "-",
+          row.beforeWashSpec || "-",
+          row.beforeWash || "-",
+          row.afterWash || "-",
+          row.shrinkage || "-",
+          row.passFail || "-"
+        ];
+        cells.forEach((val, colIdx) => {
+          const cell = dataRow.getCell(colIdx + 1);
+          cell.value = val;
+          const isShrinkage = colIdx === 4;
+          const isResult = colIdx === 5;
+          let fontColor = "FF111827";
+          if (isResult && val === "FAIL") fontColor = "FFDC2626";
+          if (isResult && val === "PASS") fontColor = "FF059669";
+          if (isShrinkage && val !== "-" && row.passFail === "FAIL") fontColor = "FFDC2626";
+          if (isShrinkage && val !== "-" && row.passFail === "PASS") fontColor = "FF059669";
+          cell.style = {
+            font: { size: 10, color: { argb: fontColor }, bold: isResult },
+            fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } },
+            alignment: { vertical: "middle", horizontal: colIdx === 0 ? "left" : "center", wrapText: colIdx === 0, indent: colIdx === 0 ? 2 : 0 },
+            border: fullBorder
+          };
+        });
+        // Taller rows for wrapped Point text; min 24, more if Point is long
+        const pointLen = (row.location || "").length;
+        dataRow.height = pointLen > 25 ? 32 : 26;
+        currentRow++;
+      });
+      currentRow += 2; // Extra space after section
+    }
+
     // --- Dynamic Extra Fields Section ---
     const skipFields = [
       "reportType", "ymStyle", "buyerStyle", "color", "po", "exFtyDate", "factory", "status",
       "createdAt", "updatedAt", "submittedAt", "reporter_emp_id", "reporter_name", "reporter_status", "notes",
       "images", "receivedImages", "completionImages", "receivedNotes", "completionNotes",
       "receivedDate", "receivedAt", "completedDate", "completedAt", "_id", "id", "__v",
-      "userId", "userName", "engName", "checkedBy", "approvedBy", "checkedByName", "approvedByName" // Legacy / shown above
+      "userId", "userName", "engName", "checkedBy", "approvedBy", "checkedByName", "approvedByName",
+      "shrinkageRows", "careSymbols", "careSymbolsImages",
+      "colorFastnessRows", "colorStainingRows", "visualAssessmentRows" // Arrays of objects - skip or use dedicated sections
     ];
+
+    // Format value for display; avoid [object Object] for objects/arrays
+    const formatValue = (val) => {
+      if (val == null || val === "") return "N/A";
+      if (typeof val === "object") {
+        if (Array.isArray(val)) {
+          if (val.length === 0) return "N/A";
+          const first = val[0];
+          if (typeof first === "object" && first !== null) return `${val.length} item(s)`; // Array of objects
+          return val.join(", ");
+        }
+        return "N/A"; // Plain object - don't stringify
+      }
+      const str = String(val);
+      // Format ISO date strings for readability
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(str)) {
+        try {
+          return new Date(str).toLocaleString("en-GB", { hour12: true });
+        } catch (_) { /* fall through */ }
+      }
+      return str;
+    };
 
     const extraFields = Object.keys(report).filter(key => !skipFields.includes(key));
 
@@ -240,13 +326,13 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "", users = 
         const k2 = extraFields[i + 1];
 
         const label1 = (k1.replace(/([A-Z])/g, ' $1').charAt(0).toUpperCase() + k1.replace(/([A-Z])/g, ' $1').slice(1)).trim() + ":";
-        const val1 = report[k1]?.toString() || "N/A";
+        const val1 = formatValue(report[k1]);
 
         let label2 = "";
         let val2 = "";
         if (k2) {
           label2 = (k2.replace(/([A-Z])/g, ' $1').charAt(0).toUpperCase() + k2.replace(/([A-Z])/g, ' $1').slice(1)).trim() + ":";
-          val2 = report[k2]?.toString() || "N/A";
+          val2 = formatValue(report[k2]);
         }
 
         addInfoRow(label1, val1, label2, val2);
@@ -267,9 +353,9 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "", users = 
         font: { bold: true, size: 10, color: { argb: "FF1F2937" } },
         fill: { type: "pattern", pattern: "solid", fgColor: { argb: color } },
         alignment: { vertical: "middle" },
-        border: { bottom: { style: "thin", color: { argb: "FFD1D5DB" } } }
+        border: fullBorder
       };
-      worksheet.getRow(currentRow).height = 20;
+      worksheet.getRow(currentRow).height = 22;
       currentRow++;
     };
 
@@ -282,7 +368,7 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "", users = 
         font: { italic: true, size: 9, color: { argb: "FF374151" } },
         fill: { type: "pattern", pattern: "solid", fgColor: { argb: color } },
         alignment: { vertical: "top", wrapText: true, indent: 2 },
-        border: { bottom: { style: "thin", color: { argb: "FFD1D5DB" } } }
+        border: fullBorder
       };
       // Auto-height for notes
       const lineCount = (notes.match(/\n/g) || []).length + 2;
@@ -330,9 +416,9 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "", users = 
       headerCell.style = {
         font: { bold: true, size: 10, color: { argb: "FF4B5563" } },
         fill: { type: "pattern", pattern: "solid", fgColor: { argb: sectionColor } },
-        border: { bottom: { style: "thin", color: { argb: "FFD1D5DB" } } }
+        border: fullBorder
       };
-      worksheet.getRow(currentRow).height = 18;
+      worksheet.getRow(currentRow).height = 20;
       currentRow++;
 
       // We'll place images 2 per row
@@ -403,9 +489,9 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "", users = 
       careHeaderCell.style = {
         font: { bold: true, size: 10, color: { argb: "FF4B5563" } },
         fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8E0F0" } },
-        border: { bottom: { style: "thin", color: { argb: "FFD1D5DB" } } }
+        border: fullBorder
       };
-      worksheet.getRow(currentRow).height = 18;
+      worksheet.getRow(currentRow).height = 20;
       currentRow++;
 
       const careImgRow = currentRow;

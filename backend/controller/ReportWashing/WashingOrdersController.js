@@ -60,25 +60,15 @@ export const getOrderDetailsWashing = async (req, res) => {
         const collection = ymProdConnection.db.collection("dt_orders");
         const yorksysCollection = ymProdConnection.db.collection("yorksys_orders");
         const specCollection = ymProdConnection.db.collection("buyer_spec_templates");
+        const mono = req.params.mono;
 
-        let order = await collection.findOne({
-            $or: [
-                { Order_No: req.params.mono },
-                { CustStyle: req.params.mono }
-            ]
-        });
+        const [dtOrder, yorksysOrder] = await Promise.all([
+            collection.findOne({ $or: [{ Order_No: mono }, { CustStyle: mono }] }),
+            yorksysCollection.findOne({ $or: [{ moNo: mono }, { style: mono }] })
+        ]);
 
-        let source = "dt_orders";
-
-        if (!order) {
-            order = await yorksysCollection.findOne({
-                $or: [
-                    { moNo: req.params.mono },
-                    { style: req.params.mono }
-                ]
-            });
-            source = "yorksys_orders";
-        }
+        let order = dtOrder || yorksysOrder;
+        const source = dtOrder ? "dt_orders" : "yorksys_orders";
 
         // Try to get sizes from ANF Spec Template regardless of where the order was found
         const specTemplate = await specCollection.findOne({ moNo: req.params.mono });

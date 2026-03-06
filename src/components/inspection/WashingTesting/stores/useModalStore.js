@@ -175,8 +175,17 @@ export const useModalStore = create((set, get) => ({
 
     handleEditReport: async (report) => {
         const { setEditFormData, setEditAvailableColors, setEditAvailablePOs, setEditAvailableETDs, setEditAvailableSizes, openEditModal } = get();
-        await prepareEditFormData(report, setEditFormData, setEditAvailableColors, setEditAvailablePOs, setEditAvailableETDs, setEditAvailableSizes);
+        // Open modal immediately for responsiveness; async option fetching
+        // can be slow/fail and shouldn't block showing the modal.
         openEditModal(report);
+        await prepareEditFormData(
+            report,
+            setEditFormData,
+            setEditAvailableColors,
+            setEditAvailablePOs,
+            setEditAvailableETDs,
+            setEditAvailableSizes,
+        );
     },
 
     resetEditState: () => {
@@ -195,8 +204,8 @@ export const useModalStore = create((set, get) => ({
 
     handleEditSubmit: (e) => {
         const { editModal, editFormData, closeEditModal, resetEditState } = get();
-        const { _currentUser, causeAssignHistory } = useAssignControlStore.getState();
-        const { isWarehouseUser } = computeUserRoles(_currentUser, causeAssignHistory);
+        const { _currentUser, causeAssignHistory, adminUsers, washingRoles } = useAssignControlStore.getState();
+        const { isAdminUser, isWarehouseUser } = computeUserRoles(_currentUser, causeAssignHistory, adminUsers, washingRoles);
         handleEditFormSubmit(
             e,
             editModal.report,
@@ -291,14 +300,18 @@ export const useModalStore = create((set, get) => ({
 
         const reportType = report?.reportType || "Garment Wash Report";
 
-        const { causeAssignHistory, _currentUser } = useAssignControlStore.getState();
-        const activeAssign = causeAssignHistory?.length > 0 ? causeAssignHistory[0] : null;
-        const completionAssign = activeAssign
+        const { _currentUser, washingRoles } = useAssignControlStore.getState();
+        // Get checkedBy/approvedBy from role_management
+        const checkedByUsers = (washingRoles.find(r => r.role === "CheckedBy")?.users) || [];
+        const approvedByUsers = (washingRoles.find(r => r.role === "ApprovedBy")?.users) || [];
+        const firstChecked = checkedByUsers.length > 0 ? checkedByUsers[0] : null;
+        const firstApproved = approvedByUsers.length > 0 ? approvedByUsers[0] : null;
+        const completionAssign = (firstChecked || firstApproved)
             ? {
-                checkedBy: activeAssign.checkedBy ?? null,
-                approvedBy: activeAssign.approvedBy ?? null,
-                checkedByName: activeAssign.checkedByName ?? null,
-                approvedByName: activeAssign.approvedByName ?? null,
+                checkedBy: firstChecked?.emp_id ?? null,
+                approvedBy: firstApproved?.emp_id ?? null,
+                checkedByName: firstChecked?.name ?? firstChecked?.eng_name ?? null,
+                approvedByName: firstApproved?.name ?? firstApproved?.eng_name ?? null,
             }
             : null;
 

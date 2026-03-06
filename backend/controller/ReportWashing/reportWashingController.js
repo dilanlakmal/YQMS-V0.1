@@ -5,7 +5,8 @@ import {
   ReportGarmentWash,
   ReportHTTesting,
   ReportEMBPrinting,
-  ReportPullingTest
+  ReportPullingTest,
+  RoleManagment
 } from "../MongoDB/dbConnectionController.js";
 import { API_BASE_URL, io } from "../../Config/appConfig.js";
 import { washingMachineTestUploadPath } from "../../helpers/helperFunctions.js";
@@ -15,6 +16,39 @@ import path from "path";
 import fs from "fs";
 
 const ASSET_BASE_PATH = path.resolve(__backendDir, "../public/assets/Wash-bold");
+
+const IMAGE_PROCESS_BATCH_SIZE = 4;
+
+// Process image files in parallel batches (concurrency cap to avoid memory spikes)
+const processImageFilesBatch = async (files, typePrefix, ymStyle = "unknown") => {
+  const sanitizedYmStyle = (ymStyle || "unknown")
+    .replace(/[/\\]/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/[^a-zA-Z0-9._-]/g, "");
+  const results = [];
+  for (let i = 0; i < files.length; i += IMAGE_PROCESS_BATCH_SIZE) {
+    const batch = files.slice(i, i + IMAGE_PROCESS_BATCH_SIZE);
+    const batchPromises = batch.map(async (file) => {
+      try {
+        const timestamp = Date.now();
+        const randomSuffix = Math.round(Math.random() * 1e9);
+        const filename = `${typePrefix}-${sanitizedYmStyle}-${timestamp}-${randomSuffix}.webp`;
+        const finalDiskPath = path.join(washingMachineTestUploadPath, filename);
+        await sharp(file.buffer)
+          .resize({ width: 1920, height: 1920, fit: "inside", withoutEnlargement: true })
+          .webp({ quality: 85 })
+          .toFile(finalDiskPath);
+        return `${API_BASE_URL}/storage/washing_machine_test/${filename}`;
+      } catch (imageError) {
+        console.error("Error processing image:", imageError);
+        return null;
+      }
+    });
+    const batchResults = await Promise.all(batchPromises);
+    results.push(...batchResults.filter(Boolean));
+  }
+  return results;
+};
 
 /* ------------------------------
    End Points - Report Washing
@@ -33,24 +67,31 @@ const getModelByReportType = (reportType) => {
   }
 };
 
-// Helper to find document across all collections (by _id or qrId)
+// Helper to find document across all collections (by _id or qrId) — parallel lookups
 const findReportById = async (id) => {
   if (!id || String(id).trim() === "") return { doc: null, model: null };
   const idVal = String(id).trim();
   const models = [ReportHomeWash, ReportGarmentWash, ReportHTTesting, ReportEMBPrinting, ReportPullingTest, ReportWashing];
 
-  // Try findById first (for MongoDB ObjectId)
-  if (mongoose.Types.ObjectId.isValid(idVal) && String(new mongoose.Types.ObjectId(idVal)) === idVal) {
-    for (const model of models) {
-      const doc = await model.findById(idVal);
-      if (doc) return { doc, model };
+  const isObjectId = mongoose.Types.ObjectId.isValid(idVal) && String(new mongoose.Types.ObjectId(idVal)) === idVal;
+
+  // Run all lookups in parallel: findById (when valid ObjectId) and findOne by qrId
+  const findByIdPromises = isObjectId ? models.map((model) => model.findById(idVal)) : [];
+  const findByQrIdPromises = models.map((model) => model.findOne({ qrId: idVal }).lean());
+
+  const [byIdResults, byQrIdResults] = await Promise.all([
+    findByIdPromises.length > 0 ? Promise.all(findByIdPromises) : [],
+    Promise.all(findByQrIdPromises)
+  ]);
+
+  // Prefer findById result (ObjectId match) if found; else use qrId match
+  if (isObjectId) {
+    for (let i = 0; i < byIdResults.length; i++) {
+      if (byIdResults[i]) return { doc: byIdResults[i], model: models[i] };
     }
   }
-
-  // Fallback: search by qrId (handles old QRs, display IDs like PTAF0001)
-  for (const model of models) {
-    const doc = await model.findOne({ qrId: idVal });
-    if (doc) return { doc, model };
+  for (let i = 0; i < byQrIdResults.length; i++) {
+    if (byQrIdResults[i]) return { doc: byQrIdResults[i], model: models[i] };
   }
 
   return { doc: null, model: null };
@@ -96,57 +137,21 @@ export const saveReportWashing = async (req, res) => {
     const careLabelImagePaths = [];
 
     if (req.files) {
-      // Ensure directory exists
       if (!fs.existsSync(washingMachineTestUploadPath)) {
         fs.mkdirSync(washingMachineTestUploadPath, { recursive: true });
       }
 
-      // Helper to process a file
-      const processFile = async (file, typePrefix = "washing-test") => {
-        const timestamp = Date.now();
-        const randomSuffix = Math.round(Math.random() * 1e9);
-        const sanitizedYmStyle = (ymStyle || "unknown")
-          .replace(/[\/\\]/g, "-")
-          .replace(/\s+/g, "-")
-          .replace(/[^a-zA-Z0-9._-]/g, "");
-        const filename = `${typePrefix}-${sanitizedYmStyle}-${timestamp}-${randomSuffix}.webp`;
-        const finalDiskPath = path.join(washingMachineTestUploadPath, filename);
-
-        await sharp(file.buffer)
-          .resize({
-            width: 1920,
-            height: 1920,
-            fit: "inside",
-            withoutEnlargement: true
-          })
-          .webp({ quality: 85 })
-          .toFile(finalDiskPath);
-
-        return `${API_BASE_URL}/storage/washing_machine_test/${filename}`;
-      };
-
-      // Handle images array (legacy or single field)
       const imagesToProcess = Array.isArray(req.files) ? req.files : (req.files.images || []);
-      for (const file of imagesToProcess) {
-        try {
-          const publicUrlPath = await processFile(file);
-          imagePaths.push(publicUrlPath);
-        } catch (imageError) {
-          console.error("Error processing image:", imageError);
-        }
-      }
+      const careLabelFiles = !Array.isArray(req.files) && req.files.careLabelImage
+        ? (Array.isArray(req.files.careLabelImage) ? req.files.careLabelImage : [req.files.careLabelImage])
+        : [];
 
-      // Handle careLabelImage field (Multiple images)
-      if (!Array.isArray(req.files) && req.files.careLabelImage && req.files.careLabelImage.length > 0) {
-        for (const file of req.files.careLabelImage) {
-          try {
-            const publicUrlPath = await processFile(file, "care-label");
-            careLabelImagePaths.push(publicUrlPath);
-          } catch (imageError) {
-            console.error("Error processing care label image:", imageError);
-          }
-        }
-      }
+      const [mainPaths, carePaths] = await Promise.all([
+        imagesToProcess.length > 0 ? processImageFilesBatch(imagesToProcess, "washing-test", ymStyle) : [],
+        careLabelFiles.length > 0 ? processImageFilesBatch(careLabelFiles, "care-label", ymStyle) : []
+      ]);
+      imagePaths.push(...mainPaths);
+      careLabelImagePaths.push(...carePaths);
     }
 
     // Parse JSON fields if they are strings
@@ -240,10 +245,14 @@ export const saveReportWashing = async (req, res) => {
       reporter_name: req.body.reporter_name || req.body.userName || "",
       submittedAt: new Date()
     };
-    if (reportDate && String(reportDate).trim()) reportData.reportDate = new Date(reportDate);
+    if (reportDate && String(reportDate).trim()) {
+      reportData.reportDate = new Date(reportDate);
+    } else {
+      reportData.reportDate = new Date(); // Fallback to submission time when not provided
+    }
 
     // Copy allowed report-type specific fields from req.body (explicit allowlist)
-        // custStyle removed: we use buyerStyle only (same value; avoid storing duplicate)
+    // custStyle removed: we use buyerStyle only (same value; avoid storing duplicate)
     const ALLOWED_EXTRA = ["season", "styleDescription", "mainFabric", "liningInserts", "detergent", "washingMethod", "beforeWashComments", "afterWashComments", "finalResult", "checkedBy", "approvedBy", "washType", "fabricColor"];
     for (const key of ALLOWED_EXTRA) {
       const val = req.body[key];
@@ -259,15 +268,10 @@ export const saveReportWashing = async (req, res) => {
     const ReportModel = getModelByReportType(reportData.reportType);
     console.log("Selected Model:", ReportModel.modelName, "Collection:", ReportModel.collection.name);
 
-    // Create and save the report
+    // Create and save the report (qrId set via pre-save hook)
     const newReport = new ReportModel(reportData);
     const savedData = await newReport.save();
     console.log("Data Saved Successfully to ID:", savedData._id);
-
-    // Store QR ID used in scan URL (?scan=qrId) for data collection
-    const qrId = savedData._id.toString();
-    await ReportModel.findByIdAndUpdate(savedData._id, { $set: { qrId } });
-    savedData.qrId = qrId;
 
     // Emit socket event for real-time updates
     io.emit("washing-report-created", savedData);
@@ -360,27 +364,35 @@ export const getReportWashing = async (req, res) => {
     }
 
     // Parallel query to all relevant collections
-    const countPromises = modelsToQuery.map(model => model.countDocuments(query));
-    const findPromises = modelsToQuery.map(model =>
-      model.find(query).sort({ reportDate: -1, createdAt: -1 }).lean()
-    );
-
+    const countPromises = modelsToQuery.map((model) => model.countDocuments(query));
     const counts = await Promise.all(countPromises);
-    const results = await Promise.all(findPromises);
+    const totalRecords = counts.reduce((sum, count) => sum + count, 0);
 
-    // Aggregate results
-    let totalRecords = counts.reduce((sum, count) => sum + count, 0);
-    let allReports = results.flat();
+    let paginatedReports;
 
-    // Sort aggregated results manually since they came from different collections
-    allReports.sort((a, b) => {
-      const dateA = new Date(a.reportDate || a.createdAt);
-      const dateB = new Date(b.reportDate || b.createdAt);
-      return dateB - dateA; // Descending
-    });
-
-    // Apply pagination to the aggregated list
-    const paginatedReports = allReports.slice(skip, skip + limitNum);
+    if (modelsToQuery.length === 1) {
+      // Single model: use DB-level pagination directly
+      paginatedReports = await modelsToQuery[0]
+        .find(query)
+        .sort({ reportDate: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean();
+    } else {
+      // Multiple models: fetch enough from each to cover skip+limitNum, merge-sort, then slice
+      const fetchLimit = skip + limitNum;
+      const findPromises = modelsToQuery.map((model) =>
+        model.find(query).sort({ reportDate: -1, createdAt: -1 }).limit(fetchLimit).lean()
+      );
+      const results = await Promise.all(findPromises);
+      const allReports = results.flat();
+      allReports.sort((a, b) => {
+        const dateA = new Date(a.reportDate || a.createdAt);
+        const dateB = new Date(b.reportDate || b.createdAt);
+        return dateB - dateA; // Descending
+      });
+      paginatedReports = allReports.slice(skip, skip + limitNum);
+    }
 
     res.status(200).json({
       success: true,
@@ -502,7 +514,7 @@ export const updateReportWashing = async (req, res) => {
         rejectedColors
       };
     }
-    // When a non-warehouse user (e.g. admin) updates the report, set admin-edit notification and clear warehouse notification
+    // When a non-warehouse user (e.g. reporter) updates the report, set reporter-edit notification and clear warehouse notification
     if (!editedByWarehouse && colorChanged) {
       updateData.colorEditedByWarehouseAt = null;
       updateData.colorEditedByWarehouseBy = "";
@@ -510,11 +522,11 @@ export const updateReportWashing = async (req, res) => {
       updateData.colorUncheckedByWarehouse = [];
       const now = new Date();
       const rejectedColors = prevColor.filter((c) => !newColor.includes(c));
-      updateData.editedByAdminAt = now;
-      updateData.editedByAdminBy = req.body.editorUserId || req.body.editorEmpId || "";
-      updateData.editedByAdminName = req.body.editorUserName || req.body.editorName || "";
+      updateData.editedByReporterAt = now;
+      updateData.editedByReporterBy = req.body.editorUserId || req.body.editorEmpId || "";
+      updateData.editedByReporterName = req.body.editorUserName || req.body.editorName || "";
       notificationHistoryEntry = {
-        type: "ADMIN_EDIT",
+        type: "REPORTER_EDIT",
         at: now,
         userId: req.body.editorUserId || req.body.editorEmpId || "",
         userName: req.body.editorUserName || req.body.editorName || "",
@@ -637,41 +649,11 @@ export const updateReportWashing = async (req, res) => {
 
     // Handle initial images if uploaded
     if (req.files && req.files.images && req.files.images.length > 0) {
-      const imagePaths = [];
-
-      for (const file of req.files.images) {
-        try {
-          // Generate unique filename
-          const timestamp = Date.now();
-          const randomSuffix = Math.round(Math.random() * 1e9);
-          const sanitizedYmStyle = (ymStyle || "unknown")
-            .replace(/[\/\\]/g, "-")
-            .replace(/\s+/g, "-")
-            .replace(/[^a-zA-Z0-9._-]/g, "");
-          const extension = path.extname(file.originalname) || ".webp";
-          const filename = `washing-test-${sanitizedYmStyle}-${timestamp}-${randomSuffix}.webp`;
-
-          const finalDiskPath = path.join(washingMachineTestUploadPath, filename);
-
-          // Process and save image using sharp
-          await sharp(file.buffer)
-            .resize({
-              width: 1920,
-              height: 1920,
-              fit: "inside",
-              withoutEnlargement: true
-            })
-            .webp({ quality: 85 })
-            .toFile(finalDiskPath);
-
-          // Store the public URL path
-          const publicUrlPath = `${API_BASE_URL}/storage/washing_machine_test/${filename}`;
-          imagePaths.push(publicUrlPath);
-        } catch (imageError) {
-          console.error("Error processing initial image:", imageError);
-          // Continue with other images even if one fails
-        }
-      }
+      const imagePaths = await processImageFilesBatch(
+        Array.isArray(req.files.images) ? req.files.images : [req.files.images],
+        "washing-test",
+        ymStyle
+      );
 
       // If imagesUrls is provided, use it to replace the array (user edited images)
       if (updateData.imagesUrls) {
@@ -709,41 +691,8 @@ export const updateReportWashing = async (req, res) => {
 
     // Handle received images if uploaded
     if (req.files && req.files.receivedImages && req.files.receivedImages.length > 0) {
-      const receivedImagePaths = [];
-
-      for (const file of req.files.receivedImages) {
-        try {
-          // Generate unique filename
-          const timestamp = Date.now();
-          const randomSuffix = Math.round(Math.random() * 1e9);
-          const sanitizedYmStyle = (ymStyle || "unknown")
-            .replace(/[\/\\]/g, "-")
-            .replace(/\s+/g, "-")
-            .replace(/[^a-zA-Z0-9._-]/g, "");
-          const extension = path.extname(file.originalname) || ".webp";
-          const filename = `received-${sanitizedYmStyle}-${timestamp}-${randomSuffix}.webp`;
-
-          const finalDiskPath = path.join(washingMachineTestUploadPath, filename);
-
-          // Process and save image using sharp
-          await sharp(file.buffer)
-            .resize({
-              width: 1920,
-              height: 1920,
-              fit: "inside",
-              withoutEnlargement: true
-            })
-            .webp({ quality: 85 })
-            .toFile(finalDiskPath);
-
-          // Store the public URL path
-          const publicUrlPath = `${API_BASE_URL}/storage/washing_machine_test/${filename}`;
-          receivedImagePaths.push(publicUrlPath);
-        } catch (imageError) {
-          console.error("Error processing received image:", imageError);
-          // Continue with other images even if one fails
-        }
-      }
+      const receivedFiles = Array.isArray(req.files.receivedImages) ? req.files.receivedImages : [req.files.receivedImages];
+      const receivedImagePaths = await processImageFilesBatch(receivedFiles, "received", ymStyle);
 
       // If receivedImagesUrls is provided, use it to replace the array (user edited images)
       if (updateData.receivedImagesUrls) {
@@ -783,42 +732,9 @@ export const updateReportWashing = async (req, res) => {
     const completionFiles = req.files?.completionImages
       ? (Array.isArray(req.files.completionImages) ? req.files.completionImages : [req.files.completionImages])
       : [];
-    if (completionFiles.length > 0) {
-      const completionImagePaths = [];
-
-      for (const file of completionFiles) {
-        if (!file || !file.buffer) continue;
-        try {
-          // Generate unique filename
-          const timestamp = Date.now();
-          const randomSuffix = Math.round(Math.random() * 1e9);
-          const sanitizedYmStyle = (ymStyle || "unknown")
-            .replace(/[\/\\]/g, "-")
-            .replace(/\s+/g, "-")
-            .replace(/[^a-zA-Z0-9._-]/g, "");
-          const filename = `completion-${sanitizedYmStyle}-${timestamp}-${randomSuffix}.webp`;
-
-          const finalDiskPath = path.join(washingMachineTestUploadPath, filename);
-
-          // Process and save image using sharp
-          await sharp(file.buffer)
-            .resize({
-              width: 1920,
-              height: 1920,
-              fit: "inside",
-              withoutEnlargement: true
-            })
-            .webp({ quality: 85 })
-            .toFile(finalDiskPath);
-
-          // Store the public URL path
-          const publicUrlPath = `${API_BASE_URL}/storage/washing_machine_test/${filename}`;
-          completionImagePaths.push(publicUrlPath);
-        } catch (imageError) {
-          console.error("Error processing completion image:", imageError);
-          // Continue with other images even if one fails
-        }
-      }
+    const validCompletionFiles = completionFiles.filter((f) => f && f.buffer);
+    if (validCompletionFiles.length > 0) {
+      const completionImagePaths = await processImageFilesBatch(validCompletionFiles, "completion", ymStyle);
 
       // If completionImagesUrls is provided, use it to replace the array (user edited images)
       if (updateData.completionImagesUrls) {
@@ -856,38 +772,8 @@ export const updateReportWashing = async (req, res) => {
 
     // Handle care label images if uploaded
     if (req.files && req.files.careLabelImage && req.files.careLabelImage.length > 0) {
-      const careLabelImagePaths = [];
-
-      for (const file of req.files.careLabelImage) {
-        try {
-          // Generate unique filename
-          const timestamp = Date.now();
-          const randomSuffix = Math.round(Math.random() * 1e9);
-          const sanitizedYmStyle = (ymStyle || "unknown")
-            .replace(/[\/\\]/g, "-")
-            .replace(/\s+/g, "-")
-            .replace(/[^a-zA-Z0-9._-]/g, "");
-          const filename = `care-label-${sanitizedYmStyle}-${timestamp}-${randomSuffix}.webp`;
-          const finalDiskPath = path.join(washingMachineTestUploadPath, filename);
-
-          // Process and save image using sharp
-          await sharp(file.buffer)
-            .resize({
-              width: 1920,
-              height: 1920,
-              fit: "inside",
-              withoutEnlargement: true
-            })
-            .webp({ quality: 85 })
-            .toFile(finalDiskPath);
-
-          // Store the public URL path
-          const publicUrlPath = `${API_BASE_URL}/storage/washing_machine_test/${filename}`;
-          careLabelImagePaths.push(publicUrlPath);
-        } catch (imageError) {
-          console.error("Error processing care label image:", imageError);
-        }
-      }
+      const careLabelFiles = Array.isArray(req.files.careLabelImage) ? req.files.careLabelImage : [req.files.careLabelImage];
+      const careLabelImagePaths = await processImageFilesBatch(careLabelFiles, "care-label", ymStyle);
 
       // If careLabelImageUrls is provided, use it to replace/merge the array
       if (updateData.careLabelImageUrls) {
@@ -1092,26 +978,15 @@ export const getUniqueStyles = async (req, res) => {
   try {
     const { search = "" } = req.query;
 
-    // Aggregate unique styles from all collections
     const models = [ReportHomeWash, ReportGarmentWash, ReportHTTesting, ReportEMBPrinting, ReportPullingTest, ReportWashing];
 
-    // We can't easily use distinct on all and merge if lists are huge, 
-    // but for autocomplete we only need top 10.
-    // A more efficient way would be to search each and merge, limiting total.
+    const distinctPromises = models.map((model) =>
+      model.distinct("ymStyle", { ymStyle: { $regex: search, $options: "i" } })
+    );
+    const results = await Promise.all(distinctPromises);
 
-    let allStyles = new Set();
-
-    for (const model of models) {
-      if (allStyles.size >= 20) break; // Optimization: stop if we have enough
-
-      const styles = await model.distinct("ymStyle", {
-        ymStyle: { $regex: search, $options: "i" }
-      });
-
-      styles.forEach(s => allStyles.add(s));
-    }
-
-    // Convert to array and limit
+    const allStyles = new Set();
+    results.forEach((styles) => styles.forEach((s) => allStyles.add(s)));
     const suggestions = Array.from(allStyles).slice(0, 10);
 
     res.status(200).json({
@@ -1275,31 +1150,21 @@ export const getUniqueColors = async (req, res) => {
     const { search = "" } = req.query;
 
     const models = [ReportHomeWash, ReportGarmentWash, ReportHTTesting, ReportEMBPrinting, ReportPullingTest, ReportWashing];
-    let allColors = new Set();
 
-    // Limit the search to prevent scanning absolutely everything if possible, 
-    // but regex search on 'color' array is expensive anyway.
+    const colorQuery = search ? { color: { $regex: search, $options: "i" } } : {};
+    const findPromises = models.map((model) =>
+      model.find(colorQuery, { color: 1 }).limit(20).lean()
+    );
+    const results = await Promise.all(findPromises);
 
-    // We will query each model with a limit to avoid fetching too much
-    for (const model of models) {
-      if (allColors.size >= 20) break;
-
-      const reports = await model.find(
-        search ? { color: { $regex: search, $options: "i" } } : {},
-        { color: 1 }
-      ).limit(20).lean();
-
-      const colors = reports.flatMap(r => r.color || []);
-      colors.forEach(c => allColors.add(c));
-    }
-
-    // Filter by search term if provided (double check since regex was on array)
+    const allColors = new Set();
+    results.forEach((reports) => {
+      reports.flatMap((r) => r.color || []).forEach((c) => allColors.add(c));
+    });
     const uniqueColors = Array.from(allColors);
     const filteredColors = search
-      ? uniqueColors.filter(c => c.toLowerCase().includes(search.toLowerCase()))
+      ? uniqueColors.filter((c) => c.toLowerCase().includes(search.toLowerCase()))
       : uniqueColors;
-
-    // Limit to 10 suggestions
     const suggestions = filteredColors.slice(0, 10);
 
     res.status(200).json({
@@ -1337,27 +1202,22 @@ export const getUsedColors = async (req, res) => {
       ReportWashing,
     ];
 
-    let usedColorsSet = new Set();
+    const query = { ymStyle: ymStyle.trim(), status: { $ne: "rejected" } };
+    const findPromises = models.map((model) =>
+      model.find(query, { color: 1 }).limit(500).lean()
+    );
+    const results = await Promise.all(findPromises);
 
-    // Query each model for this style, but ignore reports that have been
-    // fully rejected so their colors become available again for reuse.
-    for (const model of models) {
-      const reports = await model.find(
-        {
-          ymStyle: ymStyle.trim(),
-          status: { $ne: "rejected" },
-        },
-        { color: 1 }
-      ).lean();
-
-      reports.forEach(report => {
+    const usedColorsSet = new Set();
+    results.forEach((reports) => {
+      reports.forEach((report) => {
         if (Array.isArray(report.color)) {
-          report.color.forEach(c => usedColorsSet.add(c));
+          report.color.forEach((c) => usedColorsSet.add(c));
         } else if (report.color) {
           usedColorsSet.add(report.color);
         }
       });
-    }
+    });
 
     res.status(200).json({
       success: true,
@@ -1374,3 +1234,28 @@ export const getUsedColors = async (req, res) => {
 };
 
 
+
+// GET /api/report-washing/washing-roles
+export const getWashingRoles = async (req, res) => {
+  try {
+    const rolesToFetch = [
+      "Admin",
+      "Super Admin",
+      "Reporter",
+      "User Warehouse",
+      "CheckedBy",
+      "PreparedBy",
+      "ApprovedBy",
+      "Washing Testing",
+    ];
+
+    const results = await RoleManagment.find({
+      role: { $in: rolesToFetch },
+    });
+
+    res.json(results);
+  } catch (error) {
+    console.error("Error fetching washing roles:", error);
+    res.status(500).json({ message: "Failed to fetch washing roles" });
+  }
+};

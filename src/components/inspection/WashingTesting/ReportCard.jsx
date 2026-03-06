@@ -105,8 +105,8 @@ const ReportCard = ({
   hasNotification = false,
   /** When true, show warehouse-edit notification (bell icon, amber). */
   hasWarehouseNotification = false,
-  /** When true, show admin-edit notification (shield icon, blue). */
-  hasAdminNotification = false,
+  /** When true, show reporter-edit notification (shield icon, blue). */
+  hasReporterNotification = false,
   /** When true, user has opened notification (mark read) – dot is hidden, ring icon kept. */
   notificationRead = false,
   /** When true, always show the notification button so user can open status modal (default true in Reports list). */
@@ -117,8 +117,8 @@ const ReportCard = ({
   onNotificationClick,
 }) => {
   const { user } = useAuth();
-  const { users, causeAssignHistory } = useAssignControlStore();
-  const { isAdminUser, isWarehouseUser } = computeUserRoles(user, causeAssignHistory);
+  const { users, causeAssignHistory, adminUsers, washingRoles } = useAssignControlStore();
+  const { isAdminUser, isWarehouseUser, isReporterUser, isSystemAdmin } = computeUserRoles(user, causeAssignHistory, adminUsers, washingRoles);
   const { showReportDateQR, setShowReportDateQR } = useModalStore();
   const reportId = report._id || report.id;
 
@@ -223,7 +223,7 @@ const ReportCard = ({
                       )}
                     </button>
                   )}
-                  {hasAdminNotification && (
+                  {hasReporterNotification && (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -232,7 +232,7 @@ const ReportCard = ({
                         onNotificationClick?.(report);
                       }}
                       className="relative rounded transition-all duration-200 p-1 text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300"
-                      title={notificationTitle || "Admin edited this report"}
+                      title={notificationTitle || "Reporter edited this report"}
                     >
                       <Shield size={18} strokeWidth={2.25} />
                       {!notificationRead && (
@@ -720,10 +720,9 @@ const ReportCard = ({
                           <td className="p-2 text-center text-gray-600 dark:text-gray-400">
                             {row.afterWash || "-"}
                           </td>
-                          <td className={`p-2 text-center font-bold ${
-                            row.passFail === 'FAIL' ? 'text-red-600 dark:text-red-400' :
+                          <td className={`p-2 text-center font-bold ${row.passFail === 'FAIL' ? 'text-red-600 dark:text-red-400' :
                             parseFloat(row.shrinkage) > 0 ? 'text-green-600' : 'text-blue-600'
-                          }`}>
+                            }`}>
                             {row.shrinkage || "-"}
                           </td>
                           <td className="p-2 text-center">

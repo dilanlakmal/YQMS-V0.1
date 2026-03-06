@@ -109,79 +109,27 @@ const GarmentWashForm = ({
   fetchAnfSpecs,
   usedColors = [], // Added usedColors prop
   causeAssignData, // Added prop
-  assignHistory, // Full history from DB
+  assignHistory, // Full history from DB (kept for backward compat)
+  washingRoles = [], // NEW: roles from role_management
   users: parentUsers = [], // Get users from parent
   isLoadingUsers = false, // Added prop
 }) => {
   // Use the passed users or fallback
   const users = parentUsers || [];
 
-  // Filter users based on assignHistory (report_assign_control collection)
-  // Filter users based on assignHistory (report_assign_control collection)
+  // Get checkedBy/approvedBy options from role_management
   const getFilteredOptions = (field) => {
-    if (!assignHistory || assignHistory.length === 0) {
-      // No history configured? Return empty.
-      return [];
-    }
+    // Map field name to role_management role name
+    const roleMap = { checkedBy: "CheckedBy", approvedBy: "ApprovedBy" };
+    const roleName = roleMap[field];
+    if (!roleName) return [];
 
-    // 1. Process history to find the LATEST state for each user.
-    // Sort chronologically (oldest to newest) to replay inputs
-    const sortedHistory = [...assignHistory].sort(
-      (a, b) => new Date(a.updatedAt) - new Date(b.updatedAt),
-    );
+    const roleDoc = washingRoles.find(r => r.role === roleName);
+    if (!roleDoc || !roleDoc.users || roleDoc.users.length === 0) return [];
 
-    // Map<EmpID, { checkedBy: boolean, approvedBy: boolean }>
-    const userRolesMap = new Map();
-
-    // Helper to extract ID
-    const extractId = (val) => {
-      if (!val) return null;
-      const match = val.match(/\((.*?)\)/);
-      return match ? match[1] : val;
-    };
-
-    sortedHistory.forEach((item) => {
-      const checkedId = extractId(item.checkedBy);
-      const approvedId = extractId(item.approvedBy);
-
-      // If this record has a checkedId, update that user's state
-      if (checkedId) {
-        const current = userRolesMap.get(checkedId) || {
-          checkedBy: false,
-          approvedBy: false,
-        };
-        current.checkedBy = true;
-        userRolesMap.set(checkedId, current);
-      }
-
-      // If approvedId exists
-      if (approvedId) {
-        const current = userRolesMap.get(approvedId) || {
-          checkedBy: false,
-          approvedBy: false,
-        };
-        current.approvedBy = true;
-        userRolesMap.set(approvedId, current);
-      }
-    });
-
-    // 2. Now filter users who have the requested permission in their LATEST state
-    const allowedEmpIds = new Set();
-    userRolesMap.forEach((roles, empId) => {
-      if (roles[field]) {
-        allowedEmpIds.add(empId);
-      }
-    });
-
-    // If no valid IDs found, return empty
-    if (allowedEmpIds.size === 0) return [];
-
-    // Filter users who match the allowed IDs
-    const filteredUsers = users.filter((u) => allowedEmpIds.has(u.emp_id));
-
-    return filteredUsers.map((u) => ({
+    return roleDoc.users.map(u => ({
       value: u.emp_id,
-      label: `(${u.emp_id}) ${u.name}`,
+      label: `(${u.emp_id}) ${u.name || u.eng_name || u.emp_id}`,
     }));
   };
 
@@ -332,14 +280,13 @@ const GarmentWashForm = ({
     };
   }, [showColorDropdown, setShowColorDropdown]);
 
-  // Click outside handler for Size Dropdown
+  // Click outside handler for Size Dropdown (dropdown is portaled to body, so check both trigger and dropdown)
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (
-        showSizeDropdown &&
-        sizeDropdownRef.current &&
-        !sizeDropdownRef.current.contains(event.target)
-      ) {
+      if (!showSizeDropdown) return;
+      const inTrigger = sizeDropdownRef.current?.contains(event.target);
+      const inDropdown = event.target.closest("[data-size-dropdown]");
+      if (!inTrigger && !inDropdown) {
         setShowSizeDropdown(false);
       }
     };
@@ -1392,7 +1339,7 @@ const GarmentWashForm = ({
             <input
               ref={inputRef}
               type="text"
-              inputMode="decimal"
+              inputMode="text"
               value={manualInput}
               onChange={handleManualInputChange}
               onKeyDown={handleManualKeyDown}
@@ -1905,8 +1852,8 @@ const GarmentWashForm = ({
             <textarea
               value={formData.styleDescription || ""}
               readOnly
-              rows={1}
-              className="w-full px-3 py-2 border border-blue-200 dark:border-blue-800 rounded-md dark:bg-blue-900/20 text-gray-800 dark:text-gray-200 cursor-not-allowed resize-none"
+              rows={3}
+              className="w-full px-3 py-2 border border-blue-200 dark:border-blue-800 rounded-md dark:bg-blue-900/20 text-gray-800 dark:text-gray-200 cursor-not-allowed min-h-[5rem] sm:min-h-[5.5rem] overflow-y-auto resize-y"
               placeholder="Auto-filled Style Description"
             />
           </div>
@@ -2394,177 +2341,188 @@ const GarmentWashForm = ({
                 </p>
               </div>
 
-              {/* Controls: wrap on phone, row on larger screens */}
-              <div className="flex flex-nowrap items-center gap-1 sm:gap-3 px-1">
+              {/* Controls: single line, compact for mobile. overflow-visible when dropdown open so list is not clipped */}
+              <div className={`flex flex-nowrap items-center gap-1 sm:gap-2 pb-1 -mx-1 ${showSizeDropdown ? "overflow-visible" : "overflow-x-auto"}`}>
                 {formData.sampleSize &&
                   (formData.shrinkageRows || []).length > 0 && (
                     <button
                       type="button"
                       onClick={() => setIsShrinkageSaved(!isShrinkageSaved)}
-                      className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl shadow-md transition-all hover:scale-105 active:scale-95 font-bold text-[10px] sm:text-xs uppercase tracking-wider min-h-[44px] sm:min-h-0 ${isShrinkageSaved ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
+                      className={`flex items-center justify-center gap-1 px-1.5 py-1 rounded transition-all hover:opacity-90 active:scale-95 font-bold text-[8px] sm:text-[9px] uppercase tracking-wider min-h-[26px] min-w-[26px] sm:min-w-0 flex-shrink-0 ${isShrinkageSaved ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
                     >
-                      {isShrinkageSaved ? <Edit size={18} className="flex-shrink-0" /> : <Save size={18} className="flex-shrink-0" />}
+                      {isShrinkageSaved ? <Edit size={12} className="flex-shrink-0" /> : <Save size={12} className="flex-shrink-0" />}
                       <span className="hidden sm:inline">{isShrinkageSaved ? "Edit" : "Save"}</span>
                     </button>
                   )}
-                {/* Wash Type Button Selector */}
-                <div className="relative group">
-                  <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-xl blur-sm group-hover:blur-md transition-all duration-300 opacity-50"></div>
-                  <div className="relative flex items-center gap-1.5 sm:gap-3 px-1.5 sm:px-4 py-1.5 bg-white dark:bg-gray-800 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm transition-all hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md">
-                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.1em]">
-                      Wash Type
-                    </span>
-                    <div className="h-4 w-[1px] bg-gray-100 dark:bg-gray-700"></div>
-                    <div
-                      className={`flex p-1 rounded-lg border transition-all duration-300 ${isWashTypeLocked ? "bg-gray-100 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 opacity-80" : "bg-gray-50 dark:bg-gray-900/50 border-gray-100 dark:border-gray-700"}`}
-                      title={
-                        isWashTypeLocked
-                          ? "Selection is locked because both Before & After specifications are available. The system automatically defaults to Before Wash as the baseline."
-                          : ""
+                {/* Wash Type - no wrapper, inline label + toggle */}
+                <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+                  <span className="text-[8px] sm:text-[9px] font-black text-blue-400 uppercase tracking-tight whitespace-nowrap">
+                    Wash Type
+                  </span>
+                  <div className="h-3 w-px bg-gray-200 dark:bg-gray-600 flex-shrink-0"></div>
+                  <div
+                    className={`flex p-0.5 rounded border transition-all duration-300 flex-shrink-0 ${isWashTypeLocked ? "bg-gray-100 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 opacity-80" : "bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-600"}`}
+                    title={
+                      isWashTypeLocked
+                        ? "Selection is locked because both Before & After specifications are available. The system automatically defaults to Before Wash as the baseline."
+                        : ""
+                    }
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        !isWashTypeLocked &&
+                        handleInputChange("washType", "Before Wash")
                       }
+                      disabled={isWashTypeLocked}
+                      className={`px-1.5 sm:px-2 py-0.5 rounded text-[8px] sm:text-[9px] font-black uppercase tracking-wider transition-all duration-200 min-h-[24px] sm:min-h-0 ${formData.washType === "Before Wash"
+                        ? isWashTypeLocked
+                          ? "bg-gray-400 text-white"
+                          : "bg-blue-600 text-white"
+                        : "text-gray-400 hover:text-blue-500 hover:bg-white dark:hover:bg-gray-800"
+                        } ${isWashTypeLocked ? "cursor-not-allowed" : ""}`}
                     >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          !isWashTypeLocked &&
-                          handleInputChange("washType", "Before Wash")
-                        }
-                        disabled={isWashTypeLocked}
-                        className={`px-1.5 sm:px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 min-h-[40px] sm:min-h-0 ${formData.washType === "Before Wash"
-                          ? isWashTypeLocked
-                            ? "bg-gray-400 text-white"
-                            : "bg-blue-600 text-white shadow-sm"
-                          : "text-gray-400 hover:text-blue-500 hover:bg-white"
-                          } ${isWashTypeLocked ? "cursor-not-allowed" : ""}`}
-                      >
-                        Before
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          !isWashTypeLocked &&
-                          handleInputChange("washType", "After Wash")
-                        }
-                        disabled={isWashTypeLocked}
-                        className={`px-1.5 sm:px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 min-h-[40px] sm:min-h-0 ${formData.washType === "After Wash"
-                          ? isWashTypeLocked
-                            ? "bg-gray-400 text-white"
-                            : "bg-blue-600 text-white shadow-sm"
-                          : "text-gray-400 hover:text-blue-500 hover:bg-white"
-                          } ${isWashTypeLocked ? "cursor-not-allowed" : ""}`}
-                      >
-                        After
-                      </button>
-                    </div>
+                      Before
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        !isWashTypeLocked &&
+                        handleInputChange("washType", "After Wash")
+                      }
+                      disabled={isWashTypeLocked}
+                      className={`px-1.5 sm:px-2 py-0.5 rounded text-[8px] sm:text-[9px] font-black uppercase tracking-wider transition-all duration-200 min-h-[24px] sm:min-h-0 ${formData.washType === "After Wash"
+                        ? isWashTypeLocked
+                          ? "bg-gray-400 text-white"
+                          : "bg-blue-600 text-white"
+                        : "text-gray-400 hover:text-blue-500 hover:bg-white dark:hover:bg-gray-800"
+                        } ${isWashTypeLocked ? "cursor-not-allowed" : ""}`}
+                    >
+                      After
+                    </button>
                   </div>
                 </div>
 
-                <div className="relative group">
-                  <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-xl blur-sm group-hover:blur-md transition-all duration-300 opacity-50"></div>
-                  <div className="relative flex items-center gap-1.5 sm:gap-3 px-1.5 sm:px-4 py-2 bg-white dark:bg-gray-800 rounded-xl border border-blue-100 dark:border-blue-800 shadow-sm transition-all hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md min-h-[44px] sm:min-h-0">
-                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.1em]">
-                      Size
-                    </span>
-                    <div className="h-4 w-[1px] bg-gray-100 dark:bg-gray-700"></div>
-                    <div className="relative" ref={sizeDropdownRef}>
-                      <button
-                        type="button"
-                        onClick={() => setShowSizeDropdown(!showSizeDropdown)}
-                        className="flex items-center gap-2 text-base font-black text-blue-600 dark:text-blue-400 focus:outline-none cursor-pointer min-w-[3rem] justify-center"
+                {/* Size - no wrapper, inline label + dropdown */}
+                <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0 min-h-[26px]">
+                  <span className="text-[8px] sm:text-[9px] font-black text-blue-400 uppercase tracking-tight whitespace-nowrap">
+                    Size
+                  </span>
+                  <div className="h-3 w-px bg-gray-200 dark:bg-gray-600 flex-shrink-0"></div>
+                  <div className="relative" ref={sizeDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setShowSizeDropdown(!showSizeDropdown)}
+                      className="flex items-center gap-1 text-xs sm:text-base font-black text-blue-600 dark:text-blue-400 focus:outline-none cursor-pointer min-w-[1.5rem] sm:min-w-[2.5rem] justify-center"
+                    >
+                      <span className="tabular-nums">
+                        {getDisplaySizeLabel()}
+                      </span>
+                      <svg
+                        className={`transition-transform duration-200 ${showSizeDropdown ? "rotate-180" : ""}`}
+                        width="10"
+                        height="6"
+                        viewBox="0 0 10 6"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
                       >
-                        <span className="tabular-nums">
-                          {getDisplaySizeLabel()}
-                        </span>
-                        <svg
-                          className={`transition-transform duration-200 ${showSizeDropdown ? "rotate-180" : ""}`}
-                          width="10"
-                          height="6"
-                          viewBox="0 0 10 6"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            d="M1 1L5 5L9 1"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </button>
+                        <path
+                          d="M1 1L5 5L9 1"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
 
-                      {/* Dropdown Menu */}
-                      {showSizeDropdown &&
-                        (() => {
-                          const filteredSizes = getFilteredAvailableSizes();
-                          return (
-                            <div className="absolute top-full right-0 mt-3 min-w-[140px] bg-white dark:bg-gray-800 border border-blue-100 dark:border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ring-4 ring-blue-50/50 dark:ring-blue-900/20">
-                              <div className="max-h-64 overflow-y-auto p-1.5 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600">
-                                {filteredSizes.length === 0 ? (
-                                  <div className="px-4 py-3 text-xs text-gray-400 text-center font-medium italic">
-                                    No sizes available
-                                  </div>
-                                ) : (
-                                  filteredSizes.map((s) => {
-                                    // Count how many specs are available for this size
-                                    const washType =
-                                      formData.washType || "Before Wash";
-                                    const isBeforeWash =
-                                      washType === "Before Wash";
-                                    const specsSource = isBeforeWash
-                                      ? measurementSpecs.beforeWash
-                                      : measurementSpecs.afterWash;
+                    {/* Dropdown Menu - rendered via portal so it stays visible (not clipped by parent overflow) */}
+                    {showSizeDropdown &&
+                      (() => {
+                        const filteredSizes = getFilteredAvailableSizes();
+                        const rect = sizeDropdownRef.current?.getBoundingClientRect();
+                        const dropdownContent = (
+                          <div
+                            data-size-dropdown
+                            className="min-w-[120px] max-w-[200px] bg-white dark:bg-gray-800 border border-blue-100 dark:border-gray-700 rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 ring-2 ring-blue-50/50 dark:ring-blue-900/20"
+                            style={
+                              rect
+                                ? {
+                                  position: "fixed",
+                                  top: rect.bottom + 6,
+                                  left: rect.left,
+                                  zIndex: 9999,
+                                }
+                                : undefined
+                            }
+                          >
+                            <div className="max-h-48 overflow-y-auto p-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:bg-gray-600">
+                              {filteredSizes.length === 0 ? (
+                                <div className="px-3 py-2 text-[10px] text-gray-400 text-center font-medium italic">
+                                  No sizes available
+                                </div>
+                              ) : (
+                                filteredSizes.map((s) => {
+                                  const washType =
+                                    formData.washType || "Before Wash";
+                                  const isBeforeWash =
+                                    washType === "Before Wash";
+                                  const specsSource = isBeforeWash
+                                    ? measurementSpecs.beforeWash
+                                    : measurementSpecs.afterWash;
 
-                                    let specCount = 0;
-                                    if (Array.isArray(specsSource)) {
-                                      specCount = specsSource.filter((spec) => {
-                                        const specValue = getSizeSpecValue(
-                                          spec,
-                                          s,
-                                        );
-                                        return specValue && specValue !== "";
-                                      }).length;
-                                    }
+                                  let specCount = 0;
+                                  if (Array.isArray(specsSource)) {
+                                    specCount = specsSource.filter((spec) => {
+                                      const specValue = getSizeSpecValue(
+                                        spec,
+                                        s,
+                                      );
+                                      return specValue && specValue !== "";
+                                    }).length;
+                                  }
 
-                                    return (
-                                      <button
-                                        key={s}
-                                        type="button"
-                                        onClick={() => {
-                                          handleInputChange("sampleSize", s);
-                                          setShowSizeDropdown(false);
-                                          setIsShrinkageSaved(false);
-                                        }}
-                                        className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold transition-all mb-0.5 last:mb-0 flex items-center justify-between group
+                                  return (
+                                    <button
+                                      key={s}
+                                      type="button"
+                                      onClick={() => {
+                                        handleInputChange("sampleSize", s);
+                                        setShowSizeDropdown(false);
+                                        setIsShrinkageSaved(false);
+                                      }}
+                                      className={`w-full text-left px-2.5 py-1.5 rounded text-xs font-bold transition-all mb-0.5 last:mb-0 flex items-center justify-between group
                                                                         ${isSizeSelected(s)
-                                            ? "bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400"
-                                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-300"
-                                          }`}
-                                      >
-                                        <span className="flex items-center gap-2">
-                                          {s}
-                                          <span
-                                            className={`text-[10px] px-1.5 py-0.5 rounded-md font-black tabular-nums ${specCount > 0}`}
-                                          >
-                                            ( {specCount} )
-                                          </span>
+                                          ? "bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400"
+                                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-300"
+                                        }`}
+                                    >
+                                      <span className="flex items-center gap-1.5">
+                                        {s}
+                                        <span
+                                          className={`text-[9px] px-1 py-0.5 rounded font-black tabular-nums ${specCount > 0 ? "text-blue-600 dark:text-blue-400" : "text-gray-400"}`}
+                                        >
+                                          ({specCount})
                                         </span>
-                                        {isSizeSelected(s) && (
-                                          <Check
-                                            size={14}
-                                            strokeWidth={3}
-                                            className="opacity-100 transition-opacity"
-                                          />
-                                        )}
-                                      </button>
-                                    );
-                                  })
-                                )}
-                              </div>
+                                      </span>
+                                      {isSizeSelected(s) && (
+                                        <Check
+                                          size={12}
+                                          strokeWidth={3}
+                                          className="flex-shrink-0 opacity-100 transition-opacity"
+                                        />
+                                      )}
+                                    </button>
+                                  );
+                                })
+                              )}
                             </div>
-                          );
-                        })()}
-                    </div>
+                          </div>
+                        );
+                        return rect
+                          ? createPortal(dropdownContent, document.body)
+                          : null;
+                      })()}
                   </div>
                 </div>
 
@@ -2575,7 +2533,7 @@ const GarmentWashForm = ({
                       type="button"
                       onClick={() => setShowSizeComparisonModal(true)}
                       title="View all sizes comparison"
-                      className="flex items-center justify-center min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-xl border border-blue-100 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
+                      className="flex items-center justify-center min-w-[26px] min-h-[26px] sm:min-w-0 sm:min-h-0 rounded p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors flex-shrink-0"
                     >
                       <Maximize2 size={16} className="flex-shrink-0" />
                     </button>
@@ -2784,7 +2742,7 @@ const GarmentWashForm = ({
                             <div className="relative group/spec">
                               <input
                                 type="text"
-                                inputMode="decimal"
+                                inputMode="text"
                                 value={row.beforeWashSpec}
                                 onChange={(e) =>
                                   updateRow(
@@ -2826,7 +2784,7 @@ const GarmentWashForm = ({
                             <div className="relative group/spec">
                               <input
                                 type="text"
-                                inputMode="decimal"
+                                inputMode="text"
                                 value={row.afterWashSpec}
                                 onChange={(e) =>
                                   updateRow(
@@ -2855,7 +2813,7 @@ const GarmentWashForm = ({
                         >
                           <input
                             type="text"
-                            inputMode="decimal"
+                            inputMode="text"
                             value={row.beforeWash || ""}
                             onChange={(e) =>
                               updateRow(
@@ -2882,7 +2840,7 @@ const GarmentWashForm = ({
                         >
                           <input
                             type="text"
-                            inputMode="decimal"
+                            inputMode="text"
                             value={row.afterWash || ""}
                             onChange={(e) =>
                               updateRow(

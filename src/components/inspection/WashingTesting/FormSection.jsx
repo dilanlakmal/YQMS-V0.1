@@ -52,7 +52,7 @@ const FormSection = ({
     factories, isLoadingFactories,
   } = useOrderDataStore();
 
-  const { users, isLoadingUsers, causeAssignHistory } = useAssignControlStore();
+  const { users, isLoadingUsers, causeAssignHistory, washingRoles } = useAssignControlStore();
   const causeAssignData = causeAssignHistory[0] ?? null;
 
   // Common props shared by all forms
@@ -71,6 +71,7 @@ const FormSection = ({
     cameraInputRef,
     causeAssignData,
     assignHistory: causeAssignHistory,
+    washingRoles,
     users,
     isLoadingUsers,
     searchOrderNo,

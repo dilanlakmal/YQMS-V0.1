@@ -48,6 +48,7 @@ const EMBTestingForm = ({
     users: parentUsers = [],
     isLoadingUsers = false,
     assignHistory,
+    washingRoles = [], // NEW: roles from role_management
 }) => {
     const [showFabricDropdown, setShowFabricDropdown] = useState(false);
     const users = parentUsers || [];
@@ -68,41 +69,18 @@ const EMBTestingForm = ({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [showFabricDropdown]);
 
-    // Filter users based on assignHistory (same pattern as HTTestingForm / GarmentWashForm)
+    // Get checkedBy options from role_management
     const getFilteredOptions = (field) => {
-        if (!assignHistory || assignHistory.length === 0) return [];
-        const sortedHistory = [...assignHistory].sort(
-            (a, b) => new Date(a.updatedAt) - new Date(b.updatedAt),
-        );
-        const userRolesMap = new Map();
-        const extractId = (val) => {
-            if (!val) return null;
-            const match = String(val).match(/\((.*?)\)/);
-            return match ? match[1] : val;
-        };
-        sortedHistory.forEach((item) => {
-            const checkedId = extractId(item.checkedBy);
-            const approvedId = extractId(item.approvedBy);
-            if (checkedId) {
-                const current = userRolesMap.get(checkedId) || { checkedBy: false, approvedBy: false };
-                current.checkedBy = true;
-                userRolesMap.set(checkedId, current);
-            }
-            if (approvedId) {
-                const current = userRolesMap.get(approvedId) || { checkedBy: false, approvedBy: false };
-                current.approvedBy = true;
-                userRolesMap.set(approvedId, current);
-            }
-        });
-        const allowedEmpIds = new Set();
-        userRolesMap.forEach((roles, empId) => {
-            if (roles[field]) allowedEmpIds.add(empId);
-        });
-        if (allowedEmpIds.size === 0) return [];
-        const filteredUsers = users.filter((u) => allowedEmpIds.has(u.emp_id));
-        return filteredUsers.map((u) => ({
+        const roleMap = { checkedBy: "CheckedBy", approvedBy: "ApprovedBy" };
+        const roleName = roleMap[field];
+        if (!roleName) return [];
+
+        const roleDoc = washingRoles.find(r => r.role === roleName);
+        if (!roleDoc || !roleDoc.users || roleDoc.users.length === 0) return [];
+
+        return roleDoc.users.map(u => ({
             value: u.emp_id,
-            label: `(${u.emp_id}) ${u.name}`,
+            label: `(${u.emp_id}) ${u.name || u.eng_name || u.emp_id}`,
         }));
     };
     const checkedByOptions = getFilteredOptions("checkedBy");

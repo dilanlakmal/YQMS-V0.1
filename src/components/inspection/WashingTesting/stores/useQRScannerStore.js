@@ -69,7 +69,7 @@ const _drawQRReportImage = (qrDataURL, report, idQr) => {
                     try {
                         const p = JSON.parse(s);
                         if (Array.isArray(p) && p.length > 0) return p.join(", ");
-                    } catch (_) {}
+                    } catch (_) { }
                 }
                 return s;
             }
@@ -548,8 +548,8 @@ export const useQRScannerStore = create((set, get) => ({
     },
 
     initializeScanner: async (reportId) => {
-        const { _currentUser, causeAssignHistory } = useAssignControlStore.getState();
-        const { isAdminUser, isWarehouseUser } = computeUserRoles(_currentUser, causeAssignHistory);
+        const { _currentUser, causeAssignHistory, adminUsers, washingRoles } = useAssignControlStore.getState();
+        const { isAdminUser, isWarehouseUser } = computeUserRoles(_currentUser, causeAssignHistory, adminUsers, washingRoles);
         const modalStore = useModalStore.getState();
 
         try {
@@ -645,8 +645,8 @@ export const useQRScannerStore = create((set, get) => ({
         const file = event.target.files?.[0];
         if (!file) return;
 
-        const { _currentUser, causeAssignHistory } = useAssignControlStore.getState();
-        const { isAdminUser, isWarehouseUser } = computeUserRoles(_currentUser, causeAssignHistory);
+        const { _currentUser, causeAssignHistory, adminUsers, washingRoles } = useAssignControlStore.getState();
+        const { isAdminUser, isWarehouseUser } = computeUserRoles(_currentUser, causeAssignHistory, adminUsers, washingRoles);
 
         if (!isAdminUser && !isWarehouseUser) {
             showToast.error("You are not assigned to scan reports. Only assigned users can complete this action.");
@@ -773,8 +773,8 @@ export const useQRScannerStore = create((set, get) => ({
 
     processQRScanFromURL: async (targetReportId) => {
         if (!targetReportId) return;
-        const { _currentUser, causeAssignHistory } = useAssignControlStore.getState();
-        const { isAdminUser, isWarehouseUser } = computeUserRoles(_currentUser, causeAssignHistory);
+        const { _currentUser, causeAssignHistory, adminUsers, washingRoles } = useAssignControlStore.getState();
+        const { isAdminUser, isWarehouseUser } = computeUserRoles(_currentUser, causeAssignHistory, adminUsers, washingRoles);
         if (!isAdminUser && !isWarehouseUser) {
             showToast.error("You are not assigned to scan reports. Only assigned users can complete this action.");
             return;

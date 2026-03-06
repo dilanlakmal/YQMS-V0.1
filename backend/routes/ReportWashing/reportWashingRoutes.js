@@ -9,11 +9,14 @@ import {
   getUniqueColors,
   getUsedColors,
   scanReceived,
-  rejectReport
+  rejectReport,
+  getWashingRoles
 } from "../../controller/ReportWashing/reportWashingController.js";
 import { uploadWashingMachineTestImage } from "../../helpers/helperFunctions.js";
 
 const router = express.Router();
+
+router.get("/api/report-washing/washing-roles", getWashingRoles);
 
 router.post(
   "/api/report-washing/submit",

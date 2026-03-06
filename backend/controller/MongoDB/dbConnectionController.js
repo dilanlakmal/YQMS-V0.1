@@ -95,7 +95,7 @@ import createPlanPackingListModel from "../../models/PlanPackingList.js";
 import createYorksysOrdersModel from "../../models/YorksysOrders.js";
 
 import createReportWashingModel from "../../models/ReportWashing.js";
-import createReportAssignControlModel from "../../models/ReportAssignControl.js";
+
 
 import createQASectionsProductType from "../../models/QA/QASectionsProductType.js";
 import createQASectionsHomeModel from "../../models/QA/QASectionsHome.js";
@@ -281,7 +281,7 @@ export const ReportHTTesting = createReportWashingModel(ymProdConnection, "repor
 export const ReportEMBPrinting = createReportWashingModel(ymProdConnection, "report_emb_printing");
 export const ReportPullingTest = createReportWashingModel(ymProdConnection, "report_pulling_test");
 
-export const ReportAssignControl = createReportAssignControlModel(ymProdConnection);
+
 
 export const QASectionsProductType =
   createQASectionsProductType(ymProdConnection);

@@ -39,45 +39,23 @@ const HTTestingForm = ({
     users: parentUsers = [],
     isLoadingUsers = false,
     assignHistory,
+    washingRoles = [], // NEW: roles from role_management
 }) => {
     const [showFabricDropdown, setShowFabricDropdown] = useState(false);
     const users = parentUsers || [];
 
-    // Filter users based on assignHistory (same pattern as GarmentWashForm)
+    // Get checkedBy options from role_management
     const getFilteredOptions = (field) => {
-        if (!assignHistory || assignHistory.length === 0) return [];
-        const sortedHistory = [...assignHistory].sort(
-            (a, b) => new Date(a.updatedAt) - new Date(b.updatedAt),
-        );
-        const userRolesMap = new Map();
-        const extractId = (val) => {
-            if (!val) return null;
-            const match = String(val).match(/\((.*?)\)/);
-            return match ? match[1] : val;
-        };
-        sortedHistory.forEach((item) => {
-            const checkedId = extractId(item.checkedBy);
-            const approvedId = extractId(item.approvedBy);
-            if (checkedId) {
-                const current = userRolesMap.get(checkedId) || { checkedBy: false, approvedBy: false };
-                current.checkedBy = true;
-                userRolesMap.set(checkedId, current);
-            }
-            if (approvedId) {
-                const current = userRolesMap.get(approvedId) || { checkedBy: false, approvedBy: false };
-                current.approvedBy = true;
-                userRolesMap.set(approvedId, current);
-            }
-        });
-        const allowedEmpIds = new Set();
-        userRolesMap.forEach((roles, empId) => {
-            if (roles[field]) allowedEmpIds.add(empId);
-        });
-        if (allowedEmpIds.size === 0) return [];
-        const filteredUsers = users.filter((u) => allowedEmpIds.has(u.emp_id));
-        return filteredUsers.map((u) => ({
+        const roleMap = { checkedBy: "CheckedBy", approvedBy: "ApprovedBy" };
+        const roleName = roleMap[field];
+        if (!roleName) return [];
+
+        const roleDoc = washingRoles.find(r => r.role === roleName);
+        if (!roleDoc || !roleDoc.users || roleDoc.users.length === 0) return [];
+
+        return roleDoc.users.map(u => ({
             value: u.emp_id,
-            label: `(${u.emp_id}) ${u.name}`,
+            label: `(${u.emp_id}) ${u.name || u.eng_name || u.emp_id}`,
         }));
     };
     const checkedByOptions = getFilteredOptions("checkedBy");
@@ -364,11 +342,11 @@ const HTTestingForm = ({
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Style Description
                             </label>
-                            <input
-                                type="text"
+                            <textarea
                                 value={formData.styleDescription || ''}
                                 onChange={(e) => handleInputChange("styleDescription", e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                rows={3}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-h-[5rem] sm:min-h-[5.5rem] overflow-y-auto resize-y"
                                 required
                                 placeholder="e.g., LADIES' PANTS"
                             />

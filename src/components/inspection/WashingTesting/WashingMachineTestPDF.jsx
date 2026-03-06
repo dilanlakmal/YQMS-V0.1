@@ -178,6 +178,49 @@ const styles = StyleSheet.create({
     height: 28,
     objectFit: "contain",
   },
+  shrinkageSection: {
+    marginTop: 12,
+    marginBottom: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+    paddingTop: 8,
+  },
+  shrinkageLabel: {
+    fontSize: 9,
+    fontWeight: "bold",
+    marginBottom: 5,
+    color: "#333",
+  },
+  shrinkageTable: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    marginTop: 4,
+  },
+  shrinkageTableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  shrinkageTableHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+  },
+  shrinkageTableCell: {
+    padding: 4,
+    fontSize: 7,
+    width: "16.66%",
+  },
+  shrinkageTableCellPoint: {
+    padding: 4,
+    fontSize: 7,
+    width: "16.66%",
+    maxWidth: 80,
+  },
 });
 
 // Resolve emp_id to display name from users list; fallback to id
@@ -706,7 +749,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
           </>
         )}
 
-        {showCareSymbolsSection && (
+{showCareSymbolsSection && (
           <View style={styles.careSymbolsSection} wrap={false}>
             <Text style={styles.careSymbolsLabel}>Care instructions</Text>
             {hasReportCareSymbols ? (
@@ -734,6 +777,47 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
             )}
           </View>
         )}
+
+        {/* Measurements & Shrinkage */}
+        {report.shrinkageRows && Array.isArray(report.shrinkageRows) && report.shrinkageRows.length > 0 && (
+          <View style={styles.shrinkageSection} wrap={false}>
+            <Text style={styles.shrinkageLabel}>Measurements & Shrinkage</Text>
+            <View style={styles.shrinkageTable}>
+              <View style={styles.shrinkageTableHeader}>
+                <Text style={[styles.shrinkageTableCellPoint, { fontWeight: "bold" }]}>Point</Text>
+                <Text style={[styles.shrinkageTableCell, { fontWeight: "bold", textAlign: "center" }]}>Spec (B)</Text>
+                <Text style={[styles.shrinkageTableCell, { fontWeight: "bold", textAlign: "center" }]}>G1 (B)</Text>
+                <Text style={[styles.shrinkageTableCell, { fontWeight: "bold", textAlign: "center" }]}>G2 (A)</Text>
+                <Text style={[styles.shrinkageTableCell, { fontWeight: "bold", textAlign: "center" }]}>Shrinkage</Text>
+                <Text style={[styles.shrinkageTableCell, { fontWeight: "bold", textAlign: "center" }]}>Result</Text>
+              </View>
+              {report.shrinkageRows
+                .filter((row) => row.selected !== false || row.beforeWash || row.afterWash || row.location)
+                .map((row, idx) => (
+                  <View key={idx} style={styles.shrinkageTableRow}>
+                    <Text style={[styles.shrinkageTableCellPoint, { maxWidth: 80 }]}>{row.location || "-"}</Text>
+                    <Text style={[styles.shrinkageTableCell, { textAlign: "center", color: "#1976D2" }]}>{row.beforeWashSpec || "-"}</Text>
+                    <Text style={[styles.shrinkageTableCell, { textAlign: "center" }]}>{row.beforeWash || "-"}</Text>
+                    <Text style={[styles.shrinkageTableCell, { textAlign: "center" }]}>{row.afterWash || "-"}</Text>
+                    <Text style={[
+                      styles.shrinkageTableCell,
+                      { textAlign: "center", fontWeight: "bold", color: row.passFail === "FAIL" ? "#d32f2f" : "#2e7d32" }
+                    ]}>
+                      {row.shrinkage || "-"}
+                    </Text>
+                    <Text style={[
+                      styles.shrinkageTableCell,
+                      { textAlign: "center", fontWeight: "bold", color: row.passFail === "PASS" ? "#2e7d32" : row.passFail === "FAIL" ? "#d32f2f" : "#666" }
+                    ]}>
+                      {row.passFail || "-"}
+                    </Text>
+                  </View>
+                ))}
+            </View>
+          </View>
+        )}
+
+ 
       </Page>
     </Document>
   );
