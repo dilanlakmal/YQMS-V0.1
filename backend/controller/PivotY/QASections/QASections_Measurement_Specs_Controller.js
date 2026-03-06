@@ -304,7 +304,7 @@ export const getQASectionsMeasurementSpecs = async (req, res) => {
     // Process Data - Use sanitizeToleranceValue for tolerances only
     const processedSpecs = dtOrderData.BeforeWashSpecs.map((spec) => ({
       ...spec,
-      id: new mongoose.Types.ObjectId().toString(),
+      id: `${spec.no}-${spec.kValue}`,
       TolMinus: sanitizeToleranceValue(spec.TolMinus),
       TolPlus: sanitizeToleranceValue(spec.TolPlus),
       Shrinkage: spec.Shrinkage
@@ -450,7 +450,7 @@ export const getQASectionsMeasurementSpecsAW = async (req, res) => {
       const cleanTolPlus = sanitizeToleranceValue(item.TolerancePlus);
 
       return {
-        id: new mongoose.Types.ObjectId().toString(),
+        id: `${index + 1}-NA`, // CHANGED: Generate ID from no + kValue (Hardcoded NA)
         no: index + 1,
         kValue: "NA",
         MeasurementPointEngName: item.EnglishRemark || item.Area || "Unknown",
@@ -864,7 +864,7 @@ export const applyBWSelectionToAW = async (req, res) => {
       const cleanTolPlus = sanitizeToleranceValue(item.TolerancePlus); // Uses existing helper
 
       return {
-        id: new mongoose.Types.ObjectId().toString(),
+        id: `${index + 1}-NA`, // CHANGED: Generate ID from no + kValue
         no: index + 1,
         kValue: "NA", // Hardcoded for AW
         MeasurementPointEngName: item.EnglishRemark || item.Area || "Unknown",

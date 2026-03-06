@@ -1206,10 +1206,14 @@ export const updateNewKValueSpecs = async (req, res) => {
       const tolMinus = sanitizeToleranceValue(item.TolMinus);
       const tolPlus = sanitizeToleranceValue(item.TolPlus);
 
+      // ✅ Use no and kValue directly from master data
+      const masterNo = item.no || 0;
+      const masterKValue = item.kValue || "NA";
+
       return {
-        id: new mongoose.Types.ObjectId().toString(),
-        no: maxNoInAll + idx + 1,
-        kValue: item.kValue || "NA",
+        id: `${masterNo}-${masterKValue}`, // ✅ CORRECT: e.g., "1-K55"
+        no: masterNo, // ✅ From master data
+        kValue: masterKValue, // ✅ From master data
         MeasurementPointEngName: item.MeasurementPointEngName || "",
         MeasurementPointChiName: item.MeasurementPointChiName || "",
         TolMinus: tolMinus,
@@ -1232,17 +1236,10 @@ export const updateNewKValueSpecs = async (req, res) => {
       existingSelectedSpecs.map((s) => s.MeasurementPointEngName),
     );
 
-    const maxNoInSelected =
-      existingSelectedSpecs.length > 0
-        ? Math.max(...existingSelectedSpecs.map((i) => i.no || 0))
-        : 0;
-
     const newObjectsForSelected = transformedNewObjects
       .filter((obj) => selectedEngNames.has(obj.MeasurementPointEngName))
       .map((obj, idx) => ({
         ...obj,
-        id: new mongoose.Types.ObjectId().toString(), // fresh id for selected array
-        no: maxNoInSelected + idx + 1,
       }));
 
     qaRecord.selectedBeforeWashSpecs = [
