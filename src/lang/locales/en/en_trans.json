@@ -54,7 +54,9 @@
     "accessories": "Accessories",
     "fc": "FC System",
     "wip-sewing_output": "WIP #1 | Sewing Output",
-    "wip-sewing_defects": "WIP #2 | Sewing Defects"
+    "wip-sewing_defects": "WIP #2 | Sewing Defects",
+    "pattern_team_measurement": "Pattern Team | Measurement",
+    "fincheck_dashboard": "Fincheck Dashboard"
   },
 
   "nav": {

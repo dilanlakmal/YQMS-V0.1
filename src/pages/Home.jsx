@@ -998,6 +998,13 @@ function Home() {
         gradientTo: "to-blue-500",
         items: [
           {
+            path: "/pattern-team-measurement",
+            roles: ["Pattern Team"],
+            image: "assets/Home/beforemeasurement.png",
+            title: t("home.pattern_team_measurement"),
+            description: "Before Wash Measurement",
+          },
+          {
             path: "/qa-sections",
             roles: ["Fincheck Config"],
             image: "assets/Home/Fincheck_Setting.png",
@@ -1039,6 +1046,13 @@ function Home() {
             title: t("home.p88_Legacy"),
             description: "Historical Data",
             version: "0",
+          },
+          {
+            path: "/fincheck-dashboard",
+            roles: ["Fincheck Dashboard"],
+            image: "assets/Home/Fincheck_dashboard.png",
+            title: t("home.fincheck_dashboard"),
+            description: "...",
           },
         ],
       },

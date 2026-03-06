@@ -217,6 +217,11 @@ PivotY - Fincheck Analytics
 import FincheckAnalyticsReport from "./routes/PivotY/FincheckAnalytics/FincheckAnalytics_Routes.js";
 
 /* ------------------------------
+PivotY - Fincheck Dashboard
+------------------------------ */
+import FincheckDashboardRoutes from "./routes/PivotY/FincheckDashboard/FincheckDashboard_Routes.js";
+
+/* ------------------------------
  P88 Data Upoad Routes
 ------------------------------ */
 import p88Upload from "./routes/PivotY/P88Data/uploadP88DataRoutes.js";
@@ -599,6 +604,11 @@ app.use(FincheckAIRoutes);
 PivotY - Fincheck Analytics
 ------------------------------ */
 app.use(FincheckAnalyticsReport);
+
+/* ------------------------------
+PivotY - Fincheck Dashboard Routes
+------------------------------ */
+app.use(FincheckDashboardRoutes);
 
 /* ------------------------------
  P88 Data Upoad Routes

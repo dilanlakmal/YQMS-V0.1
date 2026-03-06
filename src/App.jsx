@@ -94,6 +94,7 @@ import YPivotQAReport from "./pages/YPivotQAReport";
 import YPivotQAReportFullView from "./components/inspection/PivotY/QAReports/YPivotQAReportFullView";
 import P88Legacy from "./pages/P88Legacy.jsx";
 import InspectionReportPage from "./components/inspection/PivotY/P88Legacy/InspectionReportPage.jsx";
+import FincheckDashboard from "./pages/FincheckDashboard";
 
 import QCOutput from "./pages/QCOutput.jsx";
 import QCFullReport from "./components/inspection/qcOutput/QCFullReport.jsx";
@@ -499,6 +500,10 @@ function AppContent() {
               <Route
                 path="/inspection-report/:id"
                 element={<InspectionReportPage />}
+              />
+              <Route
+                path="/fincheck-dashboard"
+                element={<FincheckDashboard />}
               />
 
               <Route path="/production-Sheet" element={<CoverPage />} />
