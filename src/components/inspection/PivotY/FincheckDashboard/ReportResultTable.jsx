@@ -64,7 +64,7 @@ const ReportResultTable = ({
           </div>
           <div>
             <h3 className="font-bold text-gray-800 dark:text-white text-lg">
-              Report Results Summary
+              Report Results Summary by Defects
             </h3>
             <p className="text-xs text-gray-500">
               Pass/Fail analysis by inspection method

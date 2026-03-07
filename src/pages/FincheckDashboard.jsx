@@ -11,7 +11,9 @@ import QASummaryDashboard from "../components/inspection/PivotY/FincheckDashboar
 import OrderNoSummaryDashboard from "../components/inspection/PivotY/FincheckDashboard/OrderNoSummaryDashboard";
 import TopDefectsChart from "../components/inspection/PivotY/FincheckDashboard/TopDefectsChart";
 import ReportResultTable from "../components/inspection/PivotY/FincheckDashboard/ReportResultTable";
-import ReportMeasurementResultDashboard from "../components/inspection/PivotY/FincheckDashboard/ReportMeasurementResultDashboard";
+import ReportMeasurementResultDashboard from "../components/inspection/PivotY/FincheckDashboard/Reportmeasurementresultdashboard";
+import TopCardVisualSummary from "../components/inspection/PivotY/FincheckDashboard/TopCardVisualSummary";
+import DefectTrendChart from "../components/inspection/PivotY/FincheckDashboard/DefectTrendChart";
 import { API_BASE_URL } from "../../config";
 
 // --- Internal Component: Buyer Autocomplete ---
@@ -294,23 +296,10 @@ const FincheckDashboard = () => {
             </select>
           </div>
 
+          {/* QA Filter Input */}
           <QASearchInput value={qaFilter} onChange={setQaFilter} />
 
-          {/* <div className="relative w-full sm:w-40">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-3.5 w-3.5 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="QA Filter..."
-              value={qaFilter}
-              onChange={(e) => setQaFilter(e.target.value)}
-              className="pl-9 pr-3 py-2.5 w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none placeholder:text-gray-400"
-            />
-          </div> */}
-
           {/* Buyer Filter Input */}
-
           <BuyerSearchInput value={buyerFilter} onChange={setBuyerFilter} />
 
           {/* Order Filter with Autocomplete */}
@@ -359,7 +348,17 @@ const FincheckDashboard = () => {
         </div>
       </div>
 
-      {/* 2. Top Section: QA & Order Feeds */}
+      {/* ── Top Card Summary Row ── */}
+      <TopCardVisualSummary
+        startDate={dateRange.startDate}
+        endDate={dateRange.endDate}
+        reportType={reportType}
+        buyer={buyerFilter}
+        qaFilter={qaFilter}
+        orderFilter={orderFilter}
+      />
+
+      {/* 1,2 Top Section: QA & Order Feeds */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="h-[500px]">
           <QASummaryDashboard
@@ -378,13 +377,14 @@ const FincheckDashboard = () => {
             orderFilter={orderFilter}
             reportType={reportType}
             buyer={buyerFilter}
+            qaFilter={qaFilter}
           />
         </div>
       </div>
 
-      {/* 3. Middle Section: Charts */}
+      {/* Middle Section: Charts */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Top Defects Chart */}
+        {/* 3. Top Defects Chart */}
         <div className="h-[700px]">
           <TopDefectsChart
             startDate={dateRange.startDate}
@@ -392,10 +392,11 @@ const FincheckDashboard = () => {
             reportType={reportType}
             orderFilter={orderFilter}
             buyer={buyerFilter}
+            qaFilter={qaFilter}
           />
         </div>
 
-        {/* 4. NEW: Report Result Table */}
+        {/* 4. Report Result Table */}
         <div className="h-[700px]">
           <ReportResultTable
             startDate={dateRange.startDate}
@@ -406,17 +407,23 @@ const FincheckDashboard = () => {
             orderFilter={orderFilter}
           />
         </div>
-
-        {/* Placeholder for Future Chart (e.g., Defect Trend or Buyer Share) */}
-        {/* <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 flex items-center justify-center text-gray-400 border-dashed">
-          <span className="text-sm font-medium">
-            Trend Chart Coming Soon...
-          </span>
-        </div> */}
-
-        {/* ← Measurement Result Dashboard (full-width row) */}
-        <div className="xl:col-span-2">
+      </div>
+      {/*Bottom Section Dashboard */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/*Measurement Result Dashboard */}
+        <div className="h-[800px]">
           <ReportMeasurementResultDashboard
+            startDate={dateRange.startDate}
+            endDate={dateRange.endDate}
+            reportType={reportType}
+            buyer={buyerFilter}
+            qaFilter={qaFilter}
+            orderFilter={orderFilter}
+          />
+        </div>
+        {/*Defect Trend Chart */}
+        <div className="h-[700px]">
+          <DefectTrendChart
             startDate={dateRange.startDate}
             endDate={dateRange.endDate}
             reportType={reportType}

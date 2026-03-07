@@ -18,6 +18,7 @@ const OrderNoSummaryDashboard = ({
   orderFilter,
   reportType,
   buyer,
+  qaFilter,
 }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -35,7 +36,7 @@ const OrderNoSummaryDashboard = ({
         const res = await axios.get(
           `${API_BASE_URL}/api/fincheck-dashboard/order-performance`,
           {
-            params: { startDate, endDate, reportType, buyer },
+            params: { startDate, endDate, reportType, buyer, qaFilter },
           },
         );
         if (res.data.success) {
@@ -51,7 +52,7 @@ const OrderNoSummaryDashboard = ({
     if (startDate && endDate) {
       fetchData();
     }
-  }, [startDate, endDate, reportType, buyer]);
+  }, [startDate, endDate, reportType, buyer, qaFilter]);
 
   // Filter Logic
   useEffect(() => {

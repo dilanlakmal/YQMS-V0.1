@@ -160,8 +160,15 @@ export const getQADashboardPerformance = async (req, res) => {
 // ============================================================
 export const getOrderSummaryPerformance = async (req, res) => {
   try {
-    const { startDate, endDate, reportType, buyer } = req.query;
+    const { startDate, endDate, reportType, buyer, qaFilter } = req.query;
     const matchStage = buildMatchStage(startDate, endDate, reportType, buyer);
+
+    if (qaFilter) {
+      matchStage.$or = [
+        { empId: { $regex: qaFilter, $options: "i" } },
+        { empName: { $regex: qaFilter, $options: "i" } },
+      ];
+    }
 
     const reports = await FincheckInspectionReports.find(matchStage)
       .select(
@@ -711,6 +718,330 @@ export const getMeasurementResultSummary = async (req, res) => {
 };
 
 // ============================================================
+// GET: Top Card Visual Summary
+// ============================================================
+export const getTopCardSummary = async (req, res) => {
+  try {
+    const { startDate, endDate, reportType, buyer, qaFilter, orderFilter } =
+      req.query;
+
+    const matchStage = buildMatchStage(startDate, endDate, reportType, buyer);
+
+    if (qaFilter) {
+      matchStage.$or = [
+        { empId: { $regex: qaFilter, $options: "i" } },
+        { empName: { $regex: qaFilter, $options: "i" } },
+      ];
+    }
+    if (orderFilter) {
+      matchStage.orderNos = {
+        $elemMatch: { $regex: orderFilter, $options: "i" },
+      };
+    }
+
+    const reports = await FincheckInspectionReports.find(matchStage)
+      .select(
+        "empId orderNos inspectionMethod inspectionDetails inspectionConfig defectData measurementData",
+      )
+      .lean();
+
+    // ── Accumulators ─────────────────────────────────────────────────────
+    let totalReports = reports.length;
+    let totalSample = 0;
+    let totalMinor = 0;
+    let totalMajor = 0;
+    let totalCritical = 0;
+    let defectPassCount = 0;
+    let defectFailCount = 0;
+    let measurementPassCount = 0;
+    let measurementFailCount = 0;
+    let finalPassCount = 0;
+    let finalFailCount = 0;
+
+    const distinctOrders = new Set();
+    const distinctQAs = new Set();
+
+    for (const report of reports) {
+      // ── Distinct counts ─────────────────────────────────────────────────
+      if (report.orderNos)
+        report.orderNos.forEach((o) => distinctOrders.add(o));
+      if (report.empId) distinctQAs.add(report.empId);
+
+      // ── Sample Size: ALWAYS from inspectionConfig.sampleSize ────────────
+      const sampleSize = report.inspectionConfig?.sampleSize || 0;
+      totalSample += sampleSize;
+
+      // ── Defect Tallies ───────────────────────────────────────────────────
+      let rMinor = 0,
+        rMajor = 0,
+        rCritical = 0;
+
+      if (Array.isArray(report.defectData)) {
+        report.defectData.forEach((defect) => {
+          const tally = (qty, status) => {
+            const q = parseInt(qty) || 0;
+            if (status === "Minor") rMinor += q;
+            else if (status === "Major") rMajor += q;
+            else if (status === "Critical") rCritical += q;
+          };
+          if (defect.isNoLocation) {
+            tally(defect.qty || 0, defect.status);
+          } else if (defect.locations) {
+            defect.locations.forEach((loc) => {
+              if (loc.positions)
+                loc.positions.forEach((pos) => tally(1, pos.status));
+            });
+          }
+        });
+      }
+
+      totalMinor += rMinor;
+      totalMajor += rMajor;
+      totalCritical += rCritical;
+
+      // ── Defect Pass/Fail ─────────────────────────────────────────────────
+      let defectPass = true;
+      const method = report.inspectionMethod || "Fixed";
+
+      if (method === "AQL") {
+        const aqlItems = report.inspectionDetails?.aqlConfig?.items || [];
+        const minorLim = aqlItems.find((i) => i.status === "Minor");
+        const majorLim = aqlItems.find((i) => i.status === "Major");
+        const critLim = aqlItems.find((i) => i.status === "Critical");
+        if (minorLim && rMinor > minorLim.ac) defectPass = false;
+        if (majorLim && rMajor > majorLim.ac) defectPass = false;
+        if (critLim && rCritical > critLim.ac) defectPass = false;
+      } else {
+        // Fixed / N/A / No: fail if any Critical or Major
+        if (rCritical > 0 || rMajor > 0) defectPass = false;
+      }
+
+      if (defectPass) defectPassCount++;
+      else defectFailCount++;
+
+      // ── Measurement Pass/Fail ────────────────────────────────────────────
+      // No measurementData → treated as Pass (N/A)
+      let measurementPass = true;
+      const md = report.measurementData || [];
+
+      for (const item of md) {
+        if ((item.inspectorDecision || "pass").toLowerCase() !== "pass") {
+          measurementPass = false;
+          break;
+        }
+      }
+
+      if (measurementPass) measurementPassCount++;
+      else measurementFailCount++;
+
+      // ── Final: BOTH must pass ────────────────────────────────────────────
+      if (defectPass && measurementPass) finalPassCount++;
+      else finalFailCount++;
+    }
+
+    const totalDefects = totalMinor + totalMajor + totalCritical;
+    const passRate =
+      totalReports > 0
+        ? ((finalPassCount / totalReports) * 100).toFixed(2)
+        : "0.00";
+    const defectPassRate =
+      totalReports > 0
+        ? ((defectPassCount / totalReports) * 100).toFixed(2)
+        : "0.00";
+    const measurementPassRate =
+      totalReports > 0
+        ? ((measurementPassCount / totalReports) * 100).toFixed(2)
+        : "0.00";
+    const defectRate =
+      totalSample > 0
+        ? ((totalDefects / totalSample) * 100).toFixed(2)
+        : "0.00";
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalReports,
+        totalPassReports: finalPassCount,
+        totalFailReports: finalFailCount,
+        defectPassCount,
+        defectFailCount,
+        measurementPassCount,
+        measurementFailCount,
+        passRate,
+        defectPassRate,
+        measurementPassRate,
+        totalSample,
+        totalDefects,
+        totalMinor,
+        totalMajor,
+        totalCritical,
+        defectRate,
+        totalOrders: distinctOrders.size,
+        totalQAs: distinctQAs.size,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching top card summary:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// GET: Defect Trend Chart  (FIXED: UTC-consistent date handling)
+// ============================================================
+export const getDefectTrendChart = async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      reportType,
+      buyer,
+      qaFilter,
+      orderFilter,
+      defectNames, // optional: comma-separated defect name keys
+    } = req.query;
+
+    const matchStage = buildMatchStage(startDate, endDate, reportType, buyer);
+
+    if (qaFilter) {
+      matchStage.$or = [
+        { empId: { $regex: qaFilter, $options: "i" } },
+        { empName: { $regex: qaFilter, $options: "i" } },
+      ];
+    }
+    if (orderFilter) {
+      matchStage.orderNos = {
+        $elemMatch: { $regex: orderFilter, $options: "i" },
+      };
+    }
+
+    const reports = await FincheckInspectionReports.find(matchStage)
+      .select("inspectionDate inspectionConfig defectData")
+      .lean();
+
+    // ── Build date list: use UTC throughout to avoid DST/timezone mismatches ──
+    // Parse startDate / endDate as UTC midnight so getUTCDay() is correct.
+    const dateList = [];
+    if (startDate && endDate) {
+      // Force UTC midnight: "2025-02-27" → 2025-02-27T00:00:00Z
+      const cursor = new Date(startDate + "T00:00:00Z");
+      const lastDay = new Date(endDate + "T00:00:00Z");
+
+      while (cursor <= lastDay) {
+        if (cursor.getUTCDay() !== 0) {
+          // 0 = Sunday in UTC
+          // Build "YYYY-MM-DD" from UTC components (no toISOString timezone shift)
+          const y = cursor.getUTCFullYear();
+          const m = String(cursor.getUTCMonth() + 1).padStart(2, "0");
+          const d = String(cursor.getUTCDate()).padStart(2, "0");
+          dateList.push(`${y}-${m}-${d}`);
+        }
+        cursor.setUTCDate(cursor.getUTCDate() + 1); // advance in UTC
+      }
+    }
+
+    // ── Per-date accumulators ─────────────────────────────────────────────
+    const dateSample = {}; // { "YYYY-MM-DD": totalSampleSize }
+    const dateDefects = {}; // { "YYYY-MM-DD": { defectKey: count } }
+
+    for (const date of dateList) {
+      dateSample[date] = 0;
+      dateDefects[date] = {};
+    }
+
+    for (const report of reports) {
+      // Extract UTC date from the stored Date object using UTC components
+      const d = new Date(report.inspectionDate);
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(d.getUTCDate()).padStart(2, "0");
+      const dateKey = `${y}-${m}-${day}`;
+
+      // Skip if date is outside our range or falls on a Sunday (already excluded)
+      if (!Object.prototype.hasOwnProperty.call(dateSample, dateKey)) continue;
+
+      // ── Sample size: ALWAYS from inspectionConfig.sampleSize ─────────────
+      // Accumulate regardless of whether defectData exists
+      dateSample[dateKey] += report.inspectionConfig?.sampleSize || 0;
+
+      // ── Defect tallying (safe even if array is empty) ─────────────────────
+      if (!Array.isArray(report.defectData) || report.defectData.length === 0) {
+        continue; // no defects to tally, but sample already counted above
+      }
+
+      for (const defect of report.defectData) {
+        const key = defect.defectCode
+          ? `${defect.defectName} [${defect.defectCode}]`
+          : defect.defectName;
+
+        if (!dateDefects[dateKey][key]) dateDefects[dateKey][key] = 0;
+
+        if (defect.isNoLocation) {
+          dateDefects[dateKey][key] += defect.qty || 0;
+        } else if (Array.isArray(defect.locations)) {
+          for (const loc of defect.locations) {
+            if (Array.isArray(loc.positions)) {
+              dateDefects[dateKey][key] += loc.positions.length;
+            }
+          }
+        }
+      }
+    }
+
+    // ── Collect all unique defect keys ────────────────────────────────────
+    const defectKeySet = new Set();
+    for (const dateKey of dateList) {
+      Object.keys(dateDefects[dateKey]).forEach((k) => defectKeySet.add(k));
+    }
+
+    // Apply optional defect name filter
+    let defectKeys = Array.from(defectKeySet).sort();
+    if (defectNames) {
+      const allowed = defectNames.split(",").map((s) => s.trim());
+      defectKeys = defectKeys.filter((k) => allowed.includes(k));
+    }
+
+    // ── Build rows ────────────────────────────────────────────────────────
+    const rows = defectKeys.map((key) => {
+      let totalQty = 0;
+      let totalSample = 0;
+      const cells = {};
+
+      for (const date of dateList) {
+        const qty = dateDefects[date][key] || 0;
+        const sample = dateSample[date] || 0;
+        const rate = sample > 0 ? (qty / sample) * 100 : 0;
+        cells[date] = { qty, rate: parseFloat(rate.toFixed(2)) };
+        totalQty += qty;
+        totalSample += sample;
+      }
+
+      const overallRate =
+        totalSample > 0
+          ? parseFloat(((totalQty / totalSample) * 100).toFixed(2))
+          : 0;
+
+      return { defectKey: key, totalQty, overallRate, cells };
+    });
+
+    rows.sort((a, b) => b.totalQty - a.totalQty);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        dates: dateList,
+        dateSamples: dateSample,
+        rows,
+        allDefectKeys: Array.from(defectKeySet).sort(),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching defect trend:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
 // GET: Report List
 // ============================================================
 
@@ -794,23 +1125,15 @@ export const getDistinctQAs = async (req, res) => {
       ];
     }
 
-    const reports = await FincheckInspectionReports.find(query)
-      .select("empId empName")
-      .lean();
+    // Use aggregation to get distinct empId + empName pairs efficiently
+    const results = await FincheckInspectionReports.aggregate([
+      { $match: query },
+      { $group: { _id: "$empId", empName: { $first: "$empName" } } },
+      { $project: { _id: 0, empId: "$_id", empName: 1 } },
+      { $sort: { empName: 1 } },
+    ]);
 
-    // Deduplicate by empId
-    const seen = new Map();
-    for (const r of reports) {
-      if (r.empId && !seen.has(r.empId)) {
-        seen.set(r.empId, r.empName || r.empId);
-      }
-    }
-
-    const result = Array.from(seen.entries())
-      .map(([empId, empName]) => ({ empId, empName }))
-      .sort((a, b) => a.empName.localeCompare(b.empName));
-
-    return res.status(200).json({ success: true, data: result });
+    return res.status(200).json({ success: true, data: results });
   } catch (error) {
     console.error("Error fetching QAs:", error);
     return res.status(500).json({ success: false, error: error.message });
