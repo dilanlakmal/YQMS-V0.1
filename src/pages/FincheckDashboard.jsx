@@ -10,6 +10,8 @@ import {
 import QASummaryDashboard from "../components/inspection/PivotY/FincheckDashboard/QASummaryDashboard";
 import OrderNoSummaryDashboard from "../components/inspection/PivotY/FincheckDashboard/OrderNoSummaryDashboard";
 import TopDefectsChart from "../components/inspection/PivotY/FincheckDashboard/TopDefectsChart";
+import ReportResultTable from "../components/inspection/PivotY/FincheckDashboard/ReportResultTable";
+import ReportMeasurementResultDashboard from "../components/inspection/PivotY/FincheckDashboard/ReportMeasurementResultDashboard";
 import { API_BASE_URL } from "../../config";
 
 // --- Internal Component: Buyer Autocomplete ---
@@ -143,6 +145,65 @@ const OrderSearchInput = ({ value, onChange }) => {
   );
 };
 
+const QASearchInput = ({ value, onChange }) => {
+  const [suggestions, setSuggestions] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  useEffect(() => {
+    const delay = setTimeout(async () => {
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/fincheck-dashboard/qas`,
+          { params: { search: value } },
+        );
+        if (res.data.success) setSuggestions(res.data.data);
+      } catch (err) {
+        console.error("Error fetching QAs", err);
+      }
+    }, 300);
+    return () => clearTimeout(delay);
+  }, [value]);
+
+  return (
+    <div className="relative w-full sm:w-44 group">
+      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <Search className="h-3.5 w-3.5 text-gray-400" />
+      </div>
+      <input
+        type="text"
+        placeholder="Filter QA..."
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setShowDropdown(true);
+        }}
+        onFocus={() => setShowDropdown(true)}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        className="pl-9 pr-3 py-2.5 w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none placeholder:text-gray-400"
+      />
+      {showDropdown && suggestions.length > 0 && (
+        <div className="absolute z-50 mt-1 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-60 overflow-y-auto custom-scrollbar animate-fadeIn">
+          {suggestions.map((qa, idx) => (
+            <div
+              key={idx}
+              onClick={() => {
+                onChange(qa.empId);
+                setShowDropdown(false);
+              }}
+              className="px-4 py-2 text-xs cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
+            >
+              <span className="font-bold text-gray-700 dark:text-gray-200">
+                {qa.empName}
+              </span>
+              <span className="ml-2 font-mono text-gray-400">{qa.empId}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const FincheckDashboard = () => {
   const end = new Date();
   const start = new Date();
@@ -233,7 +294,9 @@ const FincheckDashboard = () => {
             </select>
           </div>
 
-          <div className="relative w-full sm:w-40">
+          <QASearchInput value={qaFilter} onChange={setQaFilter} />
+
+          {/* <div className="relative w-full sm:w-40">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-3.5 w-3.5 text-gray-400" />
             </div>
@@ -244,7 +307,7 @@ const FincheckDashboard = () => {
               onChange={(e) => setQaFilter(e.target.value)}
               className="pl-9 pr-3 py-2.5 w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none placeholder:text-gray-400"
             />
-          </div>
+          </div> */}
 
           {/* Buyer Filter Input */}
 
@@ -332,11 +395,35 @@ const FincheckDashboard = () => {
           />
         </div>
 
+        {/* 4. NEW: Report Result Table */}
+        <div className="h-[700px]">
+          <ReportResultTable
+            startDate={dateRange.startDate}
+            endDate={dateRange.endDate}
+            reportType={reportType}
+            buyer={buyerFilter}
+            qaFilter={qaFilter}
+            orderFilter={orderFilter}
+          />
+        </div>
+
         {/* Placeholder for Future Chart (e.g., Defect Trend or Buyer Share) */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 flex items-center justify-center text-gray-400 border-dashed">
+        {/* <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 flex items-center justify-center text-gray-400 border-dashed">
           <span className="text-sm font-medium">
             Trend Chart Coming Soon...
           </span>
+        </div> */}
+
+        {/* ← Measurement Result Dashboard (full-width row) */}
+        <div className="xl:col-span-2">
+          <ReportMeasurementResultDashboard
+            startDate={dateRange.startDate}
+            endDate={dateRange.endDate}
+            reportType={reportType}
+            buyer={buyerFilter}
+            qaFilter={qaFilter}
+            orderFilter={orderFilter}
+          />
         </div>
       </div>
     </div>

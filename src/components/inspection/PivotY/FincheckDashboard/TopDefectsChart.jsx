@@ -100,6 +100,7 @@ const TopDefectsChart = ({
   reportType,
   orderFilter,
   buyer,
+  qaFilter,
 }) => {
   const [fullData, setFullData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -109,12 +110,23 @@ const TopDefectsChart = ({
 
   // Fetch
   useEffect(() => {
+    if (!startDate || !endDate) return;
+    const controller = new AbortController();
     const fetchData = async () => {
       setLoading(true);
       try {
         const res = await axios.get(
           `${API_BASE_URL}/api/fincheck-dashboard/top-defects`,
-          { params: { startDate, endDate, reportType, orderFilter, buyer } },
+          {
+            params: {
+              startDate,
+              endDate,
+              reportType,
+              orderFilter,
+              buyer,
+              qaFilter,
+            },
+          },
         );
         if (res.data.success) {
           setFullData(res.data.data);
@@ -126,8 +138,9 @@ const TopDefectsChart = ({
         setLoading(false);
       }
     };
-    if (startDate && endDate) fetchData();
-  }, [startDate, endDate, reportType, orderFilter, buyer]);
+    fetchData();
+    return () => controller.abort();
+  }, [startDate, endDate, reportType, orderFilter, buyer, qaFilter]);
 
   // Summary totals
   const summary = useMemo(
