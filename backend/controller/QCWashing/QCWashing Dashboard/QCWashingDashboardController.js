@@ -114,6 +114,19 @@ const absoluteTotalCount = granularDefectTotal[0]?.totalCount || 0;
 
 const summary = summaryAgg[0] || { totalPlannedQty: 0, totalWashQty: 0, totalSampleSize: 0 };
 
+    // Calculate overall stats (avgPassRate, numberOfWashings)
+    const overallStatsAgg = await QCWashing.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: null,
+          avgPassRate: { $avg: "$passRate" },
+          numberOfWashings: { $sum: 1 }
+        }
+      }
+    ]);
+    const overallStats = overallStatsAgg[0] || { avgPassRate: 0, numberOfWashings: 0 };
+
     const remainingQty = Math.max(0, summary.totalPlannedQty - summary.totalWashQty);
 
     // 2. DETAILED DEFECT ANALYTICS
@@ -393,9 +406,11 @@ const pointFailureSummary = await QCWashing.aggregate([
         totalWashQty: summary.totalWashQty,
         remainingQty: remainingQty,
         numberOfWashings: summary.numberOfWashings,
+        numberOfWashings: overallStats.numberOfWashings,
         totalPassReports: summary.totalPassReports, 
         totalFailReports: summary.totalFailReports, 
         avgPassRate: summary.avgPassRate,
+        avgPassRate: overallStats.avgPassRate,
         totalDefects: absoluteTotalPcs, 
         totalSampleSize: summary.totalSampleSize,
         defectRatio: summary.totalSampleSize > 0 ? (absoluteTotalPcs / summary.totalSampleSize) * 100 : 0,
