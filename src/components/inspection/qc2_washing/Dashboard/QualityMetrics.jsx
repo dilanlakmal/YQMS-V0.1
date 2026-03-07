@@ -3,7 +3,7 @@ import { Ruler, AlertTriangle, TrendingUp } from "lucide-react";
 
 const SkuQualityMatrices = ({ dbData }) => {
   return (
-    <div className="max-w-[1600px] mx-auto mt-8 grid grid-cols-1 xl:grid-cols-2 gap-8 pb-12">
+    <div className="max-w-8xl mx-auto mt-8 grid grid-cols-1 xl:grid-cols-2 gap-8 pb-12">
       {/* Table: Style & Color Measurement Matrix */}
       <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-gray-800">
         <div className="flex items-center justify-between mb-6">

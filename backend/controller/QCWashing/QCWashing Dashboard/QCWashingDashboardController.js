@@ -30,8 +30,84 @@ export const getWashingDashboardData = async (req, res) => {
     if (factoryName) query.factoryName = factoryName;
 
     // HELPER: Reusable stage to resolve the correct Wash Qty based on priority
-    const resolveWashQtyStage = {
+    // const resolveWashQtyStage = {
+    //   $addFields: {
+    //     resolvedWashQty: {
+    //       $ifNull: [
+    //         "$actualWashQty",
+    //         { $ifNull: ["$editedActualWashQty", "$washQty"] }
+    //       ]
+    //     }
+    //   }
+    // };
+
+    const granularDefectTotal = await QCWashing.aggregate([
+      { $match: query },
+      { $unwind: "$defectDetails.defectsByPc" },
+      { $unwind: "$defectDetails.defectsByPc.pcDefects" },
+      {
+        $group: {
+          _id: null,
+          totalPcs: {
+            $sum: {
+              $cond: {
+                if: {
+                  $eq: ["$defectDetails.defectsByPc.pcDefects.isMulti", true],
+                },
+                then: {
+                  $ifNull: ["$defectDetails.defectsByPc.pcDefects.pcCount", 0],
+                },
+                else: 1,
+              },
+            },
+          },
+          totalCount: {
+            $sum: {
+              $cond: {
+                if: {
+                  $eq: ["$defectDetails.defectsByPc.pcDefects.isMulti", true],
+                },
+                then: {
+                  $ifNull: ["$defectDetails.defectsByPc.pcDefects.pcCount", 0],
+                },
+                else: {
+                  $ifNull: [
+                    "$defectDetails.defectsByPc.pcDefects.defectQty",
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    const absoluteTotalPcs = granularDefectTotal[0]?.totalPcs || 0;
+    const absoluteTotalCount = granularDefectTotal[0]?.totalCount || 0;
+
+    const resolveMetricsStage = {
       $addFields: {
+        // Priority 1: Sum actualAQLValue.sampleSize if array exists and not empty
+        // Priority 2: Use checkedQty if above is missing
+        reportSampleSize: {
+          $cond: {
+            if: {
+              $and: [
+                { $isArray: "$actualAQLValue" },
+                { $gt: [{ $size: "$actualAQLValue" }, 0] },
+              ],
+            },
+            then: { $sum: "$actualAQLValue.sampleSize" },
+            else: { $ifNull: ["$checkedQty", 0] },
+          },
+        },
+        // Fix: Ensure rejectedDefectPcs is explicitly treated as a number to avoid sum errors
+        resolvedRejectedPcs: {
+          $add: [{ $ifNull: ["$rejectedDefectPcs", 0] }, 0],
+        },
+
+        // Resolved Wash Qty
         resolvedWashQty: {
           $ifNull: [
             "$actualWashQty",
@@ -44,21 +120,13 @@ export const getWashingDashboardData = async (req, res) => {
     // 1. ADVANCED SUMMARY: Unique Order Tracking
     const summaryAgg = await QCWashing.aggregate([
       { $match: query },
-      resolveWashQtyStage, // Use resolved qty
+      resolveMetricsStage,
       {
         $group: {
           _id: { order: "$orderNo", color: "$color" },
           skuTotalWashed: { $sum: "$resolvedWashQty" },
           skuPlanned: { $first: "$orderQty" },
-          skuBatches: { $sum: 1 },
-          skuPassReports: {
-            $sum: { $cond: [{ $eq: ["$overallFinalResult", "Pass"] }, 1, 0] },
-          },
-          skuFailReports: {
-            $sum: { $cond: [{ $eq: ["$overallFinalResult", "Fail"] }, 1, 0] },
-          },
-          skuPassRateSum: { $sum: "$passRate" },
-          skuDefectSum: { $sum: "$totalDefectCount" },
+          skuSampleSize: { $sum: "$reportSampleSize" },
         },
       },
       {
@@ -66,13 +134,7 @@ export const getWashingDashboardData = async (req, res) => {
           _id: null,
           totalPlannedQty: { $sum: "$skuPlanned" },
           totalWashQty: { $sum: "$skuTotalWashed" },
-          numberOfWashings: { $sum: "$skuBatches" },
-          totalPassReports: { $sum: "$skuPassReports" },
-          totalFailReports: { $sum: "$skuFailReports" },
-          totalDefects: { $sum: "$skuDefectSum" },
-          avgPassRate: {
-            $avg: { $divide: ["$skuPassRateSum", "$skuBatches"] },
-          },
+          totalSampleSize: { $sum: "$skuSampleSize" },
         },
       },
     ]);
@@ -80,11 +142,7 @@ export const getWashingDashboardData = async (req, res) => {
     const summary = summaryAgg[0] || {
       totalPlannedQty: 0,
       totalWashQty: 0,
-      numberOfWashings: 0,
-      totalPassReports: 0,
-      totalFailReports: 0,
-      avgPassRate: 0,
-      totalDefects: 0,
+      totalSampleSize: 0,
     };
 
     const remainingQty = Math.max(
@@ -142,7 +200,8 @@ export const getWashingDashboardData = async (req, res) => {
 
     const trendData = await QCWashing.aggregate([
       { $match: query },
-      resolveWashQtyStage, // Use resolved qty here
+      // resolveWashQtyStage, // Use resolved qty here
+      resolveMetricsStage,
       {
         $group: {
           _id: { $dateToString: { format: groupFormat, date: "$date" } },
@@ -252,7 +311,8 @@ export const getWashingDashboardData = async (req, res) => {
     // 9. Style & Color Defects (Fixed to use resolvedWashQty)
     const styleColorDefects = await QCWashing.aggregate([
       { $match: query },
-      resolveWashQtyStage,
+      // resolveWashQtyStage,
+      resolveMetricsStage,
       {
         $group: {
           _id: { orderNo: "$orderNo", color: "$color" },
@@ -370,25 +430,40 @@ export const getWashingDashboardData = async (req, res) => {
           _id: {
             factory: { $ifNull: ["$factoryName", "Unknown"] },
             defect: "$defectDetails.defectsByPc.pcDefects.defectName",
-            // Group by report ID and pcNumber to identify a UNIQUE piece
-            reportId: "$_id",
-            pcNum: "$defectDetails.defectsByPc.pcNumber",
           },
-          // Sum the quantities of this defect found on this specific piece
-          qtyOnThisPiece: {
-            $sum: "$defectDetails.defectsByPc.pcDefects.defectQty",
+          // Calculate Defect Qty based on isMulti flag
+          totalQty: {
+            $sum: {
+              $cond: {
+                if: {
+                  $eq: ["$defectDetails.defectsByPc.pcDefects.isMulti", true],
+                },
+                then: {
+                  $ifNull: ["$defectDetails.defectsByPc.pcDefects.pcCount", 0],
+                },
+                else: {
+                  $ifNull: [
+                    "$defectDetails.defectsByPc.pcDefects.defectQty",
+                    0,
+                  ],
+                },
+              },
+            },
           },
-        },
-      },
-      {
-        $group: {
-          _id: {
-            factory: "$_id.factory",
-            defect: "$_id.defect",
+          // Calculate Affected Pieces based on isMulti flag
+          totalPcs: {
+            $sum: {
+              $cond: {
+                if: {
+                  $eq: ["$defectDetails.defectsByPc.pcDefects.isMulti", true],
+                },
+                then: {
+                  $ifNull: ["$defectDetails.defectsByPc.pcDefects.pcCount", 0],
+                },
+                else: 1, // For single PC entries, each row represents 1 piece
+              },
+            },
           },
-          totalQty: { $sum: "$qtyOnThisPiece" },
-          // Count how many unique piece entries were in the previous group
-          totalPcs: { $sum: 1 },
         },
       },
       { $sort: { totalQty: -1 } },
@@ -458,7 +533,16 @@ export const getWashingDashboardData = async (req, res) => {
         totalPassReports: summary.totalPassReports,
         totalFailReports: summary.totalFailReports,
         avgPassRate: summary.avgPassRate,
-        totalDefects: summary.totalDefects,
+        totalDefects: absoluteTotalPcs,
+        totalSampleSize: summary.totalSampleSize,
+        defectRatio:
+          summary.totalSampleSize > 0
+            ? (absoluteTotalPcs / summary.totalSampleSize) * 100
+            : 0,
+        defectRate:
+          summary.totalSampleSize > 0
+            ? (absoluteTotalCount / summary.totalSampleSize) * 100
+            : 0,
       },
       defectSummary,
       measurementSummary,
