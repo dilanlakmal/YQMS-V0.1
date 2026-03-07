@@ -145,6 +145,22 @@ export const getWashingDashboardData = async (req, res) => {
       totalSampleSize: 0,
     };
 
+    // Calculate overall stats (avgPassRate, numberOfWashings)
+    const overallStatsAgg = await QCWashing.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: null,
+          avgPassRate: { $avg: "$passRate" },
+          numberOfWashings: { $sum: 1 },
+        },
+      },
+    ]);
+    const overallStats = overallStatsAgg[0] || {
+      avgPassRate: 0,
+      numberOfWashings: 0,
+    };
+
     const remainingQty = Math.max(
       0,
       summary.totalPlannedQty - summary.totalWashQty,
@@ -530,9 +546,11 @@ export const getWashingDashboardData = async (req, res) => {
         totalWashQty: summary.totalWashQty,
         remainingQty: remainingQty,
         numberOfWashings: summary.numberOfWashings,
+        numberOfWashings: overallStats.numberOfWashings,
         totalPassReports: summary.totalPassReports,
         totalFailReports: summary.totalFailReports,
         avgPassRate: summary.avgPassRate,
+        avgPassRate: overallStats.avgPassRate,
         totalDefects: absoluteTotalPcs,
         totalSampleSize: summary.totalSampleSize,
         defectRatio:
